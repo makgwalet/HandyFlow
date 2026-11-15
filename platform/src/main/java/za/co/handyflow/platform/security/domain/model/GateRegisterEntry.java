@@ -178,12 +178,23 @@ public class GateRegisterEntry {
 
     // ── Mutations ──────────────────────────────────────────────────────────────
 
+    /** An arrival the guard's phone recorded earlier, while offline. Only ever moves the arrival back in time. */
+    public void recordedOnPhoneAt(Instant at) {
+        if (at != null && at.isBefore(this.loggedInAt)) this.loggedInAt = at;
+    }
+
     public void logExit(UUID loggedOutByGuardId) {
+        logExit(loggedOutByGuardId, null);
+    }
+
+    /** A departure the phone recorded earlier. Never earlier than the arrival it closes. */
+    public void logExit(UUID loggedOutByGuardId, Instant at) {
         if (!"ON_SITE".equals(status) && !"OVERSTAYED".equals(status)) {
             throw new IllegalStateException("Only an ON_SITE or OVERSTAYED entry can be logged as departed");
         }
         this.loggedOutByGuardId = loggedOutByGuardId;
-        this.loggedOutAt        = Instant.now();
+        Instant when = at == null ? Instant.now() : at;
+        this.loggedOutAt        = when.isBefore(loggedInAt) ? loggedInAt : when;
         this.status             = "DEPARTED";
         this.updatedAt          = Instant.now();
     }

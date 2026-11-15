@@ -1,5 +1,6 @@
 package za.co.handyflow.platform.security.application.internal;
 
+import za.co.handyflow.platform.security.application.internal.GuardPushService;
 import org.junit.jupiter.api.Test;
 import za.co.handyflow.platform.security.domain.model.Checkpoint;
 import za.co.handyflow.platform.security.domain.model.PatrolRound;
@@ -231,5 +232,44 @@ class PatrolRoundServiceTest {
 
         assertThat(made).hasSize(2);
         assertThat(made).allSatisfy(r -> assertThat(r.getScansExpected()).isEqualTo(2));
+    }
+
+    @Test
+    void missedRoundsAlertTheGuardOnceAndTheSupervisorsOnDutyOncePerShift() {
+        SiteRepository sites = mock(SiteRepository.class);
+        PatrolRoundService svc = new PatrolRoundService(routes, rounds, logs, sites, checkpointRepo);
+        GuardPushService push = mock(GuardPushService.class);
+        za.co.handyflow.platform.security.domain.repository.ShiftRepository shifts = mock(za.co.handyflow.platform.security.domain.repository.ShiftRepository.class);
+        org.springframework.test.util.ReflectionTestUtils.setField(svc, "push", push);
+        org.springframework.test.util.ReflectionTestUtils.setField(svc, "shiftRepository", shifts);
+
+        UUID guardId = UUID.randomUUID();
+        Shift sh = mock(Shift.class);
+        when(sh.getGuardId()).thenReturn(guardId);
+        when(shifts.findById(shift)).thenReturn(Optional.of(sh));
+        Site s = mock(Site.class);
+        when(s.getName()).thenReturn("North Gate");
+        when(sites.findActiveById(any(), any())).thenReturn(Optional.of(s));
+        UUID tenantUuid = UUID.randomUUID();
+        when(sites.findDistinctActiveTenantIds()).thenReturn(List.of(tenantUuid));
+        when(rounds.findOverdueExpected(any())).thenReturn(List.of(round(null, 1, 2), round(null, 2, 2)));
+
+        svc.detectMissedRounds();
+
+        verify(push, org.mockito.Mockito.times(1)).notifyGuard(any(), org.mockito.ArgumentMatchers.eq(guardId),
+                org.mockito.ArgumentMatchers.eq("Patrol round missed"), org.mockito.ArgumentMatchers.contains("2 patrol rounds"), any());
+        verify(push, org.mockito.Mockito.times(1)).notifyOnDutyAt(any(), org.mockito.ArgumentMatchers.eq(site), org.mockito.ArgumentMatchers.eq(true),
+                org.mockito.ArgumentMatchers.eq(guardId), any(), org.mockito.ArgumentMatchers.contains("North Gate"), any());
+    }
+
+    @Test
+    void missingPushNeverStopsMissedRoundDetection() {
+        SiteRepository sites = mock(SiteRepository.class);
+        PatrolRoundService svc = new PatrolRoundService(routes, rounds, logs, sites, checkpointRepo);
+        when(sites.findDistinctActiveTenantIds()).thenReturn(List.of(UUID.randomUUID()));
+        PatrolRound r = round(null, 1, 2);
+        when(rounds.findOverdueExpected(any())).thenReturn(List.of(r));
+        svc.detectMissedRounds();
+        verify(rounds).save(r);
     }
 }

@@ -116,7 +116,37 @@ public class GuardGateAccessController {
         UUID guardId = TenantContext.getCurrentUserId();
         UUID siteId = deviceSessionService.resolveCurrentSiteForGuard(guardId);
         return ResponseEntity.ok(ApiResponse.success("Exit logged",
-                gateAccessService.logExitByGuard(TenantContext.getTenantIdAsObject(), guardId, siteId, entryId)));
+                offlineWrites.gateExit(TenantContext.getTenantIdAsObject(), guardId, siteId, entryId, request)));
+    }
+
+    @PostMapping("/entries/by-ref/{entryRef}/exit")
+    @PreAuthorize("hasAuthority('SECURITY_GUARD')")
+    @Operation(
+            summary = "Log a departure for an arrival the phone saved offline, named by the arrival's clientRef",
+            description = "Answers 409 ENTRY_NOT_SENT_YET until that arrival has reached the server; the phone retries. " +
+                    "Only arrivals this guard logged can be named this way.")
+    public ResponseEntity<ApiResponse<GateRegisterEntryResponse>> logExitByRef(
+            @PathVariable UUID entryRef, @Valid @RequestBody LogExitRequest request) {
+        UUID guardId = TenantContext.getCurrentUserId();
+        UUID siteId = deviceSessionService.resolveCurrentSiteForGuard(guardId);
+        return ResponseEntity.ok(ApiResponse.success("Exit logged",
+                offlineWrites.gateExitByRef(TenantContext.getTenantIdAsObject(), guardId, siteId, entryRef, request)));
+    }
+
+    @PostMapping(value = "/entries/by-ref/{entryRef}/attachments", consumes = "multipart/form-data")
+    @PreAuthorize("hasAuthority('SECURITY_GUARD')")
+    @Operation(
+            summary = "Attach a photo to an arrival the phone saved offline, named by the arrival's clientRef",
+            description = "photoRef (made once on the phone) makes a retried upload a no-op. Answers 409 ENTRY_NOT_SENT_YET until the arrival has reached the server.")
+    public ResponseEntity<ApiResponse<za.co.handyflow.platform.evidence.dto.EvidenceResponse>> attachEvidenceByRef(
+            @PathVariable UUID entryRef,
+            @RequestParam("file") org.springframework.web.multipart.MultipartFile file,
+            @RequestParam("docType") String docType,
+            @RequestParam(value = "photoRef", required = false) UUID photoRef) {
+        UUID guardId = TenantContext.getCurrentUserId();
+        UUID siteId = deviceSessionService.resolveCurrentSiteForGuard(guardId);
+        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success("Attachment uploaded",
+                offlineWrites.gateEvidenceByRef(TenantContext.getTenantIdAsObject(), guardId, siteId, entryRef, photoRef, file, docType)));
     }
 
     // ── Evidence attachment ───────────────────────────────────────────────────
@@ -133,11 +163,12 @@ public class GuardGateAccessController {
             @PathVariable UUID entryId,
             @RequestParam("file") org.springframework.web.multipart.MultipartFile file,
             @RequestParam("docType") String docType,
-            @RequestParam(value = "deviceHardwareId", required = false) String deviceHardwareId) {
+            @RequestParam(value = "deviceHardwareId", required = false) String deviceHardwareId,
+            @RequestParam(value = "photoRef", required = false) UUID photoRef) {
         UUID guardId = TenantContext.getCurrentUserId();
         UUID siteId = deviceSessionService.resolveCurrentSiteForGuard(guardId);
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success("Attachment uploaded",
-                gateAccessService.attachEvidenceByGuard(TenantContext.getTenantIdAsObject(), guardId, siteId, entryId,
+                offlineWrites.gateEvidence(TenantContext.getTenantIdAsObject(), guardId, siteId, entryId, photoRef,
                         file, docType)));
     }
 }

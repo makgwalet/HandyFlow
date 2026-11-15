@@ -84,6 +84,7 @@ public class GateAccessService {
                 req.hostName(), req.hostContact(), req.purpose(),
                 req.vehicleRegistration(), req.vehicleMakeModel(), req.driverName(),
                 req.idScanConfidence(), guardId);
+        entry.recordedOnPhoneAt(OfflineTimestamp.accept(req.recordedAt(), Instant.now()));
         entryRepository.save(entry);
 
         log.info("[Security] Gate entry logged id={} accessPoint={} type={} guard={}",
@@ -110,11 +111,18 @@ public class GateAccessService {
     /** Guard route departure: the entry must be at the guard's own site and still on site. */
     @Transactional
     public GateRegisterEntryResponse logExitByGuard(TenantId tenantId, UUID guardId, UUID siteId, UUID entryId) {
+        return logExitByGuard(tenantId, guardId, siteId, entryId, null);
+    }
+
+    /** As above, for a departure the phone saved while offline: {@code recordedAt} is when the guard recorded it. */
+    @Transactional
+    public GateRegisterEntryResponse logExitByGuard(TenantId tenantId, UUID guardId, UUID siteId, UUID entryId, Instant recordedAt) {
+        Instant when = OfflineTimestamp.accept(recordedAt, Instant.now());
         GateRegisterEntry entry = entryAtSite(tenantId, siteId, entryId);
         if (!"ON_SITE".equals(entry.getStatus()) && !"OVERSTAYED".equals(entry.getStatus())) {
             throw new HandyFlowException("This visitor is already logged as departed.", HttpStatus.CONFLICT, "ALREADY_DEPARTED");
         }
-        entry.logExit(guardId);
+        entry.logExit(guardId, when);
         entryRepository.save(entry);
         log.info("[Security] Gate entry departed id={} guard={}", entryId, guardId);
         return toResponse(entry, accessPointRepository.findById(entry.getAccessPointId()).orElse(null));

@@ -35,7 +35,9 @@ Push alerts: the app registers the phone's token after sign-in, removes it on si
 Swap colleague picker: a swap is now always sent to a named colleague (the server cannot approve a request that names nobody). The list is guards rostered at a site you are rostered at within 30 days, names only.
 Offline post orders: the last orders you loaded are kept on the phone (one file per guard, removed at sign-out). With no signal you can read that copy (it says when it was saved) and acknowledge it; the acknowledgement names the version you read and the time, is saved in the queue, and is refused by the server (shown as failed, not retried) if a newer version was published meanwhile.
 
-Not done: offline gate log, real icon and splash, translations, privacy policy.
+Offline gate log: arrivals, departures and photos work with no signal. They are saved with the time you logged them and sent when signal returns, arrivals first. The gate list and who was on site are saved on the phone (one file per guard, removed at sign-out) and labelled with when they were saved. A queued arrival keeps the visitor's ID number on the phone until it is sent.
+
+Not done: real icon and splash, translations, privacy policy, encrypting the offline queue.
 Never run on a phone or emulator: checked only by type check, unit tests and an Android bundle build.
 
 ## Rules for this app

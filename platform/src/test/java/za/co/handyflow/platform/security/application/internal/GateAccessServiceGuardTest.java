@@ -37,7 +37,7 @@ class GateAccessServiceGuardTest {
 
     private LogArrivalRequest arrivalAt(UUID accessPointId) {
         return new LogArrivalRequest(accessPointId, "someone-elses-device", "VISITOR", "Thabo", null, null, null, null, null, null,
-                null, null, null, null, null);
+                null, null, null, null, null, null);
     }
 
     @Test
@@ -86,5 +86,13 @@ class GateAccessServiceGuardTest {
         assertThatThrownBy(() -> service.attachEvidenceByGuard(TENANT, guard, mySite, entryId,
                 new org.springframework.mock.web.MockMultipartFile("file", "p.jpg", "image/jpeg", new byte[]{1}), "GENERAL_PHOTO"))
                 .isInstanceOf(ResourceNotFoundException.class);
+    }
+
+    @Test
+    void aDepartureRecordedMoreThan48HoursAgoIsRefused() {
+        UUID entryId = UUID.randomUUID();
+        assertThatThrownBy(() -> service.logExitByGuard(TENANT, guard, mySite, entryId, java.time.Instant.now().minus(java.time.Duration.ofHours(49))))
+                .isInstanceOf(HandyFlowException.class).hasMessageContaining("48 hours");
+        verify(entries, never()).save(any());
     }
 }

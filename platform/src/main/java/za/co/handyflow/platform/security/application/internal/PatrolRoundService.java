@@ -57,6 +57,12 @@ public class PatrolRoundService {
     private final PatrolRoundRepository    roundRepository;
     private final CheckpointLogRepository  logRepository;
     private final SiteRepository           siteRepository;
+
+    /** Optional so the service still builds without push (tests, installs with push off). Never throws. */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private GuardPushService push;
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private ShiftRepository shiftRepository;
     private final CheckpointRepository     checkpointRepository;
 
     // ── Round Generation ───────────────────────────────────────────────────────
@@ -235,6 +241,7 @@ public class PatrolRoundService {
                 log.warn("[Security] MISSED round shiftId={} round={} expectedStart={}",
                         round.getShiftId(), round.getRoundNumber(), round.getExpectedStartAt());
             }
+            alertMissed(TenantId.of(tenantId), overdue);
         }
 
         if (totalMissed > 0) {
@@ -253,6 +260,33 @@ public class PatrolRoundService {
         if (totalPartial > 0) {
             log.info("[Security] Marked {} rounds as PARTIAL", totalPartial);
         }
+    }
+
+    /**
+     * One message per shift per run, however many rounds were just marked missed: the guard on that shift, and the site
+     * supervisors on duty there. Plain wording, no blame; the supervisor overview has the detail.
+     */
+    private void alertMissed(TenantId tenantId, List<PatrolRound> missed) {
+        if (push == null || missed.isEmpty()) return;
+        java.util.Map<UUID, List<PatrolRound>> byShift = new java.util.LinkedHashMap<>();
+        missed.forEach(r -> byShift.computeIfAbsent(r.getShiftId(), k -> new java.util.ArrayList<>()).add(r));
+        byShift.forEach((shiftId, rounds) -> {
+            try {
+                UUID siteId = rounds.get(0).getSiteId();
+                String what = rounds.size() == 1 ? "A patrol round was" : rounds.size() + " patrol rounds were";
+                UUID guardId = shiftRepository == null || shiftId == null ? null
+                        : shiftRepository.findById(shiftId).map(Shift::getGuardId).orElse(null);
+                if (guardId != null) {
+                    push.notifyGuard(tenantId, guardId, "Patrol round missed",
+                            what + " missed. Start the next round when you can.", java.util.Map.of("screen", "Patrol"));
+                }
+                String site = siteRepository.findActiveById(tenantId, siteId).map(Site::getName).orElse("your site");
+                push.notifyOnDutyAt(tenantId, siteId, true, guardId, "Patrol round missed",
+                        what + " missed at " + site + ".", java.util.Map.of("screen", "Supervisor"));
+            } catch (Exception e) {
+                log.warn("[Security] Could not alert for missed rounds shift={}: {}", shiftId, e.toString());
+            }
+        });
     }
 
     // ── Query ──────────────────────────────────────────────────────────────────

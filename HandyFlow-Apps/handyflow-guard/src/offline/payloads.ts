@@ -111,3 +111,53 @@ export function duressItem(input: { position: Position | null }, ctx: Context): 
 export function acknowledgeItem(input: { orderId: string; version: number; deviceHardwareId: string }, ctx: Context): OutboxItem {
   return make("ACK", { orderId: input.orderId, version: input.version, deviceHardwareId: input.deviceHardwareId }, ctx);
 }
+
+export interface GateArrivalInput {
+  deviceHardwareId: string;
+  accessPointId: string;
+  entryType: string;
+  personName: string;
+  idNumber: string;
+  company: string;
+  hostName: string;
+  purpose: string;
+  vehicleRegistration: string;
+}
+
+const clean = (v: string) => v.trim() || null;
+
+/**
+ * A visitor logged while there was no signal. The item's id is the arrival's clientRef, so it can be named by a
+ * departure or a photo saved before the arrival has reached the server, and a retry logs the visitor once.
+ * `newId` should return the form's own clientRef so a retry after a lost reply is recognised.
+ */
+export function gateArrivalItem(input: GateArrivalInput, ctx: Context): OutboxItem {
+  return make(
+    "GATE_ARRIVAL",
+    {
+      deviceHardwareId: input.deviceHardwareId,
+      accessPointId: input.accessPointId,
+      entryType: input.entryType,
+      personName: input.personName.trim(),
+      idNumber: clean(input.idNumber),
+      company: clean(input.company),
+      hostName: clean(input.hostName),
+      purpose: clean(input.purpose),
+      vehicleRegistration: clean(input.vehicleRegistration)?.toUpperCase() ?? null,
+      idScanConfidence: clean(input.idNumber) ? "MANUAL_ENTRY" : null,
+    },
+    ctx,
+  );
+}
+
+/** Which gate entry something refers to: the server's id, or the clientRef of an arrival still waiting to be sent. */
+export type EntryRef = { entryId: string; entryRef?: undefined } | { entryRef: string; entryId?: undefined };
+
+export function gateExitItem(input: EntryRef & { deviceHardwareId: string }, ctx: Context): OutboxItem {
+  return make("GATE_EXIT", { entryId: input.entryId ?? null, entryRef: input.entryRef ?? null, deviceHardwareId: input.deviceHardwareId }, ctx);
+}
+
+/** A gate photo kept on the phone. The item's id is the photo's id, so a retried upload is attached once. */
+export function gatePhotoItem(input: EntryRef & { docType: string; localUri: string }, ctx: Context): OutboxItem {
+  return make("GATE_PHOTO", { entryId: input.entryId ?? null, entryRef: input.entryRef ?? null, docType: input.docType, localUri: input.localUri }, ctx);
+}

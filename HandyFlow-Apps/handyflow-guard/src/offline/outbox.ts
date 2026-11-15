@@ -1,6 +1,6 @@
 import { ApiError } from "@/api/client";
 
-export type OutboxKind = "SCAN" | "INCIDENT" | "DURESS" | "ACK" | "EVIDENCE";
+export type OutboxKind = "SCAN" | "INCIDENT" | "DURESS" | "ACK" | "GATE_ARRIVAL" | "GATE_EXIT" | "GATE_PHOTO" | "EVIDENCE";
 export type OutboxStatus = "PENDING" | "FAILED";
 
 /** One write waiting to reach the server. `id` is also the clientRef, so a retry can never double-create. */
@@ -39,7 +39,11 @@ export interface FlushResult {
 }
 
 /** Panic goes out before anything else, photos go last (they need their incident on the server first); the rest keep the order they were made in. */
-const PRIORITY: Record<OutboxKind, number> = { DURESS: 0, INCIDENT: 1, SCAN: 2, ACK: 3, EVIDENCE: 4 };
+const PRIORITY: Record<OutboxKind, number> = {
+  DURESS: 0, INCIDENT: 1, SCAN: 2, ACK: 3,
+  // An arrival must reach the server before the departure or photos that name it.
+  GATE_ARRIVAL: 4, GATE_EXIT: 5, GATE_PHOTO: 6, EVIDENCE: 7,
+};
 
 export function sortForSending(items: OutboxItem[]): OutboxItem[] {
   return [...items].sort(
@@ -54,6 +58,12 @@ export function sortForSending(items: OutboxItem[]): OutboxItem[] {
 function isRetryable(e: ApiError, kind: OutboxKind): boolean {
   if (kind === "ACK" && e.status === 409) return false;
   return e.status === 409 || e.status === 429 || e.status === 408 || e.status >= 500;
+}
+
+/** The server's words when a departure is repeated or someone else already closed the visit: the visitor is out, so the job is done. */
+const ALREADY_DEPARTED = "already logged as departed";
+function isAlreadyDone(item: OutboxItem, e: ApiError): boolean {
+  return item.kind === "GATE_EXIT" && e.status === 409 && e.message.toLowerCase().includes(ALREADY_DEPARTED);
 }
 
 let inFlight: Promise<FlushResult> | null = null;
@@ -83,6 +93,11 @@ async function run(store: OutboxStore, send: Sender, guardId: string): Promise<F
       if (e.isNetwork || e.isUnauthorized) {
         result.stopped = true;
         return result;
+      }
+      if (isAlreadyDone(item, e)) {
+        await store.remove(item.id);
+        result.sent += 1;
+        continue;
       }
       const attempts = item.attempts + 1;
       if (isRetryable(e, item.kind) && attempts < MAX_ATTEMPTS) {

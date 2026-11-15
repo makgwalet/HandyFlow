@@ -165,7 +165,7 @@ class GuardOfflineWriteServiceTest {
 
     private LogArrivalRequest arrival(UUID clientRef) {
         return new LogArrivalRequest(UUID.randomUUID(), "dev", "VISITOR", "Thabo", null, null, null, null, null, null,
-                null, null, null, null, clientRef);
+                null, null, null, null, clientRef, null);
     }
 
     @Test
@@ -192,5 +192,48 @@ class GuardOfflineWriteServiceTest {
 
         assertThat(service.gateArrival(TENANT, guard, siteId, req)).isSameAs(made);
         verify(ledger).record(TENANT, guard, Kind.GATE_ENTRY, ref, entryId);
+    }
+
+    private static final za.co.handyflow.platform.security.dto.LogExitRequest EXIT =
+            new za.co.handyflow.platform.security.dto.LogExitRequest("dev", Instant.parse("2026-11-12T10:00:00Z"));
+
+    @Test
+    void aDepartureForAnArrivalThatHasNotReachedTheServerIsToldToRetry() {
+        when(ledger.find(TENANT, Kind.GATE_ENTRY, ref, guard)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.gateExitByRef(TENANT, guard, UUID.randomUUID(), ref, EXIT))
+                .isInstanceOf(HandyFlowException.class).hasMessageContaining("not reached the server");
+        verify(gates, never()).logExitByGuard(any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void aDepartureByRefClosesTheEntryTheArrivalMadeWithThePhonesTime() {
+        UUID siteId = UUID.randomUUID();
+        UUID entryId = UUID.randomUUID();
+        when(ledger.find(TENANT, Kind.GATE_ENTRY, ref, guard)).thenReturn(Optional.of(entryId));
+
+        service.gateExitByRef(TENANT, guard, siteId, ref, EXIT);
+
+        verify(gates).logExitByGuard(TENANT, guard, siteId, entryId, EXIT.recordedAt());
+    }
+
+    @Test
+    void aRetriedGatePhotoIsNotAttachedTwice() {
+        UUID entryId = UUID.randomUUID();
+        UUID photoRef = UUID.randomUUID();
+        UUID evidenceId = UUID.randomUUID();
+        EvidenceResponse first = evidence(evidenceId);
+        when(ledger.find(TENANT, Kind.EVIDENCE, photoRef, guard)).thenReturn(Optional.of(evidenceId));
+        when(evidenceFacade.listFor(TENANT, "security", "GateRegisterEntry", entryId)).thenReturn(java.util.List.of(first));
+
+        assertThat(service.gateEvidence(TENANT, guard, UUID.randomUUID(), entryId, photoRef, photo, "ID_DOCUMENT")).isSameAs(first);
+        verify(gates, never()).attachEvidenceByGuard(any(), any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void aGatePhotoForAnArrivalNotYetSentIsToldToRetry() {
+        when(ledger.find(TENANT, Kind.GATE_ENTRY, ref, guard)).thenReturn(Optional.empty());
+        assertThatThrownBy(() -> service.gateEvidenceByRef(TENANT, guard, UUID.randomUUID(), ref, UUID.randomUUID(), photo, "ID_DOCUMENT"))
+                .isInstanceOf(HandyFlowException.class).hasMessageContaining("not reached the server");
     }
 }

@@ -1,6 +1,6 @@
 import { ApiError } from "@/api/client";
 import { flush, MAX_ATTEMPTS, sortForSending, type OutboxItem, type OutboxStore } from "@/offline/outbox";
-import { acknowledgeItem, duressItem, evidenceItem, incidentItem, scanItem, type Context } from "@/offline/payloads";
+import { acknowledgeItem, gateArrivalItem, gateExitItem, gatePhotoItem, duressItem, evidenceItem, incidentItem, scanItem, type Context } from "@/offline/payloads";
 
 function memoryStore(): OutboxStore & { all: Map<string, OutboxItem> } {
   const all = new Map<string, OutboxItem>();
@@ -197,5 +197,70 @@ describe("offline post-order acknowledgement", () => {
     const result = await flush(store, jest.fn().mockRejectedValue(new ApiError("offline", 0)), "g1");
     expect(result.stopped).toBe(true);
     expect(store.all.get(item.id)?.status).toBe("PENDING");
+  });
+});
+
+describe("offline gate log", () => {
+  const arrival = () =>
+    gateArrivalItem(
+      { deviceHardwareId: "dev", accessPointId: "ap1", entryType: "VISITOR", personName: "  Thabo ", idNumber: "", company: " ACME ", hostName: "", purpose: "", vehicleRegistration: "ca 123 gp" },
+      { ...ctx(), newId: () => "form-ref" },
+    );
+
+  it("an arrival keeps the form's own reference, the time it was logged, and tidy fields", () => {
+    const item = arrival();
+    expect(item.id).toBe("form-ref");
+    expect(item.payload).toMatchObject({
+      clientRef: "form-ref", recordedAt: "2026-11-12T10:00:00.000Z", personName: "Thabo", company: "ACME",
+      idNumber: null, idScanConfidence: null, vehicleRegistration: "CA 123 GP",
+    });
+    expect(item.payload).not.toHaveProperty("guardId");
+  });
+
+  it("an ID number is recorded as typed in by hand", () => {
+    const item = gateArrivalItem(
+      { deviceHardwareId: "d", accessPointId: "a", entryType: "VISITOR", personName: "Thabo", idNumber: "8001015009087", company: "", hostName: "", purpose: "", vehicleRegistration: "" },
+      ctx(),
+    );
+    expect(item.payload.idScanConfidence).toBe("MANUAL_ENTRY");
+  });
+
+  it("a departure or photo can name an arrival that has not been sent yet", () => {
+    const exit = gateExitItem({ entryRef: "form-ref", deviceHardwareId: "dev" }, ctx());
+    const photo = gatePhotoItem({ entryRef: "form-ref", docType: "ID_DOCUMENT", localUri: "file:///p.jpg" }, ctx());
+    expect(exit.payload).toMatchObject({ entryRef: "form-ref", entryId: null });
+    expect(photo.payload).toMatchObject({ entryRef: "form-ref", entryId: null, docType: "ID_DOCUMENT" });
+  });
+
+  it("sends the arrival before the departure and the photos that name it", () => {
+    const exit = gateExitItem({ entryRef: "form-ref", deviceHardwareId: "dev" }, ctx());
+    const photo = gatePhotoItem({ entryRef: "form-ref", docType: "GENERAL_PHOTO", localUri: "file:///p.jpg" }, ctx());
+    expect(sortForSending([photo, exit, arrival()]).map((i) => i.kind)).toEqual(["GATE_ARRIVAL", "GATE_EXIT", "GATE_PHOTO"]);
+  });
+
+  it("treats a departure the server says is already logged as done, not failed", async () => {
+    const store = memoryStore();
+    const exit = gateExitItem({ entryId: "e1", deviceHardwareId: "dev" }, ctx());
+    await store.add(exit);
+    const send = jest.fn().mockRejectedValue(new ApiError("This visitor is already logged as departed.", 409));
+    const result = await flush(store, send, "g1");
+    expect(result).toMatchObject({ sent: 1, failed: 0 });
+    expect(store.all.has(exit.id)).toBe(false);
+  });
+
+  it("retries a departure that names an arrival the server has not got yet", async () => {
+    const store = memoryStore();
+    const exit = gateExitItem({ entryRef: "r", deviceHardwareId: "dev" }, ctx());
+    await store.add(exit);
+    await flush(store, jest.fn().mockRejectedValue(new ApiError("The arrival has not reached the server yet. Try again shortly.", 409)), "g1");
+    expect(store.all.get(exit.id)).toMatchObject({ status: "PENDING", attempts: 1 });
+  });
+
+  it("parks an arrival the server refuses for good, such as a gate at another site", async () => {
+    const store = memoryStore();
+    const item = arrival();
+    await store.add(item);
+    await flush(store, jest.fn().mockRejectedValue(new ApiError("AccessPoint not found", 404)), "g1");
+    expect(store.all.get(item.id)).toMatchObject({ status: "FAILED" });
   });
 });

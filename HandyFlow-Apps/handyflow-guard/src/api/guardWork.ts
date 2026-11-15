@@ -89,6 +89,25 @@ export async function sendOutboxItem(item: OutboxItem): Promise<void> {
     await sendPhoto(item);
     return;
   }
+  if (item.kind === "GATE_ARRIVAL") {
+    await api<unknown>("/api/v1/guard/gate/entries", { method: "POST", body: item.payload });
+    return;
+  }
+  if (item.kind === "GATE_EXIT") {
+    const p = item.payload as GateRef & { deviceHardwareId: string };
+    await api<unknown>(gatePath(p, "exit"), { method: "POST", body: { deviceHardwareId: p.deviceHardwareId, recordedAt: item.recordedAt } });
+    return;
+  }
+  if (item.kind === "GATE_PHOTO") {
+    const p = item.payload as GateRef & { docType: string; localUri: string };
+    const form = new FormData();
+    form.append("file", { uri: p.localUri, name: `${item.id}.jpg`, type: "image/jpeg" } as unknown as Blob);
+    form.append("docType", p.docType);
+    form.append("photoRef", item.id);
+    await api<unknown>(gatePath(p, "attachments"), { method: "POST", form });
+    await removePhoto(p.localUri);
+    return;
+  }
   if (item.kind === "ACK") {
     const p = item.payload as { orderId: string; version: number; deviceHardwareId: string };
     await api<unknown>(`/api/v1/guard/my-post/orders/${p.orderId}/acknowledge`, {
@@ -240,10 +259,10 @@ export function returnEquipment(custodyId: string, condition: ReturnCondition, n
 
 // ── Gate log ──────────────────────────────────────────────────────────────────
 
-const accessPointSchema = z.object({ id: z.string(), name: z.string() });
+export const accessPointSchema = z.object({ id: z.string(), name: z.string() });
 export type AccessPoint = z.infer<typeof accessPointSchema>;
 
-const gateEntrySchema = z.object({
+export const gateEntrySchema = z.object({
   id: z.string(),
   accessPointName: z.string().nullish(),
   entryType: z.string(),
@@ -306,6 +325,10 @@ export function logDeparture(entryId: string, deviceHardwareId: string): Promise
   return api<unknown>(`/api/v1/guard/gate/entries/${entryId}/exit`, { method: "POST", body: { deviceHardwareId } });
 }
 
+type GateRef = { entryId?: string | null; entryRef?: string | null };
+const gatePath = (p: GateRef, tail: "exit" | "attachments") =>
+  p.entryId ? `/api/v1/guard/gate/entries/${p.entryId}/${tail}` : `/api/v1/guard/gate/entries/by-ref/${p.entryRef}/${tail}`;
+
 export const GATE_PHOTO_TYPES = [
   { docType: "ID_DOCUMENT", label: "ID photo" },
   { docType: "VEHICLE_DISC", label: "Vehicle disc" },
@@ -314,10 +337,11 @@ export const GATE_PHOTO_TYPES = [
 export type GatePhotoType = (typeof GATE_PHOTO_TYPES)[number]["docType"];
 
 /** Uploads a photo for an entry at the guard's own site, then deletes the phone's copy. The file stays if the upload fails. */
-export async function attachGatePhoto(entryId: string, docType: GatePhotoType, localUri: string): Promise<void> {
+export async function attachGatePhoto(entryId: string, docType: GatePhotoType, localUri: string, photoRef: string): Promise<void> {
   const form = new FormData();
-  form.append("file", { uri: localUri, name: `${entryId}-${docType}.jpg`, type: "image/jpeg" } as unknown as Blob);
+  form.append("file", { uri: localUri, name: `${photoRef}.jpg`, type: "image/jpeg" } as unknown as Blob);
   form.append("docType", docType);
+  form.append("photoRef", photoRef); // a retried upload (reply lost) is attached once
   await api<unknown>(`/api/v1/guard/gate/entries/${entryId}/attachments`, { method: "POST", form });
   await removePhoto(localUri);
 }

@@ -105,4 +105,31 @@ class PostOrderServiceGuardTest {
         assertThatThrownBy(() -> service.getMyPostOrderForPost(TENANT, mySite, postId))
                 .isInstanceOf(ResourceNotFoundException.class);
     }
+
+    @Test
+    void publishingAlertsGuardsOnDutyAtTheSite() {
+        GuardPushService push = mock(GuardPushService.class);
+        org.springframework.test.util.ReflectionTestUtils.setField(service, "push", push);
+        UUID site = UUID.randomUUID();
+        PostOrder draft = mock(PostOrder.class);
+        when(draft.getSiteId()).thenReturn(site);
+        when(orders.findByTenantAndId(TENANT, orderId)).thenReturn(Optional.of(draft));
+        when(orders.findCurrentActive(any(), any(), any())).thenReturn(Optional.empty());
+
+        service.publish(TENANT, orderId, guard);
+
+        verify(push).notifyOnDutyAt(any(), org.mockito.ArgumentMatchers.eq(site), org.mockito.ArgumentMatchers.eq(false), any(),
+                org.mockito.ArgumentMatchers.eq("Post orders updated"), any(), any());
+    }
+
+    @Test
+    void publishingStillWorksWithoutPush() {
+        UUID site = UUID.randomUUID();
+        PostOrder draft = mock(PostOrder.class);
+        when(draft.getSiteId()).thenReturn(site);
+        when(orders.findByTenantAndId(TENANT, orderId)).thenReturn(Optional.of(draft));
+        when(orders.findCurrentActive(any(), any(), any())).thenReturn(Optional.empty());
+        service.publish(TENANT, orderId, guard);
+        verify(orders).save(draft);
+    }
 }

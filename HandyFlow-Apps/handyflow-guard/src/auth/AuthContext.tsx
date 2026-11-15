@@ -3,6 +3,7 @@ import { configureApi } from "@/api/client";
 import { GuardSession, guardSessionSchema, loginGuard, logoutGuard, changePin as changePinApi } from "@/api/guardAuth";
 import { unregisterPushToken } from "@/api/pushApi";
 import { clearCache } from "@/postOrderCache";
+import { clearGateCache } from "@/gateCache";
 import { clearSession, getDeviceId, loadSession, saveSession } from "./deviceStore";
 
 type Status = "loading" | "signedOut" | "signedIn";
@@ -78,7 +79,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } catch {
       /* offline sign-out still clears the device */
     }
-    if (session?.guardId) await clearCache(session.guardId); // the saved post orders are this guard's, not the next person's
+    if (session?.guardId) {
+      // the saved post orders and gate list are this guard's, not the next person's
+      await clearCache(session.guardId);
+      await clearGateCache(session.guardId);
+    }
     await drop();
   }, [drop, session]);
 

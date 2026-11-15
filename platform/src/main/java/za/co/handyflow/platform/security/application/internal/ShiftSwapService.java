@@ -70,6 +70,16 @@ public class ShiftSwapService {
      */
     @Transactional(readOnly = true)
     public List<za.co.handyflow.platform.security.dto.SwapColleagueView> colleaguesFor(TenantId tenantId, UUID guardId) {
+        return colleagueIds(tenantId, guardId).stream()
+                .map(id -> guardRepository.findActiveById(tenantId, id).orElse(null))
+                .filter(g -> g != null && g.isSchedulable())
+                .map(g -> new za.co.handyflow.platform.security.dto.SwapColleagueView(g.getId(), g.getFullName()))
+                .sorted(java.util.Comparator.comparing(za.co.handyflow.platform.security.dto.SwapColleagueView::name, String.CASE_INSENSITIVE_ORDER))
+                .toList();
+    }
+
+    /** Ids of other guards rostered at a site this guard is rostered at, 30 days either side of today. */
+    private Set<UUID> colleagueIds(TenantId tenantId, UUID guardId) {
         java.time.Instant now = java.time.Instant.now();
         java.time.Instant from = now.minus(COLLEAGUE_WINDOW_DAYS, java.time.temporal.ChronoUnit.DAYS);
         java.time.Instant to = now.plus(COLLEAGUE_WINDOW_DAYS, java.time.temporal.ChronoUnit.DAYS);
@@ -81,12 +91,7 @@ public class ShiftSwapService {
                 if (s.getGuardId() != null && !s.getGuardId().equals(guardId)) others.add(s.getGuardId());
             });
         }
-        return others.stream()
-                .map(id -> guardRepository.findActiveById(tenantId, id).orElse(null))
-                .filter(g -> g != null && g.isSchedulable())
-                .map(g -> new za.co.handyflow.platform.security.dto.SwapColleagueView(g.getId(), g.getFullName()))
-                .sorted(java.util.Comparator.comparing(za.co.handyflow.platform.security.dto.SwapColleagueView::name, String.CASE_INSENSITIVE_ORDER))
-                .toList();
+        return others;
     }
 
     @Transactional(readOnly = true)
@@ -137,6 +142,10 @@ public class ShiftSwapService {
                     .orElseThrow(() -> new ResourceNotFoundException("Proposed guard not found", "lookup"));
             if (!proposed.isSchedulable()) {
                 throw new HandyFlowException("That colleague cannot take shifts right now.", HttpStatus.BAD_REQUEST, "VALIDATION_ERROR");
+            }
+            // The same rule the app's picker uses: only someone rostered at a site the requester is rostered at.
+            if (!colleagueIds(tenantId, requestingGuardId).contains(req.proposedGuardId())) {
+                throw new HandyFlowException("You can only ask a colleague who works at your site.", HttpStatus.BAD_REQUEST, "NOT_A_COLLEAGUE");
             }
         }
 

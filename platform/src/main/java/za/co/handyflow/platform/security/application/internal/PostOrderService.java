@@ -46,6 +46,10 @@ public class PostOrderService {
     private final PostOrderContactRepository orderContactRepo;
     private final GuardRepository guardRepo;
 
+    /** Optional so the service still builds without push (tests, installs with push off). Never throws. */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private GuardPushService push;
+
     // ── Contacts ─────────────────────────────────────────────────────────────
 
     @Transactional
@@ -167,6 +171,10 @@ public class PostOrderService {
             throw new HandyFlowException(e.getMessage(), HttpStatus.CONFLICT, "INVALID_STATUS");
         }
         orderRepo.save(draft);
+        if (push != null) {
+            push.notifyOnDutyAt(tenantId, draft.getSiteId(), false, null, "Post orders updated",
+                    "New post orders were published for your site. Open My post and read them.", java.util.Map.of("screen", "MyPost"));
+        }
         return toOrderResponse(draft);
     }
 

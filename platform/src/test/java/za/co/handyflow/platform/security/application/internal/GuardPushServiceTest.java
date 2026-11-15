@@ -121,4 +121,27 @@ class GuardPushServiceTest {
         service(false).notifySiteSupervisorsOf(TENANT, guard, "PANIC ALERT", "x", Map.of());
         verify(jdbc, never()).query(anyString(), any(org.springframework.jdbc.core.RowMapper.class), any(), any(), any());
     }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void everyoneOnDutyAtTheSiteIsAlertedWhenNotLimitedToSupervisors() {
+        UUID a = UUID.randomUUID(), b = UUID.randomUUID();
+        UUID site = UUID.randomUUID();
+        when(jdbc.query(contains("security_device_sessions"), any(org.springframework.jdbc.core.RowMapper.class), any(), any(), any(), any(), any()))
+                .thenReturn(List.of(a, b));
+        when(jdbc.queryForList(anyString(), eq(String.class), any(), any())).thenReturn(List.of(TOKEN_A));
+        when(client.send(any())).thenReturn(List.of(new ExpoPushClient.Result(true, false, null)));
+
+        service(true).notifyOnDutyAt(TENANT, site, false, null, "Post orders updated", "x", Map.of("screen", "MyPost"));
+
+        verify(client, times(2)).send(any());
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void onDutyAlertsDoNothingWhenPushIsOffOrNoSiteGiven() {
+        service(false).notifyOnDutyAt(TENANT, UUID.randomUUID(), true, null, "t", "b", Map.of());
+        service(true).notifyOnDutyAt(TENANT, null, true, null, "t", "b", Map.of());
+        verify(jdbc, never()).query(anyString(), any(org.springframework.jdbc.core.RowMapper.class), any(), any(), any(), any(), any());
+    }
 }

@@ -16,6 +16,7 @@ import za.co.handyflow.platform.security.dto.CreateIncidentRequest;
 import za.co.handyflow.platform.security.dto.GateRegisterEntryResponse;
 import za.co.handyflow.platform.security.dto.IncidentResponse;
 import za.co.handyflow.platform.security.dto.LogArrivalRequest;
+import za.co.handyflow.platform.security.dto.LogExitRequest;
 import za.co.handyflow.platform.security.dto.ScanRequest;
 import za.co.handyflow.platform.security.dto.ScanResponse;
 import za.co.handyflow.platform.security.dto.TriggerDuressRequest;
@@ -74,6 +75,40 @@ public class GuardOfflineWriteService {
         return once(tenantId, guardId, Kind.GATE_ENTRY, req.clientRef(),
                 () -> gateAccessService.logArrivalByGuard(tenantId, guardId, siteId, req), GateRegisterEntryResponse::id,
                 id -> gateAccessService.getEntry(tenantId, id));
+    }
+
+    /** A departure, possibly recorded earlier on the phone. Repeating it answers 409 ALREADY_DEPARTED, which the app treats as done. */
+    @Transactional
+    public GateRegisterEntryResponse gateExit(TenantId tenantId, UUID guardId, UUID siteId, UUID entryId, LogExitRequest req) {
+        return gateAccessService.logExitByGuard(tenantId, guardId, siteId, entryId, req.recordedAt());
+    }
+
+    /** A departure for an arrival the phone named by its clientRef. Until that arrival has reached the server this answers 409 and the phone retries. */
+    @Transactional
+    public GateRegisterEntryResponse gateExitByRef(TenantId tenantId, UUID guardId, UUID siteId, UUID entryRef, LogExitRequest req) {
+        return gateExit(tenantId, guardId, siteId, gateEntryFor(tenantId, guardId, entryRef), req);
+    }
+
+    /** A gate photo. {@code photoRef} makes a retried upload a no-op; without it the photo is simply attached. */
+    @Transactional
+    public EvidenceResponse gateEvidence(TenantId tenantId, UUID guardId, UUID siteId, UUID entryId, UUID photoRef,
+                                         MultipartFile file, String docType) {
+        return once(tenantId, guardId, Kind.EVIDENCE, photoRef,
+                () -> gateAccessService.attachEvidenceByGuard(tenantId, guardId, siteId, entryId, file, docType), EvidenceResponse::id,
+                id -> evidenceFacade.listFor(tenantId, "security", "GateRegisterEntry", entryId).stream()
+                        .filter(e -> e.id().equals(id)).findFirst()
+                        .orElseThrow(() -> new ResourceNotFoundException("Evidence", id.toString())));
+    }
+
+    @Transactional
+    public EvidenceResponse gateEvidenceByRef(TenantId tenantId, UUID guardId, UUID siteId, UUID entryRef, UUID photoRef,
+                                              MultipartFile file, String docType) {
+        return gateEvidence(tenantId, guardId, siteId, gateEntryFor(tenantId, guardId, entryRef), photoRef, file, docType);
+    }
+
+    private UUID gateEntryFor(TenantId tenantId, UUID guardId, UUID entryRef) {
+        return ledger.find(tenantId, Kind.GATE_ENTRY, entryRef, guardId).orElseThrow(() -> new HandyFlowException(
+                "The arrival has not reached the server yet. Try again shortly.", HttpStatus.CONFLICT, "ENTRY_NOT_SENT_YET"));
     }
 
     /**

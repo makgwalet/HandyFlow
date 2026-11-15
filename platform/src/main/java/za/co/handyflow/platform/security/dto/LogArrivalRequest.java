@@ -36,5 +36,9 @@ public record LogArrivalRequest(
         String idScanConfidence,  // BARCODE_DECODED | OCR_EXTRACTED | MANUAL_ENTRY | null
 
         // Made once on the phone per arrival. A repeat with the same id returns the first entry (guard route only).
-        UUID clientRef
+        UUID clientRef,
+
+        // When the phone recorded the arrival, if it was saved offline first. Limited like every offline time (not in the
+        // future beyond clock drift, not older than 48 hours). Guard route only.
+        java.time.Instant recordedAt
 ) {}

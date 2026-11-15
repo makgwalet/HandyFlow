@@ -108,6 +108,30 @@ public class GuardPushService {
         }, subjectGuardId);
     }
 
+    /**
+     * Alert guards on duty at a site (those with an open session on a shift there): all of them, or only the site
+     * supervisors, optionally leaving one guard out. Looked up after commit. Nobody on duty alerts nobody.
+     */
+    public void notifyOnDutyAt(TenantId tenantId, UUID siteId, boolean supervisorsOnly, UUID exclude,
+                               String title, String body, Map<String, String> data) {
+        if (!enabled || siteId == null) return;
+        afterCommit(() -> {
+            try {
+                List<UUID> guards = jdbc.query("""
+                        SELECT DISTINCT g.id FROM security_guards g
+                          JOIN security_device_sessions ds ON ds.guard_id = g.id AND ds.ended_at IS NULL
+                          JOIN security_shifts s ON s.id = ds.shift_id
+                         WHERE g.tenant_id = ? AND g.deleted_at IS NULL AND s.site_id = ?
+                           AND (? = FALSE OR g.site_supervisor = TRUE)
+                           AND (?::uuid IS NULL OR g.id <> ?::uuid)
+                        """, (rs, i) -> rs.getObject(1, UUID.class), tenantId.getValue(), siteId, supervisorsOnly, exclude, exclude);
+                guards.forEach(id -> deliver(tenantId, id, title, body, data));
+            } catch (Exception e) {
+                log.warn("[Security] Could not alert guards on duty at site={}: {}", siteId, e.toString());
+            }
+        }, null);
+    }
+
     private void afterCommit(Runnable work, UUID guardId) {
         Runnable send = () -> executor.execute(work);
         try {

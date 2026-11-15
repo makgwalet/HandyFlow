@@ -95,4 +95,20 @@ class ShiftSwapServiceColleaguesTest {
         assertThatThrownBy(() -> service.createSwapRequest(TENANT, me, new CreateSwapRequest(shiftId, other, null)))
                 .isInstanceOf(HandyFlowException.class);
     }
+
+    @Test
+    void cannotAskAGuardWhoIsNotRosteredAtMySite() {
+        UUID shiftId = UUID.randomUUID(), stranger = UUID.randomUUID();
+        Shift mine = shift(me);
+        when(mine.getStatus()).thenReturn(za.co.handyflow.platform.security.domain.model.ShiftStatus.SCHEDULED);
+        when(shifts.findByTenantAndId(TENANT, shiftId)).thenReturn(Optional.of(mine));
+        when(swaps.findOpenByShift(shiftId)).thenReturn(List.of());
+        guard(stranger, "Someone Elsewhere", true);
+        when(shifts.findByGuardInRange(any(), any(), any(), any())).thenReturn(List.of(shift(me)));
+        when(shifts.findBySiteInRange(any(), any(), any(), any())).thenReturn(List.of(shift(me)));
+
+        assertThatThrownBy(() -> service.createSwapRequest(TENANT, me, new CreateSwapRequest(shiftId, stranger, null)))
+                .isInstanceOf(HandyFlowException.class)
+                .hasMessageContaining("your site");
+    }
 }
