@@ -126,6 +126,14 @@ public class FuelReceipt {
         this.freightNote = this.freightAmount == null || note == null || note.isBlank() ? null : (note.trim().length() > 200 ? note.trim().substring(0, 200) : note.trim());
     }
 
+    /** Adds freight that arrived after the receipt. The supplier's price and total cost do not change. */
+    public void addLateFreight(BigDecimal amount) {
+        if (amount == null || amount.signum() <= 0) throw new IllegalArgumentException("The freight must be more than zero.");
+        if (isReversed()) throw new IllegalStateException("This receipt has been reversed, so freight cannot be added to it.");
+        this.freightAmount = (this.freightAmount == null ? BigDecimal.ZERO : this.freightAmount).add(amount).setScale(2, java.math.RoundingMode.HALF_UP);
+        this.updatedAt = Instant.now();
+    }
+
     /** Supplier price plus freight per litre; the supplier price when there is no freight. */
     public BigDecimal landedPricePerLitre() { return landedPrice(pricePerLitre, litresReceived, freightAmount); }
 

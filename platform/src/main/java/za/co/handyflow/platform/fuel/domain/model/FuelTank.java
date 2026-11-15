@@ -135,6 +135,16 @@ public class FuelTank {
     }
 
     /**
+     * Late freight: adds {@code amount} (rand) to the value of the fuel now in the tank, which moves the weighted-average cost by
+     * amount / current litres. Does nothing for an empty tank or one with no cost yet. Litres do not change.
+     */
+    public void absorbCost(BigDecimal amount) {
+        if (amount == null || amount.signum() <= 0 || this.costPerLitreWac == null || this.currentLitres.signum() <= 0) return;
+        this.costPerLitreWac = this.costPerLitreWac.add(amount.divide(this.currentLitres, 4, java.math.RoundingMode.HALF_UP));
+        this.updatedAt = Instant.now();
+    }
+
+    /**
      * Puts litres back after a reversed dispatch or delivery. Capacity is
      * still enforced, but the weighted-average cost is left alone: the
      * fuel returns at the cost it left at.

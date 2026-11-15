@@ -1,10 +1,13 @@
 // src/pages/fuel/ReceiptsTab.tsx
 // NEW tab — stock-in history across all tanks with supplier details and totals
 import { useState } from "react"
-import { useQuery } from "@tanstack/react-query"
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import ReverseModal from "./ReverseModal"
 import { apiClient } from "../../api/client"
 import { ArrowDownToLine, List, TrendingUp } from "lucide-react"
+import { usePermissions } from "../../hooks/usePermission"
+import { Modal, btnPrimary, btnGhost, inputStyle, labelStyle } from "../warehousing/whseUi"
+import { validateFreight, adjustmentText, type ReceiptFreight } from "./freightOps"
 
 const unwrap = (r: any) => { const p = r.data?.data ?? r.data; return p?.content ?? p ?? [] }
 const fmtDate = (d: any) => d ? new Date(d).toLocaleDateString("en-ZA", { day: "numeric", month: "short", year: "numeric" }) : "—"
@@ -21,6 +24,8 @@ export default function ReceiptsTab() {
   const [view, setView]             = useState<"history" | "trend">("history")
   const [reversing, setReversing]   = useState<any | null>(null)
   const [showReversed, setShowReversed] = useState(false)
+  const [freighting, setFreighting] = useState<any | null>(null)
+  const canFreight = usePermissions(["FUEL_MANAGE", "FUEL_OPERATIONS_MANAGE"])
 
   const { data: receipts = [], isLoading } = useQuery<any[]>({
     queryKey: ["receipts"],
@@ -127,7 +132,7 @@ export default function ReceiptsTab() {
                   <td style={{ padding: "12px 14px", whiteSpace: "nowrap", textDecoration: "none" }}>
                     {r.reversedAt
                       ? <span title={r.reversalReason ?? ""} style={{ fontSize: 11, fontWeight: 700, color: "var(--hf-danger-text)" }}>Reversed</span>
-                      : <button onClick={() => setReversing(r)} style={{ fontSize: 11, padding: "4px 10px", borderRadius: 6, border: "1px solid var(--hf-danger-border)", background: "var(--hf-danger-soft)", color: "var(--hf-danger-text)", cursor: "pointer" }}>Reverse</button>}
+                      : <>{canFreight && <button onClick={() => setFreighting(r)} style={{ fontSize: 11, padding: "4px 10px", borderRadius: 6, border: "1px solid var(--hf-border)", background: "var(--hf-surface)", color: "var(--hf-text-secondary)", cursor: "pointer", marginRight: 6 }}>Freight</button>}<button onClick={() => setReversing(r)} style={{ fontSize: 11, padding: "4px 10px", borderRadius: 6, border: "1px solid var(--hf-danger-border)", background: "var(--hf-danger-soft)", color: "var(--hf-danger-text)", cursor: "pointer" }}>Reverse</button></>}
                   </td>
                 </tr>
               ))}
@@ -141,6 +146,7 @@ export default function ReceiptsTab() {
           Show {reversedCount} reversed {reversedCount === 1 ? "entry" : "entries"} (not counted in totals)
         </label>
       )}
+      {freighting && <FreightDialog receipt={freighting} tankName={tankMap[freighting.tankId] ?? "the tank"} onClose={() => setFreighting(null)} />}
       {reversing && (
         <ReverseModal
           title="Reverse stock receipt"
@@ -151,6 +157,45 @@ export default function ReceiptsTab() {
         />
       )}
     </div>
+  )
+}
+
+/** Freight that arrived after the fuel was received. Shows what was added before and what each addition did to the tank's cost. */
+function FreightDialog({ receipt, tankName, onClose }: { receipt: any; tankName: string; onClose: () => void }) {
+  const qc = useQueryClient()
+  const [amount, setAmount] = useState(""); const [note, setNote] = useState(""); const [err, setErr] = useState("")
+  const hist = useQuery<ReceiptFreight>({ queryKey: ["receipt-freight", receipt.id], queryFn: async () => { const r = await apiClient.get(`/api/v1/fuel/receipts/${receipt.id}/freight`); return r.data?.data ?? r.data } })
+  const save = useMutation({
+    mutationFn: () => apiClient.post(`/api/v1/fuel/receipts/${receipt.id}/freight`, { amount: Number(amount), note: note.trim() }),
+    onSuccess: () => { setAmount(""); setNote(""); setErr(""); for (const k of ["receipts", "tanks", "receipt-freight"]) qc.invalidateQueries({ queryKey: [k] }) },
+    onError: (e: any) => setErr(e?.response?.data?.message ?? "Could not add the freight."),
+  })
+  const rows = hist.data?.adjustments ?? []
+  return (
+    <Modal title={`Add freight to the ${fmtDate(receipt.receivedAt)} receipt`} onClose={onClose} width={520}>
+      <p style={{ margin: "0 0 10px", fontSize: 12.5, color: "var(--hf-text-muted)" }}>
+        For a carrier invoice that arrived after the fuel was received. The supplier's price and total do not change. The share that belongs to fuel still in {tankName} is added to its cost;
+        the share that belongs to fuel already sold is recorded but never pushed back into past deliveries.
+      </p>
+      {rows.length > 0 && (
+        <div style={{ marginBottom: 12, display: "flex", flexDirection: "column", gap: 6 }}>
+          {rows.map(a => (
+            <div key={a.id} style={{ fontSize: 12, border: "1px solid var(--hf-border)", borderRadius: 8, padding: "6px 10px" }}>
+              <strong>{fmtR(a.amount)}</strong> · {a.note} · {fmtDate(a.createdAt)}
+              <div style={{ color: "var(--hf-text-muted)" }}>{adjustmentText(a)}</div>
+            </div>))}
+        </div>
+      )}
+      <div style={{ display: "flex", gap: 10 }}>
+        <div style={{ flex: 1 }}><label style={labelStyle} htmlFor="fr-amt">Freight (R) *</label><input id="fr-amt" inputMode="decimal" value={amount} onChange={e => { setAmount(e.target.value); setErr("") }} style={inputStyle} /></div>
+        <div style={{ flex: 2 }}><label style={labelStyle} htmlFor="fr-note">What it is for *</label><input id="fr-note" value={note} maxLength={300} placeholder="e.g. Carrier invoice 1042" onChange={e => { setNote(e.target.value); setErr("") }} style={inputStyle} /></div>
+      </div>
+      {err && <p role="alert" style={{ color: "var(--hf-danger-text)", fontSize: 12, margin: "8px 0 0" }}>{err}</p>}
+      <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 14 }}>
+        <button style={btnGhost} onClick={onClose}>Close</button>
+        <button style={btnPrimary} disabled={save.isPending} onClick={() => { const m = validateFreight(amount, note); if (m) return setErr(m); setErr(""); save.mutate() }}>Add freight</button>
+      </div>
+    </Modal>
   )
 }
 

@@ -59,6 +59,7 @@ import java.util.UUID;
 public class FuelTankController {
 
     private final FuelService              fuelService;
+    private final za.co.handyflow.platform.fuel.application.internal.FuelReceiptFreightService receiptFreightService;
     private final FuelSupplierApprovalService supplierApproval;
     private final FeatureGuard             featureGuard;
     private final DeliveryReceiptPdfService receiptPdfService;
@@ -414,6 +415,23 @@ public class FuelTankController {
         return ResponseEntity.ok(ApiResponse.success("Receipt reversed",
                 fuelService.reverseReceipt(TenantContext.getTenantIdAsObject(), id, request,
                         TenantContext.getCurrentUserId())));
+    }
+
+    /** Freight that arrives after the fuel was received. Moves the tank's cost only by the share that belongs to fuel still in the tank. */
+    @PostMapping("/receipts/{id}/freight")
+    @PreAuthorize("hasAnyAuthority('FUEL_MANAGE','FUEL_OPERATIONS_MANAGE')")
+    public ResponseEntity<ApiResponse<za.co.handyflow.platform.fuel.dto.FreightAdjustmentDtos.ReceiptFreightView>> addFreight(
+            @PathVariable UUID id, @Valid @RequestBody za.co.handyflow.platform.fuel.dto.FreightAdjustmentDtos.AddFreightRequest request) {
+        featureGuard.requireModule("fuel");
+        return ResponseEntity.ok(ApiResponse.success("Freight added",
+                receiptFreightService.add(TenantContext.getTenantIdAsObject(), id, request, TenantContext.getCurrentUserId())));
+    }
+
+    @GetMapping("/receipts/{id}/freight")
+    @PreAuthorize("hasAuthority('FUEL_READ')")
+    public ResponseEntity<ApiResponse<za.co.handyflow.platform.fuel.dto.FreightAdjustmentDtos.ReceiptFreightView>> freightHistory(@PathVariable UUID id) {
+        featureGuard.requireModule("fuel");
+        return ResponseEntity.ok(ApiResponse.success(receiptFreightService.history(TenantContext.getTenantIdAsObject(), id)));
     }
 
     @GetMapping("/deliveries/{id}/receipt")
