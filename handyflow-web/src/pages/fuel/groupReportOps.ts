@@ -4,6 +4,7 @@ export interface GroupRow {
   deliveries: number; litres: number; revenue: number | null; margin: number | null; deliveriesWithoutCost: number
   previousDeliveries: number; previousLitres: number; previousRevenue: number | null; previousMargin: number | null
   stockLitres: number; stockValue: number | null; tanksWithoutCost: number; openVariances: number
+  forecourtLitres?: number; forecourtSales?: number | null; forecourtShifts?: number
 }
 export interface GroupReport {
   from: string; to: string; previousFrom: string; previousTo: string; moneyShown: boolean

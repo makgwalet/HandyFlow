@@ -29,6 +29,8 @@ export default function GroupReportTab() {
       <td style={td}>{fmtL(r.litres)}<Delta now={r.litres} before={r.previousLitres} /></td>
       {money && <td style={td}>{fmtR(r.revenue)}<Delta now={r.revenue} before={r.previousRevenue} /></td>}
       {money && <td style={td}>{fmtR(r.margin)}<Delta now={r.margin} before={r.previousMargin} /></td>}
+      <td style={td}>{fmtL(r.forecourtLitres ?? 0)}{(r.forecourtShifts ?? 0) > 0 && <div style={{ fontSize: 11, color: "var(--hf-text-muted)" }}>{r.forecourtShifts} {r.forecourtShifts === 1 ? "shift" : "shifts"}</div>}</td>
+      {money && <td style={td}>{fmtR(r.forecourtSales ?? 0)}</td>}
       <td style={td}>{fmtL(r.stockLitres)}</td>
       {money && <td style={td}>{fmtR(r.stockValue)}</td>}
       <td style={td}>{r.openVariances > 0 ? <Chip bg="var(--hf-warning-soft)" fg="var(--hf-warning-text)">{r.openVariances}</Chip> : 0}</td>
@@ -38,7 +40,7 @@ export default function GroupReportTab() {
     <div>
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12, flexWrap: "wrap" }}>
         <p style={{ fontSize: 12.5, color: "var(--hf-text-muted)", margin: 0, flex: 1, minWidth: 260 }}>
-          Every legal entity side by side: fuel delivered, stock on hand and variances still open. Each figure sits with the entity that owns the depot the tank is in. Forecourt sales are shown separately below, grouped by the depot that supplies each forecourt. This page only reports; it changes nothing.
+          Every legal entity side by side: fuel delivered, forecourt sales, stock on hand and variances still open. Each figure sits with the entity that owns the depot the tank is in. The forecourt figures are also shown below, grouped by the depot that supplies each forecourt. This page only reports; it changes nothing.
         </p>
         <select aria-label="Period" value={days} onChange={e => setDays(Number(e.target.value))} style={{ ...inputStyle, width: "auto" }}>
           {PERIODS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
@@ -54,6 +56,7 @@ export default function GroupReportTab() {
               <thead><tr>
                 <th style={{ ...th, textAlign: "left" }}>Legal entity</th><th style={th}>Deliveries</th><th style={th}>Litres</th>
                 {money && <th style={th}>Revenue</th>}{money && <th style={th}>Margin</th>}
+                <th style={th}>Forecourt litres</th>{money && <th style={th}>Forecourt sales</th>}
                 <th style={th}>Stock</th>{money && <th style={th}>Stock value</th>}<th style={th}>Open variances</th>
               </tr></thead>
               <tbody>{d.entities.map(r => line(r))}{line(d.total, true)}</tbody>

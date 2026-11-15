@@ -30,6 +30,21 @@ describe("GroupReportTab", () => {
     expect(get.mock.calls[0][0]).toBe("/api/v1/fuel/group-report?days=30")
   })
 
+  it("shows forecourt litres, shifts and sales per entity, and the sales column only with money", async () => {
+    get.mockResolvedValue({ data: { data: report({ entities: [row({ forecourtLitres: 1500, forecourtSales: 34500, forecourtShifts: 3 })] }) } })
+    mount()
+    expect(await screen.findByText("Forecourt litres")).toBeTruthy(); expect(screen.getByText("Forecourt sales")).toBeTruthy()
+    expect(screen.getByText("3 shifts")).toBeTruthy()
+    cleanup(); get.mockResolvedValue({ data: { data: report({ moneyShown: false, entities: [row({ forecourtLitres: 1500, forecourtSales: null, forecourtShifts: 1 })] }) } })
+    mount()
+    expect(await screen.findByText("Forecourt litres")).toBeTruthy(); expect(screen.queryByText("Forecourt sales")).toBeNull(); expect(screen.getByText("1 shift")).toBeTruthy()
+  })
+
+  it("an older server reply without forecourt figures still renders", async () => {
+    mount()
+    expect(await screen.findByText("Acme Fuels")).toBeTruthy(); expect(screen.getByText("Forecourt litres")).toBeTruthy()
+  })
+
   it("changing the period asks for that many days", async () => {
     mount()
     await screen.findByText("Acme Fuels")

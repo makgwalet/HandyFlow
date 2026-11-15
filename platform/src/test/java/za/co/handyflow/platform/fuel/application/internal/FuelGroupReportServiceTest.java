@@ -22,6 +22,7 @@ import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 /** Phase 6a: the group report puts each load, tank and open variance with the legal entity that owns its depot. */
@@ -37,6 +38,8 @@ class FuelGroupReportServiceTest {
     @Mock FuelTankRepository tanks;
     @Mock FuelDepotRepository depots;
     @Mock FuelLegalEntityRepository legalEntities;
+    @Mock FuelShiftRepository shifts;
+    @Mock FuelShiftReadingRepository readings;
     @InjectMocks FuelGroupReportService service;
 
     FuelLegalEntity acme, beta;
@@ -158,5 +161,52 @@ class FuelGroupReportServiceTest {
         assertEquals(365, java.time.temporal.ChronoUnit.DAYS.between(big.from(), big.to()));
         Report small = service.report(T, 0, true);
         assertEquals(small.from(), small.to());
+    }
+
+    // ── forecourt sales ──────────────────────────────────────────────────────
+
+    private FuelShift closedShift(UUID id) {
+        FuelShift s = mock(FuelShift.class);
+        when(s.getId()).thenReturn(id); when(s.getClosedAt()).thenReturn(Instant.now().minusSeconds(3600));
+        return s;
+    }
+    private FuelShiftReading reading(UUID shiftId, UUID tankId, String litres, String sales) {
+        FuelShiftReading r = mock(FuelShiftReading.class);
+        when(r.getShiftId()).thenReturn(shiftId); when(r.getTankId()).thenReturn(tankId);
+        when(r.getLitresSold()).thenReturn(litres == null ? null : bd(litres)); when(r.getSalesValue()).thenReturn(sales == null ? null : bd(sales));
+        return r;
+    }
+
+    @Test @DisplayName("forecourt sales go to the entity that owns each pump's tank, with a shift that spans two entities counted once in the group total")
+    void forecourtByEntity() {
+        UUID s1 = UUID.randomUUID(), s2 = UUID.randomUUID();
+        FuelShift shift1 = closedShift(s1), shift2 = closedShift(s2);
+        UUID acmeId = acmeTank.getId(), looseId = looseTank.getId();
+        var rA1 = reading(s1, acmeId, "100", "2300"); var rA2 = reading(s2, acmeId, "50", "1150");
+        var rL = reading(s2, looseId, "20", "460"); var rSkip = reading(s1, acmeId, null, null);
+        when(shifts.findClosedSince(eq(T), any())).thenReturn(List.of(shift1, shift2));
+        when(readings.findByShifts(eq(T), any())).thenReturn(List.of(rA1, rA2, rL, rSkip));
+        Report r = service.report(T, 30, true);
+        Row a = row(r, "Acme Fuels");
+        assertEquals(0, bd("150.00").compareTo(a.forecourtLitres())); assertEquals(0, bd("3450.00").compareTo(a.forecourtSales())); assertEquals(2, a.forecourtShifts());
+        Row un = row(r, "Not assigned to a legal entity");
+        assertEquals(0, bd("20.00").compareTo(un.forecourtLitres())); assertEquals(1, un.forecourtShifts());
+        assertEquals(0, bd("170.00").compareTo(r.total().forecourtLitres())); assertEquals(0, bd("3910.00").compareTo(r.total().forecourtSales()));
+        assertEquals(2, r.total().forecourtShifts());           // s2 spans Acme and Not assigned, but is one shift
+    }
+
+    @Test @DisplayName("forecourt sales value is hidden without margin permission, litres and shifts are not; no forecourt data means zero, not an error")
+    void forecourtMoneyHidden() {
+        UUID s1 = UUID.randomUUID();
+        FuelShift shift1 = closedShift(s1);
+        UUID acmeId = acmeTank.getId();
+        var rA = reading(s1, acmeId, "100", "2300");
+        when(shifts.findClosedSince(eq(T), any())).thenReturn(List.of(shift1));
+        when(readings.findByShifts(eq(T), any())).thenReturn(List.of(rA));
+        Row a = row(service.report(T, 30, false), "Acme Fuels");
+        assertNull(a.forecourtSales()); assertEquals(0, bd("100.00").compareTo(a.forecourtLitres())); assertEquals(1, a.forecourtShifts());
+        when(shifts.findClosedSince(eq(T), any())).thenReturn(List.of());
+        Row none = row(service.report(T, 30, true), "Acme Fuels");
+        assertEquals(0, none.forecourtLitres().signum()); assertEquals(0, none.forecourtShifts());
     }
 }

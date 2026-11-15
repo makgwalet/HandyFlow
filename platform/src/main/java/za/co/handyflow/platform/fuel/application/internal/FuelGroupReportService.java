@@ -22,7 +22,7 @@ import java.util.*;
 /**
  * Phase 6a: the group at a glance. A delivery, a tank and an open variance belong to the legal entity that owns the depot the tank
  * is in; anything with no depot or a depot with no entity goes in "Not assigned to a legal entity" so nothing drops out of the totals.
- * Covers distribution deliveries, stock and delivery variances. Forecourt sales are not in it: a forecourt shift is not tied to a depot.
+ * Covers distribution deliveries, stock, delivery variances and forecourt sales (each shift reading belongs to the entity of its tank's depot).
  * Read-only; it changes nothing.
  */
 @Service
@@ -36,6 +36,8 @@ public class FuelGroupReportService {
     private final FuelTankRepository tanks;
     private final FuelDepotRepository depots;
     private final FuelLegalEntityRepository legalEntities;
+    private final FuelShiftRepository shifts;
+    private final FuelShiftReadingRepository readings;
 
     @Transactional(readOnly = true)
     public Report report(TenantId tenantId, int days, boolean includeMoney) {
@@ -74,6 +76,22 @@ public class FuelGroupReportService {
             a.stockLitres = a.stockLitres.add(litres);
             if (litres.signum() > 0) {
                 if (t.getCostPerLitreWac() == null) a.tanksWithoutCost++; else a.stockValue = a.stockValue.add(litres.multiply(t.getCostPerLitreWac()));
+            }
+        }
+
+        // Forecourt sales in the period, by the entity of each pump's tank. A tank that has since been removed falls in the not-assigned bucket.
+        var fromInstant = from.atStartOfDay(SAST).toInstant();
+        var toInstant = to.plusDays(1).atStartOfDay(SAST).toInstant();
+        Set<UUID> shiftIds = new HashSet<>();
+        for (var s : shifts.findClosedSince(tenantId, fromInstant)) if (s.getClosedAt() != null && s.getClosedAt().isBefore(toInstant)) shiftIds.add(s.getId());
+        if (!shiftIds.isEmpty()) {
+            for (var r : readings.findByShifts(tenantId, shiftIds)) {
+                if (r.getLitresSold() == null) continue;
+                FuelTank t = tankById.get(r.getTankId());
+                Acc a = t == null ? unassigned : ownerOfTank(t, depotEntity, accs, unassigned);
+                a.forecourtLitres = a.forecourtLitres.add(r.getLitresSold());
+                if (r.getSalesValue() != null) a.forecourtSales = a.forecourtSales.add(r.getSalesValue());
+                a.forecourtShiftIds.add(r.getShiftId());
             }
         }
 
@@ -135,21 +153,24 @@ public class FuelGroupReportService {
         long deliveries, prevDeliveries, withoutCost, tanksWithoutCost, openVariances;
         BigDecimal litres = BigDecimal.ZERO, revenue = BigDecimal.ZERO, margin = BigDecimal.ZERO,
                 prevLitres = BigDecimal.ZERO, prevRevenue = BigDecimal.ZERO, prevMargin = BigDecimal.ZERO,
-                stockLitres = BigDecimal.ZERO, stockValue = BigDecimal.ZERO;
+                stockLitres = BigDecimal.ZERO, stockValue = BigDecimal.ZERO, forecourtLitres = BigDecimal.ZERO, forecourtSales = BigDecimal.ZERO;
+        Set<UUID> forecourtShiftIds = new HashSet<>();   // a set, so a shift that spans two entities still counts once in the group total
 
-        boolean hasAnything() { return deliveries + prevDeliveries + openVariances > 0 || stockLitres.signum() != 0; }
+        boolean hasAnything() { return deliveries + prevDeliveries + openVariances > 0 || stockLitres.signum() != 0 || forecourtLitres.signum() != 0; }
 
         void addAll(Acc o) {
             deliveries += o.deliveries; prevDeliveries += o.prevDeliveries; withoutCost += o.withoutCost; tanksWithoutCost += o.tanksWithoutCost; openVariances += o.openVariances;
             litres = litres.add(o.litres); revenue = revenue.add(o.revenue); margin = margin.add(o.margin);
             prevLitres = prevLitres.add(o.prevLitres); prevRevenue = prevRevenue.add(o.prevRevenue); prevMargin = prevMargin.add(o.prevMargin);
             stockLitres = stockLitres.add(o.stockLitres); stockValue = stockValue.add(o.stockValue);
+            forecourtLitres = forecourtLitres.add(o.forecourtLitres); forecourtSales = forecourtSales.add(o.forecourtSales); forecourtShiftIds.addAll(o.forecourtShiftIds);
         }
 
         Row row(UUID id, String name, boolean unassigned, boolean money) {
             return new Row(id, name == null ? "(removed entity)" : name, unassigned, deliveries, m(litres), money ? m(revenue) : null, money ? m(margin) : null, withoutCost,
                     prevDeliveries, m(prevLitres), money ? m(prevRevenue) : null, money ? m(prevMargin) : null,
-                    m(stockLitres), money ? m(stockValue) : null, tanksWithoutCost, openVariances);
+                    m(stockLitres), money ? m(stockValue) : null, tanksWithoutCost, openVariances,
+                    m(forecourtLitres), money ? m(forecourtSales) : null, forecourtShiftIds.size());
         }
     }
 }
