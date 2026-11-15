@@ -12,11 +12,14 @@ import org.mockito.quality.Strictness;
 import za.co.handyflow.platform.fuel.domain.model.*;
 import za.co.handyflow.platform.fuel.domain.repository.*;
 import za.co.handyflow.platform.fuel.dto.EligibilityDtos.*;
+import za.co.handyflow.platform.hr.EmployeeSummary;
+import za.co.handyflow.platform.hr.application.HrFacade;
 import za.co.handyflow.platform.shared.ResourceNotFoundException;
 import za.co.handyflow.platform.shared.TenantId;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.*;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -37,6 +40,8 @@ class FuelEligibilityServiceTest {
     @Mock FuelCustomerSiteRepository sites;
     @Mock FuelTankerRepository tankers;
     @Mock FuelEligibilityOverrideRepository overrides;
+    @Mock FuelSiteDriverApprovalRepository driverApprovals;
+    @Mock HrFacade hr;
     @InjectMocks FuelEligibilityService service;
 
     FuelTanker tanker; FuelCustomerSite site; FuelSiteAccessRule rule; FuelDelivery load; FuelTankerCompartment c1, c2;
@@ -56,10 +61,12 @@ class FuelEligibilityServiceTest {
         when(tankers.findActiveById(T, tanker.getId())).thenReturn(Optional.of(tanker));
         when(tankers.save(any())).thenAnswer(i -> i.getArgument(0));
         when(siteRules.save(any())).thenAnswer(i -> i.getArgument(0));
+        when(driverApprovals.findForDriver(any(), any(), any())).thenReturn(Optional.empty());
+        when(driverApprovals.save(any())).thenAnswer(i -> i.getArgument(0));
     }
 
     private static void rule(FuelSiteAccessRule r, String cap, Integer gvm, String len, String wid, String hgt, Set<String> types, String notes) {
-        r.update(cap == null ? null : bd(cap), gvm, len == null ? null : bd(len), wid == null ? null : bd(wid), hgt == null ? null : bd(hgt), types, notes, USER);
+        r.update(cap == null ? null : bd(cap), gvm, len == null ? null : bd(len), wid == null ? null : bd(wid), hgt == null ? null : bd(hgt), types, notes, false, null, USER);
     }
     private EligibilityResult eval() { return service.evaluate(T, load, tanker, UUID.randomUUID(), "Moses", List.of(c1, c2)); }
     private static Set<String> codes(List<Finding> f) { var s = new HashSet<String>(); f.forEach(x -> s.add(x.code())); return s; }
@@ -190,18 +197,19 @@ class FuelEligibilityServiceTest {
 
     @Test @DisplayName("saving a site rule replaces its limits and its list of approved tankers")
     void saveRule() {
-        var v = service.saveSiteRule(T, site.getId(), new SiteRuleRequest(bd("18000"), 30000, bd("12"), null, null, List.of(" rigid ", "", "Super-link"), "Gate 2", List.of(tanker.getId())), USER);
+        var v = service.saveSiteRule(T, site.getId(), new SiteRuleRequest(bd("18000"), 30000, bd("12"), null, null, List.of(" rigid ", "", "Super-link"), "Gate 2", List.of(tanker.getId()), true, " Mine induction "), USER);
         assertEquals(0, bd("18000").compareTo(v.maxCapacityLitres()));
         assertEquals(List.of("RIGID", "SUPER-LINK"), v.approvedTypes());
+        assertTrue(v.requireApprovedDrivers()); assertEquals("Mine induction", v.requiredTraining());
         verify(siteTankers).deleteForSite(T, site.getId());
         verify(siteTankers).saveAll(argThat(list -> ((Collection<?>) list).size() == 1));
     }
 
     @Test @DisplayName("a rule naming an unknown tanker, or a limit of zero or less, is refused and nothing is saved")
     void ruleValidation() {
-        assertThrows(ResourceNotFoundException.class, () -> service.saveSiteRule(T, site.getId(), new SiteRuleRequest(null, null, null, null, null, null, null, List.of(UUID.randomUUID())), USER));
-        assertThrows(IllegalArgumentException.class, () -> service.saveSiteRule(T, site.getId(), new SiteRuleRequest(bd("0"), null, null, null, null, null, null, null), USER));
-        assertThrows(IllegalArgumentException.class, () -> service.saveSiteRule(T, site.getId(), new SiteRuleRequest(null, -5, null, null, null, null, null, null), USER));
+        assertThrows(ResourceNotFoundException.class, () -> service.saveSiteRule(T, site.getId(), new SiteRuleRequest(null, null, null, null, null, null, null, List.of(UUID.randomUUID()), false, null), USER));
+        assertThrows(IllegalArgumentException.class, () -> service.saveSiteRule(T, site.getId(), new SiteRuleRequest(bd("0"), null, null, null, null, null, null, null, false, null), USER));
+        assertThrows(IllegalArgumentException.class, () -> service.saveSiteRule(T, site.getId(), new SiteRuleRequest(null, -5, null, null, null, null, null, null, false, null), USER));
         verify(siteRules, never()).save(any());
     }
 
@@ -219,5 +227,123 @@ class FuelEligibilityServiceTest {
         assertNull(cleared.tankerType()); assertNull(cleared.gvmKg());
         assertThrows(IllegalArgumentException.class, () -> service.saveSpecs(T, tanker.getId(), new TankerSpecsRequest(null, 0, null, null, null)));
         assertThrows(IllegalArgumentException.class, () -> service.saveSpecs(T, tanker.getId(), new TankerSpecsRequest(null, null, bd("-1"), null, null)));
+    }
+
+    // ── Step 2: site driver approvals ────────────────────────────────────────
+
+    static final LocalDate TODAY = LocalDate.now(java.time.ZoneId.of("Africa/Johannesburg"));
+    final UUID driverId = UUID.randomUUID();
+
+    private FuelSiteAccessRule requireDrivers(String training) {
+        rule.update(null, null, null, null, null, Set.of(), null, true, training, USER);
+        return rule;
+    }
+    private FuelSiteDriverApproval approval(String status, LocalDate inducted, LocalDate expires, String trainingRef, LocalDate trainingExpires, String conditions) {
+        var a = FuelSiteDriverApproval.forDriver(T, site.getId(), driverId);
+        a.update(status, inducted, expires, trainingRef, trainingExpires, conditions, USER);
+        return a;
+    }
+    private List<Finding> driver(FuelSiteDriverApproval a) { return FuelEligibilityService.siteDriverFindings("Mine Gate 2", rule, a, "Moses", TODAY); }
+
+    @Test @DisplayName("a site that does not require approved drivers asks nothing of a driver with no record")
+    void driversNotRequired() { assertTrue(driver(null).isEmpty()); }
+
+    @Test @DisplayName("a site that requires approved drivers blocks a driver who is not on its list")
+    void notOnList() {
+        requireDrivers(null);
+        assertEquals(Set.of("SITE_DRIVER_NOT_APPROVED"), codes(driver(null)));
+        assertEquals(Severity.BLOCK, driver(null).get(0).severity());
+    }
+
+    @Test @DisplayName("a valid induction is clear; an expired one blocks; no expiry date recorded is a review")
+    void inductionExpiry() {
+        requireDrivers(null);
+        assertTrue(driver(approval("APPROVED", TODAY.minusDays(30), TODAY.plusDays(60), null, null, null)).isEmpty());
+        assertTrue(driver(approval("APPROVED", TODAY.minusDays(30), TODAY, null, null, null)).isEmpty(), "valid through its expiry date");
+        assertEquals(Set.of("SITE_DRIVER_INDUCTION_EXPIRED"), codes(driver(approval("APPROVED", TODAY.minusDays(400), TODAY.minusDays(1), null, null, null))));
+        var r = driver(approval("APPROVED", TODAY.minusDays(30), null, null, null, null));
+        assertEquals(Set.of("SITE_DRIVER_INDUCTION_NO_EXPIRY"), codes(r)); assertEquals(Severity.REVIEW, r.get(0).severity());
+    }
+
+    @Test @DisplayName("required training: none recorded blocks, expired blocks, no expiry is a review, valid is clear")
+    void training() {
+        requireDrivers("Mine safety induction");
+        var base = TODAY.minusDays(30);
+        assertEquals(Set.of("SITE_DRIVER_TRAINING_MISSING"), codes(driver(approval("APPROVED", base, TODAY.plusDays(60), null, null, null))));
+        assertEquals(Set.of("SITE_DRIVER_TRAINING_EXPIRED"), codes(driver(approval("APPROVED", base, TODAY.plusDays(60), "CERT-9", TODAY.minusDays(2), null))));
+        assertEquals(Set.of("SITE_DRIVER_TRAINING_NO_EXPIRY"), codes(driver(approval("APPROVED", base, TODAY.plusDays(60), "CERT-9", null, null))));
+        assertTrue(driver(approval("APPROVED", base, TODAY.plusDays(60), "CERT-9", TODAY.plusDays(200), null)).isEmpty());
+    }
+
+    @Test @DisplayName("a suspension blocks even when the site does not require approved drivers, and says why")
+    void suspension() {
+        var r = driver(approval("SUSPENDED", null, null, null, null, "Safety breach on 3 Nov"));
+        assertEquals(Set.of("SITE_DRIVER_SUSPENDED"), codes(r));
+        assertTrue(r.get(0).message().contains("Safety breach on 3 Nov"));
+        assertEquals(1, r.size(), "a suspension is the only thing said about the driver");
+    }
+
+    @Test @DisplayName("a restricted driver is a review that shows the restriction, and approved conditions are information only")
+    void restrictedAndConditions() {
+        var r = driver(approval("RESTRICTED", TODAY.minusDays(5), TODAY.plusDays(5), null, null, "Daylight deliveries only"));
+        assertEquals(Set.of("SITE_DRIVER_RESTRICTED"), codes(r)); assertTrue(r.get(0).message().contains("Daylight deliveries only"));
+        var c = driver(approval("APPROVED", TODAY.minusDays(5), TODAY.plusDays(5), null, null, "Escort from gate"));
+        assertEquals(Set.of("SITE_DRIVER_CONDITIONS"), codes(c)); assertEquals(Severity.INFO, c.get(0).severity());
+    }
+
+    @Test @DisplayName("the approval's own rules: status, induction date, restriction and suspension reasons")
+    void approvalValidation() {
+        var a = FuelSiteDriverApproval.forDriver(T, site.getId(), driverId);
+        assertThrows(IllegalArgumentException.class, () -> a.update("MAYBE", TODAY, null, null, null, null, USER));
+        assertThrows(IllegalArgumentException.class, () -> a.update("APPROVED", null, null, null, null, null, USER));
+        assertThrows(IllegalArgumentException.class, () -> a.update("APPROVED", TODAY, TODAY.minusDays(1), null, null, null, USER));
+        assertThrows(IllegalArgumentException.class, () -> a.update("RESTRICTED", TODAY, null, null, null, " ", USER));
+        assertThrows(IllegalArgumentException.class, () -> a.update("SUSPENDED", null, null, null, null, null, USER));
+        a.update("SUSPENDED", null, null, null, null, "Breach", USER);
+        assertEquals("SUSPENDED", a.getStatus());
+    }
+
+    @Test @DisplayName("evaluate includes the driver's findings for the load's site, and a suspension counts even when the site has no rule")
+    void evaluateIncludesDriver() {
+        when(siteRules.findForSite(T, site.getId())).thenReturn(Optional.empty());
+        var suspended = approval("SUSPENDED", null, null, null, null, "Breach");
+        when(driverApprovals.findForDriver(T, site.getId(), driverId)).thenReturn(Optional.of(suspended));
+        var r = service.evaluate(T, load, tanker, driverId, "Moses", List.of(c1, c2));
+        assertEquals(Set.of("SITE_DRIVER_SUSPENDED"), codes(r.blocks()));
+    }
+
+    @Test @DisplayName("the list says what each approval would run into today")
+    void approvalList() {
+        requireDrivers("Mine safety induction");
+        var ok = approval("APPROVED", TODAY.minusDays(5), TODAY.plusDays(90), "C1", TODAY.plusDays(90), null);
+        var late = FuelSiteDriverApproval.forDriver(T, site.getId(), UUID.randomUUID());
+        late.update("APPROVED", TODAY.minusDays(400), TODAY.minusDays(1), "C1", TODAY.plusDays(90), null, USER);
+        when(driverApprovals.findForSite(T, site.getId())).thenReturn(List.of(ok, late));
+        when(hr.findEmployeeById(eq(T), any())).thenAnswer(i -> Optional.of(new EmployeeSummary(i.getArgument(1), "E1", "A", "B", "Driver " + i.getArgument(1).toString().substring(0, 4), null, null, "Driver", null, "ACTIVE")));
+        var v = service.driverApprovals(T, site.getId());
+        assertEquals(Set.of("OK", "EXPIRED"), new HashSet<>(v.stream().map(DriverApprovalView::state).toList()));
+    }
+
+    @Test @DisplayName("saving an approval needs a current employee and replaces an earlier record")
+    void saveApproval() {
+        var driver = new EmployeeSummary(driverId, "E1", "Moses", "Sithole", "Moses Sithole", null, null, "Driver", null, "ACTIVE");
+        when(hr.findEmployeeById(T, driverId)).thenReturn(Optional.of(driver));
+        var req = new DriverApprovalRequest("APPROVED", TODAY.minusDays(1), TODAY.plusDays(300), "C-7", TODAY.plusDays(300), "Escort from gate");
+        var v = service.saveDriverApproval(T, site.getId(), driverId, req, USER);
+        assertEquals("Moses Sithole", v.driverName()); assertEquals("APPROVED", v.status());
+        verify(driverApprovals).save(any());
+        when(hr.findEmployeeById(T, driverId)).thenReturn(Optional.empty());
+        assertThrows(ResourceNotFoundException.class, () -> service.saveDriverApproval(T, site.getId(), driverId, req, USER));
+        when(hr.findEmployeeById(T, driverId)).thenReturn(Optional.of(new EmployeeSummary(driverId, "E1", "Moses", "Sithole", "Moses Sithole", null, null, "Driver", null, "TERMINATED")));
+        assertThrows(IllegalStateException.class, () -> service.saveDriverApproval(T, site.getId(), driverId, req, USER));
+    }
+
+    @Test @DisplayName("removing an approval that is not there is not found")
+    void removeMissing() {
+        assertThrows(ResourceNotFoundException.class, () -> service.removeDriverApproval(T, site.getId(), driverId));
+        var a = approval("APPROVED", TODAY, null, null, null, null);
+        when(driverApprovals.findForDriver(T, site.getId(), driverId)).thenReturn(Optional.of(a));
+        service.removeDriverApproval(T, site.getId(), driverId);
+        verify(driverApprovals).delete(a);
     }
 }

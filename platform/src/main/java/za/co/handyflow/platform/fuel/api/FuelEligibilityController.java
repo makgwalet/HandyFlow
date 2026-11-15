@@ -38,6 +38,29 @@ public class FuelEligibilityController {
         return ResponseEntity.ok(ApiResponse.success("Site rule saved", eligibility.saveSiteRule(TenantContext.getTenantIdAsObject(), siteId, req, TenantContext.getCurrentUserId())));
     }
 
+    @GetMapping("/customer-sites/{siteId}/driver-approvals")
+    @PreAuthorize("hasAuthority('FUEL_READ')")
+    public ResponseEntity<ApiResponse<java.util.List<DriverApprovalView>>> driverApprovals(@PathVariable UUID siteId) {
+        featureGuard.requireModule("fuel");
+        return ResponseEntity.ok(ApiResponse.success(eligibility.driverApprovals(TenantContext.getTenantIdAsObject(), siteId)));
+    }
+
+    @PutMapping("/customer-sites/{siteId}/driver-approvals/{employeeId}")
+    @PreAuthorize("hasAnyAuthority('FUEL_MANAGE','FUEL_TRANSPORT_MANAGE')")
+    public ResponseEntity<ApiResponse<DriverApprovalView>> saveDriverApproval(@PathVariable UUID siteId, @PathVariable UUID employeeId, @Valid @RequestBody DriverApprovalRequest req) {
+        featureGuard.requireModule("fuel");
+        return ResponseEntity.ok(ApiResponse.success("Driver approval saved",
+                eligibility.saveDriverApproval(TenantContext.getTenantIdAsObject(), siteId, employeeId, req, TenantContext.getCurrentUserId())));
+    }
+
+    @DeleteMapping("/customer-sites/{siteId}/driver-approvals/{employeeId}")
+    @PreAuthorize("hasAnyAuthority('FUEL_MANAGE','FUEL_TRANSPORT_MANAGE')")
+    public ResponseEntity<ApiResponse<Void>> removeDriverApproval(@PathVariable UUID siteId, @PathVariable UUID employeeId) {
+        featureGuard.requireModule("fuel");
+        eligibility.removeDriverApproval(TenantContext.getTenantIdAsObject(), siteId, employeeId);
+        return ResponseEntity.ok(ApiResponse.success("Driver approval removed", null));
+    }
+
     @GetMapping("/tankers/{id}/specs")
     @PreAuthorize("hasAuthority('FUEL_READ')")
     public ResponseEntity<ApiResponse<TankerSpecsView>> specs(@PathVariable UUID id) {

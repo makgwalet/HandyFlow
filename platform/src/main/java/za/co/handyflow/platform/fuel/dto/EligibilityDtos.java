@@ -3,6 +3,7 @@ package za.co.handyflow.platform.fuel.dto;
 import jakarta.validation.constraints.Size;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
@@ -30,12 +31,21 @@ public final class EligibilityDtos {
     }
 
     public record SiteRuleRequest(BigDecimal maxCapacityLitres, Integer maxGvmKg, BigDecimal maxLengthM, BigDecimal maxWidthM, BigDecimal maxHeightM,
-                                  List<@Size(max = 40) String> approvedTypes, @Size(max = 500) String accessNotes, List<UUID> approvedTankerIds) {}
+                                  List<@Size(max = 40) String> approvedTypes, @Size(max = 500) String accessNotes, List<UUID> approvedTankerIds,
+                                  boolean requireApprovedDrivers, @Size(max = 120) String requiredTraining) {}
 
     public record ApprovedTankerView(UUID tankerId, String registration) {}
 
     public record SiteRuleView(UUID siteId, boolean hasRule, BigDecimal maxCapacityLitres, Integer maxGvmKg, BigDecimal maxLengthM, BigDecimal maxWidthM,
-                               BigDecimal maxHeightM, List<String> approvedTypes, String accessNotes, List<ApprovedTankerView> approvedTankers) {}
+                               BigDecimal maxHeightM, List<String> approvedTypes, String accessNotes, List<ApprovedTankerView> approvedTankers,
+                               boolean requireApprovedDrivers, String requiredTraining) {}
+
+    public record DriverApprovalRequest(String status, LocalDate inductionDate, LocalDate inductionExpiry, @Size(max = 120) String trainingRef,
+                                        LocalDate trainingExpiry, @Size(max = 500) String conditions) {}
+
+    /** state is what the check would say today: OK, NO_EXPIRY, EXPIRED, TRAINING_MISSING, TRAINING_EXPIRED, TRAINING_NO_EXPIRY, RESTRICTED or SUSPENDED. */
+    public record DriverApprovalView(UUID employeeId, String driverName, String status, LocalDate inductionDate, LocalDate inductionExpiry, String trainingRef,
+                                     LocalDate trainingExpiry, String conditions, String state) {}
 
     public record TankerSpecsRequest(@Size(max = 40) String tankerType, Integer gvmKg, BigDecimal lengthM, BigDecimal widthM, BigDecimal heightM) {}
 

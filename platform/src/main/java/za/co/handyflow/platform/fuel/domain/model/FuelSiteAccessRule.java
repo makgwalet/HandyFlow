@@ -55,6 +55,14 @@ public class FuelSiteAccessRule {
     @Column(name = "access_notes", length = 500)
     private String accessNotes;
 
+    /** When true only drivers approved for this site (see FuelSiteDriverApproval) may serve it. */
+    @Column(name = "require_approved_drivers", nullable = false)
+    private boolean requireApprovedDrivers = false;
+
+    /** Name of a safety training the site requires of its drivers; empty means none. The approval records the driver's evidence. */
+    @Column(name = "required_training", length = 120)
+    private String requiredTraining;
+
     @Column(name = "updated_by")
     private UUID updatedBy;
 
@@ -74,7 +82,7 @@ public class FuelSiteAccessRule {
     }
 
     public void update(BigDecimal maxCapacityLitres, Integer maxGvmKg, BigDecimal maxLengthM, BigDecimal maxWidthM, BigDecimal maxHeightM,
-                       Set<String> approvedTypes, String accessNotes, UUID by) {
+                       Set<String> approvedTypes, String accessNotes, boolean requireApprovedDrivers, String requiredTraining, UUID by) {
         requirePositive(maxCapacityLitres, "The maximum capacity");
         requirePositive(maxLengthM, "The maximum length"); requirePositive(maxWidthM, "The maximum width"); requirePositive(maxHeightM, "The maximum height");
         if (maxGvmKg != null && maxGvmKg <= 0) throw new IllegalArgumentException("The maximum gross vehicle mass must be more than zero.");
@@ -86,6 +94,8 @@ public class FuelSiteAccessRule {
         if (joined.length() > 300) throw new IllegalArgumentException("The list of tanker types is too long.");
         this.approvedTypes = joined.isEmpty() ? null : joined;
         this.accessNotes = accessNotes == null || accessNotes.isBlank() ? null : (accessNotes.trim().length() > 500 ? accessNotes.trim().substring(0, 500) : accessNotes.trim());
+        this.requireApprovedDrivers = requireApprovedDrivers;
+        this.requiredTraining = requiredTraining == null || requiredTraining.isBlank() ? null : (requiredTraining.trim().length() > 120 ? requiredTraining.trim().substring(0, 120) : requiredTraining.trim());
         this.updatedBy = by; this.updatedAt = Instant.now();
     }
 

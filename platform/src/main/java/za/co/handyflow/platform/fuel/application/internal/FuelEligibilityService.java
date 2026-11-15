@@ -6,12 +6,15 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import za.co.handyflow.platform.fuel.domain.model.*;
 import za.co.handyflow.platform.fuel.domain.repository.*;
-import za.co.handyflow.platform.fuel.dto.AllocationRequest;
 import za.co.handyflow.platform.fuel.dto.EligibilityDtos.*;
+import za.co.handyflow.platform.hr.EmployeeSummary;
+import za.co.handyflow.platform.hr.application.HrFacade;
 import za.co.handyflow.platform.shared.ResourceNotFoundException;
 import za.co.handyflow.platform.shared.TenantId;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -33,6 +36,10 @@ public class FuelEligibilityService {
     private final FuelCustomerSiteRepository sites;
     private final FuelTankerRepository tankers;
     private final FuelEligibilityOverrideRepository overrides;
+    private final FuelSiteDriverApprovalRepository driverApprovals;
+    private final HrFacade hr;
+
+    private static final ZoneId SAST = ZoneId.of("Africa/Johannesburg");
 
     // ── Evaluation ───────────────────────────────────────────────────────────
 
@@ -41,6 +48,7 @@ public class FuelEligibilityService {
     public EligibilityResult evaluate(TenantId tenantId, FuelDelivery d, FuelTanker tanker, UUID driverEmployeeId, String driverLabel,
                                       Collection<FuelTankerCompartment> tankerCompartments) {
         List<Finding> out = new ArrayList<>();
+        LocalDate today = LocalDate.now(SAST);
         if (d.getSiteId() != null) {
             FuelCustomerSite site = sites.findActiveById(tenantId, d.getSiteId()).orElse(null);
             FuelSiteAccessRule rule = siteRules.findForSite(tenantId, d.getSiteId()).orElse(null);
@@ -48,6 +56,11 @@ public class FuelEligibilityService {
                 Set<UUID> listed = siteTankers.findForSite(tenantId, d.getSiteId()).stream().map(FuelSiteApprovedTanker::getTankerId).collect(Collectors.toSet());
                 BigDecimal total = tankerCompartments.stream().map(FuelTankerCompartment::getCapacityLitres).reduce(BigDecimal.ZERO, BigDecimal::add);
                 out.addAll(siteTankerFindings(site.getName(), rule, listed, tanker, total));
+            }
+            // A suspension or restriction recorded at the site counts even when the site has no rule requiring approved drivers.
+            if (site != null) {
+                FuelSiteDriverApproval approval = driverApprovals.findForDriver(tenantId, d.getSiteId(), driverEmployeeId).orElse(null);
+                out.addAll(siteDriverFindings(site.getName(), rule, approval, driverLabel, today));
             }
         }
         out.sort(Comparator.comparing(f -> f.severity().ordinal()));
@@ -78,6 +91,58 @@ public class FuelEligibilityService {
         }
         if (rule.getAccessNotes() != null) out.add(new Finding("SITE_ACCESS_NOTES", Severity.INFO, "Access at " + siteName + ": " + rule.getAccessNotes()));
         return out;
+    }
+
+    /**
+     * The driver's standing at the site. A suspension blocks always; a restriction is a review; the other checks apply only when the site's
+     * rule requires approved drivers. A driver who is not inducted, or whose induction or required training has expired, is blocked, and
+     * the site's own dates are only compared with today. A missing expiry date is a review. Pure, so it can be tested without a database.
+     */
+    static List<Finding> siteDriverFindings(String siteName, FuelSiteAccessRule rule, FuelSiteDriverApproval a, String driver, LocalDate today) {
+        List<Finding> out = new ArrayList<>();
+        boolean required = rule != null && rule.isRequireApprovedDrivers();
+        if (a == null) {
+            if (required) out.add(block("SITE_DRIVER_NOT_APPROVED", driver + " is not on " + siteName + "'s list of approved drivers, so has not been inducted there."));
+            return out;
+        }
+        if (FuelSiteDriverApproval.SUSPENDED.equals(a.getStatus())) {
+            out.add(block("SITE_DRIVER_SUSPENDED", driver + " is suspended at " + siteName + ": " + a.getConditions()));
+            return out;
+        }
+        if (FuelSiteDriverApproval.RESTRICTED.equals(a.getStatus())) {
+            out.add(review("SITE_DRIVER_RESTRICTED", driver + " is restricted at " + siteName + ": " + a.getConditions()));
+        }
+        if (required) {
+            if (a.getInductionExpiry() == null) out.add(review("SITE_DRIVER_INDUCTION_NO_EXPIRY", "The induction of " + driver + " at " + siteName + " has no expiry date recorded."));
+            else if (a.getInductionExpiry().isBefore(today)) out.add(block("SITE_DRIVER_INDUCTION_EXPIRED", "The induction of " + driver + " at " + siteName + " expired on " + a.getInductionExpiry() + "."));
+            String training = rule.getRequiredTraining();
+            if (training != null) {
+                if (a.getTrainingRef() == null) out.add(block("SITE_DRIVER_TRAINING_MISSING", siteName + " requires " + training + " and none is recorded for " + driver + "."));
+                else if (a.getTrainingExpiry() == null) out.add(review("SITE_DRIVER_TRAINING_NO_EXPIRY", "The " + training + " of " + driver + " has no expiry date recorded."));
+                else if (a.getTrainingExpiry().isBefore(today)) out.add(block("SITE_DRIVER_TRAINING_EXPIRED", "The " + training + " of " + driver + " expired on " + a.getTrainingExpiry() + "."));
+            }
+        }
+        if (FuelSiteDriverApproval.APPROVED.equals(a.getStatus()) && a.getConditions() != null) {
+            out.add(new Finding("SITE_DRIVER_CONDITIONS", Severity.INFO, "Conditions at " + siteName + " for " + driver + ": " + a.getConditions()));
+        }
+        return out;
+    }
+
+    /** What the check would say about an approval today, in one word, for the approvals list. */
+    static String approvalState(FuelSiteAccessRule rule, FuelSiteDriverApproval a, LocalDate today) {
+        if (FuelSiteDriverApproval.SUSPENDED.equals(a.getStatus())) return "SUSPENDED";
+        boolean required = rule != null && rule.isRequireApprovedDrivers();
+        if (required) {
+            if (a.getInductionExpiry() != null && a.getInductionExpiry().isBefore(today)) return "EXPIRED";
+            String training = rule.getRequiredTraining();
+            if (training != null) {
+                if (a.getTrainingRef() == null) return "TRAINING_MISSING";
+                if (a.getTrainingExpiry() != null && a.getTrainingExpiry().isBefore(today)) return "TRAINING_EXPIRED";
+                if (a.getTrainingExpiry() == null) return "TRAINING_NO_EXPIRY";
+            }
+            if (a.getInductionExpiry() == null) return "NO_EXPIRY";
+        }
+        return FuelSiteDriverApproval.RESTRICTED.equals(a.getStatus()) ? "RESTRICTED" : "OK";
     }
 
     private static void dimension(List<Finding> out, String site, String reg, String what, String code, BigDecimal max, BigDecimal actual) {
@@ -134,7 +199,8 @@ public class FuelEligibilityService {
         for (UUID id : ids) tankers.findActiveById(tenantId, id).orElseThrow(() -> new ResourceNotFoundException("Tanker", id.toString()));
         FuelSiteAccessRule rule = siteRules.findForSite(tenantId, siteId).orElseGet(() -> FuelSiteAccessRule.forSite(tenantId, siteId));
         rule.update(req.maxCapacityLitres(), req.maxGvmKg(), req.maxLengthM(), req.maxWidthM(), req.maxHeightM(),
-                req.approvedTypes() == null ? Set.of() : new LinkedHashSet<>(req.approvedTypes()), req.accessNotes(), by);
+                req.approvedTypes() == null ? Set.of() : new LinkedHashSet<>(req.approvedTypes()), req.accessNotes(),
+                req.requireApprovedDrivers(), req.requiredTraining(), by);
         siteRules.save(rule);
         siteTankers.deleteForSite(tenantId, siteId);
         siteTankers.saveAll(ids.stream().map(t -> FuelSiteApprovedTanker.of(tenantId, siteId, t)).toList());
@@ -145,13 +211,50 @@ public class FuelEligibilityService {
         List<ApprovedTankerView> listed = siteTankers.findForSite(tenantId, siteId).stream()
                 .map(a -> tankers.findActiveById(tenantId, a.getTankerId()).map(t -> new ApprovedTankerView(t.getId(), t.getRegistration())).orElse(null))
                 .filter(Objects::nonNull).sorted(Comparator.comparing(ApprovedTankerView::registration)).toList();
-        if (r == null) return new SiteRuleView(siteId, !listed.isEmpty(), null, null, null, null, null, List.of(), null, listed);
+        if (r == null) return new SiteRuleView(siteId, !listed.isEmpty(), null, null, null, null, null, List.of(), null, listed, false, null);
         return new SiteRuleView(siteId, true, r.getMaxCapacityLitres(), r.getMaxGvmKg(), r.getMaxLengthM(), r.getMaxWidthM(), r.getMaxHeightM(),
-                List.copyOf(r.approvedTypeSet()), r.getAccessNotes(), listed);
+                List.copyOf(r.approvedTypeSet()), r.getAccessNotes(), listed, r.isRequireApprovedDrivers(), r.getRequiredTraining());
     }
 
     private void requireSite(TenantId tenantId, UUID siteId) {
         sites.findActiveById(tenantId, siteId).orElseThrow(() -> new ResourceNotFoundException("Delivery site", siteId.toString()));
+    }
+
+    // ── Driver approvals ─────────────────────────────────────────────────────
+
+    @Transactional(readOnly = true)
+    public List<DriverApprovalView> driverApprovals(TenantId tenantId, UUID siteId) {
+        requireSite(tenantId, siteId);
+        FuelSiteAccessRule rule = siteRules.findForSite(tenantId, siteId).orElse(null);
+        LocalDate today = LocalDate.now(SAST);
+        return driverApprovals.findForSite(tenantId, siteId).stream()
+                .map(a -> approvalView(tenantId, rule, a, today))
+                .sorted(Comparator.comparing((DriverApprovalView v) -> v.driverName() == null ? "" : v.driverName())).toList();
+    }
+
+    /** Adds or replaces a driver's standing at the site. The driver must be an employee who is still employed. */
+    @Transactional
+    public DriverApprovalView saveDriverApproval(TenantId tenantId, UUID siteId, UUID employeeId, DriverApprovalRequest req, UUID by) {
+        requireSite(tenantId, siteId);
+        EmployeeSummary e = hr.findEmployeeById(tenantId, employeeId).orElseThrow(() -> new ResourceNotFoundException("Driver", employeeId.toString()));
+        if (e.status() != null && e.status().toUpperCase().startsWith("TERMINATED")) throw new IllegalStateException(e.fullName() + " is no longer employed.");
+        FuelSiteDriverApproval a = driverApprovals.findForDriver(tenantId, siteId, employeeId).orElseGet(() -> FuelSiteDriverApproval.forDriver(tenantId, siteId, employeeId));
+        a.update(req.status(), req.inductionDate(), req.inductionExpiry(), req.trainingRef(), req.trainingExpiry(), req.conditions(), by);
+        driverApprovals.save(a);
+        return approvalView(tenantId, siteRules.findForSite(tenantId, siteId).orElse(null), a, LocalDate.now(SAST));
+    }
+
+    @Transactional
+    public void removeDriverApproval(TenantId tenantId, UUID siteId, UUID employeeId) {
+        requireSite(tenantId, siteId);
+        FuelSiteDriverApproval a = driverApprovals.findForDriver(tenantId, siteId, employeeId).orElseThrow(() -> new ResourceNotFoundException("Driver approval", employeeId.toString()));
+        driverApprovals.delete(a);
+    }
+
+    private DriverApprovalView approvalView(TenantId tenantId, FuelSiteAccessRule rule, FuelSiteDriverApproval a, LocalDate today) {
+        String name = hr.findEmployeeById(tenantId, a.getEmployeeId()).map(EmployeeSummary::fullName).orElse("(employee removed)");
+        return new DriverApprovalView(a.getEmployeeId(), name, a.getStatus(), a.getInductionDate(), a.getInductionExpiry(), a.getTrainingRef(), a.getTrainingExpiry(),
+                a.getConditions(), approvalState(rule, a, today));
     }
 
     // ── Tanker specifications ────────────────────────────────────────────────
