@@ -65,7 +65,8 @@ public class FuelRouteController {
     @PreAuthorize("hasAnyAuthority('FUEL_MANAGE','FUEL_TRANSPORT_MANAGE')")
     public ResponseEntity<ApiResponse<RouteView>> addStop(@PathVariable UUID id, @Valid @RequestBody AddStopRequest req) {
         featureGuard.requireModule("fuel");
-        return ResponseEntity.ok(ApiResponse.success("Stop added", routes.addStop(TenantContext.getTenantIdAsObject(), id, req)));
+        return ResponseEntity.ok(ApiResponse.success("Stop added", routes.addStop(TenantContext.getTenantIdAsObject(), id, req,
+                new za.co.handyflow.platform.fuel.dto.EligibilityDtos.ReviewAuthority(FuelEligibilityAuthority.canReview(), TenantContext.getCurrentUserId()))));
     }
 
     @DeleteMapping("/{id}/stops/{deliveryId}")

@@ -13,8 +13,12 @@ import java.util.UUID;
 public record AllocationRequest(
         @NotNull UUID tankerId,
         @NotNull UUID driverEmployeeId,
-        @NotEmpty @Valid List<CompartmentLoad> loads
+        @NotEmpty @Valid List<CompartmentLoad> loads,
+        // Only needed when the eligibility check has review points: why an authorised person is allocating it anyway.
+        String reviewReason
 ) {
+    public AllocationRequest(UUID tankerId, UUID driverEmployeeId, List<CompartmentLoad> loads) { this(tankerId, driverEmployeeId, loads, null); }
+
     public record CompartmentLoad(@NotNull UUID compartmentId,
                                   @NotNull @Positive(message = "Litres must be above zero") BigDecimal litres) {}
 }

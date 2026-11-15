@@ -35,6 +35,22 @@ public class FuelTanker {
     @Column(name = "fleet_vehicle_id")
     private UUID fleetVehicleId;
 
+    /** Free-text type chosen by the company (for example RIGID or ARTICULATED), upper case. Sites list the types they accept. Optional. */
+    @Column(name = "tanker_type", length = 40)
+    private String tankerType;
+
+    @Column(name = "gvm_kg")
+    private Integer gvmKg;
+
+    @Column(name = "length_m", precision = 5, scale = 2)
+    private java.math.BigDecimal lengthM;
+
+    @Column(name = "width_m", precision = 5, scale = 2)
+    private java.math.BigDecimal widthM;
+
+    @Column(name = "height_m", precision = 5, scale = 2)
+    private java.math.BigDecimal heightM;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
@@ -66,6 +82,18 @@ public class FuelTanker {
         this.fleetVehicleId = vehicleId;
         if (vehicleId != null) update(fleetRegistration, this.name);
         else this.updatedAt = Instant.now();
+    }
+
+    /** Optional specifications that site access rules are checked against. Blank or null clears one. */
+    public void updateSpecs(String type, Integer gvmKg, java.math.BigDecimal lengthM, java.math.BigDecimal widthM, java.math.BigDecimal heightM) {
+        if (gvmKg != null && gvmKg <= 0) throw new IllegalArgumentException("The gross vehicle mass must be more than zero.");
+        for (java.math.BigDecimal d : new java.math.BigDecimal[]{lengthM, widthM, heightM}) {
+            if (d != null && d.signum() <= 0) throw new IllegalArgumentException("A dimension must be more than zero.");
+        }
+        String t = type == null || type.isBlank() ? null : type.trim().toUpperCase();
+        if (t != null && t.length() > 40) throw new IllegalArgumentException("The tanker type can be at most 40 characters.");
+        this.tankerType = t; this.gvmKg = gvmKg; this.lengthM = lengthM; this.widthM = widthM; this.heightM = heightM;
+        this.updatedAt = Instant.now();
     }
 
     public void deactivate() { this.active = false; this.deletedAt = Instant.now(); this.updatedAt = Instant.now(); }

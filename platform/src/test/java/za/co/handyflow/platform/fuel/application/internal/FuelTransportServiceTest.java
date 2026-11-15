@@ -48,6 +48,7 @@ class FuelTransportServiceTest {
     @Mock HrFacade hr;
     @Mock CrmFacade crm;
     @Mock FuelComplianceService compliance;
+    @Mock FuelEligibilityService eligibility;
     @Mock ObjectProvider<FleetVehicleLookup> fleetProvider;
     @Mock FleetVehicleLookup fleetLookup;
     @InjectMocks FuelTransportService service;
@@ -72,6 +73,7 @@ class FuelTransportServiceTest {
         when(deliveries.findTankerConflicts(any(), any(), any(), any(), any())).thenReturn(List.of());
         when(deliveries.findDriverConflicts(any(), any(), any(), any(), any())).thenReturn(List.of());
         when(fuelService.deliveriesForOrderOrSelf(any(), any())).thenReturn(null);
+        when(eligibility.evaluate(any(), any(), any(), any(), any(), any())).thenReturn(za.co.handyflow.platform.fuel.dto.EligibilityDtos.EligibilityResult.NONE);
     }
 
     private AllocationRequest alloc(String a, String b) {
@@ -301,5 +303,35 @@ class FuelTransportServiceTest {
         load.joinRoute(UUID.randomUUID(), 1);
         assertThrows(IllegalStateException.class, () -> service.allocate(T, load.getId(), alloc("10000", "2000")));
         verify(deliveries, never()).save(any());
+    }
+
+    @Test @DisplayName("eligibility is checked last: a block from it leaves the load unallocated")
+    void eligibilityBlockStopsAllocation() {
+        doThrow(new IllegalStateException("This load cannot be allocated to GP 12 AB: not on the site's list")).when(eligibility).enforce(any(), any(), any(), any(), any(), any(), any());
+        var e = assertThrows(IllegalStateException.class, () -> service.allocate(T, load.getId(), alloc("10000", "2000")));
+        assertTrue(e.getMessage().contains("not on the site's list"));
+        assertFalse(load.isAllocated());
+        verify(deliveries, never()).save(any());
+        verify(loadSplits, never()).saveAll(any());
+    }
+
+    @Test @DisplayName("the review reason and who is allocating are passed to the eligibility check")
+    void reviewPassedThrough() {
+        var who = new za.co.handyflow.platform.fuel.dto.EligibilityDtos.ReviewAuthority(true, UUID.randomUUID());
+        var req = new AllocationRequest(tanker.getId(), driver.id(), List.of(
+                new AllocationRequest.CompartmentLoad(c1.getId(), bd("10000")), new AllocationRequest.CompartmentLoad(c2.getId(), bd("2000"))), "Weight confirmed by phone");
+        service.allocate(T, load.getId(), req, null, who);
+        verify(eligibility).enforce(eq(T), eq(load), eq(tanker), eq(driver.id()), any(), eq("Weight confirmed by phone"), eq(who));
+        assertTrue(load.isAllocated());
+    }
+
+    @Test @DisplayName("previewing changes nothing and returns what the eligibility check found")
+    void preview() {
+        var finding = new za.co.handyflow.platform.fuel.dto.EligibilityDtos.EligibilityResult(List.of(new za.co.handyflow.platform.fuel.dto.EligibilityDtos.Finding("X",
+                za.co.handyflow.platform.fuel.dto.EligibilityDtos.Severity.REVIEW, "Check the weight")));
+        when(eligibility.evaluate(any(), any(), any(), any(), any(), any())).thenReturn(finding);
+        assertSame(finding, service.previewEligibility(T, load.getId(), alloc("10000", "2000")));
+        assertFalse(load.isAllocated());
+        verify(eligibility, never()).enforce(any(), any(), any(), any(), any(), any(), any());
     }
 }

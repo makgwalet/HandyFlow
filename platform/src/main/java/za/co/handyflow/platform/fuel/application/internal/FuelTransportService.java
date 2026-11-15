@@ -11,6 +11,8 @@ import za.co.handyflow.platform.fuel.FleetVehicleLookup.VehicleRef;
 import za.co.handyflow.platform.fuel.domain.model.*;
 import za.co.handyflow.platform.fuel.domain.repository.*;
 import za.co.handyflow.platform.fuel.dto.*;
+import za.co.handyflow.platform.fuel.dto.EligibilityDtos.EligibilityResult;
+import za.co.handyflow.platform.fuel.dto.EligibilityDtos.ReviewAuthority;
 import za.co.handyflow.platform.hr.EmployeeSummary;
 import za.co.handyflow.platform.hr.application.HrFacade;
 import za.co.handyflow.platform.shared.ConflictException;
@@ -42,6 +44,7 @@ public class FuelTransportService {
     private final HrFacade hr;
     private final CrmFacade crm;
     private final FuelComplianceService compliance;
+    private final FuelEligibilityService eligibility;
     private final ObjectProvider<FleetVehicleLookup> fleet;
 
     // ── Tankers ──────────────────────────────────────────────────────────────
@@ -126,13 +129,31 @@ public class FuelTransportService {
         return allocate(tenantId, deliveryId, req, null);
     }
 
+    @Transactional
+    public DeliveryResponse allocate(TenantId tenantId, UUID deliveryId, AllocationRequest req, UUID routeId) {
+        return allocate(tenantId, deliveryId, req, routeId, ReviewAuthority.NONE);
+    }
+
+    /**
+     * What allocating this tanker and driver to this load would run into, without changing anything: Blocks, Reviews and information for
+     * the screen. Allocation makes the same check, so a load that previews clean is not turned away later by eligibility.
+     */
+    @Transactional(readOnly = true)
+    public EligibilityResult previewEligibility(TenantId tenantId, UUID deliveryId, AllocationRequest req) {
+        FuelDelivery d = deliveries.findActiveById(tenantId, deliveryId).orElseThrow(() -> new ResourceNotFoundException("Delivery", deliveryId.toString()));
+        FuelTanker tanker = findTanker(tenantId, req.tankerId());
+        EmployeeSummary driver = hr.findEmployeeById(tenantId, req.driverEmployeeId())
+                .orElseThrow(() -> new ResourceNotFoundException("Driver", req.driverEmployeeId().toString()));
+        return eligibility.evaluate(tenantId, d, tanker, driver.id(), driver.fullName(), compartments.findByTanker(tenantId, tanker.getId()));
+    }
+
     /**
      * Allocates a load. With a route id the load is a stop on that route: the tanker is shared with the route's other stops, so
      * the time-conflict check ignores them, a compartment may be used by several stops as long as together they fit and carry
      * one fuel type, and a load already on a route can only be changed from that route.
      */
     @Transactional
-    public DeliveryResponse allocate(TenantId tenantId, UUID deliveryId, AllocationRequest req, UUID routeId) {
+    public DeliveryResponse allocate(TenantId tenantId, UUID deliveryId, AllocationRequest req, UUID routeId, ReviewAuthority review) {
         FuelDelivery d = deliveries.findActiveByIdForUpdate(tenantId, deliveryId)
                 .orElseThrow(() -> new ResourceNotFoundException("Delivery", deliveryId.toString()));
         if (routeId == null && d.getRouteId() != null) {
@@ -178,6 +199,10 @@ public class FuelTransportService {
         if (deliveries.findDriverConflicts(tenantId, req.driverEmployeeId(), d.getId(), from, to).stream().anyMatch(c -> !sameRoute(c, routeId))) {
             throw new IllegalStateException(driver.fullName() + " is already on another load within " + TURNAROUND.toHours() + " hours of this one.");
         }
+
+        // Last, so a review acknowledgement is only recorded for an allocation that goes ahead.
+        eligibility.enforce(tenantId, d, tanker, driver.id(),
+                eligibility.evaluate(tenantId, d, tanker, driver.id(), driver.fullName(), comps.values()), req.reviewReason(), review);
 
         d.allocate(tanker.getId(), tanker.getRegistration(), driver.id(), driver.fullName());
         deliveries.save(d);

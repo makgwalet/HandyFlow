@@ -17,7 +17,9 @@ public final class RouteDtos {
 
     public record CreateRouteRequest(@NotNull LocalDate routeDate, @Size(max = 100) String label, @NotNull UUID tankerId, @NotNull UUID driverEmployeeId) {}
 
-    public record AddStopRequest(@NotNull UUID deliveryId, @NotEmpty List<AllocationRequest.CompartmentLoad> loads) {}
+    public record AddStopRequest(@NotNull UUID deliveryId, @NotEmpty List<AllocationRequest.CompartmentLoad> loads, String reviewReason) {
+        public AddStopRequest(UUID deliveryId, List<AllocationRequest.CompartmentLoad> loads) { this(deliveryId, loads, null); }
+    }
 
     public record StopOrderRequest(@NotEmpty List<UUID> deliveryIds) {}
 

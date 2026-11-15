@@ -107,7 +107,7 @@ class FuelRouteServiceTest {
         FuelDelivery d = load(10, "4000");
         service.addStop(T, route.getId(), add(d));
         var cap = org.mockito.ArgumentCaptor.forClass(AllocationRequest.class);
-        verify(transport).allocate(eq(T), eq(d.getId()), cap.capture(), eq(route.getId()));
+        verify(transport).allocate(eq(T), eq(d.getId()), cap.capture(), eq(route.getId()), any());
         assertEquals(tanker.getId(), cap.getValue().tankerId()); assertEquals(driver.id(), cap.getValue().driverEmployeeId());
         assertEquals(route.getId(), d.getRouteId()); assertEquals(2, d.getRouteSequence());
     }
@@ -122,7 +122,7 @@ class FuelRouteServiceTest {
         assertThrows(IllegalStateException.class, () -> service.addStop(T, route.getId(), add(wrongDay)));
         FuelDelivery onRoad = load(9, "1000"); onRoad.dispatch("D", "V");
         assertThrows(IllegalStateException.class, () -> service.addStop(T, route.getId(), add(onRoad)));
-        verify(transport, never()).allocate(any(), any(), any(), any());
+        verify(transport, never()).allocate(any(), any(), any(), any(), any());
     }
 
     @Test @DisplayName("nothing can be added to or changed on a cancelled route")

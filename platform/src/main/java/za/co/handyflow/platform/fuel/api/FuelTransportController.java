@@ -81,7 +81,16 @@ public class FuelTransportController {
     @PreAuthorize("hasAnyAuthority('FUEL_MANAGE','FUEL_TRANSPORT_MANAGE')")
     public ResponseEntity<ApiResponse<DeliveryResponse>> allocate(@PathVariable UUID id, @Valid @RequestBody AllocationRequest req) {
         featureGuard.requireModule("fuel");
-        return ResponseEntity.ok(ApiResponse.success("Load allocated", transport.allocate(TenantContext.getTenantIdAsObject(), id, req)));
+        return ResponseEntity.ok(ApiResponse.success("Load allocated", transport.allocate(TenantContext.getTenantIdAsObject(), id, req, null,
+                new EligibilityDtos.ReviewAuthority(FuelEligibilityAuthority.canReview(), TenantContext.getCurrentUserId()))));
+    }
+
+    /** What allocating this tanker and driver would run into: Blocks, Reviews and information. Changes nothing. */
+    @PostMapping("/deliveries/{id}/eligibility")
+    @PreAuthorize("hasAnyAuthority('FUEL_MANAGE','FUEL_TRANSPORT_MANAGE','FUEL_READ')")
+    public ResponseEntity<ApiResponse<EligibilityDtos.EligibilityResult>> eligibility(@PathVariable UUID id, @Valid @RequestBody AllocationRequest req) {
+        featureGuard.requireModule("fuel");
+        return ResponseEntity.ok(ApiResponse.success(transport.previewEligibility(TenantContext.getTenantIdAsObject(), id, req)));
     }
 
     @GetMapping("/planning")

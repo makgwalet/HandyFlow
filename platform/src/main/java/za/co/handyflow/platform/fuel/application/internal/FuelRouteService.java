@@ -15,6 +15,7 @@ import za.co.handyflow.platform.fuel.domain.repository.FuelRouteRepository;
 import za.co.handyflow.platform.fuel.domain.repository.FuelTankerCompartmentRepository;
 import za.co.handyflow.platform.fuel.domain.repository.FuelTankerRepository;
 import za.co.handyflow.platform.fuel.dto.AllocationRequest;
+import za.co.handyflow.platform.fuel.dto.EligibilityDtos.ReviewAuthority;
 import za.co.handyflow.platform.fuel.dto.RouteDtos.*;
 import za.co.handyflow.platform.hr.EmployeeSummary;
 import za.co.handyflow.platform.hr.application.HrFacade;
@@ -80,6 +81,12 @@ public class FuelRouteService {
     /** Puts a scheduled load on the route as the last stop, allocating it to the route's tanker and driver with the given compartment split. */
     @Transactional
     public RouteView addStop(TenantId tenantId, UUID routeId, AddStopRequest req) {
+        return addStop(tenantId, routeId, req, ReviewAuthority.NONE);
+    }
+
+    /** As above; {@code review} says whether the caller may allocate a stop that has eligibility review points, which also needs a reason in the request. */
+    @Transactional
+    public RouteView addStop(TenantId tenantId, UUID routeId, AddStopRequest req, ReviewAuthority review) {
         FuelRoute r = open(tenantId, routeId);
         FuelDelivery d = deliveries.findActiveByIdForUpdate(tenantId, req.deliveryId()).orElseThrow(() -> new ResourceNotFoundException("Delivery", req.deliveryId().toString()));
         if (d.getRouteId() != null) throw new IllegalStateException("This load is already a stop on a route.");
@@ -87,7 +94,7 @@ public class FuelRouteService {
         LocalDate day = d.getScheduledAt().atZone(SAST).toLocalDate();
         if (!day.equals(r.getRouteDate())) throw new IllegalStateException("This load is scheduled for " + day + ", but the route is for " + r.getRouteDate() + ".");
         List<FuelDelivery> current = deliveries.findByRoute(tenantId, routeId);
-        transport.allocate(tenantId, d.getId(), new AllocationRequest(r.getTankerId(), r.getDriverEmployeeId(), req.loads()), routeId);
+        transport.allocate(tenantId, d.getId(), new AllocationRequest(r.getTankerId(), r.getDriverEmployeeId(), req.loads(), req.reviewReason()), routeId, review);
         // allocate() saved and flushed the delivery; reload so the route fields go on the same managed row
         FuelDelivery fresh = deliveries.findActiveByIdForUpdate(tenantId, d.getId()).orElseThrow();
         int next = current.stream().mapToInt(x -> x.getRouteSequence() == null ? 0 : x.getRouteSequence()).max().orElse(0) + 1;
