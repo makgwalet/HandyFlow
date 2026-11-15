@@ -32,3 +32,12 @@ export function runText(r: RunResult): string {
   if (r.failed > 0) parts.push(`${r.failed} rule${r.failed === 1 ? "" : "s"} could not run: see the log below.`)
   return parts.join(" ")
 }
+
+/** Message for the "variance open too long" days box, or null. Empty is allowed: it switches the alert off. */
+export function validateReviewDays(text: string): string | null {
+  if (text.trim() === "") return null
+  const n = Number(text)
+  if (!Number.isInteger(n) || n < 1 || n > 365) return "Days must be a whole number from 1 to 365, or empty for no alert."
+  return null
+}
+export const reviewDaysValue = (text: string): number | null => text.trim() === "" ? null : Number(text)

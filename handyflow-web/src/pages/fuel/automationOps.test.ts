@@ -27,3 +27,15 @@ describe("automationOps (6b)", () => {
     expect(t).toMatch(/No requisition was drafted/); expect(t).toMatch(/2 tanks are below the level but already have/); expect(t).toMatch(/1 rule could not run/)
   })
 })
+
+import { validateReviewDays, reviewDaysValue } from "./automationOps"
+describe("variance review days", () => {
+  it("allows empty (off) and 1 to 365 whole days only", () => {
+    expect(validateReviewDays("")).toBeNull()
+    expect(validateReviewDays("  ")).toBeNull()
+    expect(validateReviewDays("1")).toBeNull()
+    expect(validateReviewDays("365")).toBeNull()
+    for (const bad of ["0", "366", "-3", "2.5", "abc"]) expect(validateReviewDays(bad)).toMatch(/1 to 365/)
+  })
+  it("empty means null, otherwise the number", () => { expect(reviewDaysValue("")).toBeNull(); expect(reviewDaysValue("14")).toBe(14) })
+})

@@ -136,10 +136,10 @@ public class FuelAutomationService {
     }
 
     @Transactional(readOnly = true)
-    public AutomationSettings settings(TenantId tenantId) { return new AutomationSettings(settings.current(tenantId).isAlertOverduePurchaseOrders()); }
+    public AutomationSettings settings(TenantId tenantId) { var s = settings.current(tenantId); return new AutomationSettings(s.isAlertOverduePurchaseOrders(), s.getVarianceReviewDays()); }
 
     @Transactional
-    public AutomationSettings updateSettings(TenantId tenantId, boolean alertOverdue) { return settings.updateAutomation(tenantId, alertOverdue); }
+    public AutomationSettings updateSettings(TenantId tenantId, boolean alertOverdue, Integer varianceReviewDays) { return settings.updateAutomation(tenantId, alertOverdue, varianceReviewDays); }
 
     private void requireSupplier(TenantId tenantId, UUID supplierId) {
         if (supplierId != null && suppliers.findActiveById(tenantId, supplierId).isEmpty()) throw new ResourceNotFoundException("Supplier", supplierId.toString());

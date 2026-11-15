@@ -64,6 +64,10 @@ public class FuelDeliveryVariance {
     @Column(name = "detected_at", nullable = false)
     private Instant detectedAt = Instant.now();
 
+    /** When the administrators were told this variance had stayed unresolved too long; null until then. Set by a guarded update. */
+    @Column(name = "overdue_alerted_at", insertable = false, updatable = false)
+    private Instant overdueAlertedAt;
+
     @Version
     private Long version;
 

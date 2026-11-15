@@ -81,6 +81,6 @@ public class FuelAutomationController {
     @PreAuthorize("hasAnyAuthority('FUEL_MANAGE','FUEL_PURCHASING_MANAGE')")
     public ResponseEntity<ApiResponse<AutomationSettings>> updateSettings(@RequestBody AutomationSettings req) {
         featureGuard.requireModule("fuel");
-        return ResponseEntity.ok(ApiResponse.success("Saved", automation.updateSettings(TenantContext.getTenantIdAsObject(), req.alertOverduePurchaseOrders())));
+        return ResponseEntity.ok(ApiResponse.success("Saved", automation.updateSettings(TenantContext.getTenantIdAsObject(), req.alertOverduePurchaseOrders(), req.varianceReviewDays())));
     }
 }

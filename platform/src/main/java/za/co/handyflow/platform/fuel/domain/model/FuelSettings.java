@@ -80,6 +80,10 @@ public class FuelSettings {
     @Column(name = "alert_overdue_purchase_orders", nullable = false)
     private boolean alertOverduePurchaseOrders = false;
 
+    /** Days an unresolved delivery variance may stay open before the administrators are told. Null: no alert. */
+    @Column(name = "variance_review_days")
+    private Integer varianceReviewDays;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt = Instant.now();
 
@@ -160,6 +164,12 @@ public class FuelSettings {
 
     public void updateAutomation(boolean alertOverduePurchaseOrders) {
         this.alertOverduePurchaseOrders = alertOverduePurchaseOrders; this.updatedAt = Instant.now();
+    }
+
+    /** Days an unresolved variance may stay open before an alert, 1 to 365; null switches the alert off. There is no default. */
+    public void updateVarianceReviewDays(Integer days) {
+        if (days != null && (days < 1 || days > 365)) throw new IllegalArgumentException("Days must be between 1 and 365, or empty to switch the alert off.");
+        this.varianceReviewDays = days; this.updatedAt = Instant.now();
     }
 
     public java.util.Set<String> blockingActivities() {

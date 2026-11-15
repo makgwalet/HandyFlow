@@ -10,7 +10,7 @@ vi.mock("../../hooks/usePermission", () => ({ usePermissions: (ps: string[]) => 
 
 const rule = (o: any = {}) => ({ id: "r1", tankId: "t1", tankName: "Tank 1", fuelType: "DIESEL_50", currentLitres: 1500, supplierId: "s1", supplierName: "Sasol", reorderBelowLitres: 2000, orderLitres: 5000,
   estimatedPrice: 21.5, enabled: true, belowLevel: true, lastCheckedAt: null, lastDraftedAt: null, ...o })
-let rules: any[] = []; let log: any[] = []; let alertOn = false
+let rules: any[] = []; let log: any[] = []; let alertOn = false; let reviewDays: number | null = null
 
 function mount() {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } })
@@ -20,13 +20,13 @@ function mount() {
 describe("AutomationTab", () => {
   beforeEach(() => {
     get.mockReset(); post.mockReset(); put.mockReset(); del.mockReset(); perms = ["FUEL_PURCHASING_MANAGE"]
-    rules = [rule()]; log = []; alertOn = false
+    rules = [rule()]; log = []; alertOn = false; reviewDays = null
     post.mockResolvedValue({ data: { data: { checked: 1, drafted: 1, alreadyOpen: 0, failed: 0, requisitionNumbers: ["REQ-2026-00001"] } } })
     put.mockResolvedValue({ data: { data: {} } })
     get.mockImplementation(async (u: string) => {
       if (u.endsWith("/rules")) return { data: { data: rules } }
       if (u.endsWith("/log")) return { data: { data: log } }
-      if (u.endsWith("/settings")) return { data: { data: { alertOverduePurchaseOrders: alertOn } } }
+      if (u.endsWith("/settings")) return { data: { data: { alertOverduePurchaseOrders: alertOn, varianceReviewDays: reviewDays } } }
       if (u.endsWith("/tanks")) return { data: { data: [{ id: "t1", name: "Tank 1" }, { id: "t2", name: "Tank 2" }] } }
       if (u.endsWith("/suppliers")) return { data: { data: [{ id: "s1", name: "Sasol" }] } }
       return { data: { data: [] } }
@@ -79,7 +79,27 @@ describe("AutomationTab", () => {
     await waitFor(() => expect(box.disabled).toBe(false))
     expect(box.checked).toBe(false)
     fireEvent.click(box)
-    await waitFor(() => expect(put).toHaveBeenCalledWith("/api/v1/fuel/automation/settings", { alertOverduePurchaseOrders: true }))
+    await waitFor(() => expect(put).toHaveBeenCalledWith("/api/v1/fuel/automation/settings", { alertOverduePurchaseOrders: true, varianceReviewDays: null }))
+  })
+
+  it("the variance days box starts empty (no default) and saving sends the number with the other setting", async () => {
+    mount()
+    const box = (await screen.findByLabelText(/delivery variance is still unresolved after this many days/)) as HTMLInputElement
+    await waitFor(() => expect(box.disabled).toBe(false))
+    expect(box.value).toBe("")
+    fireEvent.change(box, { target: { value: "5" } })
+    fireEvent.click(screen.getByText("Save days"))
+    await waitFor(() => expect(put).toHaveBeenCalledWith("/api/v1/fuel/automation/settings", { alertOverduePurchaseOrders: false, varianceReviewDays: 5 }))
+  })
+
+  it("refuses days outside 1 to 365", async () => {
+    mount()
+    const box = (await screen.findByLabelText(/delivery variance is still unresolved after this many days/)) as HTMLInputElement
+    await waitFor(() => expect(box.disabled).toBe(false))
+    fireEvent.change(box, { target: { value: "0" } })
+    fireEvent.click(screen.getByText("Save days"))
+    expect(await screen.findByText(/1 to 365/)).toBeTruthy()
+    expect(put).not.toHaveBeenCalled()
   })
 
   it("lists what the rules did, including failures", async () => {

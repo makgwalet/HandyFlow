@@ -5,7 +5,7 @@ import { apiClient } from "../../api/client"
 import { usePermissions } from "../../hooks/usePermission"
 import { Modal, btnPrimary, btnGhost, card, inputStyle, labelStyle, Chip } from "../warehousing/whseUi"
 import { fmtL, fmtR } from "./orderOps"
-import { emptyRule, fromRule, validateRule, toRuleRequest, runText, type Rule, type RuleForm, type LogRow, type RunResult } from "./automationOps"
+import { emptyRule, fromRule, validateRule, toRuleRequest, runText, validateReviewDays, reviewDaysValue, type Rule, type RuleForm, type LogRow, type RunResult } from "./automationOps"
 
 const unwrap = (r: any) => r.data?.data ?? r.data
 const msg = (e: any, fb: string) => e?.response?.data?.message ?? fb
@@ -19,12 +19,18 @@ export default function AutomationTab() {
   const [err, setErr] = useState(""); const [ran, setRan] = useState<RunResult | null>(null)
   const rules = useQuery<Rule[]>({ queryKey: ["fuel-automation-rules"], queryFn: async () => unwrap(await apiClient.get("/api/v1/fuel/automation/rules")) })
   const log = useQuery<LogRow[]>({ queryKey: ["fuel-automation-log"], queryFn: async () => unwrap(await apiClient.get("/api/v1/fuel/automation/log")) })
-  const settings = useQuery<{ alertOverduePurchaseOrders: boolean }>({ queryKey: ["fuel-automation-settings"], queryFn: async () => unwrap(await apiClient.get("/api/v1/fuel/automation/settings")) })
+  const settings = useQuery<{ alertOverduePurchaseOrders: boolean; varianceReviewDays?: number | null }>({ queryKey: ["fuel-automation-settings"], queryFn: async () => unwrap(await apiClient.get("/api/v1/fuel/automation/settings")) })
   const refresh = () => { for (const k of ["fuel-automation-rules", "fuel-automation-log", "fuel-requisitions"]) qc.invalidateQueries({ queryKey: [k] }) }
   const remove = useMutation({ mutationFn: (id: string) => apiClient.delete(`/api/v1/fuel/automation/rules/${id}`), onSuccess: () => { setErr(""); refresh() }, onError: (e: any) => setErr(msg(e, "Could not remove the rule")) })
   const toggle = useMutation({ mutationFn: (r: Rule) => apiClient.put(`/api/v1/fuel/automation/rules/${r.id}`, { ...toRuleRequest(fromRule(r), false), enabled: !r.enabled }), onSuccess: () => { setErr(""); refresh() }, onError: (e: any) => setErr(msg(e, "Could not change the rule")) })
   const run = useMutation({ mutationFn: async () => unwrap(await apiClient.post("/api/v1/fuel/automation/run")) as RunResult, onSuccess: r => { setErr(""); setRan(r); refresh() }, onError: (e: any) => setErr(msg(e, "Could not run the rules")) })
-  const saveSettings = useMutation({ mutationFn: (v: boolean) => apiClient.put("/api/v1/fuel/automation/settings", { alertOverduePurchaseOrders: v }), onSuccess: () => { setErr(""); qc.invalidateQueries({ queryKey: ["fuel-automation-settings"] }) }, onError: (e: any) => setErr(msg(e, "Could not save")) })
+  const [days, setDays] = useState<string | null>(null)
+  const daysText = days ?? (settings.data?.varianceReviewDays == null ? "" : String(settings.data.varianceReviewDays))
+  const saveSettings = useMutation({
+    mutationFn: (v: { alert: boolean; days: number | null }) => apiClient.put("/api/v1/fuel/automation/settings", { alertOverduePurchaseOrders: v.alert, varianceReviewDays: v.days }),
+    onSuccess: () => { setErr(""); setDays(null); qc.invalidateQueries({ queryKey: ["fuel-automation-settings"] }) }, onError: (e: any) => setErr(msg(e, "Could not save")),
+  })
+  const currentDays = settings.data?.varianceReviewDays ?? null
   const rows = rules.data ?? []
   return (
     <div>
@@ -63,10 +69,18 @@ export default function AutomationTab() {
 
       <div style={{ ...card, padding: 14, marginBottom: 14 }}>
         <label style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 13 }}>
-          <input type="checkbox" checked={!!settings.data?.alertOverduePurchaseOrders} disabled={!canManage || !settings.data || saveSettings.isPending} onChange={e => saveSettings.mutate(e.target.checked)} />
+          <input type="checkbox" checked={!!settings.data?.alertOverduePurchaseOrders} disabled={!canManage || !settings.data || saveSettings.isPending} onChange={e => saveSettings.mutate({ alert: e.target.checked, days: currentDays })} />
           Tell the administrators when a purchase order passes its expected date without being fully received
         </label>
         <div style={{ fontSize: 11, color: "var(--hf-text-muted)", marginTop: 4 }}>Off by default. Each order is mentioned once. Orders with no expected date are never flagged.</div>
+        <div style={{ display: "flex", gap: 8, alignItems: "flex-end", flexWrap: "wrap", marginTop: 12 }}>
+          <div>
+            <label style={labelStyle} htmlFor="au-vdays">Warn the administrators when a delivery variance is still unresolved after this many days</label>
+            <input id="au-vdays" inputMode="numeric" value={daysText} placeholder="No alert" disabled={!canManage || !settings.data} onChange={e => { setDays(e.target.value); setErr("") }} style={{ ...inputStyle, width: 120 }} />
+          </div>
+          {canManage && <button style={btnGhost} disabled={saveSettings.isPending || days === null || !settings.data} onClick={() => { const m = validateReviewDays(daysText); if (m) return setErr(m); setErr(""); saveSettings.mutate({ alert: !!settings.data?.alertOverduePurchaseOrders, days: reviewDaysValue(daysText) }) }}>Save days</button>}
+        </div>
+        <div style={{ fontSize: 11, color: "var(--hf-text-muted)", marginTop: 4 }}>The number is your own; there is no default, so no alert is sent until you set one. Counted from when the variance was raised, until it is closed. Each variance is mentioned once.</div>
       </div>
 
       <p style={{ fontSize: 12.5, fontWeight: 700, margin: "0 0 6px" }}>What the rules did</p>

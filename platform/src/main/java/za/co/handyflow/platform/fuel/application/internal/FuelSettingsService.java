@@ -43,10 +43,12 @@ public class FuelSettingsService {
     }
 
     @Transactional
-    public za.co.handyflow.platform.fuel.dto.AutomationDtos.AutomationSettings updateAutomation(TenantId tenantId, boolean alertOverduePurchaseOrders) {
+    public za.co.handyflow.platform.fuel.dto.AutomationDtos.AutomationSettings updateAutomation(TenantId tenantId, boolean alertOverduePurchaseOrders, Integer varianceReviewDays) {
         FuelSettings s = settings.findByTenant(tenantId).orElseGet(() -> FuelSettings.forTenant(tenantId));
         s.updateAutomation(alertOverduePurchaseOrders);
-        return new za.co.handyflow.platform.fuel.dto.AutomationDtos.AutomationSettings(settings.save(s).isAlertOverduePurchaseOrders());
+        s.updateVarianceReviewDays(varianceReviewDays);
+        FuelSettings saved = settings.save(s);
+        return new za.co.handyflow.platform.fuel.dto.AutomationDtos.AutomationSettings(saved.isAlertOverduePurchaseOrders(), saved.getVarianceReviewDays());
     }
 
     @Transactional(readOnly = true)

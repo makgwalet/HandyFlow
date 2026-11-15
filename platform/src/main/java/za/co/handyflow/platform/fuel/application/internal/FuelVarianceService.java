@@ -55,6 +55,18 @@ public class FuelVarianceService {
         return tolerance == null ? 0 : detect(tenantId, tolerance);
     }
 
+    /** Variances unresolved for longer than {@code days} that the administrators have not been told about yet. Read only. */
+    @Transactional(readOnly = true)
+    public List<FuelDeliveryVariance> overdueNotAlerted(TenantId tenantId, int days) {
+        return variances.findOverdueNotAlerted(tenantId, Instant.now().minus(days, ChronoUnit.DAYS));
+    }
+
+    /** Called after the alert went out, so a failed alert is tried again the next day. */
+    @Transactional
+    public void markAlerted(TenantId tenantId, List<UUID> ids) {
+        if (!ids.isEmpty()) variances.markAlerted(tenantId, ids, Instant.now());
+    }
+
     int detect(TenantId tenantId, BigDecimal tolerance) {
         Instant since = Instant.now().minus(LOOKBACK_DAYS, ChronoUnit.DAYS);
         int created = 0;

@@ -26,5 +26,6 @@ public final class AutomationDtos {
     /** drafted: new draft requisitions; alreadyOpen: below level but a requisition or order for the tank is already on the way. */
     public record RunResult(int checked, int drafted, int alreadyOpen, int failed, List<String> requisitionNumbers) {}
 
-    public record AutomationSettings(boolean alertOverduePurchaseOrders) {}
+    /** varianceReviewDays: days an unresolved delivery variance may stay open before the administrators are told; null means no alert. */
+    public record AutomationSettings(boolean alertOverduePurchaseOrders, Integer varianceReviewDays) {}
 }

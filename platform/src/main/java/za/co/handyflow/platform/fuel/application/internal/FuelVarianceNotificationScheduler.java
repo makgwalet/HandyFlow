@@ -41,6 +41,40 @@ public class FuelVarianceNotificationScheduler {
     public void dailySweep() {
         if (!enabled) return;
         sweep();
+        sweepOverdue();
+    }
+
+    /** Public so a test can run it. Tells administrators about variances left unresolved longer than the company's own number of days. Each variance once. */
+    public int sweepOverdue() {
+        int alerted = 0;
+        for (var s : settings.findWithVarianceReviewDays()) {
+            TenantId tenant = s.getTenantId();
+            try {
+                if (!featureGuard.hasModuleFor(tenant, "fuel")) continue;
+                var overdue = variances.overdueNotAlerted(tenant, s.getVarianceReviewDays());
+                if (overdue.isEmpty()) continue;
+                List<Recipient> recipients = adminRecipients.resolveTenantAdmins(tenant);
+                if (recipients.isEmpty()) continue;
+                int n = overdue.size();
+                notifications.send(NotificationRequest.builder()
+                        .tenantId(tenant)
+                        .type(NotificationType.FUEL_VARIANCE_OVERDUE)
+                        .title("Fuel: delivery variance still unresolved")
+                        .message(n + " delivery variance" + (n == 1 ? " has" : "s have") + " been open for more than " + s.getVarianceReviewDays()
+                                + " day" + (s.getVarianceReviewDays() == 1 ? "" : "s") + ". Review " + (n == 1 ? "it" : "them") + " in Fuel > Variances.")
+                        .actionUrl("/fuel/variances")
+                        .sourceModule("fuel")
+                        .sourceEntityId(tenant.getValue().toString())
+                        .recipients(recipients)
+                        .build());
+                variances.markAlerted(tenant, overdue.stream().map(v -> v.getId()).toList());
+                alerted++;
+            } catch (RuntimeException ex) {
+                log.error("Fuel overdue variance sweep failed for tenant {}: {}", tenant, ex.getMessage());
+            }
+        }
+        log.info("Fuel overdue variance sweep: tenants alerted={}", alerted);
+        return alerted;
     }
 
     /** Public so a test can run it. Returns how many tenants were alerted. */
