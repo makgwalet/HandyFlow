@@ -84,6 +84,10 @@ public class FuelSettings {
     @Column(name = "variance_review_days")
     private Integer varianceReviewDays;
 
+    /** When on, a compartment with no product rating is a review point on every allocation. */
+    @Column(name = "require_compartment_rating", nullable = false)
+    private boolean requireCompartmentRating = false;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt = Instant.now();
 
@@ -171,6 +175,8 @@ public class FuelSettings {
         if (days != null && (days < 1 || days > 365)) throw new IllegalArgumentException("Days must be between 1 and 365, or empty to switch the alert off.");
         this.varianceReviewDays = days; this.updatedAt = Instant.now();
     }
+
+    public void updateRequireCompartmentRating(boolean on) { this.requireCompartmentRating = on; this.updatedAt = Instant.now(); }
 
     public java.util.Set<String> blockingActivities() {
         if (licenceBlockingActivities == null || licenceBlockingActivities.isBlank()) return java.util.Set.of();

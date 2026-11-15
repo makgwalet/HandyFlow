@@ -144,7 +144,7 @@ public class FuelTransportService {
         FuelTanker tanker = findTanker(tenantId, req.tankerId());
         EmployeeSummary driver = hr.findEmployeeById(tenantId, req.driverEmployeeId())
                 .orElseThrow(() -> new ResourceNotFoundException("Driver", req.driverEmployeeId().toString()));
-        return eligibility.evaluate(tenantId, d, tanker, driver.id(), driver.fullName(), compartments.findByTanker(tenantId, tanker.getId()));
+        return eligibility.evaluate(tenantId, d, tanker, driver.id(), driver.fullName(), compartments.findByTanker(tenantId, tanker.getId()), req.loads());
     }
 
     /**
@@ -202,7 +202,7 @@ public class FuelTransportService {
 
         // Last, so a review acknowledgement is only recorded for an allocation that goes ahead.
         eligibility.enforce(tenantId, d, tanker, driver.id(),
-                eligibility.evaluate(tenantId, d, tanker, driver.id(), driver.fullName(), comps.values()), req.reviewReason(), review);
+                eligibility.evaluate(tenantId, d, tanker, driver.id(), driver.fullName(), comps.values(), req.loads()), req.reviewReason(), review);
 
         d.allocate(tanker.getId(), tanker.getRegistration(), driver.id(), driver.fullName());
         deliveries.save(d);

@@ -50,4 +50,15 @@ public final class EligibilityDtos {
     public record TankerSpecsRequest(@Size(max = 40) String tankerType, Integer gvmKg, BigDecimal lengthM, BigDecimal widthM, BigDecimal heightM) {}
 
     public record TankerSpecsView(UUID tankerId, String registration, String tankerType, Integer gvmKg, BigDecimal lengthM, BigDecimal widthM, BigDecimal heightM) {}
+
+    // ── Compartment product rating, changeover and cleaning ──────────────────
+
+    public record CompartmentRatingRequest(List<@Size(max = 30) String> fuelTypes) {}
+    /** An empty list of products means the compartment is not restricted. */
+    public record CompartmentRatingView(UUID compartmentId, int number, BigDecimal capacityLitres, List<String> fuelTypes, String lastCargo, java.time.Instant lastCargoAt, java.time.Instant lastCleanedAt) {}
+    public record ChangeoverRuleRequest(@Size(max = 30) String fromFuel, @Size(max = 30) String toFuel, @Size(max = 300) String note) {}
+    public record ChangeoverRuleView(UUID id, String fromFuel, String toFuel, String note) {}
+    public record CleaningRequest(java.time.Instant cleanedAt, @Size(max = 120) String method, @Size(max = 120) String certificateRef, @Size(max = 300) String evidenceNote) {}
+    public record CleaningView(UUID id, UUID compartmentId, java.time.Instant cleanedAt, String method, String certificateRef, String evidenceNote, UUID recordedBy) {}
+    public record EligibilitySettings(boolean requireCompartmentRating) {}
 }

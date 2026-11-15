@@ -73,7 +73,7 @@ class FuelTransportServiceTest {
         when(deliveries.findTankerConflicts(any(), any(), any(), any(), any())).thenReturn(List.of());
         when(deliveries.findDriverConflicts(any(), any(), any(), any(), any())).thenReturn(List.of());
         when(fuelService.deliveriesForOrderOrSelf(any(), any())).thenReturn(null);
-        when(eligibility.evaluate(any(), any(), any(), any(), any(), any())).thenReturn(za.co.handyflow.platform.fuel.dto.EligibilityDtos.EligibilityResult.NONE);
+        when(eligibility.evaluate(any(), any(), any(), any(), any(), any(), any())).thenReturn(za.co.handyflow.platform.fuel.dto.EligibilityDtos.EligibilityResult.NONE);
     }
 
     private AllocationRequest alloc(String a, String b) {
@@ -329,7 +329,7 @@ class FuelTransportServiceTest {
     void preview() {
         var finding = new za.co.handyflow.platform.fuel.dto.EligibilityDtos.EligibilityResult(List.of(new za.co.handyflow.platform.fuel.dto.EligibilityDtos.Finding("X",
                 za.co.handyflow.platform.fuel.dto.EligibilityDtos.Severity.REVIEW, "Check the weight")));
-        when(eligibility.evaluate(any(), any(), any(), any(), any(), any())).thenReturn(finding);
+        when(eligibility.evaluate(any(), any(), any(), any(), any(), any(), any())).thenReturn(finding);
         assertSame(finding, service.previewEligibility(T, load.getId(), alloc("10000", "2000")));
         assertFalse(load.isAllocated());
         verify(eligibility, never()).enforce(any(), any(), any(), any(), any(), any(), any());

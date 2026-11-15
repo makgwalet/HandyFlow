@@ -74,4 +74,70 @@ public class FuelEligibilityController {
         featureGuard.requireModule("fuel");
         return ResponseEntity.ok(ApiResponse.success("Tanker specifications saved", eligibility.saveSpecs(TenantContext.getTenantIdAsObject(), id, req)));
     }
+
+    private static final String MANAGE = "hasAnyAuthority('FUEL_MANAGE','FUEL_TRANSPORT_MANAGE')";
+
+    @GetMapping("/tankers/{id}/compartment-ratings")
+    @PreAuthorize("hasAuthority('FUEL_READ')")
+    public ResponseEntity<ApiResponse<java.util.List<CompartmentRatingView>>> ratings(@PathVariable UUID id) {
+        featureGuard.requireModule("fuel");
+        return ResponseEntity.ok(ApiResponse.success(eligibility.compartmentRatings(TenantContext.getTenantIdAsObject(), id)));
+    }
+
+    @PutMapping("/tankers/{id}/compartments/{compartmentId}/rating")
+    @PreAuthorize(MANAGE)
+    public ResponseEntity<ApiResponse<CompartmentRatingView>> saveRating(@PathVariable UUID id, @PathVariable UUID compartmentId, @Valid @RequestBody CompartmentRatingRequest req) {
+        featureGuard.requireModule("fuel");
+        return ResponseEntity.ok(ApiResponse.success("Rating saved", eligibility.saveCompartmentRating(TenantContext.getTenantIdAsObject(), id, compartmentId, req)));
+    }
+
+    @GetMapping("/tankers/{id}/compartments/{compartmentId}/cleanings")
+    @PreAuthorize("hasAuthority('FUEL_READ')")
+    public ResponseEntity<ApiResponse<java.util.List<CleaningView>>> cleanings(@PathVariable UUID id, @PathVariable UUID compartmentId) {
+        featureGuard.requireModule("fuel");
+        return ResponseEntity.ok(ApiResponse.success(eligibility.cleanings(TenantContext.getTenantIdAsObject(), id, compartmentId)));
+    }
+
+    @PostMapping("/tankers/{id}/compartments/{compartmentId}/cleanings")
+    @PreAuthorize(MANAGE)
+    public ResponseEntity<ApiResponse<CleaningView>> recordCleaning(@PathVariable UUID id, @PathVariable UUID compartmentId, @Valid @RequestBody CleaningRequest req) {
+        featureGuard.requireModule("fuel");
+        return ResponseEntity.ok(ApiResponse.success("Cleaning recorded", eligibility.recordCleaning(TenantContext.getTenantIdAsObject(), id, compartmentId, req, TenantContext.getCurrentUserId())));
+    }
+
+    @GetMapping("/changeover-rules")
+    @PreAuthorize("hasAuthority('FUEL_READ')")
+    public ResponseEntity<ApiResponse<java.util.List<ChangeoverRuleView>>> changeoverRules() {
+        featureGuard.requireModule("fuel");
+        return ResponseEntity.ok(ApiResponse.success(eligibility.changeoverRules(TenantContext.getTenantIdAsObject())));
+    }
+
+    @PostMapping("/changeover-rules")
+    @PreAuthorize(MANAGE)
+    public ResponseEntity<ApiResponse<ChangeoverRuleView>> addChangeoverRule(@Valid @RequestBody ChangeoverRuleRequest req) {
+        featureGuard.requireModule("fuel");
+        return ResponseEntity.ok(ApiResponse.success("Changeover rule added", eligibility.addChangeoverRule(TenantContext.getTenantIdAsObject(), req)));
+    }
+
+    @DeleteMapping("/changeover-rules/{id}")
+    @PreAuthorize(MANAGE)
+    public ResponseEntity<ApiResponse<Void>> removeChangeoverRule(@PathVariable UUID id) {
+        featureGuard.requireModule("fuel");
+        eligibility.removeChangeoverRule(TenantContext.getTenantIdAsObject(), id);
+        return ResponseEntity.ok(ApiResponse.success("Changeover rule removed", null));
+    }
+
+    @GetMapping("/eligibility/settings")
+    @PreAuthorize("hasAuthority('FUEL_READ')")
+    public ResponseEntity<ApiResponse<EligibilitySettings>> settings() {
+        featureGuard.requireModule("fuel");
+        return ResponseEntity.ok(ApiResponse.success(eligibility.eligibilitySettings(TenantContext.getTenantIdAsObject())));
+    }
+
+    @PutMapping("/eligibility/settings")
+    @PreAuthorize(MANAGE)
+    public ResponseEntity<ApiResponse<EligibilitySettings>> saveSettings(@Valid @RequestBody EligibilitySettings req) {
+        featureGuard.requireModule("fuel");
+        return ResponseEntity.ok(ApiResponse.success("Saved", eligibility.saveEligibilitySettings(TenantContext.getTenantIdAsObject(), req)));
+    }
 }

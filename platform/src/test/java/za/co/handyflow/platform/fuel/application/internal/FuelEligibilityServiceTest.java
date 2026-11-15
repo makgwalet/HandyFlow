@@ -42,6 +42,12 @@ class FuelEligibilityServiceTest {
     @Mock FuelEligibilityOverrideRepository overrides;
     @Mock FuelSiteDriverApprovalRepository driverApprovals;
     @Mock HrFacade hr;
+    @Mock FuelCompartmentProductRepository compartmentProducts;
+    @Mock FuelChangeoverRuleRepository changeovers;
+    @Mock FuelCompartmentCleaningRepository cleanings;
+    @Mock FuelDeliveryCompartmentRepository loadSplits;
+    @Mock FuelTankerCompartmentRepository tankerCompartments;
+    @Mock FuelSettingsRepository settings;
     @InjectMocks FuelEligibilityService service;
 
     FuelTanker tanker; FuelCustomerSite site; FuelSiteAccessRule rule; FuelDelivery load; FuelTankerCompartment c1, c2;
@@ -345,5 +351,87 @@ class FuelEligibilityServiceTest {
         when(driverApprovals.findForDriver(T, site.getId(), driverId)).thenReturn(Optional.of(a));
         service.removeDriverApproval(T, site.getId(), driverId);
         verify(driverApprovals).delete(a);
+    }
+
+    // ── Compartment product rating ───────────────────────────────────────────
+
+    private static FuelDeliveryCompartmentRepository.PreviousCargo prev(String fuel, Instant at) { return new FuelDeliveryCompartmentRepository.PreviousCargo(UUID.randomUUID(), fuel, at); }
+    private static final Instant NOW = Instant.parse("2026-11-10T08:00:00Z");
+
+    @Test @DisplayName("a compartment rated for other products is blocked for this one; an unrated compartment is free unless the company asks for ratings")
+    void rating() {
+        assertEquals(Set.of("COMPARTMENT_PRODUCT_NOT_RATED"), codes(FuelEligibilityService.compartmentFindings("GP 1", 1, "PARAFFIN", Set.of("DIESEL"), false, null, Set.of(), null)));
+        assertTrue(FuelEligibilityService.compartmentFindings("GP 1", 1, "DIESEL", Set.of("DIESEL", "PETROL"), false, null, Set.of(), null).isEmpty());
+        assertTrue(FuelEligibilityService.compartmentFindings("GP 1", 1, "DIESEL", Set.of(), false, null, Set.of(), null).isEmpty());
+        var f = FuelEligibilityService.compartmentFindings("GP 1", 1, "DIESEL", Set.of(), true, null, Set.of(), null);
+        assertEquals(Set.of("COMPARTMENT_UNRATED"), codes(f)); assertTrue(f.get(0).severity() == Severity.REVIEW);
+    }
+
+    @Test @DisplayName("diesel to paraffin is blocked without a cleaning after the diesel load, and passes with one; a cleaning before it does not count")
+    void changeover() {
+        var rules = Set.of("DIESEL>PARAFFIN");
+        var last = prev("DIESEL", NOW);
+        assertEquals(Set.of("COMPARTMENT_CLEANING_REQUIRED"), codes(FuelEligibilityService.compartmentFindings("GP 1", 1, "PARAFFIN", Set.of(), false, last, rules, null)));
+        assertEquals(Set.of("COMPARTMENT_CLEANING_REQUIRED"), codes(FuelEligibilityService.compartmentFindings("GP 1", 1, "PARAFFIN", Set.of(), false, last, rules, NOW.minusSeconds(3600))));
+        assertTrue(FuelEligibilityService.compartmentFindings("GP 1", 1, "PARAFFIN", Set.of(), false, last, rules, NOW.plusSeconds(3600)).isEmpty());
+    }
+
+    @Test @DisplayName("no rule for the pair, or the same product again, needs no cleaning; the company decides which pairs matter")
+    void changeoverNeedsARule() {
+        assertTrue(FuelEligibilityService.compartmentFindings("GP 1", 1, "PARAFFIN", Set.of(), false, prev("DIESEL", NOW), Set.of(), null).isEmpty());
+        assertTrue(FuelEligibilityService.compartmentFindings("GP 1", 1, "DIESEL", Set.of(), false, prev("DIESEL", NOW), Set.of("DIESEL>PARAFFIN"), null).isEmpty());
+        assertTrue(FuelEligibilityService.compartmentFindings("GP 1", 1, "PETROL", Set.of(), false, prev("DIESEL", NOW), Set.of("DIESEL>PARAFFIN"), null).isEmpty());
+    }
+
+    @Test @DisplayName("an unknown previous load is a review only when a rule leads into this product and nothing has ever been cleaned")
+    void unknownPrevious() {
+        var f = FuelEligibilityService.compartmentFindings("GP 1", 1, "PARAFFIN", Set.of(), false, null, Set.of("DIESEL>PARAFFIN"), null);
+        assertEquals(Set.of("COMPARTMENT_PREVIOUS_CARGO_UNKNOWN"), codes(f)); assertEquals(Severity.REVIEW, f.get(0).severity());
+        assertTrue(FuelEligibilityService.compartmentFindings("GP 1", 1, "PARAFFIN", Set.of(), false, null, Set.of("DIESEL>PARAFFIN"), NOW).isEmpty());
+        assertTrue(FuelEligibilityService.compartmentFindings("GP 1", 1, "DIESEL", Set.of(), false, null, Set.of("DIESEL>PARAFFIN"), null).isEmpty());
+    }
+
+    @Test @DisplayName("evaluate checks only the compartments the load uses, and a rating on an unused compartment is ignored")
+    void evaluateUsesLoadedCompartments() {
+        when(compartmentProducts.findForCompartments(eq(T), any())).thenReturn(List.of(FuelCompartmentProduct.of(T, c1.getId(), "paraffin")));
+        when(loadSplits.findPreviousCargo(eq(T), any(), any())).thenReturn(List.of());
+        when(changeovers.findAllForTenant(T)).thenReturn(List.of());
+        when(settings.findByTenant(T)).thenReturn(Optional.empty());
+        when(cleanings.findForCompartment(eq(T), any(), any())).thenReturn(List.of());
+        var onC2 = List.of(new za.co.handyflow.platform.fuel.dto.AllocationRequest.CompartmentLoad(c2.getId(), bd("12000")));
+        assertTrue(service.evaluate(T, load, tanker, driverId, "Moses", List.of(c1, c2), onC2).blocks().isEmpty());
+        var onC1 = List.of(new za.co.handyflow.platform.fuel.dto.AllocationRequest.CompartmentLoad(c1.getId(), bd("10000")));
+        assertEquals(Set.of("COMPARTMENT_PRODUCT_NOT_RATED"), codes(service.evaluate(T, load, tanker, driverId, "Moses", List.of(c1, c2), onC1).blocks()));
+    }
+
+    @Test @DisplayName("evaluate takes the most recent previous load per compartment")
+    void evaluateLatestPrevious() {
+        when(compartmentProducts.findForCompartments(eq(T), any())).thenReturn(List.of());
+        when(loadSplits.findPreviousCargo(eq(T), any(), any())).thenReturn(List.of(
+                new FuelDeliveryCompartmentRepository.PreviousCargo(c1.getId(), "DIESEL", NOW.minusSeconds(86400)),
+                new FuelDeliveryCompartmentRepository.PreviousCargo(c1.getId(), "PARAFFIN", NOW)));
+        when(changeovers.findAllForTenant(T)).thenReturn(List.of(FuelChangeoverRule.of(T, "PARAFFIN", "DIESEL", null)));
+        when(settings.findByTenant(T)).thenReturn(Optional.empty());
+        when(cleanings.findForCompartment(eq(T), any(), any())).thenReturn(List.of());
+        var onC1 = List.of(new za.co.handyflow.platform.fuel.dto.AllocationRequest.CompartmentLoad(c1.getId(), bd("10000")));
+        assertEquals(Set.of("COMPARTMENT_CLEANING_REQUIRED"), codes(service.evaluate(T, load, tanker, driverId, "Moses", List.of(c1, c2), onC1).blocks()));
+    }
+
+    @Test @DisplayName("a cleaning needs evidence and cannot be dated in the future; a rule needs two different products")
+    void cleaningAndRuleValidation() {
+        assertThrows(IllegalArgumentException.class, () -> FuelCompartmentCleaning.record(T, c1.getId(), NOW, "Steam", null, " ", USER, NOW));
+        assertThrows(IllegalArgumentException.class, () -> FuelCompartmentCleaning.record(T, c1.getId(), NOW.plusSeconds(7200), "Steam", "CERT-1", null, USER, NOW));
+        assertThrows(IllegalArgumentException.class, () -> FuelCompartmentCleaning.record(T, c1.getId(), null, null, "CERT-1", null, USER, NOW));
+        assertEquals("CERT-1", FuelCompartmentCleaning.record(T, c1.getId(), NOW, null, "CERT-1", null, USER, NOW).getCertificateRef());
+        assertThrows(IllegalArgumentException.class, () -> FuelChangeoverRule.of(T, "diesel", "DIESEL", null));
+        assertEquals("DIESEL", FuelChangeoverRule.of(T, "diesel", "paraffin", null).getFromFuel());
+    }
+
+    @Test @DisplayName("a changeover rule cannot be added twice, and a compartment of another tanker cannot be rated")
+    void ruleDuplicatesAndOwnership() {
+        when(changeovers.findAllForTenant(T)).thenReturn(List.of(FuelChangeoverRule.of(T, "DIESEL", "PARAFFIN", null)));
+        assertThrows(IllegalStateException.class, () -> service.addChangeoverRule(T, new ChangeoverRuleRequest("diesel", "paraffin", null)));
+        when(tankerCompartments.findByTanker(T, tanker.getId())).thenReturn(List.of(c1));
+        assertThrows(ResourceNotFoundException.class, () -> service.saveCompartmentRating(T, tanker.getId(), UUID.randomUUID(), new CompartmentRatingRequest(List.of("DIESEL"))));
     }
 }

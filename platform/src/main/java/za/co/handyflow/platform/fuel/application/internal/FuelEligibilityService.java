@@ -13,6 +13,7 @@ import za.co.handyflow.platform.shared.ResourceNotFoundException;
 import za.co.handyflow.platform.shared.TenantId;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.*;
@@ -38,6 +39,12 @@ public class FuelEligibilityService {
     private final FuelEligibilityOverrideRepository overrides;
     private final FuelSiteDriverApprovalRepository driverApprovals;
     private final HrFacade hr;
+    private final FuelCompartmentProductRepository compartmentProducts;
+    private final FuelChangeoverRuleRepository changeovers;
+    private final FuelCompartmentCleaningRepository cleanings;
+    private final FuelDeliveryCompartmentRepository loadSplits;
+    private final FuelTankerCompartmentRepository tankerCompartments;
+    private final FuelSettingsRepository settings;
 
     private static final ZoneId SAST = ZoneId.of("Africa/Johannesburg");
 
@@ -47,6 +54,13 @@ public class FuelEligibilityService {
     @Transactional(readOnly = true)
     public EligibilityResult evaluate(TenantId tenantId, FuelDelivery d, FuelTanker tanker, UUID driverEmployeeId, String driverLabel,
                                       Collection<FuelTankerCompartment> tankerCompartments) {
+        return evaluate(tenantId, d, tanker, driverEmployeeId, driverLabel, tankerCompartments, List.of());
+    }
+
+    /** As above, and also checks each compartment the load would use (compartment and litres) against the product. No loads means no product check. */
+    @Transactional(readOnly = true)
+    public EligibilityResult evaluate(TenantId tenantId, FuelDelivery d, FuelTanker tanker, UUID driverEmployeeId, String driverLabel,
+                                      Collection<FuelTankerCompartment> tankerCompartments, List<za.co.handyflow.platform.fuel.dto.AllocationRequest.CompartmentLoad> loads) {
         List<Finding> out = new ArrayList<>();
         LocalDate today = LocalDate.now(SAST);
         if (d.getSiteId() != null) {
@@ -63,8 +77,58 @@ public class FuelEligibilityService {
                 out.addAll(siteDriverFindings(site.getName(), rule, approval, driverLabel, today));
             }
         }
+        if (loads != null && !loads.isEmpty() && d.getFuelType() != null) out.addAll(productFindings(tenantId, d, tanker, tankerCompartments, loads));
         out.sort(Comparator.comparing(f -> f.severity().ordinal()));
         return new EligibilityResult(out);
+    }
+
+    /** Reads what each compartment is rated for, what it last carried and when it was last cleaned, then applies {@link #compartmentFindings}. */
+    private List<Finding> productFindings(TenantId tenantId, FuelDelivery d, FuelTanker tanker, Collection<FuelTankerCompartment> comps,
+                                          List<za.co.handyflow.platform.fuel.dto.AllocationRequest.CompartmentLoad> loads) {
+        Map<UUID, FuelTankerCompartment> byId = comps.stream().collect(Collectors.toMap(FuelTankerCompartment::getId, c -> c, (a, b) -> a));
+        Set<UUID> used = loads.stream().map(za.co.handyflow.platform.fuel.dto.AllocationRequest.CompartmentLoad::compartmentId).filter(byId::containsKey).collect(Collectors.toCollection(LinkedHashSet::new));
+        if (used.isEmpty()) return List.of();
+        Map<UUID, Set<String>> rated = new HashMap<>();
+        compartmentProducts.findForCompartments(tenantId, used).forEach(p -> rated.computeIfAbsent(p.getCompartmentId(), k -> new TreeSet<>()).add(p.getFuelType()));
+        Map<UUID, FuelDeliveryCompartmentRepository.PreviousCargo> previous = new HashMap<>();
+        loadSplits.findPreviousCargo(tenantId, used, d.getId()).forEach(c -> previous.merge(c.compartmentId(), c, (a, b) -> a.at().isAfter(b.at()) ? a : b));
+        Set<String> rules = changeovers.findAllForTenant(tenantId).stream().map(r -> r.getFromFuel() + ">" + r.getToFuel()).collect(Collectors.toSet());
+        boolean requireRating = settings.findByTenant(tenantId).map(FuelSettings::isRequireCompartmentRating).orElse(false);
+        String fuel = d.getFuelType().trim().toUpperCase();
+        List<Finding> out = new ArrayList<>();
+        for (UUID id : used) {
+            FuelTankerCompartment c = byId.get(id);
+            Instant lastCleaned = cleanings.findForCompartment(tenantId, id, org.springframework.data.domain.PageRequest.of(0, 1)).stream().map(FuelCompartmentCleaning::getCleanedAt).findFirst().orElse(null);
+            out.addAll(compartmentFindings(tanker.getRegistration(), c.getNumber(), fuel, rated.getOrDefault(id, Set.of()), requireRating, previous.get(id), rules, lastCleaned));
+        }
+        return out;
+    }
+
+    /**
+     * The product rules for one compartment. Not rated for the product is a Block. When the company has a changeover rule from what the compartment
+     * last carried to this product, it is a Block until a cleaning is recorded after that cargo. When the last cargo is unknown and some rule leads
+     * into this product, it is a Review, unless any cleaning has been recorded. An unrated compartment is a Review only when the company asks for
+     * ratings. Pure, so it can be tested without a database.
+     */
+    static List<Finding> compartmentFindings(String reg, int number, String fuel, Set<String> rated, boolean requireRating,
+                                             FuelDeliveryCompartmentRepository.PreviousCargo previous, Set<String> changeoverRules, Instant lastCleaned) {
+        List<Finding> out = new ArrayList<>();
+        String where = "Compartment " + number + " of " + reg;
+        if (!rated.isEmpty() && !rated.contains(fuel)) {
+            out.add(block("COMPARTMENT_PRODUCT_NOT_RATED", where + " is not rated for " + fuel + " (rated for " + String.join(", ", rated) + ")."));
+        } else if (rated.isEmpty() && requireRating) {
+            out.add(review("COMPARTMENT_UNRATED", where + " has no product rating recorded."));
+        }
+        if (previous != null) {
+            if (!previous.fuelType().equalsIgnoreCase(fuel) && changeoverRules.contains(previous.fuelType().toUpperCase() + ">" + fuel)
+                    && (lastCleaned == null || !lastCleaned.isAfter(previous.at()))) {
+                out.add(block("COMPARTMENT_CLEANING_REQUIRED", where + " last carried " + previous.fuelType() + "; going to " + fuel
+                        + " needs a cleaning recorded after that load, with its certificate or evidence."));
+            }
+        } else if (lastCleaned == null && changeoverRules.stream().anyMatch(r -> r.endsWith(">" + fuel))) {
+            out.add(review("COMPARTMENT_PREVIOUS_CARGO_UNKNOWN", where + " has no recorded previous load or cleaning, and " + fuel + " has a changeover rule."));
+        }
+        return out;
     }
 
     /** Pure, so it can be tested without a database. */
@@ -275,5 +339,93 @@ public class FuelEligibilityService {
 
     private static TankerSpecsView specsView(FuelTanker t) {
         return new TankerSpecsView(t.getId(), t.getRegistration(), t.getTankerType(), t.getGvmKg(), t.getLengthM(), t.getWidthM(), t.getHeightM());
+    }
+
+    // ── Compartment ratings, changeover rules, cleanings ─────────────────────
+
+    @Transactional(readOnly = true)
+    public List<CompartmentRatingView> compartmentRatings(TenantId tenantId, UUID tankerId) {
+        find(tenantId, tankerId);
+        List<FuelTankerCompartment> comps = tankerCompartments.findByTanker(tenantId, tankerId);
+        if (comps.isEmpty()) return List.of();
+        Set<UUID> ids = comps.stream().map(FuelTankerCompartment::getId).collect(Collectors.toSet());
+        Map<UUID, List<String>> rated = new HashMap<>();
+        compartmentProducts.findForCompartments(tenantId, ids).forEach(p -> rated.computeIfAbsent(p.getCompartmentId(), k -> new ArrayList<>()).add(p.getFuelType()));
+        Map<UUID, FuelDeliveryCompartmentRepository.PreviousCargo> previous = new HashMap<>();
+        loadSplits.findPreviousCargo(tenantId, ids, new UUID(0, 0)).forEach(c -> previous.merge(c.compartmentId(), c, (a, b) -> a.at().isAfter(b.at()) ? a : b));
+        return comps.stream().map(c -> {
+            var prev = previous.get(c.getId());
+            Instant cleaned = cleanings.findForCompartment(tenantId, c.getId(), org.springframework.data.domain.PageRequest.of(0, 1)).stream().map(FuelCompartmentCleaning::getCleanedAt).findFirst().orElse(null);
+            List<String> types = rated.getOrDefault(c.getId(), List.of()).stream().sorted().toList();
+            return new CompartmentRatingView(c.getId(), c.getNumber(), c.getCapacityLitres(), types, prev == null ? null : prev.fuelType(), prev == null ? null : prev.at(), cleaned);
+        }).toList();
+    }
+
+    /** Replaces the products a compartment is rated for. Empty removes the restriction. */
+    @Transactional
+    public CompartmentRatingView saveCompartmentRating(TenantId tenantId, UUID tankerId, UUID compartmentId, CompartmentRatingRequest req) {
+        requireCompartment(tenantId, tankerId, compartmentId);
+        Set<String> types = new TreeSet<>();
+        if (req.fuelTypes() != null) req.fuelTypes().forEach(t -> types.add(FuelCompartmentProduct.normalise(t)));
+        compartmentProducts.deleteForCompartment(tenantId, compartmentId);
+        compartmentProducts.saveAll(types.stream().map(t -> FuelCompartmentProduct.of(tenantId, compartmentId, t)).toList());
+        return compartmentRatings(tenantId, tankerId).stream().filter(v -> v.compartmentId().equals(compartmentId)).findFirst().orElseThrow();
+    }
+
+    @Transactional(readOnly = true)
+    public List<ChangeoverRuleView> changeoverRules(TenantId tenantId) {
+        return changeovers.findAllForTenant(tenantId).stream().map(r -> new ChangeoverRuleView(r.getId(), r.getFromFuel(), r.getToFuel(), r.getNote())).toList();
+    }
+
+    @Transactional
+    public ChangeoverRuleView addChangeoverRule(TenantId tenantId, ChangeoverRuleRequest req) {
+        FuelChangeoverRule rule = FuelChangeoverRule.of(tenantId, req.fromFuel(), req.toFuel(), req.note());
+        if (changeovers.findAllForTenant(tenantId).stream().anyMatch(r -> r.getFromFuel().equals(rule.getFromFuel()) && r.getToFuel().equals(rule.getToFuel()))) {
+            throw new IllegalStateException("There is already a changeover rule from " + rule.getFromFuel() + " to " + rule.getToFuel() + ".");
+        }
+        FuelChangeoverRule saved = changeovers.save(rule);
+        return new ChangeoverRuleView(saved.getId(), saved.getFromFuel(), saved.getToFuel(), saved.getNote());
+    }
+
+    @Transactional
+    public void removeChangeoverRule(TenantId tenantId, UUID id) {
+        FuelChangeoverRule r = changeovers.findById(id).filter(x -> x.getTenantId().equals(tenantId)).orElseThrow(() -> new ResourceNotFoundException("Changeover rule", id.toString()));
+        changeovers.delete(r);
+    }
+
+    @Transactional(readOnly = true)
+    public List<CleaningView> cleanings(TenantId tenantId, UUID tankerId, UUID compartmentId) {
+        requireCompartment(tenantId, tankerId, compartmentId);
+        return cleanings.findForCompartment(tenantId, compartmentId, org.springframework.data.domain.PageRequest.of(0, 50)).stream().map(FuelEligibilityService::cleaningView).toList();
+    }
+
+    @Transactional
+    public CleaningView recordCleaning(TenantId tenantId, UUID tankerId, UUID compartmentId, CleaningRequest req, UUID by) {
+        requireCompartment(tenantId, tankerId, compartmentId);
+        FuelCompartmentCleaning c = FuelCompartmentCleaning.record(tenantId, compartmentId, req.cleanedAt(), req.method(), req.certificateRef(), req.evidenceNote(), by, Instant.now());
+        return cleaningView(cleanings.save(c));
+    }
+
+    private static CleaningView cleaningView(FuelCompartmentCleaning c) {
+        return new CleaningView(c.getId(), c.getCompartmentId(), c.getCleanedAt(), c.getMethod(), c.getCertificateRef(), c.getEvidenceNote(), c.getRecordedBy());
+    }
+
+    private void requireCompartment(TenantId tenantId, UUID tankerId, UUID compartmentId) {
+        find(tenantId, tankerId);
+        if (tankerCompartments.findByTanker(tenantId, tankerId).stream().noneMatch(c -> c.getId().equals(compartmentId))) {
+            throw new ResourceNotFoundException("Compartment", compartmentId.toString());
+        }
+    }
+
+    @Transactional(readOnly = true)
+    public EligibilitySettings eligibilitySettings(TenantId tenantId) {
+        return new EligibilitySettings(settings.findByTenant(tenantId).map(FuelSettings::isRequireCompartmentRating).orElse(false));
+    }
+
+    @Transactional
+    public EligibilitySettings saveEligibilitySettings(TenantId tenantId, EligibilitySettings req) {
+        FuelSettings s = settings.findByTenant(tenantId).orElseGet(() -> FuelSettings.forTenant(tenantId));
+        s.updateRequireCompartmentRating(req.requireCompartmentRating());
+        return new EligibilitySettings(settings.save(s).isRequireCompartmentRating());
     }
 }
