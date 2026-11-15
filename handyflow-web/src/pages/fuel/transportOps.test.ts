@@ -80,3 +80,16 @@ describe("routes (C04 part 2)", () => {
   })
   it("labels route states", () => { expect(routeStateLabel("IN_PROGRESS")).toBe("On the road"); expect(routeStateLabel("X")).toBe("X") })
 })
+
+import { eligibilityGate, splitToLoads } from "./transportOps"
+describe("eligibilityGate", () => {
+  const blk = { code: "A", severity: "BLOCK" as const, message: "m" }, rev = { code: "B", severity: "REVIEW" as const, message: "m" }, inf = { code: "C", severity: "INFO" as const, message: "m" }
+  it("never lets a Block through, even for a reviewer with a reason", () => { expect(eligibilityGate([blk, rev], true, "a good reason")).toMatch(/blocked/) })
+  it("needs the permission and 5 characters for a review", () => {
+    expect(eligibilityGate([rev], false, "a good reason")).toMatch(/permission/)
+    expect(eligibilityGate([rev], true, "no")).toMatch(/5 characters/)
+    expect(eligibilityGate([rev], true, "  fine ok  ")).toBeNull()
+  })
+  it("information and nothing need no reason", () => { expect(eligibilityGate([inf], false, "")).toBeNull(); expect(eligibilityGate([], false, "")).toBeNull() })
+  it("sends only the compartments with litres", () => { expect(splitToLoads({ a: "100", b: " " })).toEqual([{ compartmentId: "a", litres: 100 }]) })
+})

@@ -111,3 +111,26 @@ export function moveStop(stops: RouteStop[], index: number, dir: -1 | 1): string
 export const routable = (loads: PlanLoad[]) => loads.filter(l => l.status === "SCHEDULED" && !l.routeId)
 
 export const routeStateLabel = (s: string) => ({ PLANNED: "Planned", IN_PROGRESS: "On the road", COMPLETED: "Completed", CANCELLED: "Cancelled" } as Record<string, string>)[s] ?? s
+
+// ── Eligibility (what a site, driver and compartment allow) ─────────────────
+export type Severity = "BLOCK" | "REVIEW" | "INFO"
+export interface Finding { code: string; severity: Severity; message: string }
+export interface EligibilityResult { findings: Finding[] }
+
+/** The litres entered per compartment, as the server wants them. */
+export function splitToLoads(split: Record<string, string>): { compartmentId: string; litres: number }[] {
+  return Object.entries(split).filter(([, v]) => v.trim() !== "").map(([compartmentId, v]) => ({ compartmentId, litres: Number(v) }))
+}
+
+/**
+ * Whether the allocation may be sent, given what the eligibility check found. A Block stops everyone; a Review needs the review permission and
+ * a reason of at least 5 characters. Returns the sentence to show, or null when it may go ahead.
+ */
+export function eligibilityGate(findings: Finding[], canReview: boolean, reason: string): string | null {
+  if (findings.some(f => f.severity === "BLOCK")) return "This allocation is blocked. Fix what is listed above; it cannot be overridden."
+  if (findings.some(f => f.severity === "REVIEW")) {
+    if (!canReview) return "Someone with the eligibility review permission must allocate this load."
+    if (reason.trim().length < 5) return "Give a reason of at least 5 characters to allocate with these review points."
+  }
+  return null
+}

@@ -7,7 +7,7 @@ import { Modal, btnPrimary, btnGhost, card, inputStyle, labelStyle, Chip } from 
 import { fmtL } from "./orderOps"
 import { WindowDialog, FailedAttemptDialog } from "./DeliveryExceptionDialogs"
 import RoutesPanel from "./RoutesPanel"
-import { parseCapacities, validateTanker, autoSplit, validateAllocation, type Plan, type PlanLoad, type Tanker, type Driver, type FleetVehicleOption, fleetOptionText, windowText } from "./transportOps"
+import { parseCapacities, validateTanker, autoSplit, validateAllocation, splitToLoads, eligibilityGate, type EligibilityResult, type Plan, type PlanLoad, type Tanker, type Driver, type FleetVehicleOption, fleetOptionText, windowText } from "./transportOps"
 
 const unwrap = (r: any) => r.data?.data ?? r.data
 const msg = (e: any, fb: string) => e?.response?.data?.message ?? fb
@@ -143,10 +143,20 @@ function AllocateDialog({ load, tankers, onDone, onClose }: { load: PlanLoad; ta
   const [split, setSplit] = useState<Record<string, string>>({}); const [err, setErr] = useState("")
   const drivers = useQuery<Driver[]>({ queryKey: ["fuel-drivers"], queryFn: async () => unwrap(await apiClient.get("/api/v1/fuel/drivers")) })
   const tanker = tankers.find(t => t.id === tankerId)
+  const canReview = usePermissions(["FUEL_ELIGIBILITY_REVIEW"])
+  const [reason, setReason] = useState("")
+  // Ask what this tanker, driver and split would run into as soon as they are complete, so a Block shows before Allocate is pressed.
+  const complete = !!tankerId && !!driverId && validateAllocation(tankerId, driverId, load.litres, split, tanker?.compartments ?? []) === null
+  const loadsBody = splitToLoads(split)
+  const check = useQuery<EligibilityResult>({
+    queryKey: ["fuel-eligibility", load.deliveryId, tankerId, driverId, JSON.stringify(loadsBody)], enabled: complete,
+    queryFn: async () => unwrap(await apiClient.post(`/api/v1/fuel/deliveries/${load.deliveryId}/eligibility`, { tankerId, driverEmployeeId: driverId, loads: loadsBody })),
+  })
+  const findings = complete ? (check.data?.findings ?? []) : []
+  const hasReview = findings.some(f => f.severity === "REVIEW")
   const save = useMutation({
     mutationFn: () => apiClient.post(`/api/v1/fuel/deliveries/${load.deliveryId}/allocate`, {
-      tankerId, driverEmployeeId: driverId,
-      loads: Object.entries(split).filter(([, v]) => v.trim() !== "").map(([compartmentId, v]) => ({ compartmentId, litres: Number(v) })),
+      tankerId, driverEmployeeId: driverId, loads: loadsBody, reviewReason: hasReview ? reason.trim() : null,
     }),
     onSuccess: () => { onDone(); onClose() }, onError: (e: any) => setErr(msg(e, "Could not allocate the load")),
   })
@@ -175,10 +185,30 @@ function AllocateDialog({ load, tankers, onDone, onClose }: { load: PlanLoad; ta
           ))}
         </div>
       )}
+      {complete && check.isLoading && <p style={{ fontSize: 12, color: "var(--hf-text-muted)" }}>Checking site, driver and product rules…</p>}
+      {findings.length > 0 && (
+        <div aria-label="Eligibility" style={{ marginTop: 12, fontSize: 13 }}>
+          {(["BLOCK", "REVIEW", "INFO"] as const).map(sev => {
+            const list = findings.filter(f => f.severity === sev); if (!list.length) return null
+            const head = sev === "BLOCK" ? "Blocked" : sev === "REVIEW" ? "Needs review" : "For information"
+            return <div key={sev} style={{ marginBottom: 8 }}>
+              <strong style={{ color: sev === "BLOCK" ? "var(--hf-danger-text)" : "inherit" }}>{head}</strong>
+              <ul style={{ margin: "4px 0 0", paddingLeft: 18 }}>{list.map(f => <li key={f.code + f.message}>{f.message}</li>)}</ul>
+            </div>
+          })}
+          {hasReview && !findings.some(f => f.severity === "BLOCK") && (canReview
+            ? <><label style={labelStyle}>Why allocate anyway? *</label><input aria-label="Review reason" value={reason} onChange={e => setReason(e.target.value)} style={inputStyle} />
+                <p style={{ fontSize: 12, color: "var(--hf-text-muted)", margin: "4px 0 0" }}>Your name and this reason are recorded.</p></>
+            : <p style={{ fontSize: 12, color: "var(--hf-text-muted)" }}>Only someone with the eligibility review permission can allocate past review points.</p>)}
+        </div>
+      )}
       <Err text={err} />
       <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 14 }}>
         <button style={btnGhost} onClick={onClose}>Cancel</button>
-        <button style={btnPrimary} disabled={save.isPending} onClick={() => { const v = validateAllocation(tankerId, driverId, load.litres, split, tanker?.compartments ?? []); if (v) return setErr(v); setErr(""); save.mutate() }}>Allocate</button>
+        <button style={btnPrimary} disabled={save.isPending || (complete && check.isLoading)} onClick={() => {
+          const v = validateAllocation(tankerId, driverId, load.litres, split, tanker?.compartments ?? []); if (v) return setErr(v)
+          const g = eligibilityGate(findings, canReview, reason); if (g) return setErr(g)
+          setErr(""); save.mutate() }}>Allocate</button>
       </div>
     </Modal>
   )

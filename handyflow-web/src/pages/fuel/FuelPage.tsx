@@ -38,6 +38,7 @@ import SetupTab from "./SetupTab"
 import AccessLimitsTab from "./AccessLimitsTab"
 import ImportsTab from "./ImportsTab"
 import LegalEntitiesTab from "./LegalEntitiesTab"
+import EligibilityTab from "./EligibilityTab"
 import { useEffect } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
@@ -81,6 +82,7 @@ export function FuelPage() {
         case "orders":     return <OrdersTab />
         case "invoicing":  return <InvoicingTab />
         case "planning":   return <PlanningTab />
+        case "eligibility": return <EligibilityTab />
         case "driver":     return <DriverTab />
         case "pricing":    return <PricingTab />
         case "compliance": return <ComplianceTab />

@@ -255,6 +255,7 @@ export const FUEL_SECTIONS: ModuleSections = {
       label: 'Distribution',
       sections: [
         { id: 'planning', label: 'Planning & tankers', icon: CalendarDays, divisions: ['DISTRIBUTION'] },
+        { id: 'eligibility', label: 'Site & tanker rules', icon: ShieldCheck, divisions: ['DISTRIBUTION'] },
         { id: 'driver', label: 'My loads', icon: Truck, divisions: ['DISTRIBUTION'] },
         { id: 'returned-fuel', label: 'Returned fuel', icon: Droplets, divisions: ['DISTRIBUTION'] },
       ],
