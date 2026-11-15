@@ -50,6 +50,7 @@ public class FuelTruckStopStayService {
 
     @Transactional
     public StayView book(TenantId tenantId, BookRequest req, UUID by, LocalDate today) {
+        parking.lockForTenant(tenantId); // serialise bookings so the last bay cannot be given twice
         var p = parking.findForTenant(tenantId).orElse(null);
         if (p == null || p.getNightlyRate() == null) throw new IllegalStateException("Set the nightly rate first, under the parking settings.");
         if (req.arrivalDate() != null && req.arrivalDate().isBefore(today))
@@ -80,6 +81,7 @@ public class FuelTruckStopStayService {
     /** Moves the planned departure. Extra nights need a free bay on each of them. */
     @Transactional
     public StayView changeDeparture(TenantId tenantId, UUID id, DepartureRequest req, LocalDate today) {
+        parking.lockForTenant(tenantId);
         FuelTruckStopStay s = find(tenantId, id);
         var oldDeparture = s.getDepartureDate();
         s.changeDeparture(req.departureDate());
@@ -113,6 +115,30 @@ public class FuelTruckStopStayService {
         int arrivals = (int) held.stream().filter(s -> FuelTruckStopStay.BOOKED.equals(s.getStatus()) && s.getArrivalDate().equals(date)).count();
         int departures = (int) held.stream().filter(s -> s.getDepartureDate().equals(date)).count();
         return new Occupancy(date, inYard, arrivals, departures, bays, bays == null ? null : Math.max(0, bays - inYard));
+    }
+
+    /**
+     * Bays used and free for each of the next {@code days} nights (1 to 31), counting a night with the same rule that stops a
+     * double booking, plus the trucks still in the yard past their planned departure. A read only view; nothing is changed.
+     */
+    @Transactional(readOnly = true)
+    public CapacityView capacity(TenantId tenantId, LocalDate from, int days, LocalDate today) {
+        int n = Math.max(1, Math.min(days, 31));
+        Integer bays = parking.findForTenant(tenantId).map(FuelTruckStopParking::getBays).orElse(null);
+        List<FuelTruckStopStay> held = stays.findHoldingBays(tenantId, from, from.plusDays(n));
+        List<NightView> nights = new java.util.ArrayList<>();
+        for (int i = 0; i < n; i++) {
+            final LocalDate night = from.plusDays(i);
+            int used = (int) held.stream().filter(s -> occupies(s, night, today)).count();
+            int arrivals = (int) held.stream().filter(s -> FuelTruckStopStay.BOOKED.equals(s.getStatus()) && s.getArrivalDate().equals(night)).count();
+            int departures = (int) held.stream().filter(s -> s.getDepartureDate().equals(night)).count();
+            nights.add(new NightView(night, used, arrivals, departures, bays == null ? null : Math.max(0, bays - used)));
+        }
+        List<OverstayView> over = held.stream().filter(s -> s.isOverstaying(today))
+                .map(s -> new OverstayView(s.getId(), s.getVehicleRegistration(), s.getDepartureDate(),
+                        java.time.temporal.ChronoUnit.DAYS.between(s.getDepartureDate(), today)))
+                .sorted(java.util.Comparator.comparing(OverstayView::plannedDeparture)).toList();
+        return new CapacityView(from, bays, nights, over);
     }
 
     private void requireRoom(TenantId tenantId, Integer bays, LocalDate from, LocalDate to, UUID excludeId, LocalDate today) {

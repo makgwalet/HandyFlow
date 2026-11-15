@@ -6,6 +6,9 @@ export interface Stay {
 }
 export interface ParkingSettings { nightlyRate: number | null; bays: number | null }
 export interface Occupancy { date: string; inYard: number; arrivals: number; departures: number; bays: number | null; free: number | null }
+export interface Night { date: string; used: number; arrivals: number; departures: number; free: number | null }
+export interface Overstay { id: string; vehicleRegistration: string; plannedDeparture: string; daysOver: number }
+export interface Capacity { from: string; bays: number | null; nights: Night[]; overstays: Overstay[] }
 export interface StayForm { vehicleRegistration: string; driverName: string; driverPhone: string; arrivalDate: string; departureDate: string; note: string }
 export const emptyStay = (today: string): StayForm => ({ vehicleRegistration: "", driverName: "", driverPhone: "", arrivalDate: today, departureDate: "", note: "" })
 
@@ -35,4 +38,17 @@ export function stayActions(s: Stay, today: string): ("checkIn" | "checkOut" | "
   if (s.status === "BOOKED") return [...(s.arrivalDate <= today ? ["checkIn" as const] : []), "extend", "cancel", ...(s.arrivalDate <= today ? ["noShow" as const] : [])]
   if (s.status === "CHECKED_IN") return ["checkOut", "extend"]
   return []
+}
+
+/** How full a night is, for colouring: "full" when no bay is free, "tight" when one or two are, "ok" otherwise, "open" with no bay limit. */
+export function nightState(n: Night, bays: number | null): "open" | "ok" | "tight" | "full" {
+  if (bays == null || n.free == null) return "open"
+  if (n.free === 0) return "full"
+  return n.free <= 2 ? "tight" : "ok"
+}
+
+/** The first night with no free bay, or null. Used for the one line summary above the table. */
+export function firstFullNight(c: Capacity): string | null {
+  const n = c.nights.find(x => nightState(x, c.bays) === "full")
+  return n ? n.date : null
 }

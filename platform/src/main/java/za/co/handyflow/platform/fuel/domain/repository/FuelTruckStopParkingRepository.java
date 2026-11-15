@@ -12,4 +12,12 @@ public interface FuelTruckStopParkingRepository extends JpaRepository<FuelTruckS
 
     @Query("SELECT p FROM FuelTruckStopParking p WHERE p.tenantId = :tenantId")
     Optional<FuelTruckStopParking> findForTenant(TenantId tenantId);
+
+    /**
+     * Takes a row lock on the company's parking settings for the rest of the transaction. Booking and extending a stay take it
+     * first, so two requests for the last bay are handled one after the other and the second sees the first.
+     */
+    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT p FROM FuelTruckStopParking p WHERE p.tenantId = :tenantId")
+    Optional<FuelTruckStopParking> lockForTenant(TenantId tenantId);
 }

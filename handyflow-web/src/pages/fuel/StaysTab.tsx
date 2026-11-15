@@ -5,7 +5,7 @@ import { apiClient } from "../../api/client"
 import { usePermissions } from "../../hooks/usePermission"
 import { Modal, btnPrimary, btnGhost, card, inputStyle, labelStyle, Chip } from "../warehousing/whseUi"
 import { fmtR } from "./orderOps"
-import { emptyStay, validateStay, validateSettings, nightsText, stayActions, STATUS_LABEL, type Stay, type StayForm, type ParkingSettings, type Occupancy } from "./stayOps"
+import { emptyStay, validateStay, validateSettings, nightsText, stayActions, nightState, firstFullNight, STATUS_LABEL, type Stay, type StayForm, type ParkingSettings, type Occupancy, type Capacity } from "./stayOps"
 
 const unwrap = (r: any) => r.data?.data ?? r.data
 const msg = (e: any, fb: string) => e?.response?.data?.message ?? fb
@@ -23,8 +23,9 @@ export default function StaysTab() {
   const [err, setErr] = useState("")
   const settings = useQuery<ParkingSettings>({ queryKey: ["fuel-stay-settings"], queryFn: async () => unwrap(await apiClient.get("/api/v1/fuel/truck-stop/parking-settings")) })
   const occ = useQuery<Occupancy>({ queryKey: ["fuel-stay-occupancy"], queryFn: async () => unwrap(await apiClient.get("/api/v1/fuel/truck-stop/stays/occupancy")) })
+  const capacity = useQuery<Capacity>({ queryKey: ["fuel-stay-capacity"], queryFn: async () => unwrap(await apiClient.get("/api/v1/fuel/truck-stop/stays/capacity?days=14")) })
   const stays = useQuery<Stay[]>({ queryKey: ["fuel-stays"], queryFn: async () => unwrap(await apiClient.get("/api/v1/fuel/truck-stop/stays")) })
-  const refresh = () => { for (const k of ["fuel-stays", "fuel-stay-occupancy", "fuel-stay-settings"]) qc.invalidateQueries({ queryKey: [k] }) }
+  const refresh = () => { for (const k of ["fuel-stays", "fuel-stay-occupancy", "fuel-stay-settings", "fuel-stay-capacity"]) qc.invalidateQueries({ queryKey: [k] }) }
   const act = useMutation({ mutationFn: (v: { id: string; path: string }) => apiClient.post(`/api/v1/fuel/truck-stop/stays/${v.id}/${v.path}`), onSuccess: () => { setErr(""); refresh() }, onError: (e: any) => setErr(msg(e, "That did not work")) })
   const rows = stays.data ?? []
   const rateSet = settings.data?.nightlyRate != null
@@ -42,6 +43,7 @@ export default function StaysTab() {
           <span>{occ.data.bays == null ? "No bay limit set" : <><strong>{occ.data.free}</strong> of {occ.data.bays} bays free</>}</span>
         </div>
       )}
+      {capacity.data?.nights && <CapacityBox c={capacity.data} />}
       <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 8 }}>{canManage && <button style={btnPrimary} onClick={() => setDialog("book")}>Book a stay</button>}</div>
       {err && <p role="alert" style={{ color: "var(--hf-danger-text)", fontSize: 12.5 }}>{err}</p>}
       {stays.isLoading ? <p style={{ color: "var(--hf-text-muted)" }}>Loading…</p> : stays.isError ? <p role="alert" style={{ color: "var(--hf-danger-text)" }}>Could not load stays.</p> : rows.length === 0 ? (
@@ -73,6 +75,41 @@ export default function StaysTab() {
       {dialog === "book" && <BookDialog today={today} rateSet={rateSet} onDone={refresh} onClose={() => setDialog(null)} />}
       {dated && <DateDialog stay={dated.stay} kind={dated.kind} today={today} onDone={refresh} onClose={() => setDated(null)} />}
       {cancelling && <CancelDialog stay={cancelling} onDone={refresh} onClose={() => setCancelling(null)} />}
+    </div>
+  )
+}
+
+const FILL: Record<"open" | "ok" | "tight" | "full", { bg: string; fg: string }> = {
+  open: { bg: "var(--hf-surface-muted)", fg: "var(--hf-text-muted)" },
+  ok: { bg: "var(--hf-success-soft-strong)", fg: "var(--hf-success-text-strong)" },
+  tight: { bg: "var(--hf-warning-soft)", fg: "var(--hf-warning-text)" },
+  full: { bg: "var(--hf-danger-soft)", fg: "var(--hf-danger-text)" },
+}
+
+/** The next two weeks night by night, read only. The state is also written in words, so colour is never the only signal. */
+function CapacityBox({ c }: { c: Capacity }) {
+  const full = firstFullNight(c)
+  return (
+    <div style={{ ...card, padding: 14, marginBottom: 12 }}>
+      <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 4 }}>Yard, next {c.nights.length} nights</div>
+      <div style={{ fontSize: 12, color: "var(--hf-text-muted)", marginBottom: 8 }}>
+        {c.bays == null ? "No bay limit is set, so nothing is capacity-limited. The numbers are trucks expected each night."
+          : full ? `Every bay is taken on the night of ${full}.` : "There is a free bay on every night shown."}
+      </div>
+      <div style={{ display: "flex", gap: 6, overflowX: "auto", paddingBottom: 4 }}>
+        {c.nights.map(n => { const st = nightState(n, c.bays); const f = FILL[st]; return (
+          <div key={n.date} data-testid={`night-${n.date}`} style={{ minWidth: 74, padding: "6px 8px", borderRadius: 8, background: f.bg, color: f.fg, fontSize: 11.5, textAlign: "center" }}>
+            <div style={{ fontWeight: 700 }}>{n.date.slice(5)}</div>
+            <div>{c.bays == null ? `${n.used} in` : `${n.used} of ${c.bays}`}</div>
+            <div>{st === "full" ? "Full" : st === "tight" ? "Nearly full" : st === "open" ? "" : "Free"}</div>
+            {(n.arrivals > 0 || n.departures > 0) && <div>{n.arrivals > 0 ? `+${n.arrivals}` : ""}{n.arrivals > 0 && n.departures > 0 ? " " : ""}{n.departures > 0 ? `-${n.departures}` : ""}</div>}
+          </div>) })}
+      </div>
+      {c.overstays.length > 0 && (
+        <div style={{ marginTop: 8, fontSize: 12.5 }}>
+          <strong>Past their departure date:</strong> {c.overstays.map(o => `${o.vehicleRegistration} (${o.daysOver} ${o.daysOver === 1 ? "day" : "days"} over)`).join(", ")}
+        </div>
+      )}
     </div>
   )
 }

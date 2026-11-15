@@ -13,12 +13,14 @@ const plus = (n: number) => { const d = new Date(todayStr() + "T12:00:00"); d.se
 const stay = (o: any = {}) => ({ id: "s1", vehicleRegistration: "GP 12 AB", driverName: "Sipho", driverPhone: "0821234567", arrivalDate: todayStr(), departureDate: plus(2), actualDepartureDate: null, status: "BOOKED",
   ratePerNight: 150, nights: 2, amount: 300, note: null, cancelledReason: null, overstaying: false, checkedInAt: null, checkedOutAt: null, ...o })
 let settingsNow: any
+let capacityNow: any
 function mount() { render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><StaysTab /></QueryClientProvider>) }
 
 describe("StaysTab", () => {
   beforeEach(() => {
     get.mockReset(); post.mockReset(); put.mockReset(); can = true; settingsNow = { nightlyRate: 150, bays: 5 }
-    get.mockImplementation(async (u: string) => ({ data: { data: u.includes("parking-settings") ? settingsNow : u.includes("occupancy") ? { date: todayStr(), inYard: 2, arrivals: 1, departures: 0, bays: 5, free: 3 } : [stay()] } }))
+    capacityNow = { from: todayStr(), bays: 5, overstays: [], nights: [{ date: todayStr(), used: 2, arrivals: 1, departures: 0, free: 3 }, { date: plus(1), used: 5, arrivals: 0, departures: 0, free: 0 }] }
+    get.mockImplementation(async (u: string) => ({ data: { data: u.includes("parking-settings") ? settingsNow : u.includes("occupancy") ? { date: todayStr(), inYard: 2, arrivals: 1, departures: 0, bays: 5, free: 3 } : u.includes("capacity") ? capacityNow : [stay()] } }))
     post.mockResolvedValue({ data: { data: {} } }); put.mockResolvedValue({ data: { data: {} } })
   })
   afterEach(cleanup)
@@ -72,5 +74,22 @@ describe("StaysTab", () => {
     can = false; mount()
     expect(await screen.findByText("Past its departure date")).toBeTruthy(); expect(screen.getByText("No bay limit set")).toBeTruthy()
     expect(screen.queryByText("Book a stay")).toBeNull(); expect(screen.queryByText("Check out")).toBeNull()
+  })
+  it("shows the next nights with the first full night in words, not only colour", async () => {
+    mount()
+    expect(await screen.findByText(/Yard, next 2 nights/)).toBeTruthy()
+    expect(screen.getByText(new RegExp(`Every bay is taken on the night of ${plus(1)}`))).toBeTruthy()
+    expect(screen.getByTestId(`night-${plus(1)}`).textContent).toContain("Full")
+    expect(screen.getByTestId(`night-${todayStr()}`).textContent).toContain("Free")
+  })
+  it("lists trucks past their departure date", async () => {
+    capacityNow = { ...capacityNow, overstays: [{ id: "s9", vehicleRegistration: "GP 99 ZZ", plannedDeparture: plus(-2), daysOver: 2 }] }
+    mount()
+    expect(await screen.findByText(/GP 99 ZZ \(2 days over\)/)).toBeTruthy()
+  })
+  it("says so when no bay limit is set", async () => {
+    capacityNow = { ...capacityNow, bays: null, nights: [{ date: todayStr(), used: 1, arrivals: 0, departures: 0, free: null }] }
+    mount()
+    expect(await screen.findByText(/No bay limit is set, so nothing is capacity-limited/)).toBeTruthy()
   })
 })

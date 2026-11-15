@@ -55,6 +55,13 @@ public class FuelTruckStopStayController {
         return ResponseEntity.ok(ApiResponse.success(service.occupancy(TenantContext.getTenantIdAsObject(), date != null ? date : today())));
     }
 
+    @GetMapping("/stays/capacity")
+    @PreAuthorize("hasAnyAuthority('FUEL_READ','FUEL_MANAGE','FUEL_TRUCKSTOP_MANAGE')")
+    public ResponseEntity<ApiResponse<CapacityView>> capacity(@RequestParam(required = false) LocalDate from, @RequestParam(defaultValue = "14") int days) {
+        featureGuard.requireModule("fuel");
+        return ResponseEntity.ok(ApiResponse.success(service.capacity(TenantContext.getTenantIdAsObject(), from != null ? from : today(), days, today())));
+    }
+
     @PostMapping("/stays")
     @PreAuthorize("hasAnyAuthority('FUEL_MANAGE','FUEL_TRUCKSTOP_MANAGE')")
     public ResponseEntity<ApiResponse<StayView>> book(@Valid @RequestBody BookRequest req) {

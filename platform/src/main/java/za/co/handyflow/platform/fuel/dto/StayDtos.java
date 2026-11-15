@@ -7,6 +7,7 @@ import jakarta.validation.constraints.Size;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.List;
 import java.util.UUID;
 
 /** Phase 7d: overnight stays at the truck stop, owned by Fuel. */
@@ -31,6 +32,15 @@ public final class StayDtos {
     public record StayView(UUID id, String vehicleRegistration, String driverName, String driverPhone, LocalDate arrivalDate, LocalDate departureDate,
                            LocalDate actualDepartureDate, String status, BigDecimal ratePerNight, int nights, BigDecimal amount, String note,
                            String cancelledReason, boolean overstaying, Instant checkedInAt, Instant checkedOutAt) {}
+
+    /** One night in the capacity view. free is null when no bay count is set. */
+    public record NightView(LocalDate date, int used, int arrivals, int departures, Integer free) {}
+
+    /** A truck still in the yard past its planned departure. */
+    public record OverstayView(UUID id, String vehicleRegistration, LocalDate plannedDeparture, long daysOver) {}
+
+    /** Bays used and free night by night, from {@code from} for {@code nights.size()} nights, and the trucks that are overstaying. */
+    public record CapacityView(LocalDate from, Integer bays, List<NightView> nights, List<OverstayView> overstays) {}
 
     /** The yard on one date. bays and free are null when no bay count is set. */
     public record Occupancy(LocalDate date, int inYard, int arrivals, int departures, Integer bays, Integer free) {}

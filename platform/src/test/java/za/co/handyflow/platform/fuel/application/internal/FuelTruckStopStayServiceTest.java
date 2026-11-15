@@ -181,4 +181,59 @@ class FuelTruckStopStayServiceTest {
         assertThrows(IllegalArgumentException.class, () -> service.saveSettings(T, new SettingsRequest(bd("100"), 0), BY));
         assertNull(service.settings(T).nightlyRate());
     }
+
+    @Test @DisplayName("booking and extending a stay take the company's parking lock first, so the last bay cannot be given twice")
+    void takesTheLock() {
+        rate("150", 1);
+        StayView v = book("GP 1", 0, 2);
+        verify(parking).lockForTenant(T);
+        service.changeDeparture(T, v.id(), new DepartureRequest(TODAY.plusDays(3)), TODAY);
+        verify(parking, times(2)).lockForTenant(T);
+    }
+
+    @Test @DisplayName("the capacity view counts bays used and free night by night, with arrivals and departures")
+    void capacityView() {
+        rate("150", 3);
+        book("GP 1", 0, 3);
+        book("GP 2", 1, 2);
+        CapacityView v = service.capacity(T, TODAY, 4, TODAY);
+        assertEquals(3, v.bays());
+        assertEquals(4, v.nights().size());
+        assertEquals(1, v.nights().get(0).used());
+        assertEquals(2, v.nights().get(1).used());
+        assertEquals(1, v.nights().get(1).free());
+        assertEquals(1, v.nights().get(2).used());
+        assertEquals(0, v.nights().get(3).used());
+        assertEquals(1, v.nights().get(1).arrivals());
+        assertEquals(1, v.nights().get(2).departures());
+        assertTrue(v.overstays().isEmpty());
+    }
+
+    @Test @DisplayName("with no bay count the capacity view still shows use but no free figure")
+    void capacityNoLimit() {
+        rate("150", null);
+        book("GP 1", 0, 2);
+        CapacityView v = service.capacity(T, TODAY, 2, TODAY);
+        assertNull(v.bays());
+        assertNull(v.nights().get(0).free());
+        assertEquals(1, v.nights().get(0).used());
+    }
+
+    @Test @DisplayName("a truck in the yard past its planned departure is listed as overstaying with the days over")
+    void capacityOverstay() {
+        rate("150", 2);
+        StayView v = book("GP 1", 0, 1);
+        service.checkIn(T, v.id(), TODAY);
+        CapacityView c = service.capacity(T, TODAY, 3, TODAY.plusDays(2));
+        assertEquals(1, c.overstays().size());
+        assertEquals("GP 1", c.overstays().get(0).vehicleRegistration());
+        assertEquals(1, c.overstays().get(0).daysOver());
+    }
+
+    @Test @DisplayName("the number of nights is held between 1 and 31")
+    void capacityDaysLimit() {
+        rate("150", 2);
+        assertEquals(1, service.capacity(T, TODAY, 0, TODAY).nights().size());
+        assertEquals(31, service.capacity(T, TODAY, 400, TODAY).nights().size());
+    }
 }

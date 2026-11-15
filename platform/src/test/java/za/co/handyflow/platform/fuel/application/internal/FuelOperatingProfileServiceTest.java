@@ -43,6 +43,8 @@ class FuelOperatingProfileServiceTest {
     @Mock FuelSalesOrderRepository orders;
     @Mock FuelReservationRepository reservations;
     @Mock FuelPurchaseOrderRepository purchaseOrders;
+    @Mock FuelTruckStopStayRepository truckStopStays;
+    @Mock FuelTruckStopService truckStop;
     @InjectMocks FuelOperatingProfileService service;
 
     private final List<FuelDivisionActivation> saved = new ArrayList<>();
@@ -195,5 +197,25 @@ class FuelOperatingProfileServiceTest {
         assertFalse(keys.contains("pumps"));
         assertTrue(service.view(T).checklist().stream().filter(c -> c.key().equals("divisions")).findFirst().orElseThrow().done());
         assertFalse(service.view(T).checklist().stream().filter(c -> c.key().equals("legal-entity")).findFirst().orElseThrow().done());
+    }
+
+    @Test @DisplayName("Truck Stop cannot be switched off while a stay is booked or in the yard, or a reservation is open")
+    void truckStopBlockedByOpenWork() {
+        service.activate(T, List.of(WHOLESALE_SUPPLY, TRUCK_STOP), BY);
+        when(truckStopStays.countOpen(T)).thenReturn(2L);
+        IllegalStateException e = assertThrows(IllegalStateException.class, () -> service.deactivateDivision(T, TRUCK_STOP, "closing the yard", BY));
+        assertTrue(e.getMessage().contains("2 overnight stay(s)"));
+        when(truckStopStays.countOpen(T)).thenReturn(0L);
+        when(truckStop.openReservationCount(T)).thenReturn(1);
+        e = assertThrows(IllegalStateException.class, () -> service.deactivateDivision(T, TRUCK_STOP, "closing the yard", BY));
+        assertTrue(e.getMessage().contains("1 truck stop reservation(s)"));
+    }
+
+    @Test @DisplayName("Truck Stop switches off once nothing is open")
+    void truckStopOffWhenClear() {
+        service.activate(T, List.of(WHOLESALE_SUPPLY, TRUCK_STOP), BY);
+        when(truckStopStays.countOpen(T)).thenReturn(0L);
+        when(truckStop.openReservationCount(T)).thenReturn(0);
+        assertFalse(service.deactivateDivision(T, TRUCK_STOP, "closing the yard", BY).activeDivisions().contains(TRUCK_STOP));
     }
 }

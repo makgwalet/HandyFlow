@@ -103,6 +103,24 @@ public class FuelTruckStopService {
         return toReservation(r, o, b);
     }
 
+    /**
+     * How many reservations are still open in Bookings (not completed, cancelled or no-show), looking at the most recent 500.
+     * Used to stop the Truck Stop division being switched off while trucks are expected.
+     */
+    @Transactional(readOnly = true)
+    public int openReservationCount(TenantId tenantId) {
+        int open = 0;
+        for (FuelTruckStopReservation r : reservations.findRecent(tenantId, PageRequest.of(0, 500))) {
+            try {
+                String status = bookings.get(tenantId, r.getBookingId()).status();
+                if (status != null && !List.of("COMPLETED", "CANCELLED", "NO_SHOW").contains(status)) open++;
+            } catch (ResourceNotFoundException e) {
+                // The booking was removed in Bookings: nothing is expected.
+            }
+        }
+        return open;
+    }
+
     @Transactional(readOnly = true)
     public List<ReservationResponse> recent(TenantId tenantId, String vehicle, int limit) {
         int n = Math.max(1, Math.min(limit, 100));

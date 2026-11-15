@@ -16,6 +16,9 @@ public interface FuelTruckStopStayRepository extends JpaRepository<FuelTruckStop
     @Query("SELECT s FROM FuelTruckStopStay s WHERE s.tenantId = :tenantId ORDER BY s.arrivalDate DESC, s.createdAt DESC")
     List<FuelTruckStopStay> findRecent(TenantId tenantId, Pageable page);
 
+    @Query("SELECT COUNT(s) FROM FuelTruckStopStay s WHERE s.tenantId = :tenantId AND s.status IN ('BOOKED','CHECKED_IN')")
+    long countOpen(TenantId tenantId);
+
     @Query("SELECT s FROM FuelTruckStopStay s WHERE s.tenantId = :tenantId AND s.id = :id")
     Optional<FuelTruckStopStay> findOwned(TenantId tenantId, UUID id);
 
