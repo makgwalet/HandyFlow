@@ -5,6 +5,7 @@ import { apiClient } from "../../api/client"
 import { card, inputStyle, Chip } from "../warehousing/whseUi"
 import { fmtL, fmtR } from "./orderOps"
 import ForecourtSupplySection from "./ForecourtSupplySection"
+import ForecourtReconciliationSection from "./ForecourtReconciliationSection"
 import { changeText, caveats, type GroupReport, type GroupRow } from "./groupReportOps"
 
 const unwrap = (r: any) => r.data?.data ?? r.data
@@ -63,6 +64,7 @@ export default function GroupReportTab() {
             </table>
           </div>
           <ForecourtSupplySection days={days} />
+          <ForecourtReconciliationSection days={days} />
         </>
       )}
     </div>

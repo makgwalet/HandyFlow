@@ -62,4 +62,8 @@ public interface FuelReceiptRepository extends JpaRepository<FuelReceipt, UUID> 
     @Query("SELECT r FROM FuelReceipt r WHERE r.tenantId = :tenantId AND r.supplierId = :supplierId AND r.deletedAt IS NULL AND r.reversedAt IS NULL "
             + "AND r.id NOT IN (SELECT l.receiptId FROM FuelSupplierInvoiceReceipt l WHERE l.tenantId = :tenantId) ORDER BY r.receivedAt DESC")
     List<FuelReceipt> findInvoiceCandidates(TenantId tenantId, UUID supplierId, Pageable pageable);
+
+    /** Receipts into any tank within a period, not deleted and not reversed. Backs the forecourt supply reconciliation. */
+    @Query("SELECT r FROM FuelReceipt r WHERE r.tenantId = :tenantId AND r.deletedAt IS NULL AND r.reversedAt IS NULL AND r.receivedAt >= :from AND r.receivedAt < :to ORDER BY r.receivedAt ASC")
+    List<FuelReceipt> findReceivedBetween(TenantId tenantId, Instant from, Instant to);
 }

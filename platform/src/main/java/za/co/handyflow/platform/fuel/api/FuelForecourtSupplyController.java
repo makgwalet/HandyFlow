@@ -23,6 +23,7 @@ public class FuelForecourtSupplyController {
     private final FuelForecourtSupplyReportService report;
     private final FeatureGuard featureGuard;
     private final za.co.handyflow.platform.fuel.application.internal.FuelScopeService scopes;
+    private final za.co.handyflow.platform.fuel.application.internal.FuelForecourtSupplyReconciliationService reconciliation;
 
     @GetMapping
     @PreAuthorize("hasAuthority('FUEL_READ')")
@@ -31,6 +32,16 @@ public class FuelForecourtSupplyController {
         var tenant = TenantContext.getTenantIdAsObject();
         var allowed = scopes.allowedDepotIds(tenant, za.co.handyflow.platform.fuel.application.internal.FuelScopeService.currentUserOrNull());
         return ResponseEntity.ok(ApiResponse.success(report.report(tenant, days, canSeeMoney(), allowed)));
+    }
+
+    /** Where each forecourt's fuel came from in the period. Litres only, so no margin permission is needed. */
+    @GetMapping("/reconciliation")
+    @PreAuthorize("hasAuthority('FUEL_READ')")
+    public ResponseEntity<ApiResponse<za.co.handyflow.platform.fuel.dto.ForecourtSupplyDtos.Reconciliation>> reconcile(@RequestParam(defaultValue = "30") int days) {
+        featureGuard.requireModule("fuel");
+        var tenant = TenantContext.getTenantIdAsObject();
+        var allowed = scopes.allowedDepotIds(tenant, za.co.handyflow.platform.fuel.application.internal.FuelScopeService.currentUserOrNull());
+        return ResponseEntity.ok(ApiResponse.success(reconciliation.report(tenant, days, allowed)));
     }
 
     private static boolean canSeeMoney() {

@@ -16,4 +16,14 @@ public final class ForecourtSupplyDtos {
     public record Supplier(UUID supplierId, String name, boolean unassigned, List<Forecourt> forecourts, BigDecimal litresSold, BigDecimal salesValue) {}
 
     public record Report(LocalDate from, LocalDate to, boolean moneyShown, List<Supplier> suppliers, BigDecimal totalLitres, BigDecimal totalSales, long readingsLeftOut) {}
+
+    /**
+     * Reconciliation for one forecourt: where its fuel came from in the period. All litres, no money.
+     * supplierName is the depot recorded as supplying it (null if none). Shares are percentages of total inbound litres, null when nothing came in.
+     */
+    public record Inbound(UUID depotId, String name, UUID supplierId, String supplierName,
+                          BigDecimal fromSupplierDepot, BigDecimal fromOtherDepots, BigDecimal fromSuppliers, BigDecimal totalIn,
+                          BigDecimal supplierDepotSharePct, BigDecimal litresSold) {}
+
+    public record Reconciliation(LocalDate from, LocalDate to, List<Inbound> forecourts, BigDecimal totalIn, BigDecimal totalSold) {}
 }
