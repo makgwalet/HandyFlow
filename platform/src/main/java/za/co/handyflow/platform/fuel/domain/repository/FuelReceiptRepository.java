@@ -26,6 +26,9 @@ public interface FuelReceiptRepository extends JpaRepository<FuelReceipt, UUID> 
     @Query("SELECT r FROM FuelReceipt r WHERE r.tenantId = :tenantId AND r.deletedAt IS NULL ORDER BY r.receivedAt DESC")
     Page<FuelReceipt> findAllActive(TenantId tenantId, Pageable pageable);
 
+    @Query("SELECT r FROM FuelReceipt r WHERE r.tenantId = :tenantId AND r.deletedAt IS NULL AND r.tankId IN :tankIds ORDER BY r.receivedAt DESC")
+    Page<FuelReceipt> findActiveForTanks(TenantId tenantId, java.util.Collection<UUID> tankIds, Pageable pageable);
+
     /**
      * Most recent receipt for a tank — backs the reorder suggestion's "last supplier" hint.
      */

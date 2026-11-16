@@ -209,4 +209,21 @@ class FuelGroupReportServiceTest {
         Row none = row(service.report(T, 30, true), "Acme Fuels");
         assertEquals(0, none.forecourtLitres().signum()); assertEquals(0, none.forecourtShifts());
     }
+
+    @Test @DisplayName("a depot-limited user's report counts only their tanks: deliveries, stock, forecourt sales and open variances")
+    void depotLimited() {
+        FuelDelivery mine = load(acmeTank, "1000", "20000", "18", false), other = load(looseTank, "200", "4000", "18", false);
+        when(deliveries.findDeliveredBetween(any(), any(), any())).thenReturn(List.of(mine, other), List.of(), List.of(mine, other), List.of());
+        UUID s1 = UUID.randomUUID(); FuelShift shift1 = closedShift(s1);
+        UUID acmeId = acmeTank.getId(), looseId = looseTank.getId();
+        var rMine = reading(s1, acmeId, "100", "2300"); var rOther = reading(s1, looseId, "50", "1150");
+        when(shifts.findClosedSince(eq(T), any())).thenReturn(List.of(shift1));
+        when(readings.findByShifts(eq(T), any())).thenReturn(List.of(rMine, rOther));
+        Report all = service.report(T, 30, true);
+        assertEquals(2, all.total().deliveries()); assertEquals(0, bd("150.00").compareTo(all.total().forecourtLitres()));
+        Report limited = service.report(T, 30, true, java.util.Set.of(acmeId));
+        assertEquals(1, limited.total().deliveries()); assertEquals(0, bd("1000.00").compareTo(limited.total().litres()));
+        assertEquals(0, bd("100.00").compareTo(limited.total().forecourtLitres())); assertEquals(0, bd("10000.00").compareTo(limited.total().stockLitres()));
+        assertFalse(limited.entities().stream().anyMatch(Row::unassigned));       // the other depot's tank, which has no entity, is not shown
+    }
 }

@@ -182,4 +182,45 @@ class FuelServiceStage0Test {
         assertThrows(IllegalStateException.class, () -> service.completeDelivery(TENANT, UUID.randomUUID(), other));
         assertEquals(0, bd("4000").compareTo(tank.getCurrentLitres()));
     }
+
+    // ── depot limits on receipts, dispatches and deliveries ──────────────────
+
+    @Test @DisplayName("receipts, dispatches and deliveries ask only for the user's tanks, an empty set returns nothing without a query, and no limit is unchanged")
+    void listsFilteredByDepotLimit() {
+        var pageable = org.springframework.data.domain.PageRequest.of(0, 50);
+        java.util.Set<UUID> ids = java.util.Set.of(UUID.randomUUID());
+        var none = new org.springframework.data.domain.PageImpl<>(java.util.List.<FuelReceipt>of());
+        when(receiptRepository.findActiveForTanks(TENANT, ids, pageable)).thenReturn(none);
+        when(dispatchRepository.findActiveForTanks(TENANT, ids, pageable)).thenReturn(new org.springframework.data.domain.PageImpl<>(java.util.List.of()));
+        when(deliveryRepository.findActiveForTanks(TENANT, ids, pageable)).thenReturn(new org.springframework.data.domain.PageImpl<>(java.util.List.of()));
+        when(deliveryRepository.findByStatusForTanks(TENANT, "SCHEDULED", ids, pageable)).thenReturn(new org.springframework.data.domain.PageImpl<>(java.util.List.of()));
+        service.getReceipts(TENANT, ids, pageable); service.getDispatches(TENANT, ids, pageable); service.getDeliveries(TENANT, null, ids, pageable); service.getDeliveries(TENANT, "scheduled", ids, pageable);
+        verify(receiptRepository).findActiveForTanks(TENANT, ids, pageable); verify(dispatchRepository).findActiveForTanks(TENANT, ids, pageable);
+        verify(deliveryRepository).findActiveForTanks(TENANT, ids, pageable); verify(deliveryRepository).findByStatusForTanks(TENANT, "SCHEDULED", ids, pageable);
+        verify(receiptRepository, never()).findAllActive(any(), any()); verify(dispatchRepository, never()).findAllActive(any(), any()); verify(deliveryRepository, never()).findAllActive(any(), any());
+
+        assertTrue(service.getReceipts(TENANT, java.util.Set.of(), pageable).isEmpty());
+        assertTrue(service.getDispatches(TENANT, java.util.Set.of(), pageable).isEmpty());
+        assertTrue(service.getDeliveries(TENANT, null, java.util.Set.of(), pageable).isEmpty());
+
+        when(receiptRepository.findAllActive(TENANT, pageable)).thenReturn(none);
+        service.getReceipts(TENANT, pageable);
+        verify(receiptRepository).findAllActive(TENANT, pageable);
+    }
+
+    @Test @DisplayName("the usage and margin reports leave out other depots' tanks")
+    void reportsFilteredByDepotLimit() {
+        FuelTank mine = mock(FuelTank.class); UUID mineId = UUID.randomUUID(); when(mine.getId()).thenReturn(mineId);
+        FuelDispatch mineD = mock(FuelDispatch.class), otherD = mock(FuelDispatch.class);
+        UUID otherId = UUID.randomUUID();
+        when(mineD.getTankId()).thenReturn(mineId); when(otherD.getTankId()).thenReturn(otherId);
+        when(mineD.getLitresDispensed()).thenReturn(new java.math.BigDecimal("100")); when(otherD.getLitresDispensed()).thenReturn(new java.math.BigDecimal("900"));
+        when(dispatchRepository.findByTenantAndDispatchedAtBetween(any(), any(), any())).thenReturn(java.util.List.of(mineD, otherD));
+        when(deliveryRepository.findDeliveredBetween(any(), any(), any())).thenReturn(java.util.List.of());
+        var all = service.generateMarginReport(TENANT, null, null);
+        assertEquals(2, all.lines().size());
+        var limited = service.generateMarginReport(TENANT, null, null, java.util.Set.of(mineId));
+        assertEquals(1, limited.lines().size());
+        assertEquals(mineId, limited.lines().get(0).tankId());
+    }
 }

@@ -196,17 +196,27 @@ public class FuelForecourtService {
 
     /**
      * {@code allowedTankIds} null means no depot limit. Otherwise a shift is listed only when every pump read in it is on one of those tanks, because
-     * a shift's takings cover all of its pumps. The limit applies before that filter, so a limited user can get fewer rows than asked for.
+     * a shift's takings cover all of its pumps. A limited user is given a full page of their own shifts where the history has enough (up to 20 pages back).
      */
     @Transactional(readOnly = true)
     public List<ShiftResponse> listShifts(TenantId tenantId, int limit, Set<UUID> allowedTankIds) {
-        List<FuelShift> list = shifts.findRecent(tenantId, PageRequest.of(0, Math.max(1, Math.min(limit, 200))));
-        if (list.isEmpty()) return List.of();
-        Map<UUID, List<FuelShiftReading>> byShift = readings.findByShifts(tenantId, list.stream().map(FuelShift::getId).toList())
-                .stream().collect(Collectors.groupingBy(FuelShiftReading::getShiftId));
+        int want = Math.max(1, Math.min(limit, 200));
         Map<UUID, String> names = pumpNames(tenantId);
-        return list.stream().filter(s -> visible(allowedTankIds, byShift.getOrDefault(s.getId(), List.of())))
-                .map(s -> toShift(s, byShift.getOrDefault(s.getId(), List.of()), names)).toList();
+        List<ShiftResponse> out = new java.util.ArrayList<>();
+        // A depot-limited user is given a full page of their own shifts: keep reading further back until there are enough or the history ends (bounded).
+        int maxPages = allowedTankIds == null ? 1 : 20;
+        for (int page = 0; page < maxPages && out.size() < want; page++) {
+            List<FuelShift> list = shifts.findRecent(tenantId, PageRequest.of(page, want));
+            if (list.isEmpty()) break;
+            Map<UUID, List<FuelShiftReading>> byShift = readings.findByShifts(tenantId, list.stream().map(FuelShift::getId).toList())
+                    .stream().collect(Collectors.groupingBy(FuelShiftReading::getShiftId));
+            for (FuelShift s : list) {
+                List<FuelShiftReading> rs = byShift.getOrDefault(s.getId(), List.of());
+                if (visible(allowedTankIds, rs) && out.size() < want) out.add(toShift(s, rs, names));
+            }
+            if (list.size() < want) break;
+        }
+        return out;
     }
 
     private static boolean visible(Set<UUID> allowedTankIds, List<FuelShiftReading> rs) {

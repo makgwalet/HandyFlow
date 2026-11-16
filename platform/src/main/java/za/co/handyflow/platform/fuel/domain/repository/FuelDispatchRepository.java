@@ -22,6 +22,9 @@ public interface FuelDispatchRepository extends JpaRepository<FuelDispatch, UUID
     @Query("SELECT d FROM FuelDispatch d WHERE d.tenantId = :tenantId AND d.deletedAt IS NULL ORDER BY d.dispatchedAt DESC")
     Page<FuelDispatch> findAllActive(TenantId tenantId, Pageable pageable);
 
+    @Query("SELECT d FROM FuelDispatch d WHERE d.tenantId = :tenantId AND d.deletedAt IS NULL AND d.tankId IN :tankIds ORDER BY d.dispatchedAt DESC")
+    Page<FuelDispatch> findActiveForTanks(TenantId tenantId, java.util.Collection<UUID> tankIds, Pageable pageable);
+
     /** Backs the monthly usage report — full (non-paginated) dispatches within a date range. */
     @Query("SELECT d FROM FuelDispatch d WHERE d.tenantId = :tenantId AND d.deletedAt IS NULL AND d.reversedAt IS NULL AND d.dispatchedAt BETWEEN :from AND :to ORDER BY d.dispatchedAt ASC")
     List<FuelDispatch> findByTenantAndDispatchedAtBetween(TenantId tenantId, Instant from, Instant to);

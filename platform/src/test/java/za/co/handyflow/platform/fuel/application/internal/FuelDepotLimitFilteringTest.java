@@ -172,4 +172,18 @@ class FuelDepotLimitFilteringTest {
         HandyFlowException e = assertThrows(HandyFlowException.class, () -> forecourt.getShift(T, mixed.getId(), Set.of(mine.getId())));
         assertEquals("FUEL_SCOPE_DEPOT", e.getErrorCode());
     }
+
+    @Test @DisplayName("a limited user gets a full page of their own shifts by reading further back, not a short page")
+    void shiftsPagesPastOthers() {
+        forecourt = forecourt();
+        FuelShift a = shift(UUID.randomUUID()), b = shift(UUID.randomUUID()), c = shift(UUID.randomUUID());
+        // page 0 holds a (other depot) and b (other depot); page 1 holds c (mine). Asking for 2 per page.
+        var rA = reading(a.getId(), theirs, "5", "115"); var rB = reading(b.getId(), theirs, "5", "115"); var rC = reading(c.getId(), mine, "5", "115");
+        when(shifts.findRecent(eq(T), org.mockito.ArgumentMatchers.argThat(p -> p != null && p.getPageNumber() == 0))).thenReturn(List.of(a, b));
+        when(shifts.findRecent(eq(T), org.mockito.ArgumentMatchers.argThat(p -> p != null && p.getPageNumber() == 1))).thenReturn(List.of(c));
+        when(readings.findByShifts(eq(T), any())).thenReturn(List.of(rA, rB, rC));
+        var seen = forecourt.listShifts(T, 2, Set.of(mine.getId()));
+        assertEquals(1, seen.size()); assertEquals(c.getId(), seen.get(0).id());
+        verify(shifts, times(2)).findRecent(eq(T), any());
+    }
 }

@@ -39,20 +39,28 @@ public class FuelGroupReportService {
     private final FuelShiftRepository shifts;
     private final FuelShiftReadingRepository readings;
 
+    public Report report(TenantId tenantId, int days, boolean includeMoney) { return report(tenantId, days, includeMoney, null); }
+
+    /**
+     * {@code allowedTankIds} null means no depot limit. Otherwise every figure (deliveries, stock, forecourt sales, open variances) counts only what is on
+     * those tanks, so a depot-limited user sees their own part of each legal entity and the group total is the total of what they may see.
+     */
     @Transactional(readOnly = true)
-    public Report report(TenantId tenantId, int days, boolean includeMoney) {
+    public Report report(TenantId tenantId, int days, boolean includeMoney, Set<UUID> allowedTankIds) {
         int span = Math.max(1, Math.min(days, 366));
         LocalDate to = LocalDate.now(SAST), from = to.minusDays(span - 1L);
         LocalDate prevTo = from.minusDays(1), prevFrom = prevTo.minusDays(span - 1L);
 
         Map<UUID, UUID> depotEntity = new HashMap<>();
         for (FuelDepot d : depots.findAllActive(tenantId)) depotEntity.put(d.getId(), d.getLegalEntityId());
-        List<FuelTank> activeTanks = tanks.findAllActive(tenantId);
+        List<FuelTank> activeTanks = tanks.findAllActive(tenantId).stream().filter(t -> allowedTankIds == null || allowedTankIds.contains(t.getId())).toList();
         Map<UUID, FuelTank> tankById = new HashMap<>();
         for (FuelTank t : activeTanks) tankById.put(t.getId(), t);
 
-        List<FuelDelivery> current = deliveries.findDeliveredBetween(tenantId, from.atStartOfDay(SAST).toInstant(), to.plusDays(1).atStartOfDay(SAST).toInstant());
-        List<FuelDelivery> previous = deliveries.findDeliveredBetween(tenantId, prevFrom.atStartOfDay(SAST).toInstant(), prevTo.plusDays(1).atStartOfDay(SAST).toInstant());
+        List<FuelDelivery> current = deliveries.findDeliveredBetween(tenantId, from.atStartOfDay(SAST).toInstant(), to.plusDays(1).atStartOfDay(SAST).toInstant()).stream()
+                .filter(d -> allowedTankIds == null || allowedTankIds.contains(d.getTankId())).toList();
+        List<FuelDelivery> previous = deliveries.findDeliveredBetween(tenantId, prevFrom.atStartOfDay(SAST).toInstant(), prevTo.plusDays(1).atStartOfDay(SAST).toInstant()).stream()
+                .filter(d -> allowedTankIds == null || allowedTankIds.contains(d.getTankId())).toList();
 
         // Tanks removed since a delivery was made still own that history: look them up too, but only this tenant's.
         Set<UUID> missing = new HashSet<>();
@@ -87,6 +95,7 @@ public class FuelGroupReportService {
         if (!shiftIds.isEmpty()) {
             for (var r : readings.findByShifts(tenantId, shiftIds)) {
                 if (r.getLitresSold() == null) continue;
+                if (allowedTankIds != null && !allowedTankIds.contains(r.getTankId())) continue;
                 FuelTank t = tankById.get(r.getTankId());
                 Acc a = t == null ? unassigned : ownerOfTank(t, depotEntity, accs, unassigned);
                 a.forecourtLitres = a.forecourtLitres.add(r.getLitresSold());
@@ -104,6 +113,7 @@ public class FuelGroupReportService {
             for (FuelDelivery d : deliveries.findAllByIds(tenantId, ids)) byId.put(d.getId(), d);
             for (FuelDeliveryVariance v : open) {
                 FuelDelivery d = byId.get(v.getDeliveryId());
+                if (allowedTankIds != null && (d == null || !allowedTankIds.contains(d.getTankId()))) continue;
                 (d == null ? unassigned : owner(d, tankById, historicTanks, depotEntity, accs, unassigned)).openVariances++;
             }
         }

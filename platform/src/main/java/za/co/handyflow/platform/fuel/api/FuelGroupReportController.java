@@ -25,12 +25,14 @@ public class FuelGroupReportController {
 
     private final FuelGroupReportService report;
     private final FeatureGuard featureGuard;
+    private final za.co.handyflow.platform.fuel.application.internal.FuelScopeService scopes;
 
     @GetMapping
     @PreAuthorize("hasAuthority('FUEL_READ')")
     public ResponseEntity<ApiResponse<Report>> get(@RequestParam(defaultValue = "30") int days) {
         featureGuard.requireModule("fuel");
-        return ResponseEntity.ok(ApiResponse.success(report.report(TenantContext.getTenantIdAsObject(), days, canSeeMoney())));
+        return ResponseEntity.ok(ApiResponse.success(report.report(TenantContext.getTenantIdAsObject(), days, canSeeMoney(),
+                scopes.allowedTankIds(TenantContext.getTenantIdAsObject(), za.co.handyflow.platform.fuel.application.internal.FuelScopeService.currentUserOrNull()))));
     }
 
     private static boolean canSeeMoney() {

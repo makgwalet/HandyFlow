@@ -89,7 +89,7 @@ public class FuelTankController {
     public ResponseEntity<ApiResponse<List<TankUtilizationForecastResponse>>> getUtilizationForecasts() {
         featureGuard.requireModule("fuel");
         return ResponseEntity.ok(ApiResponse.success(
-                fuelService.getUtilizationForecasts(TenantContext.getTenantIdAsObject())));
+                fuelService.getUtilizationForecasts(TenantContext.getTenantIdAsObject(), allowedTanks())));
     }
 
     @GetMapping("/tanks/{id}")
@@ -212,7 +212,7 @@ public class FuelTankController {
             @PageableDefault(size = 50) Pageable pageable) {
         featureGuard.requireModule("fuel");
         return ResponseEntity.ok(ApiResponse.success(
-                fuelService.getReceipts(TenantContext.getTenantIdAsObject(), pageable)));
+                fuelService.getReceipts(TenantContext.getTenantIdAsObject(), allowedTanks(), pageable)));
     }
 
     @PostMapping("/tanks/{id}/receive")
@@ -234,7 +234,7 @@ public class FuelTankController {
             @PageableDefault(size = 50) Pageable pageable) {
         featureGuard.requireModule("fuel");
         return ResponseEntity.ok(ApiResponse.success(
-                fuelService.getDispatches(TenantContext.getTenantIdAsObject(), pageable)));
+                fuelService.getDispatches(TenantContext.getTenantIdAsObject(), allowedTanks(), pageable)));
     }
 
     // FIX (P1 backlog): getDispatchApprovalStatus's own service-method
@@ -312,7 +312,7 @@ public class FuelTankController {
             @RequestParam(required = false) Instant from,
             @RequestParam(required = false) Instant to) {
         featureGuard.requireModule("fuel");
-        byte[] pdf = fuelService.generateUsageReport(TenantContext.getTenantIdAsObject(), from, to);
+        byte[] pdf = fuelService.generateUsageReport(TenantContext.getTenantIdAsObject(), from, to, allowedTanks());
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION,
                         "attachment; filename=\"fuel-usage-report.pdf\"")
@@ -335,7 +335,7 @@ public class FuelTankController {
             @RequestParam(required = false) Instant to) {
         featureGuard.requireModule("fuel");
         return ResponseEntity.ok(ApiResponse.success(
-                fuelService.generateMarginReport(TenantContext.getTenantIdAsObject(), from, to)));
+                fuelService.generateMarginReport(TenantContext.getTenantIdAsObject(), from, to, allowedTanks())));
     }
 
     // ── Deliveries ────────────────────────────────────────────────────────────
@@ -347,7 +347,7 @@ public class FuelTankController {
             @PageableDefault(size = 50) Pageable pageable) {
         featureGuard.requireModule("fuel");
         return ResponseEntity.ok(ApiResponse.success(
-                fuelService.getDeliveries(TenantContext.getTenantIdAsObject(), status, pageable)));
+                fuelService.getDeliveries(TenantContext.getTenantIdAsObject(), status, allowedTanks(), pageable)));
     }
 
     @PostMapping("/deliveries")
@@ -445,5 +445,10 @@ public class FuelTankController {
                 .contentType(MediaType.APPLICATION_PDF)
                 .contentLength(pdf.length)
                 .body(pdf);
+    }
+
+    /** The tanks a depot-limited user may see, or null when the signed-in user has no depot limit. */
+    private java.util.Set<UUID> allowedTanks() {
+        return scopeService.allowedTankIds(TenantContext.getTenantIdAsObject(), za.co.handyflow.platform.fuel.application.internal.FuelScopeService.currentUserOrNull());
     }
 }

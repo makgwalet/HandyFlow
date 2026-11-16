@@ -33,6 +33,7 @@ import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -136,8 +137,12 @@ public class FuelService {
      * meaningful answer to "when will this run out."
      */
     @Transactional(readOnly = true)
-    public List<TankUtilizationForecastResponse> getUtilizationForecasts(TenantId tenantId) {
-        List<FuelTank> tanks = tankRepository.findAllActive(tenantId);
+    public List<TankUtilizationForecastResponse> getUtilizationForecasts(TenantId tenantId) { return getUtilizationForecasts(tenantId, null); }
+
+    /** {@code allowedTankIds} null means no depot limit. */
+    @Transactional(readOnly = true)
+    public List<TankUtilizationForecastResponse> getUtilizationForecasts(TenantId tenantId, Set<UUID> allowedTankIds) {
+        List<FuelTank> tanks = tankRepository.findAllActive(tenantId).stream().filter(t -> allowedTankIds == null || allowedTankIds.contains(t.getId())).toList();
         Instant to = Instant.now();
         Instant from = to.minus(forecastLookbackDays, ChronoUnit.DAYS);
 
@@ -230,12 +235,17 @@ public class FuelService {
      * custom period.
      */
     @Transactional(readOnly = true)
-    public byte[] generateUsageReport(TenantId tenantId, Instant from, Instant to) {
+    public byte[] generateUsageReport(TenantId tenantId, Instant from, Instant to) { return generateUsageReport(tenantId, from, to, null); }
+
+    /** {@code allowedTankIds} null means no depot limit; otherwise only dispatches from those tanks are in the report. */
+    @Transactional(readOnly = true)
+    public byte[] generateUsageReport(TenantId tenantId, Instant from, Instant to, Set<UUID> allowedTankIds) {
         Instant rangeTo   = to != null ? to : Instant.now();
         Instant rangeFrom = from != null ? from : rangeTo.atZone(java.time.ZoneId.of("Africa/Johannesburg"))
                 .toLocalDate().withDayOfMonth(1).atStartOfDay(java.time.ZoneId.of("Africa/Johannesburg")).toInstant();
 
-        List<FuelDispatch> dispatches = dispatchRepository.findByTenantAndDispatchedAtBetween(tenantId, rangeFrom, rangeTo);
+        List<FuelDispatch> dispatches = dispatchRepository.findByTenantAndDispatchedAtBetween(tenantId, rangeFrom, rangeTo).stream()
+                .filter(d -> allowedTankIds == null || allowedTankIds.contains(d.getTankId())).toList();
         return usageReportPdfGenerator.generate(dispatches, rangeFrom, rangeTo, resolveTenantName(tenantId));
     }
 
@@ -251,13 +261,19 @@ public class FuelService {
     // three different entity types for what's fundamentally a financial
     // summary, not a detail view.
     @Transactional(readOnly = true)
-    public FuelMarginReportResponse generateMarginReport(TenantId tenantId, Instant from, Instant to) {
+    public FuelMarginReportResponse generateMarginReport(TenantId tenantId, Instant from, Instant to) { return generateMarginReport(tenantId, from, to, null); }
+
+    /** {@code allowedTankIds} null means no depot limit; otherwise only deliveries and dispatches from those tanks, and totals for those. */
+    @Transactional(readOnly = true)
+    public FuelMarginReportResponse generateMarginReport(TenantId tenantId, Instant from, Instant to, Set<UUID> allowedTankIds) {
         Instant rangeTo   = to != null ? to : Instant.now();
         Instant rangeFrom = from != null ? from : rangeTo.atZone(java.time.ZoneId.of("Africa/Johannesburg"))
                 .toLocalDate().withDayOfMonth(1).atStartOfDay(java.time.ZoneId.of("Africa/Johannesburg")).toInstant();
 
-        List<FuelDelivery> deliveries = deliveryRepository.findDeliveredBetween(tenantId, rangeFrom, rangeTo);
-        List<FuelDispatch> dispatches = dispatchRepository.findByTenantAndDispatchedAtBetween(tenantId, rangeFrom, rangeTo);
+        List<FuelDelivery> deliveries = deliveryRepository.findDeliveredBetween(tenantId, rangeFrom, rangeTo).stream()
+                .filter(d -> allowedTankIds == null || allowedTankIds.contains(d.getTankId())).toList();
+        List<FuelDispatch> dispatches = dispatchRepository.findByTenantAndDispatchedAtBetween(tenantId, rangeFrom, rangeTo).stream()
+                .filter(d -> allowedTankIds == null || allowedTankIds.contains(d.getTankId())).toList();
 
         List<FuelMarginLineResponse> lines = new java.util.ArrayList<>();
         BigDecimal totalRevenue = BigDecimal.ZERO;
@@ -369,8 +385,13 @@ public class FuelService {
     // ── Receipts (receiving stock) ────────────────────────────────────────────
 
     @Transactional(readOnly = true)
-    public Page<ReceiptResponse> getReceipts(TenantId tenantId, Pageable pageable) {
-        return receiptRepository.findAllActive(tenantId, pageable)
+    public Page<ReceiptResponse> getReceipts(TenantId tenantId, Pageable pageable) { return getReceipts(tenantId, null, pageable); }
+
+    /** {@code allowedTankIds} null means no depot limit; otherwise only receipts into those tanks. */
+    @Transactional(readOnly = true)
+    public Page<ReceiptResponse> getReceipts(TenantId tenantId, Set<UUID> allowedTankIds, Pageable pageable) {
+        if (allowedTankIds != null && allowedTankIds.isEmpty()) return Page.empty(pageable);
+        return (allowedTankIds == null ? receiptRepository.findAllActive(tenantId, pageable) : receiptRepository.findActiveForTanks(tenantId, allowedTankIds, pageable))
                 .map(this::toReceiptResponse);
     }
 
@@ -410,8 +431,12 @@ public class FuelService {
     // ── Dispatches (issuing fuel) ─────────────────────────────────────────────
 
     @Transactional(readOnly = true)
-    public Page<DispatchResponse> getDispatches(TenantId tenantId, Pageable pageable) {
-        return dispatchRepository.findAllActive(tenantId, pageable)
+    public Page<DispatchResponse> getDispatches(TenantId tenantId, Pageable pageable) { return getDispatches(tenantId, null, pageable); }
+
+    @Transactional(readOnly = true)
+    public Page<DispatchResponse> getDispatches(TenantId tenantId, Set<UUID> allowedTankIds, Pageable pageable) {
+        if (allowedTankIds != null && allowedTankIds.isEmpty()) return Page.empty(pageable);
+        return (allowedTankIds == null ? dispatchRepository.findAllActive(tenantId, pageable) : dispatchRepository.findActiveForTanks(tenantId, allowedTankIds, pageable))
                 .map(this::toDispatchResponse);
     }
 
@@ -591,10 +616,15 @@ public class FuelService {
 
     @Transactional(readOnly = true)
     public Page<DeliveryResponse> getDeliveries(TenantId tenantId,
-                                                String status, Pageable pageable) {
-        var page = (status == null || status.isBlank())
-                ? deliveryRepository.findAllActive(tenantId, pageable)
-                : deliveryRepository.findByStatus(tenantId, status.toUpperCase(), pageable);
+                                                String status, Pageable pageable) { return getDeliveries(tenantId, status, null, pageable); }
+
+    @Transactional(readOnly = true)
+    public Page<DeliveryResponse> getDeliveries(TenantId tenantId, String status, Set<UUID> allowedTankIds, Pageable pageable) {
+        if (allowedTankIds != null && allowedTankIds.isEmpty()) return Page.empty(pageable);
+        boolean all = status == null || status.isBlank();
+        var page = allowedTankIds == null
+                ? (all ? deliveryRepository.findAllActive(tenantId, pageable) : deliveryRepository.findByStatus(tenantId, status.toUpperCase(), pageable))
+                : (all ? deliveryRepository.findActiveForTanks(tenantId, allowedTankIds, pageable) : deliveryRepository.findByStatusForTanks(tenantId, status.toUpperCase(), allowedTankIds, pageable));
         return page.map(this::toDeliveryResponse);
     }
 
