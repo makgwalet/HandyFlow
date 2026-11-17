@@ -1,32 +1,29 @@
--- Renumber to your next Flyway version (must run AFTER the chunk 1 migration).
+-- Supply Chain: supplier compliance documents. Files live in the shared evidence store; evidence_id points at it.
 
-ALTER TABLE sc_goods_receipts ADD COLUMN IF NOT EXISTS reversed_at     TIMESTAMPTZ;
-ALTER TABLE sc_goods_receipts ADD COLUMN IF NOT EXISTS reversed_by     UUID;
-ALTER TABLE sc_goods_receipts ADD COLUMN IF NOT EXISTS reversal_reason VARCHAR(500);
-
--- The new GR status REVERSED and stock movement type PURCHASE_REVERSAL may be rejected by
--- CHECK constraints created in the original SCM migration. Drop any CHECK that mentions
--- those columns (names unknown), then re-add a permissive one for the GR status.
-DO $$
-DECLARE r RECORD;
-BEGIN
-    FOR r IN SELECT conname FROM pg_constraint
-             WHERE conrelid = 'sc_goods_receipts'::regclass AND contype = 'c'
-               AND pg_get_constraintdef(oid) ILIKE '%status%'
-    LOOP
-        EXECUTE format('ALTER TABLE sc_goods_receipts DROP CONSTRAINT %I', r.conname);
-    END LOOP;
-
-    FOR r IN SELECT conname FROM pg_constraint
-             WHERE conrelid = 'sc_stock_movements'::regclass AND contype = 'c'
-               AND pg_get_constraintdef(oid) ILIKE '%movement_type%'
-    LOOP
-        EXECUTE format('ALTER TABLE sc_stock_movements DROP CONSTRAINT %I', r.conname);
-    END LOOP;
-END $$;
-
-ALTER TABLE sc_goods_receipts
-    ADD CONSTRAINT chk_sc_gr_status CHECK (status IN ('DRAFT','POSTED','REVERSED','CANCELLED'));
-
-CREATE INDEX IF NOT EXISTS idx_sc_gr_lines_po_line ON sc_gr_lines(po_line_id);
-CREATE INDEX IF NOT EXISTS idx_sc_stock_mv_reference ON sc_stock_movements(reference_type, reference_id);
+CREATE TABLE IF NOT EXISTS sc_supplier_documents (
+    id               UUID PRIMARY KEY,
+    tenant_id        UUID         NOT NULL,
+    supplier_id      UUID         NOT NULL REFERENCES sc_suppliers(id),
+    doc_type         VARCHAR(40)  NOT NULL,
+    reference_number VARCHAR(100),
+    issued_date      DATE,
+    expiry_date      DATE,
+    status           VARCHAR(12)  NOT NULL DEFAULT 'ACTIVE',
+    verified         BOOLEAN      NOT NULL DEFAULT FALSE,
+    verified_by      UUID,
+    verified_by_name VARCHAR(255),
+    verified_at      TIMESTAMPTZ,
+    evidence_id      UUID,
+    file_name        VARCHAR(255),
+    content_type     VARCHAR(100),
+    uploaded_by      UUID,
+    uploaded_by_name VARCHAR(255),
+    removed_reason   VARCHAR(500),
+    removed_at       TIMESTAMPTZ,
+    created_at       TIMESTAMPTZ  NOT NULL DEFAULT now(),
+    updated_at       TIMESTAMPTZ  NOT NULL DEFAULT now(),
+    CONSTRAINT chk_sc_supplier_doc_status CHECK (status IN ('ACTIVE','SUPERSEDED','REMOVED')),
+    CONSTRAINT chk_sc_supplier_doc_dates CHECK (issued_date IS NULL OR expiry_date IS NULL OR expiry_date >= issued_date)
+);
+CREATE INDEX IF NOT EXISTS idx_sc_supplier_docs_supplier ON sc_supplier_documents(tenant_id, supplier_id, status);
+CREATE INDEX IF NOT EXISTS idx_sc_supplier_docs_expiry ON sc_supplier_documents(expiry_date) WHERE status = 'ACTIVE';
