@@ -7,6 +7,8 @@ import { Modal, btnPrimary, btnGhost, card, inputStyle, labelStyle, Chip } from 
 import { fmtL } from "./orderOps"
 import { WindowDialog, FailedAttemptDialog } from "./DeliveryExceptionDialogs"
 import RoutesPanel from "./RoutesPanel"
+import { KpiGrid, KpiTile, Panel, EmptyState } from "./fuelUi"
+import { Truck, AlertTriangle, Route, Droplets } from "lucide-react"
 import { parseCapacities, validateTanker, autoSplit, validateAllocation, splitToLoads, eligibilityGate, type EligibilityResult, type Plan, type PlanLoad, type Tanker, type Driver, type FleetVehicleOption, fleetOptionText, windowText } from "./transportOps"
 
 const unwrap = (r: any) => r.data?.data ?? r.data
@@ -31,6 +33,8 @@ export default function PlanningTab() {
   const remove = useMutation({ mutationFn: (id: string) => apiClient.delete(`/api/v1/fuel/tankers/${id}`), onSuccess: refresh })
   const loads = plan.data?.loads ?? []
   const open = loads.filter(l => !l.allocated && l.status === "SCHEDULED")
+  const onRoad = loads.filter(l => l.status === "IN_TRANSIT").length
+  const planned = loads.reduce((s, l) => s + Number(l.litres ?? 0), 0)
 
   return (
     <div>
@@ -41,8 +45,17 @@ export default function PlanningTab() {
         {open.length > 0 && <Chip bg="var(--hf-danger-soft)" fg="var(--hf-danger-text)">{open.length} load{open.length === 1 ? "" : "s"} need a tanker and driver</Chip>}
       </div>
 
-      {plan.isLoading ? <p style={{ color: "var(--hf-text-muted)" }}>Loading…</p> : loads.length === 0 ? <p style={{ color: "var(--hf-text-muted)" }}>No loads scheduled for this day.</p> : (
-        <div style={{ ...card, overflowX: "auto", marginBottom: 20 }}>
+      <div style={{ marginBottom: 16 }}>
+        <KpiGrid>
+          <KpiTile label="Loads planned" icon={Truck} tone="blue" value={plan.isLoading ? "…" : loads.length} hint={fmtL(planned)} />
+          <KpiTile label="Needing allocation" icon={AlertTriangle} tone={open.length > 0 ? "red" : "slate"} value={plan.isLoading ? "…" : open.length} hint={open.length > 0 ? "No tanker or driver yet" : "All allocated"} />
+          <KpiTile label="On the road" icon={Route} tone="violet" value={plan.isLoading ? "…" : onRoad} hint="In transit now" />
+          <KpiTile label="Tankers in use" icon={Droplets} tone="green" value={plan.isLoading ? "…" : (plan.data?.tankers ?? []).length} hint={`${(tankers.data ?? []).length} in the register`} />
+        </KpiGrid>
+      </div>
+
+      {plan.isLoading ? <p style={{ color: "var(--hf-text-muted)" }}>Loading…</p> : loads.length === 0 ? <EmptyState icon={Truck} title="No loads scheduled for this day." /> : (
+        <div style={{ marginBottom: 20 }}><Panel title="Loads for the day" pad={false}><div style={{ overflowX: "auto" }}>
           <table style={{ width: "100%", borderCollapse: "collapse" }}>
             <thead><tr><th style={th}>Time</th><th style={th}>Window</th><th style={th}>Customer</th><th style={th}>Fuel</th><th style={th}>Litres</th><th style={th}>Tanker</th><th style={th}>Driver</th><th style={th}>Status</th><th style={th}></th></tr></thead>
             <tbody>
@@ -58,7 +71,7 @@ export default function PlanningTab() {
               ))}
             </tbody>
           </table>
-        </div>
+        </div></Panel></div>
       )}
 
       <RoutesPanel date={date} loads={loads} tankers={tankers.data ?? []} canManage={canManage} onChanged={refresh} />

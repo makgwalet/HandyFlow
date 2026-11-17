@@ -3,9 +3,11 @@ import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import { usePermissions } from "../../hooks/usePermission"
-import { btnPrimary, card, Chip } from "../warehousing/whseUi"
+import { btnPrimary, Chip } from "../warehousing/whseUi"
 import { fmtL, fmtR, groupByCustomer, type QueueLine } from "./orderOps"
 import InvoiceAttentionPanel from "./InvoiceAttentionPanel"
+import { KpiGrid, KpiTile, Panel, EmptyState } from "./fuelUi"
+import { FileText, Users, AlertTriangle, Receipt } from "lucide-react"
 
 const unwrap = (r: any) => r.data?.data ?? r.data
 const th: React.CSSProperties = { textAlign: "left", padding: "8px 12px", fontSize: 11, fontWeight: 700, color: "var(--hf-text-muted)" }
@@ -24,23 +26,30 @@ export default function InvoicingTab() {
   })
   const groups = groupByCustomer(queue.data ?? [])
   const total = (queue.data ?? []).reduce((s, l) => s + Number(l.totalAmount ?? 0), 0)
+  const failedLoads = (queue.data ?? []).filter(l => l.invoiceState === "FAILED").length
+  const litres = (queue.data ?? []).reduce((s, l) => s + Number(l.litresDelivered ?? 0), 0)
 
   return (
     <div>
       <p style={{ fontSize: 12.5, color: "var(--hf-text-muted)", margin: "0 0 12px" }}>
         Fuel that has been delivered but not yet invoiced{queue.data?.length ? `: ${queue.data.length} load${queue.data.length === 1 ? "" : "s"}, ${fmtR(total)}` : ""}. Choose loads for one customer to create a draft invoice. A failed attempt stays here with the reason.
       </p>
+      <div style={{ marginBottom: 14 }}>
+        <KpiGrid>
+          <KpiTile label="Waiting to invoice" icon={FileText} tone="blue" value={queue.isLoading ? "…" : fmtR(total)} hint={`${(queue.data ?? []).length} load${(queue.data ?? []).length === 1 ? "" : "s"} · ${fmtL(litres)}`} />
+          <KpiTile label="Customers to bill" icon={Users} tone="violet" value={queue.isLoading ? "…" : groups.length} hint="With delivered, uninvoiced loads" />
+          <KpiTile label="Failed attempts" icon={AlertTriangle} tone={failedLoads > 0 ? "red" : "slate"} value={queue.isLoading ? "…" : failedLoads} hint={failedLoads > 0 ? "Each shows its reason below" : "Nothing stuck"} />
+        </KpiGrid>
+      </div>
       <InvoiceAttentionPanel />
       {done && <p role="status" style={{ color: "var(--hf-success-text-strong)", fontSize: 13 }}>{done}</p>}
       {err && <p role="alert" style={{ color: "var(--hf-danger-text)", fontSize: 13 }}>{err}</p>}
-      {queue.isLoading ? <p style={{ color: "var(--hf-text-muted)" }}>Loading…</p> : groups.length === 0 ? <p style={{ color: "var(--hf-text-muted)" }}>Nothing waiting: every delivered load has been invoiced.</p> : groups.map(g => {
+      {queue.isLoading ? <p style={{ color: "var(--hf-text-muted)" }}>Loading…</p> : groups.length === 0 ? <EmptyState icon={Receipt} title="Nothing waiting: every delivered load has been invoiced." /> : groups.map(g => {
         const ids = g.lines.filter(l => picked[l.deliveryId]).map(l => l.deliveryId)
         return (
-          <div key={g.customerId ?? "none"} style={{ ...card, marginBottom: 14, overflowX: "auto" }}>
-            <div style={{ display: "flex", alignItems: "center", padding: "10px 12px", gap: 10 }}>
-              <strong style={{ flex: 1 }}>{g.name} · {fmtR(g.total)}</strong>
-              {canManage && g.customerId && <button style={btnPrimary} disabled={ids.length === 0 || create.isPending} onClick={() => create.mutate(ids)}>Create draft invoice ({ids.length})</button>}
-            </div>
+          <div key={g.customerId ?? "none"} style={{ marginBottom: 14 }}>
+          <Panel title={`${g.name} · ${fmtR(g.total)}`} pad={false} action={canManage && g.customerId ? <button style={btnPrimary} disabled={ids.length === 0 || create.isPending} onClick={() => create.mutate(ids)}>Create draft invoice ({ids.length})</button> : undefined}>
+          <div style={{ overflowX: "auto" }}>
             <table style={{ width: "100%", borderCollapse: "collapse" }}>
               <thead><tr><th style={th}></th><th style={th}>Receipt</th><th style={th}>Fuel</th><th style={th}>Litres</th><th style={th}>Amount</th><th style={th}>State</th></tr></thead>
               <tbody>
@@ -53,6 +62,8 @@ export default function InvoicingTab() {
                 ))}
               </tbody>
             </table>
+          </div>
+          </Panel>
           </div>
         )
       })}

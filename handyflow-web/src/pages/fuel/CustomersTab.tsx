@@ -4,6 +4,8 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import { usePermissions } from "../../hooks/usePermission"
 import { Modal, btnPrimary, btnGhost, card, inputStyle, labelStyle, Chip } from "../warehousing/whseUi"
+import { KpiGrid, KpiTile, EmptyState } from "./fuelUi"
+import { Users, PauseCircle, MapPin, Wallet } from "lucide-react"
 import { CUSTOMER_TYPES, typeLabel, fmtR, validateAccount, validateHold, validateSite, validateDistance, validateCoordinates, type CustomerAccount, type CustomerSite } from "./customerOps"
 
 const unwrap = (r: any) => r.data?.data ?? r.data
@@ -36,8 +38,19 @@ export default function CustomersTab() {
   })
 
   const list = accounts.data ?? []
+  const onHold = list.filter(a => a.creditHold).length
+  const siteTotal = list.reduce((n, a) => n + Number(a.siteCount ?? 0), 0)
+  const creditTotal = list.reduce((n, a) => n + Number(a.creditLimit ?? 0), 0)
   return (
     <div>
+      <div style={{ marginBottom: 14 }}>
+        <KpiGrid>
+          <KpiTile label="Customer accounts" icon={Users} tone="blue" value={accounts.isLoading ? "…" : list.length} hint="Fuel accounts on CRM customers" />
+          <KpiTile label="Accounts on hold" icon={PauseCircle} tone={onHold > 0 ? "red" : "slate"} value={accounts.isLoading ? "…" : onHold} hint={onHold > 0 ? "No fuel is scheduled for these" : "None on credit hold"} />
+          <KpiTile label="Delivery sites" icon={MapPin} tone="violet" value={accounts.isLoading ? "…" : siteTotal} hint="Across all accounts" />
+          <KpiTile label="Credit extended" icon={Wallet} tone="green" value={accounts.isLoading ? "…" : fmtR(creditTotal)} hint="Sum of credit limits" />
+        </KpiGrid>
+      </div>
       <div style={{ display: "flex", alignItems: "center", marginBottom: 14, gap: 10 }}>
         <p style={{ fontSize: 12.5, color: "var(--hf-text-muted)", margin: 0, flex: 1 }}>
           A fuel account sits on top of a CRM customer and adds the type, credit limit and terms. Fuel is not scheduled or dispatched for an account on credit hold.
@@ -46,7 +59,7 @@ export default function CustomersTab() {
       </div>
       {err && <Err text={err} />}
       {accounts.isLoading ? <p style={{ color: "var(--hf-text-muted)" }}>Loading…</p>
-        : list.length === 0 ? <p style={{ color: "var(--hf-text-muted)" }}>No customer accounts yet.</p>
+        : list.length === 0 ? <EmptyState icon={Users} title="No customer accounts yet." />
         : (
           <div style={{ ...card, overflowX: "auto" }}>
             <table style={{ width: "100%", borderCollapse: "collapse" }}>
