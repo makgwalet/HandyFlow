@@ -1,4 +1,4 @@
-import { alreadyRecorded, canRecordDip, dipBody, fillText, sortTanks, tankSchema, validateDip, varianceText, type Tank } from "@depot/tanks";
+import { canReceiveFuel, canRecordDip, dipBody, emptyReceive, fillText, receiveBody, sortTanks, tankSchema, validateDip, validateReceive, varianceText, type ReceiveForm, type Tank } from "@depot/tanks";
 
 const tank = (o: Partial<Tank> = {}): Tank => ({ id: "t", name: "Tank 1", fuelType: "DIESEL_50", capacityLitres: 30000, currentLitres: 12000, low: false, ...o });
 
@@ -35,10 +35,29 @@ describe("dip reading", () => {
     expect(varianceText({ varianceLitres: 0.2, negativeVariance: false })).toBe("Matches the book stock");
     expect(varianceText({ varianceLitres: null, negativeVariance: false })).toBe("No variance calculated");
   });
-  it("recognises a reading that already reached the server", () => {
-    const r = [{ id: "1", readAt: "2026-01-01T00:00:00Z", actualLitres: 500, negativeVariance: false }];
-    expect(alreadyRecorded(r, "2026-01-01T00:00:00.000Z", 500)).toBe(true);
-    expect(alreadyRecorded(r, "2026-01-01T00:00:00.000Z", 501)).toBe(false);
-    expect(alreadyRecorded(r, "2026-01-01T00:05:00.000Z", 500)).toBe(false);
+  const tank = { capacityLitres: 30000, currentLitres: 12000 };
+  const f = (o: Partial<ReceiveForm> = {}): ReceiveForm => ({ ...emptyReceive, litres: "10000", price: "21.50", ...o });
+  it("accepts a receipt that fits", () => expect(validateReceive(f(), tank)).toBeNull());
+  it("asks for litres and price", () => {
+    expect(validateReceive(f({ litres: "" }), tank)).toMatch(/litres received/i);
+    expect(validateReceive(f({ price: "" }), tank)).toMatch(/price/i);
+    expect(validateReceive(f({ litres: "0" }), tank)).toMatch(/more than zero/);
+    expect(validateReceive(f({ price: "-1" }), tank)).toMatch(/more than zero/);
+  });
+  it("refuses more fuel than the room left, and says how much room there is", () => {
+    expect(validateReceive(f({ litres: "18000" }), tank)).toBeNull();
+    expect(validateReceive(f({ litres: "18001" }), tank)).toMatch(/18.000 L of room/);
+  });
+  it("checks freight only when given", () => {
+    expect(validateReceive(f({ freight: "" }), tank)).toBeNull();
+    expect(validateReceive(f({ freight: "x" }), tank)).toMatch(/Freight/);
+  });
+  it("builds the receipt body with only what was filled in", () => {
+    expect(receiveBody(f({ litres: "10 000".replace(" ", ""), price: "21,5" }), "2026-01-01T00:00:00.000Z")).toEqual({ litresReceived: 10000, pricePerLitre: 21.5, receivedAt: "2026-01-01T00:00:00.000Z" });
+    expect(receiveBody(f({ deliveryNote: " DN1 ", invoiceRef: "INV9", freight: "350" }), "t")).toMatchObject({ deliveryNote: "DN1", invoiceRef: "INV9", freightAmount: 350 });
+  });
+  it("lets the same people receive as record dips", () => {
+    expect(canReceiveFuel(["FUEL_OPERATIONS_MANAGE"])).toBe(true);
+    expect(canReceiveFuel(["FUEL_READ"])).toBe(false);
   });
 });

@@ -11,6 +11,8 @@ export const KIND_LABEL: Record<OutboxItem["kind"], string> = {
   COMPLETE: "Delivery",
   FAILED_ATTEMPT: "Failed delivery",
   EVIDENCE: "Photo",
+  DIP_READING: "Dip reading",
+  RECEIVE_FUEL: "Fuel received",
 };
 
 export function SyncCentreScreen() {

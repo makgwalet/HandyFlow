@@ -9,7 +9,8 @@
     "paths": {
       "@/*": ["./src/*"],
       "@driver/*": ["./packages/fuel-driver/src/*"],
-      "@depot/*": ["./packages/fuel-depot/src/*"]
+      "@depot/*": ["./packages/fuel-depot/src/*"],
+      "@overview/*": ["./packages/fuel-overview/src/*"]
     }
   },
   "include": ["**/*.ts", "**/*.tsx", ".expo/types/**/*.ts", "expo-env.d.ts"],

@@ -1,7 +1,7 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { AppState } from "react-native";
 import * as Crypto from "expo-crypto";
-import { sendDriverItem } from "@driver/send";
+import { sendItem } from "./send";
 import { useAuth } from "@/auth/AuthContext";
 import { flush, type OutboxItem, type OutboxKind, type OutboxStore } from "./outbox";
 import { openLocalDb, type KeyValueStore } from "./sqliteStore";
@@ -44,7 +44,7 @@ export function OutboxProvider({ children }: { children: React.ReactNode }) {
     const store = storeRef.current;
     if (!store || !ownerId) return;
     try {
-      await flush(store, sendDriverItem, ownerId);
+      await flush(store, sendItem, ownerId);
     } finally {
       await refresh();
     }

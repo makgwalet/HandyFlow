@@ -12,6 +12,8 @@ export type RootStackParamList = {
   ArrivalCheck: { loadId: string };
   Signature: { loadId: string };
   FailedAttempt: { loadId: string };
+  Overview: undefined;
   DepotTanks: undefined;
   TankDetail: { tankId: string };
+  ReceiveFuel: { tankId: string };
 };

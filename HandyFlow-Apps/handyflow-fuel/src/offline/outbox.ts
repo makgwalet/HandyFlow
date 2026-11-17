@@ -1,7 +1,7 @@
 import { ApiError } from "@/api/client";
 
 /** Every write the app can queue. Add a kind here, give it a priority below and a sender in the mode's package. */
-export type OutboxKind = "DISPATCH" | "COMPLETE" | "FAILED_ATTEMPT" | "EVIDENCE";
+export type OutboxKind = "DISPATCH" | "COMPLETE" | "FAILED_ATTEMPT" | "EVIDENCE" | "DIP_READING" | "RECEIVE_FUEL";
 export type OutboxStatus = "PENDING" | "FAILED";
 
 /** One write waiting to reach the server. `id` is also the clientRequestId, so a retry can never double-create. */
@@ -43,7 +43,7 @@ export interface FlushResult {
  * A trip must start before it can be completed, and photos go last because they need the delivery on the server.
  * Within the same step the order of creation is kept.
  */
-const PRIORITY: Record<OutboxKind, number> = { DISPATCH: 0, COMPLETE: 1, FAILED_ATTEMPT: 1, EVIDENCE: 2 };
+const PRIORITY: Record<OutboxKind, number> = { DISPATCH: 0, COMPLETE: 1, FAILED_ATTEMPT: 1, EVIDENCE: 2, DIP_READING: 1, RECEIVE_FUEL: 1 };
 
 export function sortForSending(items: OutboxItem[]): OutboxItem[] {
   return [...items].sort((a, b) => PRIORITY[a.kind] - PRIORITY[b.kind] || a.createdAt.localeCompare(b.createdAt));

@@ -66,8 +66,42 @@ export function varianceText(r: Pick<DipReading, "varianceLitres" | "negativeVar
   return `${v < 0 ? "Short" : "Over"} by ${fmtL(Math.abs(v))}`;
 }
 
-/** After a lost reply the reading may already be on the server. Same time and litres means it is: do not save it twice. */
-export function alreadyRecorded(readings: DipReading[], readAtIso: string, litres: number): boolean {
-  const at = Date.parse(readAtIso);
-  return readings.some((r) => Date.parse(r.readAt) === at && Math.abs(r.actualLitres - litres) < 0.001);
+/** The server enforces this too. Receiving fuel needs the same permission as a dip reading. */
+export const canReceiveFuel = canRecordDip;
+
+export interface ReceiveForm { litres: string; price: string; deliveryNote: string; invoiceRef: string; freight: string }
+export const emptyReceive: ReceiveForm = { litres: "", price: "", deliveryNote: "", invoiceRef: "", freight: "" };
+
+const toNum = (t: string) => Number(t.trim().replace(",", "."));
+
+/**
+ * Null when the receipt can be saved, otherwise the message to show. Fuel cannot be received past the room left in the tank
+ * (the server refuses it too, but an offline phone should say so now, not hours later).
+ */
+export function validateReceive(f: ReceiveForm, tank: Pick<Tank, "capacityLitres" | "currentLitres">): string | null {
+  if (!f.litres.trim()) return "Enter the litres received.";
+  const l = toNum(f.litres);
+  if (!Number.isFinite(l) || l <= 0) return "Litres received must be more than zero.";
+  const room = tank.capacityLitres - tank.currentLitres;
+  if (l > room + 0.001) return `That is more than the ${fmtL(Math.max(room, 0))} of room left in the tank. Check the litres.`;
+  if (!f.price.trim()) return "Enter the price per litre.";
+  const p = toNum(f.price);
+  if (!Number.isFinite(p) || p <= 0) return "Price per litre must be more than zero.";
+  if (f.freight.trim()) {
+    const fr = toNum(f.freight);
+    if (!Number.isFinite(fr) || fr < 0) return "Freight must be a number, zero or more.";
+  }
+  return null;
+}
+
+/** The request body without clientRequestId; the outbox adds its item id when it sends. */
+export function receiveBody(f: ReceiveForm, receivedAtIso: string) {
+  return {
+    litresReceived: toNum(f.litres),
+    pricePerLitre: toNum(f.price),
+    receivedAt: receivedAtIso,
+    ...(f.deliveryNote.trim() ? { deliveryNote: f.deliveryNote.trim() } : {}),
+    ...(f.invoiceRef.trim() ? { invoiceRef: f.invoiceRef.trim() } : {}),
+    ...(f.freight.trim() ? { freightAmount: toNum(f.freight) } : {}),
+  };
 }
