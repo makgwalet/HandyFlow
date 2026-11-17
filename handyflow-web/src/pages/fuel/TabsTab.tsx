@@ -6,7 +6,7 @@ import { usePermissions } from "../../hooks/usePermission"
 import { Modal, btnPrimary, btnGhost, card, inputStyle, labelStyle, Chip } from "../warehousing/whseUi"
 import { fmtR } from "./orderOps"
 import { chargeableAccounts, onlyFleetOptions, type StayAccount } from "./stayOps"
-import { onlyTabs, sellable, validateQuantity, validateNewTab, tabActions, tabInvoiceText, canRaiseTabInvoice, paidText, TAB_STATUS_LABEL, TILL_METHODS, type Tab } from "./tabOps"
+import { onlyTabs, sellable, validateQuantity, validateNewTab, tabActions, tabInvoiceText, canRaiseTabInvoice, paidText, vatBreakdown, vatText, TAB_STATUS_LABEL, TILL_METHODS, type Tab } from "./tabOps"
 
 const unwrap = (r: any) => r.data?.data ?? r.data
 const msg = (e: any, fb: string) => e?.response?.data?.message ?? fb
@@ -18,6 +18,7 @@ export default function TabsTab() {
   const canManage = usePermissions(["FUEL_MANAGE", "FUEL_TRUCKSTOP_MANAGE"])
   const qc = useQueryClient()
   const tabs = useQuery<Tab[]>({ queryKey: ["fuel-ts-tabs"], queryFn: async () => onlyTabs(unwrap(await apiClient.get(`${BASE}/tabs`))) })
+  const vat = useQuery({ queryKey: ["fuel-ts-vat"], retry: false, queryFn: async () => unwrap(await apiClient.get(`${BASE}/tabs/vat`)) })
   const offerings = useQuery({ queryKey: ["fuel-ts-tab-offerings"], queryFn: async () => sellable(unwrap(await apiClient.get(`${BASE}/offerings`))) })
   const accounts = useQuery<StayAccount[]>({ queryKey: ["fuel-stay-accounts"], queryFn: async () => unwrap(await apiClient.get("/api/v1/fuel/customer-accounts")) })
   const accountList: StayAccount[] = Array.isArray(accounts.data) ? accounts.data.filter((a: any) => a?.customerName) : []
@@ -60,7 +61,7 @@ export default function TabsTab() {
                   </tr>
                   {open === t.id && (
                     <tr><td colSpan={6} style={{ ...td, background: "var(--hf-surface-alt)" }}>
-                      <TabDetail tab={t} canManage={canManage} offerings={offerings.data ?? []} onChanged={refresh}
+                      <TabDetail tab={t} canManage={canManage} offerings={offerings.data ?? []} vat={vat.data} onChanged={refresh}
                         onAct={(path, body) => act.mutate({ id: t.id, path, body })} busy={act.isPending} />
                     </td></tr>
                   )}
@@ -75,7 +76,7 @@ export default function TabsTab() {
   )
 }
 
-function TabDetail({ tab, canManage, offerings, onChanged, onAct, busy }: { tab: Tab; canManage: boolean; offerings: { id: string; serviceName: string; price: number | null }[]; onChanged: () => void; onAct: (path: string, body?: unknown) => void; busy: boolean }) {
+function TabDetail({ tab, canManage, offerings, vat, onChanged, onAct, busy }: { tab: Tab; vat?: unknown; canManage: boolean; offerings: { id: string; serviceName: string; price: number | null }[]; onChanged: () => void; onAct: (path: string, body?: unknown) => void; busy: boolean }) {
   const [offeringId, setOfferingId] = useState("")
   const [qty, setQty] = useState("1")
   const [method, setMethod] = useState("CASH")
@@ -120,7 +121,8 @@ function TabDetail({ tab, canManage, offerings, onChanged, onAct, busy }: { tab:
       )}
       {offerings.length === 0 && actions.includes("addLines") && <p style={{ fontSize: 12, color: "var(--hf-text-muted)" }}>No services can be sold yet. Add services under Truck stop, and give them a price in Bookings.</p>}
       {err && <p role="alert" style={{ color: "var(--hf-danger-text)", fontSize: 12, margin: "8px 0 0" }}>{err}</p>}
-      <p style={{ fontSize: 13, fontWeight: 600, margin: "10px 0 0" }}>Total {fmtR(tab.total)}</p>
+      <p style={{ fontSize: 13, fontWeight: 600, margin: "10px 0 0" }}>Total {fmtR(tab.total)} ex VAT</p>
+      {vatText(vatBreakdown(tab.total, vat), fmtR) && <p style={{ fontSize: 12, color: "var(--hf-text-muted)", margin: "2px 0 0" }}>{vatText(vatBreakdown(tab.total, vat), fmtR)}</p>}
       <div style={{ display: "flex", gap: 8, alignItems: "flex-end", marginTop: 8, flexWrap: "wrap" }}>
         {actions.includes("settle") && (<>
           <div><label style={labelStyle} htmlFor={`tl-m-${tab.id}`}>Paid by</label>

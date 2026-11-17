@@ -5,6 +5,7 @@ import { apiClient } from "../../api/client"
 import { usePermissions } from "../../hooks/usePermission"
 import { Modal, btnPrimary, btnGhost, card, inputStyle, labelStyle, Chip } from "../warehousing/whseUi"
 import { fmtR } from "./orderOps"
+import { vatBreakdown, vatText } from "./tabOps"
 import { emptyStay, validateStay, validateSettings, nightsText, stayActions, nightState, firstFullNight, chargeText, invoiceText, canRaiseInvoice, chargeableAccounts, onlyFleetOptions, onlyBays, bayName, canChangeBay, STATUS_LABEL, type Bay, type StayAccount, type Stay, type StayForm, type ParkingSettings, type Occupancy, type Capacity } from "./stayOps"
 
 const unwrap = (r: any) => r.data?.data ?? r.data
@@ -29,6 +30,7 @@ export default function StaysTab() {
   const capacity = useQuery<Capacity>({ queryKey: ["fuel-stay-capacity"], queryFn: async () => unwrap(await apiClient.get("/api/v1/fuel/truck-stop/stays/capacity?days=14")) })
   const bayQ = useQuery<Bay[]>({ queryKey: ["fuel-stay-bays"], retry: false, queryFn: async () => onlyBays(unwrap(await apiClient.get("/api/v1/fuel/truck-stop/bays"))) })
   const bayList: Bay[] = bayQ.data ?? []
+  const vat = useQuery({ queryKey: ["fuel-ts-vat"], retry: false, queryFn: async () => unwrap(await apiClient.get("/api/v1/fuel/truck-stop/tabs/vat")) })
   const stays = useQuery<Stay[]>({ queryKey: ["fuel-stays"], queryFn: async () => unwrap(await apiClient.get("/api/v1/fuel/truck-stop/stays")) })
   const setBay = useMutation({
     mutationFn: (a: { id: string; bayId: string | null }) => apiClient.put(`/api/v1/fuel/truck-stop/stays/${a.id}/bay`, { bayId: a.bayId }),
@@ -69,7 +71,7 @@ export default function StaysTab() {
                 <td style={td}>{s.arrivalDate}</td>
                 <td style={td}>{s.actualDepartureDate ?? s.departureDate}{s.actualDepartureDate && s.actualDepartureDate !== s.departureDate && <div style={{ fontSize: 11, color: "var(--hf-text-muted)" }}>planned {s.departureDate}</div>}</td>
                 <td style={td}>{nightsText(s)}</td>
-                <td style={td}>{fmtR(s.amount)}<div style={{ fontSize: 11, color: "var(--hf-text-muted)" }}>{fmtR(s.ratePerNight)} a night</div></td>
+                <td style={td}>{fmtR(s.amount)} <span style={{ fontSize: 11, color: "var(--hf-text-muted)" }}>ex VAT</span>{vatText(vatBreakdown(s.amount, vat.data), fmtR) && <div style={{ fontSize: 11, color: "var(--hf-text-muted)" }}>{vatText(vatBreakdown(s.amount, vat.data), fmtR)}</div>}<div style={{ fontSize: 11, color: "var(--hf-text-muted)" }}>{fmtR(s.ratePerNight)} a night</div></td>
                 <td style={td}>{canManage && bayList.length > 0 && canChangeBay(s)
                   ? <select aria-label={`Bay for ${s.vehicleRegistration}`} value={s.bayId ?? ""} style={{ ...inputStyle, width: 110 }} onChange={e => setBay.mutate({ id: s.id, bayId: e.target.value || null })}>
                       <option value="">No bay</option>{bayList.filter(b => b.active || b.id === s.bayId).map(b => <option key={b.id} value={b.id}>{b.name}</option>)}</select>

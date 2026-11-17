@@ -44,3 +44,18 @@ describe("tabOps", () => {
     expect(paidText(tab({ status: "VOID", voidReason: "Left without paying" }))).toBe("Void: Left without paying")
   })
 })
+
+import { vatBreakdown as vb, vatText as vt } from "./tabOps"
+describe("VAT breakdown", () => {
+  it("adds VAT once on an ex-VAT amount", () => {
+    const b = vb(170, { registered: true, ratePercent: 15 })!
+    expect(b.vat).toBe(25.5); expect(b.total).toBe(195.5)
+  })
+  it("adds nothing when not registered", () => {
+    const b = vb(170, { registered: false, ratePercent: 15 })!
+    expect(b.vat).toBe(0); expect(b.total).toBe(170)
+    expect(vt(b, n => `R${n}`)).toBe("R170, no VAT charged")
+  })
+  it("says nothing until the rate is known", () => { expect(vb(170, undefined)).toBeNull(); expect(vb(170, { x: 1 })).toBeNull() })
+  it("words the breakdown", () => { expect(vt(vb(100, { registered: true, ratePercent: 15 }), n => `R${n}`)).toBe("R100 ex VAT + R15 VAT (15%) = R115") })
+})

@@ -29,4 +29,7 @@ public final class TabDtos {
 
     public record TabView(UUID id, String vehicleRegistration, String driverName, UUID accountId, String status, String paymentMethod, Instant openedAt, Instant settledAt,
                           String voidReason, String invoiceState, String invoiceNumber, String invoiceError, List<LineView> lines, BigDecimal total, UUID fleetVehicleId) {}
+
+    /** The company's VAT treatment today: prices are ex-VAT and Invoicing adds this rate once. Zero when not registered. */
+    public record VatInfo(boolean registered, BigDecimal ratePercent) {}
 }

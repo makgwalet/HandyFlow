@@ -45,6 +45,13 @@ public class FuelTabInvoicingService {
     private final InvoicingFacade invoicing;
     private final CrmFacade crm;
 
+    /** The rate Invoicing will add today, for showing ex-VAT, VAT and total. Same rule as the invoice itself. */
+    public za.co.handyflow.platform.fuel.dto.TabDtos.VatInfo vatToday(TenantId tenantId) {
+        var vat = invoicing.vatTreatment(tenantId, LocalDate.now(SAST));
+        boolean on = vat.registered() && vat.ratePercent() != null;
+        return new za.co.handyflow.platform.fuel.dto.TabDtos.VatInfo(on, on ? vat.ratePercent() : BigDecimal.ZERO);
+    }
+
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public TabView invoice(TenantId tenantId, UUID tabId) {
         FuelTruckStopTab t = tabs.findOwned(tenantId, tabId).orElseThrow(() -> new ResourceNotFoundException("Tab", tabId.toString()));

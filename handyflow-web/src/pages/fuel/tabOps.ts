@@ -65,3 +65,19 @@ export function paidText(t: Tab, accountName?: string): string {
   if (t.paymentMethod === "ACCOUNT") return `Charged to ${accountName ?? "the account"}`
   return `Paid by ${(TILL_METHODS.find(m => m.id === t.paymentMethod)?.label ?? t.paymentMethod ?? "").toLowerCase()}`
 }
+
+export interface VatInfo { registered: boolean; ratePercent: number }
+export interface VatBreakdown { exVat: number; vat: number; total: number; ratePercent: number }
+
+/** Truck stop prices are VAT-exclusive; Invoicing adds the rate once. Rounded to cents like an invoice line. Null until the rate is known. */
+export function vatBreakdown(exVat: number | null | undefined, info: unknown): VatBreakdown | null {
+  if (typeof exVat !== "number" || !info || typeof (info as any).registered !== "boolean") return null
+  const rate = (info as VatInfo).registered ? Number((info as VatInfo).ratePercent) || 0 : 0
+  const vat = Math.round(exVat * rate) / 100
+  return { exVat, vat, total: Math.round((exVat + vat) * 100) / 100, ratePercent: rate }
+}
+
+export function vatText(b: VatBreakdown | null, fmt: (n: number) => string): string | null {
+  if (!b) return null
+  return b.ratePercent > 0 ? `${fmt(b.exVat)} ex VAT + ${fmt(b.vat)} VAT (${b.ratePercent}%) = ${fmt(b.total)}` : `${fmt(b.exVat)}, no VAT charged`
+}

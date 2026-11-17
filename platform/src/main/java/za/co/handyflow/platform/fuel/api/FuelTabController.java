@@ -40,6 +40,13 @@ public class FuelTabController {
         return ResponseEntity.ok(ApiResponse.success(service.list(TenantContext.getTenantIdAsObject(), status, limit)));
     }
 
+    @GetMapping("/vat")
+    @PreAuthorize(READ)
+    public ResponseEntity<ApiResponse<VatInfo>> vat() {
+        featureGuard.requireModule("fuel");
+        return ResponseEntity.ok(ApiResponse.success(invoicing.vatToday(TenantContext.getTenantIdAsObject())));
+    }
+
     @PostMapping
     @PreAuthorize(WRITE)
     public ResponseEntity<ApiResponse<TabView>> open(@Valid @RequestBody OpenRequest req) {

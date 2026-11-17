@@ -79,6 +79,25 @@ class FuelTabInvoicingServiceTest {
         verify(tx).link(T, tab.getId(), inv, "INV-5");
     }
 
+    @Test @DisplayName("VAT is added once: lines carry ex-VAT prices and the rate, never a price with VAT already in it")
+    void noDoubleVat() {
+        when(invoicing.createDraftInvoice(any(), any())).thenReturn(new InvoicingFacade.DraftInvoiceResult(UUID.randomUUID(), "INV-6", bd("170"), bd("25.50"), bd("195.50")));
+        service.invoice(T, tab.getId());
+        ArgumentCaptor<InvoicingFacade.DraftInvoice> c = ArgumentCaptor.forClass(InvoicingFacade.DraftInvoice.class);
+        verify(invoicing).createDraftInvoice(eq(T), c.capture());
+        BigDecimal exVat = c.getValue().lines().stream().map(l -> l.unitPrice().multiply(l.quantity())).reduce(BigDecimal.ZERO, BigDecimal::add);
+        assertEquals(0, bd("170").compareTo(exVat));
+    }
+
+    @Test @DisplayName("vatToday gives the registered rate, and zero when not registered")
+    void vatToday() {
+        assertTrue(service.vatToday(T).registered());
+        assertEquals(0, bd("15").compareTo(service.vatToday(T).ratePercent()));
+        when(invoicing.vatTreatment(any(), any())).thenReturn(new InvoicingFacade.VatTreatment(false, bd("15"), true, LocalDate.of(2020, 1, 1)));
+        assertFalse(service.vatToday(T).registered());
+        assertEquals(0, BigDecimal.ZERO.compareTo(service.vatToday(T).ratePercent()));
+    }
+
     @Test @DisplayName("when Invoicing fails the tab is marked FAILED for a retry")
     void invoicingFails() {
         when(invoicing.createDraftInvoice(any(), any())).thenThrow(new IllegalStateException("No invoice number series"));
