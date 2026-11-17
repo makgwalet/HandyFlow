@@ -126,7 +126,7 @@ public class FuelPortalDataService {
                 created.value(), created.status(), created.requestedDate(), created.customerReference(), created.litresDelivered(), created.litresRemaining(), created.createdAt());
     }
 
-    private FuelPortalAccessGrant requireGrant(UUID portalUserId, UUID accountId) {
+    FuelPortalAccessGrant requireGrant(UUID portalUserId, UUID accountId) {
         FuelPortalAccessGrant g = grants.findActiveGrant(portalUserId, accountId).orElseThrow(FuelPortalDataService::notFound);
         // The portal request has no tenant context, so the module check uses the grant's tenant. Same answer as "not yours".
         if (!featureGuard.hasModuleFor(TenantId.of(g.getTenantId()), "fuel")) throw notFound();

@@ -27,7 +27,7 @@ class FuelEndpointSecurityTest {
     /** Public by design: login/accept-invite for portal users, and the key-authenticated pump/POS import (8e). */
     private static final Set<String> PUBLIC_CONTROLLERS = Set.of("FuelPortalAuthController.java", "FuelImportIngestController.java", "FuelGaugeIngestController.java", "FuelTransactionIngestController.java");
     /** Portal-token controllers: class-level guard, tenant derived from the grant, no staff module guard. */
-    private static final Set<String> PORTAL_CONTROLLERS = Set.of("FuelPortalDataController.java");
+    private static final Set<String> PORTAL_CONTROLLERS = Set.of("FuelPortalDataController.java", "FuelPortalTruckStopController.java");
     private static final Pattern MAPPING = Pattern.compile("^\\s*@(Get|Post|Put|Delete|Patch)Mapping");
     private static final Pattern AUTH = Pattern.compile("'([A-Z][A-Z0-9_]+)'");
 
