@@ -7,6 +7,9 @@ import org.springframework.transaction.annotation.Transactional;
 import za.co.handyflow.platform.fuel.domain.model.FuelGaugeReading;
 import za.co.handyflow.platform.fuel.domain.model.FuelImportAutoAccept;
 import za.co.handyflow.platform.fuel.domain.model.FuelPosImport;
+import za.co.handyflow.platform.fuel.domain.model.FuelShiftAutoAcceptLog;
+import za.co.handyflow.platform.fuel.domain.repository.FuelShiftAutoAcceptLogRepository;
+import za.co.handyflow.platform.fuel.domain.repository.FuelShiftRepository;
 import za.co.handyflow.platform.fuel.domain.repository.FuelGaugeReadingRepository;
 import za.co.handyflow.platform.fuel.domain.repository.FuelImportAutoAcceptRepository;
 import za.co.handyflow.platform.fuel.domain.repository.FuelPosImportRepository;
@@ -36,6 +39,10 @@ public class FuelImportAutoAcceptService {
     private final FuelGaugeReadingRepository gaugeReadings;
     private final FuelPosImportService pos;
     private final FuelGaugeImportService gauges;
+    private final FuelShiftRepository shiftRepo;
+    private final FuelShiftAutoAcceptLogRepository acceptLog;
+    private final FuelShiftAlertService alerts;
+    private final FuelToleranceService tolerances;
 
     @Transactional(readOnly = true)
     public Setting get(TenantId tenant) {
@@ -51,20 +58,47 @@ public class FuelImportAutoAcceptService {
         return new Setting(a.isShiftsEnabled(), a.isGaugesEnabled(), a.getGaugeMaxDifferenceLitres());
     }
 
-    /** Called after a shift was staged. Returns the result to send back: updated to ACCEPTED when it was accepted here, otherwise as given. */
+    /**
+     * Called after a shift was staged. Returns the result to send back: updated to ACCEPTED when it was accepted here, otherwise as given.
+     * It is accepted only through the normal close, which refuses a variance outside the tolerance in force, so only a shift within tolerance
+     * is accepted. Each acceptance is logged with its variance and tolerance and the supervisor is told; a refusal tells the exception recipients.
+     */
     public IngestResult afterShift(IngestResult r) {
         if (r == null || r.duplicate() || !"PENDING".equals(r.status()) || (r.problems() != null && !r.problems().isEmpty())) return r;
+        FuelPosImport imp = null;
         try {
-            FuelPosImport imp = posImports.findById(r.importId()).orElse(null);
+            imp = posImports.findById(r.importId()).orElse(null);
             if (imp == null || !imp.isPending()) return r;
             Setting s = get(imp.getTenantId());
             if (!s.shiftsEnabled()) return r;
-            pos.accept(imp.getTenantId(), imp.getId(), new AcceptRequest(null, NOTE), null);
+            var accepted = pos.accept(imp.getTenantId(), imp.getId(), new AcceptRequest(null, NOTE), null);
+            recordAcceptance(imp, accepted == null ? null : accepted.shiftId());
             return new IngestResult(r.importId(), "ACCEPTED", false, r.problems());
         } catch (RuntimeException ex) {
             log.info("Fuel shift import {} left for review: {}", r.importId(), ex.getMessage());
+            if (imp != null) alerts.notAccepted(imp.getTenantId(), imp.getExternalId(), ex.getMessage());
             return r;
         }
+    }
+
+    /** The acceptance stands even if the log or the notice fails. */
+    private void recordAcceptance(FuelPosImport imp, UUID shiftId) {
+        try {
+            if (shiftId == null) return;
+            var shift = shiftRepo.findByTenantAndId(imp.getTenantId(), shiftId).orElse(null);
+            if (shift == null) return;
+            acceptLog.save(FuelShiftAutoAcceptLog.of(imp.getTenantId(), imp.getId(), shift));
+            alerts.autoAccepted(imp.getTenantId(), shift);
+        } catch (RuntimeException ex) {
+            log.warn("Shift import {} was accepted but its record or notice failed: {}", imp.getId(), ex.getMessage());
+        }
+    }
+
+    @Transactional(readOnly = true)
+    public java.util.List<za.co.handyflow.platform.fuel.dto.ShiftControlDtos.AutoAcceptLogView> log(TenantId tenant, int limit) {
+        return acceptLog.findRecent(tenant, org.springframework.data.domain.PageRequest.of(0, Math.max(1, Math.min(limit, 200)))).stream()
+                .map(l -> new za.co.handyflow.platform.fuel.dto.ShiftControlDtos.AutoAcceptLogView(l.getId(), l.getShiftId(), l.getShiftNumber(), l.getAttendantName(),
+                        l.getVarianceAmount(), l.getToleranceApplied(), l.getActor(), l.getAcceptedAt())).toList();
     }
 
     /** Called after a gauge reading was staged. Accepted only within the company's own difference limit from the book level. */
@@ -76,7 +110,8 @@ public class FuelImportAutoAcceptService {
             Setting s = get(g.getTenantId());
             if (!s.gaugesEnabled() || s.gaugeMaxDifferenceLitres() == null) return r;
             BigDecimal diff = gauges.differenceFromBook(g.getTenantId(), g.getId());
-            if (diff == null || diff.compareTo(s.gaugeMaxDifferenceLitres()) > 0) return r;
+            BigDecimal limit = tolerances.gaugeLimitFor(g.getTenantId(), gauges.fuelTypeOf(g.getTenantId(), g.getId()), s.gaugeMaxDifferenceLitres());
+            if (diff == null || limit == null || diff.compareTo(limit) > 0) return r;
             gauges.accept(g.getTenantId(), g.getId(), new GaugeImportDtos.AcceptRequest(NOTE), null);
             return new IngestResult(r.importId(), "ACCEPTED", false, r.problems());
         } catch (RuntimeException ex) {

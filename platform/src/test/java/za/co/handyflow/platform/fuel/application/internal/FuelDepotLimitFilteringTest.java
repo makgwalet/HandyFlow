@@ -122,7 +122,7 @@ class FuelDepotLimitFilteringTest {
     // ── forecourt shifts ─────────────────────────────────────────────────────
 
     private FuelForecourtService forecourt() {
-        return new FuelForecourtService(pumps, shifts, readings, tanks, ledger, numbers, cash);
+        return new FuelForecourtService(pumps, shifts, readings, tanks, ledger, numbers, cash, tolerances(), mock(FuelShiftAlertService.class));
     }
 
     private FuelShift shift(UUID id) {
@@ -185,5 +185,11 @@ class FuelDepotLimitFilteringTest {
         var seen = forecourt.listShifts(T, 2, Set.of(mine.getId()));
         assertEquals(1, seen.size()); assertEquals(c.getId(), seen.get(0).id());
         verify(shifts, times(2)).findRecent(eq(T), any());
+    }
+
+    private static FuelToleranceService tolerances() {
+        FuelToleranceService t = mock(FuelToleranceService.class);
+        when(t.cashToleranceFor(any(), any(), any())).thenAnswer(i -> i.getArgument(2));
+        return t;
     }
 }

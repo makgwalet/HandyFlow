@@ -2,6 +2,8 @@ import { useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import AutoAcceptSettings from "./AutoAcceptSettings"
+import ShiftControls from "./ShiftControls"
+import AutoAcceptLog from "./AutoAcceptLog"
 import { usePermissions } from "../../hooks/usePermission"
 import { btnGhost, btnPrimary, card, Chip, ErrorLine, ReasonModal, inputStyle } from "../warehousing/whseUi"
 import { fmtL, fmtR } from "./orderOps"
@@ -99,6 +101,8 @@ export default function ImportsTab() {
       {canKeys && <PumpLabels seenSources={list.data ?? []} />}
 
       {canConfigure && <AutoAcceptSettings />}
+      {canConfigure && <ShiftControls />}
+      {canConfigure && <AutoAcceptLog />}
 
       {rejecting && <ReasonModal title="Reject this shift" intro={`${rejecting.shift.attendantName} · ${rejecting.externalId}. It stays on record as rejected.`} confirmLabel="Reject" pending={reject.isPending} error={reject.error}
         onConfirm={reason => reject.mutate({ id: rejecting.id, reason })} onClose={() => setRejecting(null)} />}

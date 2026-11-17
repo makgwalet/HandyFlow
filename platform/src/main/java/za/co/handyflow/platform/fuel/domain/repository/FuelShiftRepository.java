@@ -23,4 +23,9 @@ public interface FuelShiftRepository extends JpaRepository<FuelShift, UUID> {
 
     @Query("SELECT COUNT(s) FROM FuelShift s WHERE s.tenantId = :tenantId AND s.status = 'OPEN'")
     long countOpen(TenantId tenantId);
+
+    /** Closed shifts by this attendant since a time whose variance was outside the tolerance in force when they closed. */
+    @Query("SELECT COUNT(s) FROM FuelShift s WHERE s.tenantId = :tenantId AND s.status = 'CLOSED' AND LOWER(s.attendantName) = LOWER(:attendant) "
+            + "AND s.closedAt >= :since AND s.varianceAmount IS NOT NULL AND s.toleranceApplied IS NOT NULL AND ABS(s.varianceAmount) > s.toleranceApplied")
+    long countOutsideToleranceSince(TenantId tenantId, String attendant, Instant since);
 }

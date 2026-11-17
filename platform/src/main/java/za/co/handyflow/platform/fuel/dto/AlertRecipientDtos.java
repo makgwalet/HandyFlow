@@ -7,8 +7,9 @@ public final class AlertRecipientDtos {
     private AlertRecipientDtos() {}
 
     /** The extra people told about one kind of alert. Administrators are told as well unless excludeAdmins is set (only allowed when someone else is chosen), so they are not listed. */
-    public record Topic(String topic, String label, List<UUID> userIds, boolean excludeAdmins) {
-        public Topic(String topic, String label, List<UUID> userIds) { this(topic, label, userIds, false); }
+    public record Topic(String topic, String label, List<UUID> userIds, boolean excludeAdmins, boolean adminsByDefault) {
+        public Topic(String topic, String label, List<UUID> userIds, boolean excludeAdmins) { this(topic, label, userIds, excludeAdmins, true); }
+        public Topic(String topic, String label, List<UUID> userIds) { this(topic, label, userIds, false, true); }
     }
 
     /** excludeAdmins left out (null) keeps the current setting. */

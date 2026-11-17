@@ -36,4 +36,12 @@ public class FuelImportAutoAcceptController {
         return ResponseEntity.ok(ApiResponse.success("Saved", service.save(TenantContext.getTenantIdAsObject(),
                 req.shiftsEnabled(), req.gaugesEnabled(), req.gaugeMaxDifferenceLitres(), TenantContext.getCurrentUserId())));
     }
+
+    /** Every shift accepted automatically: variance, tolerance in force, who and when. */
+    @GetMapping("/log")
+    @PreAuthorize("hasAnyAuthority('FUEL_CONFIGURATION_MANAGE','FUEL_SHIFT_SUPERVISE')")
+    public ResponseEntity<ApiResponse<java.util.List<za.co.handyflow.platform.fuel.dto.ShiftControlDtos.AutoAcceptLogView>>> log(@RequestParam(defaultValue = "50") int limit) {
+        featureGuard.requireModule("fuel");
+        return ResponseEntity.ok(ApiResponse.success(service.log(TenantContext.getTenantIdAsObject(), limit)));
+    }
 }

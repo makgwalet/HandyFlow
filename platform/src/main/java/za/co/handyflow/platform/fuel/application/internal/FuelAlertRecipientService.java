@@ -29,7 +29,20 @@ public class FuelAlertRecipientService {
     /** Delivery variances: both "to review" and "still unresolved". */
     public static final String VARIANCE = "VARIANCE";
     static final Map<String, String> TOPICS = new LinkedHashMap<>();
-    static { TOPICS.put(VARIANCE, "Delivery variances"); }
+    /** A routine notice for each shift accepted automatically. Administrators are not told by default: they get exceptions and escalations, not every routine acceptance. */
+    public static final String SHIFT_ACCEPTED = "SHIFT_ACCEPTED";
+    /** A shift that could not be accepted automatically, or closed outside its tolerance, and needs a person. */
+    public static final String SHIFT_EXCEPTION = "SHIFT_EXCEPTION";
+    /** The same attendant closing shifts outside tolerance again and again, as the company defines it. */
+    public static final String SHIFT_REPEAT = "SHIFT_REPEAT";
+    static {
+        TOPICS.put(VARIANCE, "Delivery variances");
+        TOPICS.put(SHIFT_ACCEPTED, "Shifts accepted automatically");
+        TOPICS.put(SHIFT_EXCEPTION, "Shifts that need review");
+        TOPICS.put(SHIFT_REPEAT, "Repeated shift variances");
+    }
+    /** Topics where administrators are told unless the company leaves them off. The others go only to the people chosen. */
+    static final Set<String> ADMINS_BY_DEFAULT = Set.of(VARIANCE, SHIFT_EXCEPTION, SHIFT_REPEAT);
     static final int MAX_EXTRA = 10;
 
     private final FuelAlertRecipientRepository repo;
@@ -43,7 +56,7 @@ public class FuelAlertRecipientService {
         Map<String, List<UUID>> by = new HashMap<>();
         for (FuelAlertRecipient r : repo.findAllForTenant(tenant)) by.computeIfAbsent(r.getTopic(), k -> new ArrayList<>()).add(r.getUserId());
         List<Topic> out = new ArrayList<>();
-        TOPICS.forEach((k, label) -> out.add(new Topic(k, label, by.getOrDefault(k, List.of()), excl.getOrDefault(k, false))));
+        TOPICS.forEach((k, label) -> out.add(new Topic(k, label, by.getOrDefault(k, List.of()), excl.getOrDefault(k, false), ADMINS_BY_DEFAULT.contains(k))));
         return out;
     }
 
@@ -83,17 +96,21 @@ public class FuelAlertRecipientService {
             else repo.delete(r);
         }
         for (UUID u : wanted) if (!have.contains(u)) repo.save(FuelAlertRecipient.of(tenant, topic, u, by));
-        return new Topic(topic, label, new ArrayList<>(wanted), exclude);
+        return new Topic(topic, label, new ArrayList<>(wanted), exclude, ADMINS_BY_DEFAULT.contains(topic));
     }
 
-    /** Administrators plus the company's chosen extras, each person once. Never throws; falls back to the administrators. */
+    /**
+     * Who to tell. Administrators plus the company's chosen people for most topics; only the chosen people for a routine topic. Each person once.
+     * Never throws; falls back to the administrators for a topic they are normally told about.
+     */
     public List<Recipient> recipientsFor(TenantId tenant, String topic) {
-        List<Recipient> admins = adminRecipients.resolveTenantAdmins(tenant);
+        boolean adminsNormally = ADMINS_BY_DEFAULT.contains(topic);
+        List<Recipient> admins = adminsNormally ? adminRecipients.resolveTenantAdmins(tenant) : List.of();
         List<UUID> extra;
         boolean exclude;
         try {
             extra = repo.findByTopic(tenant, topic).stream().map(FuelAlertRecipient::getUserId).toList();
-            exclude = !extra.isEmpty() && settings.findOne(tenant.getValue(), topic).map(FuelAlertTopicSetting::isExcludeAdmins).orElse(false);
+            exclude = adminsNormally && !extra.isEmpty() && settings.findOne(tenant.getValue(), topic).map(FuelAlertTopicSetting::isExcludeAdmins).orElse(false);
         } catch (RuntimeException ex) {
             return admins;
         }

@@ -106,6 +106,14 @@ public class FuelGaugeImportService {
         return view(g, t);
     }
 
+    /** The fuel type of the tank a staged reading belongs to, or null when the tank cannot be resolved. */
+    @Transactional(readOnly = true)
+    public String fuelTypeOf(TenantId tenantId, UUID id) {
+        FuelGaugeReading g = find(tenantId, id);
+        FuelTank t = resolve(tenantId, g.getSource(), g.getTankLabel());
+        return t == null ? null : t.getFuelType();
+    }
+
     /** How far the staged level is from the tank's book level, in litres (absolute). Null when the tank cannot be resolved. */
     @Transactional(readOnly = true)
     public java.math.BigDecimal differenceFromBook(TenantId tenantId, UUID id) {

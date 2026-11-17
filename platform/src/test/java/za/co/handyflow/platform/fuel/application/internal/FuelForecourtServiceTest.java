@@ -37,6 +37,8 @@ class FuelForecourtServiceTest {
     @Mock FuelStockLedger ledger;
     @Mock ShiftNumberGenerator numbers;
     @Mock FuelCashControlService cash;
+    @Mock FuelToleranceService tolerances;
+    @Mock FuelShiftAlertService shiftAlerts;
     @InjectMocks FuelForecourtService service;
 
     FuelTank diesel;
@@ -48,6 +50,7 @@ class FuelForecourtServiceTest {
 
     @BeforeEach
     void setUp() {
+        when(tolerances.cashToleranceFor(any(), any(), any())).thenAnswer(i -> i.getArgument(2));   // no depot override: the company-wide number
         diesel = FuelTank.create(TENANT, "Diesel 1", "DIESEL", d("20000"), null, d("20"));
         diesel.addStock(d("10000"), d("18.00"));
         pump1 = FuelPump.create(TENANT, "Pump 1", diesel.getId(), d("20.00"));
@@ -267,5 +270,23 @@ class FuelForecourtServiceTest {
         when(cash.policy(TENANT)).thenReturn(new FuelCashControlService.CashPolicy(d("5.00"), true));
         assertThrows(IllegalStateException.class, () -> service.closeShift(TENANT, s.getId(), close("4000", "2000", null, "1210", "10", "5100"), USER));
         assertTrue(s.isOpen());
+    }
+
+    @Test @DisplayName("a depot's own tolerance is used for the close: R1,000 short is refused at R5 but closes inside a R2,000 tolerance")
+    void depotToleranceIsUsed() {
+        UUID depot = UUID.randomUUID();
+        diesel.place(depot, null);
+        FuelShift s = opened();
+        when(tolerances.cashToleranceFor(eq(TENANT), eq(java.util.Set.of(depot)), any())).thenReturn(d("2000.00"));
+        ShiftResponse r = service.closeShift(TENANT, s.getId(), close("3000", "2000", null, "1210", "10", "5100"), USER);
+        assertEquals("CLOSED", r.status());
+        assertEquals(0, d("2000.00").compareTo(s.getToleranceApplied()));
+    }
+
+    @Test @DisplayName("the shift alerts are told after a close, and a failing alert cannot be what stops it (the alert service swallows its own errors)")
+    void alertsAfterClose() {
+        FuelShift s = opened();
+        service.closeShift(TENANT, s.getId(), close("4000", "2000", null, "1210", "10", "5100"), USER);
+        verify(shiftAlerts).afterClose(TENANT, s);
     }
 }

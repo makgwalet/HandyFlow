@@ -38,7 +38,14 @@ class FuelImportAutoAcceptServiceTest {
     @Mock FuelGaugeReadingRepository gaugeReadings;
     @Mock FuelPosImportService pos;
     @Mock FuelGaugeImportService gauges;
+    @Mock za.co.handyflow.platform.fuel.domain.repository.FuelShiftRepository shiftRepo;
+    @Mock za.co.handyflow.platform.fuel.domain.repository.FuelShiftAutoAcceptLogRepository acceptLog;
+    @Mock FuelShiftAlertService alerts;
+    @Mock FuelToleranceService tolerances;
     @InjectMocks FuelImportAutoAcceptService service;
+
+    @org.junit.jupiter.api.BeforeEach
+    void defaults() { when(tolerances.gaugeLimitFor(any(), any(), any())).thenAnswer(i -> i.getArgument(2)); }
 
     final UUID id = UUID.randomUUID();
     final IngestResult pending = new IngestResult(id, "PENDING", false, List.of());
@@ -120,5 +127,48 @@ class FuelImportAutoAcceptServiceTest {
         assertTrue(s.shiftsEnabled()); assertTrue(s.gaugesEnabled());
         assertEquals(new BigDecimal("300"), s.gaugeMaxDifferenceLitres());
         verify(settings).save(any());
+    }
+
+    @Test @DisplayName("an automatic acceptance is logged with the variance and tolerance, and the supervisor is told")
+    void acceptanceIsLoggedAndNotified() {
+        var imp = pendingShift(); setting(true, false, null);
+        var shift = za.co.handyflow.platform.fuel.domain.model.FuelShift.open(T, "SH-7", "Thabo", null, null);
+        shift.close(new BigDecimal("6000"), BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, new BigDecimal("0"), new BigDecimal("6000"), BigDecimal.ZERO, new BigDecimal("300"), null, null, new BigDecimal("5.00"), false);
+        when(shiftRepo.findByTenantAndId(T, shift.getId())).thenReturn(Optional.of(shift));
+        when(pos.accept(eq(T), eq(id), any(), isNull())).thenReturn(new za.co.handyflow.platform.fuel.dto.PosImportDtos.ImportView(id, "src", "EXT-1", "ACCEPTED", null, List.of(), null, null, null, null, shift.getId()));
+        assertEquals("ACCEPTED", service.afterShift(pending).status());
+        var cap = org.mockito.ArgumentCaptor.forClass(za.co.handyflow.platform.fuel.domain.model.FuelShiftAutoAcceptLog.class);
+        verify(acceptLog).save(cap.capture());
+        assertEquals("SYSTEM", cap.getValue().getActor());
+        assertEquals(0, new BigDecimal("5.00").compareTo(cap.getValue().getToleranceApplied()));
+        verify(alerts).autoAccepted(T, shift);
+    }
+
+    @Test @DisplayName("a failing log or notice does not undo the acceptance")
+    void logFailureKeepsAcceptance() {
+        pendingShift(); setting(true, false, null);
+        var shift = za.co.handyflow.platform.fuel.domain.model.FuelShift.open(T, "SH-8", "Thabo", null, null);
+        when(shiftRepo.findByTenantAndId(T, shift.getId())).thenReturn(Optional.of(shift));
+        when(pos.accept(eq(T), eq(id), any(), isNull())).thenReturn(new za.co.handyflow.platform.fuel.dto.PosImportDtos.ImportView(id, "src", "EXT-1", "ACCEPTED", null, List.of(), null, null, null, null, shift.getId()));
+        when(acceptLog.save(any())).thenThrow(new RuntimeException("db"));
+        assertEquals("ACCEPTED", service.afterShift(pending).status());
+    }
+
+    @Test @DisplayName("a refusal leaves the shift for a person and tells the exception recipients the reason")
+    void refusalNotifiesExceptions() {
+        var imp = pendingShift(); when(imp.getExternalId()).thenReturn("EXT-9"); setting(true, false, null);
+        when(pos.accept(any(), any(), any(), any())).thenThrow(new IllegalArgumentException("The takings are R 1000.00 short"));
+        assertEquals("PENDING", service.afterShift(pending).status());
+        verify(alerts).notAccepted(T, "EXT-9", "The takings are R 1000.00 short");
+        verify(acceptLog, never()).save(any());
+    }
+
+    @Test @DisplayName("a fuel type's own gauge limit is used instead of the company-wide one")
+    void productGaugeLimitUsed() {
+        pendingGauge(); setting(false, true, "500");
+        when(gauges.differenceFromBook(T, id)).thenReturn(new BigDecimal("300"));
+        when(gauges.fuelTypeOf(T, id)).thenReturn("PETROL");
+        when(tolerances.gaugeLimitFor(T, "PETROL", new BigDecimal("500.00"))).thenReturn(new BigDecimal("200"));
+        assertEquals("PENDING", service.afterGauge(pending).status());
     }
 }

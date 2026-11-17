@@ -33,7 +33,7 @@ export default function AlertRecipients({ users }: { users: UserOption[] }) {
     <div style={{ ...card, padding: 16, marginTop: 14 }}>
       <h3 style={{ margin: "0 0 4px", fontSize: 14 }}>Who is told about alerts</h3>
       <p style={{ margin: "0 0 12px", fontSize: 12.5, color: "var(--hf-text-muted)" }}>
-        Administrators are told by default. Add people here who should be told as well, and you can leave administrators off the routine notification once someone else is chosen. Administrators still see the alert in the app, and security or compliance escalations are not affected. Only active users with an email address can be added.
+        Administrators are told by default, except for routine notices such as each shift accepted automatically, which go only to the people you choose. Add people here who should be told as well, and you can leave administrators off the routine notification once someone else is chosen. Administrators still see the alert in the app, and security or compliance escalations are not affected. Only active users with an email address can be added.
       </p>
       {topics.map(t => (
         <div key={t.topic} style={{ display: "flex", gap: 10, alignItems: "center", padding: "8px 0", borderTop: "1px solid var(--hf-border)" }}>
@@ -53,9 +53,9 @@ export default function AlertRecipients({ users }: { users: UserOption[] }) {
               <input type="checkbox" checked={ids.includes(u.id)} onChange={() => setIds(toggle(ids, u.id))} /> {u.name}
             </label>
           ))}
-          <label style={{ display: "block", fontSize: 13, marginTop: 8 }}>
+          {topics.find(x => x.topic === topic)?.adminsByDefault !== false && <label style={{ display: "block", fontSize: 13, marginTop: 8 }}>
             <input type="checkbox" checked={excl && ids.length > 0} disabled={ids.length === 0} onChange={e => setExcl(e.target.checked)} /> Leave administrators off this notification
-          </label>
+          </label>}
           {err && <p role="alert" style={{ color: "var(--hf-danger-text)", fontSize: 12 }}>{err}</p>}
           <button style={{ ...btnPrimary, marginTop: 8 }} disabled={save.isPending} onClick={() => save.mutate()}>Save</button>
         </fieldset>

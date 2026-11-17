@@ -35,6 +35,8 @@ public class FuelForecourtService {
     private final FuelStockLedger ledger;
     private final ShiftNumberGenerator numbers;
     private final FuelCashControlService cash;
+    private final FuelToleranceService tolerances;
+    private final FuelShiftAlertService shiftAlerts;
 
     // ── Pumps ────────────────────────────────────────────────────────────────
 
@@ -146,8 +148,12 @@ public class FuelForecourtService {
         if (pending > 0) throw new IllegalStateException(pending + " refund, void or discount entr" + (pending == 1 ? "y is" : "ies are")
                 + " still waiting for a supervisor. Decide or withdraw " + (pending == 1 ? "it" : "them") + " before closing the shift.");
         FuelCashControlService.CashPolicy policy = cash.policy(tenantId);
+        // A depot may have its own tolerance; a shift that drew on several uses the smallest.
+        Set<UUID> depotIds = new HashSet<>();
+        for (FuelShiftReading r : rows) { FuelTank t = tankMap.get(r.getTankId()); if (t != null && t.getDepotId() != null) depotIds.add(t.getDepotId()); }
+        BigDecimal tolerance = tolerances.cashToleranceFor(tenantId, depotIds, policy.tolerance());
         shift.close(req.cash(), req.card(), req.fleetCard(), req.account(), req.other(), expected, cash.approvedTotal(tenantId, shiftId), litres,
-                req.varianceReason(), userId, policy.tolerance(), policy.requireSeparateCloser());
+                req.varianceReason(), userId, tolerance, policy.requireSeparateCloser());
 
         // Lock tanks in id order (TreeMap) so two shifts closing together cannot deadlock.
         for (Map.Entry<UUID, BigDecimal> e : perTank.entrySet()) {
@@ -169,6 +175,7 @@ public class FuelForecourtService {
         readings.saveAll(rows);
         shifts.save(shift);
         log.info("Forecourt shift closed {} litres={} variance={} by={}", shift.getShiftNumber(), litres, shift.getVarianceAmount(), userId);
+        shiftAlerts.afterClose(tenantId, shift);
         return toShift(shift, rows, pumpNames(tenantId));
     }
 

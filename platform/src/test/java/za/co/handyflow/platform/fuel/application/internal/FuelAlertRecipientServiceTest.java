@@ -148,4 +148,32 @@ class FuelAlertRecipientServiceTest {
         var t = service.replace(T, "VARIANCE", List.of(), null, null);
         assertFalse(t.excludeAdmins());
     }
+
+    @Test @DisplayName("the routine shift-accepted notice goes only to the people chosen, never to administrators")
+    void routineNoticeSkipsAdmins() {
+        when(admins.resolveTenantAdmins(T)).thenReturn(List.of(admin));
+        when(repo.findByTopic(T, "SHIFT_ACCEPTED")).thenReturn(List.of());
+        assertEquals(List.of(), service.recipientsFor(T, "SHIFT_ACCEPTED"));
+        when(repo.findByTopic(T, "SHIFT_ACCEPTED")).thenReturn(List.of(FuelAlertRecipient.of(T, "SHIFT_ACCEPTED", other.userId(), null)));
+        when(admins.resolveUsers(eq(T), any())).thenReturn(List.of(other));
+        assertEquals(List.of(other), service.recipientsFor(T, "SHIFT_ACCEPTED"));
+    }
+
+    @Test @DisplayName("exceptions and repeats go to administrators as well as the people chosen")
+    void exceptionsIncludeAdmins() {
+        when(admins.resolveTenantAdmins(T)).thenReturn(List.of(admin));
+        when(repo.findByTopic(T, "SHIFT_EXCEPTION")).thenReturn(List.of(FuelAlertRecipient.of(T, "SHIFT_EXCEPTION", other.userId(), null)));
+        when(admins.resolveUsers(eq(T), any())).thenReturn(List.of(other));
+        assertEquals(List.of(admin, other), service.recipientsFor(T, "SHIFT_EXCEPTION"));
+        when(repo.findByTopic(T, "SHIFT_REPEAT")).thenReturn(List.of());
+        assertEquals(List.of(admin), service.recipientsFor(T, "SHIFT_REPEAT"));
+    }
+
+    @Test @DisplayName("the list says which topics administrators are told about by default")
+    void listShowsAdminDefault() {
+        var topics = service.list(T);
+        assertTrue(topics.stream().filter(t -> t.topic().equals("VARIANCE")).findFirst().orElseThrow().adminsByDefault());
+        assertFalse(topics.stream().filter(t -> t.topic().equals("SHIFT_ACCEPTED")).findFirst().orElseThrow().adminsByDefault());
+        assertEquals(4, topics.size());
+    }
 }

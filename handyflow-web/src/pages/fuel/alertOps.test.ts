@@ -12,6 +12,10 @@ describe("alertOps", () => {
   it("says when administrators are left off", () => {
     expect(topicSummary({ topic: "VARIANCE", label: "x", userIds: ["u1"], excludeAdmins: true }, users)).toContain("administrators left off")
   })
+  it("says a routine notice is not sent to administrators", () => {
+    expect(topicSummary({ topic: "SHIFT_ACCEPTED", label: "x", userIds: [], adminsByDefault: false }, users)).toContain("not sent to administrators")
+    expect(topicSummary({ topic: "SHIFT_ACCEPTED", label: "x", userIds: ["u1"], adminsByDefault: false }, users)).toBe("Thabo M")
+  })
   it("keeps only rows shaped like alert topics", () => {
     expect(onlyTopics([{ id: "x" }, { topic: "VARIANCE", label: "L", userIds: [] }])).toHaveLength(1)
     expect(onlyTopics({})).toEqual([])
