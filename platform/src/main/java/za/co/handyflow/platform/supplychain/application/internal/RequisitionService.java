@@ -65,6 +65,7 @@ public class RequisitionService {
     private final VatRateProvider vatRateProvider;
     // NEW (chunk 7): budget check at submit and approve.
     private final BudgetService budgetService;
+    private final org.springframework.transaction.PlatformTransactionManager txManager;
 
     @Value("${app.scm.sod.enforce:false}")
     private boolean enforceSegregationOfDuties;
@@ -111,7 +112,9 @@ public class RequisitionService {
     @Transactional
     public RequisitionResponse submit(TenantId tenantId, UUID id, UUID userId, String userName) {
         UUID tid = tenantId.getValue();
-        ScRequisition r = requireOwned(tenantId, id, userId);
+        requireOwned(tenantId, id, userId);
+        // Lock so a double-click / retry can't submit twice and open two approval requests.
+        ScRequisition r = reqRepo.lockByTenantAndId(tid, id).orElseThrow(this::notFound);
         List<ScRequisitionLine> lines = lineRepo.findByRequisition(tid, id);
         if (lines.isEmpty()) throw bad("Add at least one line before submitting");
         List<String> errors = RequisitionRules.validate(r.getType(), r.getTitle(), r.getBusinessReason(), r.getProjectRef(),
@@ -390,14 +393,21 @@ public class RequisitionService {
         return r;
     }
 
-    /** Closes the open approval step so it leaves approvers' inboxes; non-approvers may be refused, which mustn't block. */
+    /**
+     * Closes the open approval step so it leaves approvers' inboxes; non-approvers may be refused, which mustn't block.
+     * The best-effort variant runs in its own transaction: swallowing an exception thrown inside the caller's
+     * transaction would mark it rollback-only and the withdrawal/cancel would fail at commit.
+     */
     private void closeOpenApproval(TenantId tenantId, UUID id, UUID userId, String action, String note, boolean mustSucceed) {
+        Runnable close = () -> approvalFacade.getLatestRequestForEntity(tenantId, APPROVALS_MODULE, APPROVALS_ENTITY_TYPE, id)
+                .filter(this::isOpen).flatMap(this::firstPending)
+                .ifPresent(step -> approvalFacade.actOnStep(tenantId, step.id(), userId, authorities(), action, note, null));
+        if (mustSucceed) { close.run(); return; }
         try {
-            approvalFacade.getLatestRequestForEntity(tenantId, APPROVALS_MODULE, APPROVALS_ENTITY_TYPE, id)
-                    .filter(this::isOpen).flatMap(this::firstPending)
-                    .ifPresent(step -> approvalFacade.actOnStep(tenantId, step.id(), userId, authorities(), action, note, null));
+            var def = new org.springframework.transaction.support.DefaultTransactionDefinition();
+            def.setPropagationBehavior(org.springframework.transaction.TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+            new org.springframework.transaction.support.TransactionTemplate(txManager, def).executeWithoutResult(st -> close.run());
         } catch (RuntimeException e) {
-            if (mustSucceed) throw e;
             log.warn("[SCM] Could not close approval request for requisition {}: {}", id, e.getMessage());
         }
     }

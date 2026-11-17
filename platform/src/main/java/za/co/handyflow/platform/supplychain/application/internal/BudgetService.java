@@ -145,7 +145,7 @@ public class BudgetService {
                                        BigDecimal amount, LocalDate date) {
         if (amount == null || amount.signum() < 0) throw bad("amount is required");
         return toCheckResponse(evaluate(tenantId.getValue(), new Dims(department, costCentre, project,
-                date != null ? date : LocalDate.now()), amount, null));
+                date != null ? date : LocalDate.now()), amount, null, false));
     }
 
     // ── Enforcement hooks ─────────────────────────────────────────────────────
@@ -161,7 +161,7 @@ public class BudgetService {
         Dims d = dimsForPo(tid, po);
         BigDecimal amount = poAmount(po);
         enforce(tenantId, ScBudgetOverride.PURCHASE_ORDER, po.getId(), "PO " + po.getOrderNumber(),
-                evaluate(tid, d, amount, po.getId()), amount, true);
+                evaluate(tid, d, amount, po.getId(), true), amount, true);
         upsertCommitment(tid, po, d, amount);
     }
 
@@ -177,7 +177,7 @@ public class BudgetService {
         Optional<ScBudgetCommitment> existing = commitmentRepo.findByPo(tid, po.getId());
         if (existing.isEmpty() || amount.compareTo(existing.get().getAmount()) > 0) {
             enforce(tenantId, ScBudgetOverride.PURCHASE_ORDER, po.getId(), "PO " + po.getOrderNumber() + " (amended)",
-                    evaluate(tid, d, amount, po.getId()), amount, true);
+                    evaluate(tid, d, amount, po.getId(), true), amount, true);
         }
         upsertCommitment(tid, po, d, amount);
     }
@@ -190,7 +190,7 @@ public class BudgetService {
         Dims d = new Dims(r.getDepartment(), r.getCostCentre(), r.getProjectRef(),
                 r.getRequiredByDate() != null ? r.getRequiredByDate() : LocalDate.now());
         enforce(tenantId, ScBudgetOverride.REQUISITION, r.getId(), "Requisition " + r.getRequisitionNumber(),
-                evaluate(tid, d, amount, null), amount, alert);
+                evaluate(tid, d, amount, null, false), amount, alert);
     }
 
     // ── Overrides ─────────────────────────────────────────────────────────────
@@ -236,9 +236,11 @@ public class BudgetService {
 
     // ── internals ─────────────────────────────────────────────────────────────
 
-    private BudgetRules.Result evaluate(UUID tid, Dims d, BigDecimal requested, UUID excludePoId) {
+    /** lock=true (PO commit paths) serialises on the budget rows; read-only checks never lock. */
+    private BudgetRules.Result evaluate(UUID tid, Dims d, BigDecimal requested, UUID excludePoId, boolean lock) {
         List<View> views = new ArrayList<>();
-        for (ScBudget b : budgetRepo.findActiveCovering(tid, d.spendDate())) {
+        for (ScBudget b : lock ? budgetRepo.lockActiveCovering(tid, d.spendDate())
+                               : budgetRepo.findActiveCovering(tid, d.spendDate())) {
             if (!BudgetRules.matches(b.getScopeType(), b.getScopeValue(), d.department(), d.costCentre(), d.project())) continue;
             views.add(new View(b.getId(), b.getName(), b.getScopeType(), b.getScopeValue(), b.getAmount(),
                     b.getControlMode(), usage(tid, b, excludePoId).used()));

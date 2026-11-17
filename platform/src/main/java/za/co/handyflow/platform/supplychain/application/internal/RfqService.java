@@ -214,6 +214,8 @@ public class RfqService {
                 .orElseThrow(() -> new HandyFlowException("Supplier not found", HttpStatus.NOT_FOUND, "NOT_FOUND"));
         if (!supplier.isOrderable())
             throw conflict(supplier.getName() + " is " + supplier.getStatus() + " and cannot be awarded business");
+        // Documents can lapse between invitation and award — re-apply the same compliance policy.
+        compliance.requireCompliant(tenantId, q.getSupplierId());
 
         RfqComparisonResponse cmp = comparison.compare(tenantId, id, false);
         boolean isRecommended = quotationId.equals(cmp.recommendedQuotationId());
@@ -258,7 +260,8 @@ public class RfqService {
         Map<UUID, BigDecimal> ordered = new HashMap<>();
         Map<UUID, ScRequisitionLine> reqLines = new HashMap<>();
         if (rfq.getRequisitionId() != null) {
-            requisition = requisitionRepo.findByTenantAndId(tid, rfq.getRequisitionId()).orElse(null);
+            // Locked: a concurrent convertToPo on the same requisition would otherwise over-order its lines.
+            requisition = requisitionRepo.lockByTenantAndId(tid, rfq.getRequisitionId()).orElse(null);
             if (requisition == null || requisition.getStatus() != RequisitionStatus.APPROVED)
                 throw conflict("The requisition this RFQ came from is no longer APPROVED");
             requisitionLineRepo.findByRequisition(tid, requisition.getId()).forEach(l -> reqLines.put(l.getId(), l));

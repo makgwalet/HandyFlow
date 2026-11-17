@@ -22,6 +22,15 @@ public interface ScBudgetRepository extends JpaRepository<ScBudget, UUID> {
     @Query("SELECT b FROM ScBudget b WHERE b.tenantId = :tenantId AND b.status = 'ACTIVE' AND b.periodStart <= :date AND b.periodEnd >= :date")
     List<ScBudget> findActiveCovering(@Param("tenantId") UUID tenantId, @Param("date") LocalDate date);
 
+    /**
+     * Same as findActiveCovering but takes a row lock, so two concurrent PO approvals against one
+     * hard-stop budget are serialised and the second sees the first's commitment.
+     * Ordered by id so concurrent callers lock in the same order (no deadlock).
+     */
+    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT b FROM ScBudget b WHERE b.tenantId = :tenantId AND b.status = 'ACTIVE' AND b.periodStart <= :date AND b.periodEnd >= :date ORDER BY b.id")
+    List<ScBudget> lockActiveCovering(@Param("tenantId") UUID tenantId, @Param("date") LocalDate date);
+
     /** Active budgets for the same scope whose period overlaps [start, end] — a second one would double-count. */
     @Query("""
             SELECT b FROM ScBudget b

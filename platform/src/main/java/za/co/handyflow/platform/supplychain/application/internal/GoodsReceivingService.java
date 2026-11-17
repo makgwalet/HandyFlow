@@ -146,7 +146,12 @@ public class GoodsReceivingService {
 
             BigDecimal unitCost = line.unitCost() != null && line.unitCost().signum() > 0
                     ? line.unitCost() : poLine.getUnitCost();
-            UUID catItemId = line.catalogueItemId() != null ? line.catalogueItemId() : poLine.getCatalogueItemId();
+            // The PO line decides which stock item is received: a client-supplied catalogueItemId
+            // may only fill the gap on a non-catalogue line, never redirect stock to another item.
+            if (poLine.getCatalogueItemId() != null && line.catalogueItemId() != null
+                    && !poLine.getCatalogueItemId().equals(line.catalogueItemId()))
+                throw bad(poLine.getItemName() + ": catalogueItemId does not match the purchase order line");
+            UUID catItemId = poLine.getCatalogueItemId() != null ? poLine.getCatalogueItemId() : line.catalogueItemId();
             String condition = line.condition() != null && !line.condition().isBlank() ? line.condition()
                     : rejected.signum() > 0 ? "DAMAGED" : "GOOD";
 

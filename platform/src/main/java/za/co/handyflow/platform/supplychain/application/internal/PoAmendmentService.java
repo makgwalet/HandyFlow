@@ -10,6 +10,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.util.HtmlUtils;
 import za.co.handyflow.platform.approvals.application.ApprovalFacade;
 import za.co.handyflow.platform.approvals.dto.ApprovalRequestResponse;
@@ -70,6 +71,7 @@ public class PoAmendmentService {
     private final ApprovalFacade approvalFacade;
     private final EmailService emailService;
     private final VatRateProvider vatRateProvider;
+    private final org.springframework.transaction.PlatformTransactionManager txManager;
 
     /** Same switch as ScmService: app.scm.sod.enforce=true -> the requester cannot approve their own amendment. */
     @Value("${app.scm.sod.enforce:false}")
@@ -247,13 +249,16 @@ public class PoAmendmentService {
             throw new HandyFlowException("Only the person who raised an amendment can withdraw it (others can reject it)",
                     HttpStatus.FORBIDDEN, "NOT_REQUESTER");
         // Close the open approval request so it leaves approvers' inboxes. The engine may refuse
-        // a non-approver, which must not stop the withdrawal itself.
+        // a non-approver, which must not stop the withdrawal itself. It runs in its own transaction:
+        // an exception swallowed inside the caller's transaction would mark it rollback-only and the
+        // withdrawal would then fail at commit with UnexpectedRollbackException.
         try {
-            approvalFacade.getLatestRequestForEntity(tenantId, APPROVALS_MODULE, APPROVALS_ENTITY_TYPE, amendmentId)
-                    .filter(this::isOpen)
-                    .flatMap(this::firstPending)
-                    .ifPresent(step -> approvalFacade.actOnStep(tenantId, step.id(), userId, authorities(),
-                            "REJECT", "Withdrawn by requester", null));
+            new TransactionTemplate(txManager, requiresNew()).executeWithoutResult(st ->
+                    approvalFacade.getLatestRequestForEntity(tenantId, APPROVALS_MODULE, APPROVALS_ENTITY_TYPE, amendmentId)
+                            .filter(this::isOpen)
+                            .flatMap(this::firstPending)
+                            .ifPresent(step -> approvalFacade.actOnStep(tenantId, step.id(), userId, authorities(),
+                                    "REJECT", "Withdrawn by requester", null)));
         } catch (Exception e) {
             log.warn("[SCM] Could not close approval request for withdrawn amendment {}: {}", amendmentId, e.getMessage());
         }
@@ -412,6 +417,12 @@ public class PoAmendmentService {
         } catch (Exception e) {
             log.error("[SCM] Failed to notify supplier of amended PO {}: {}", po.getOrderNumber(), e.getMessage());
         }
+    }
+
+    private static org.springframework.transaction.support.DefaultTransactionDefinition requiresNew() {
+        var def = new org.springframework.transaction.support.DefaultTransactionDefinition();
+        def.setPropagationBehavior(org.springframework.transaction.TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+        return def;
     }
 
     private boolean isOpen(ApprovalRequestResponse r) {
