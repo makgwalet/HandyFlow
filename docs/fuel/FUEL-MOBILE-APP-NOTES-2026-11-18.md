@@ -12,6 +12,14 @@
 - **Offline outbox** (SQLite): each action is saved first, then sent. Order: start trip, then delivery or failed delivery, then photos. The outbox item id is sent as `clientRequestId`. No signal, expired sign-in (401) or inactive subscription (402) stops the run and keeps everything. 400, 403, 404, 409 park the item as refused with the server's words, and the driver can retry or discard it in the Sync centre. 429, 408, 5xx retry up to 8 times.
 - Screens read the phone's own queue, so a trip started offline is not offered again and a delivery saved offline cannot be closed twice.
 
+## Depot mode (`packages/fuel-depot`)
+
+- **Tanks**: `GET /api/v1/fuel/tanks` (the server already limits it by the person's scope). Low tanks first. The last list is saved and shown with its time when there is no signal.
+- **Tank detail**: fill level, recent dip readings with variance (`GET .../dip-readings`), and **Save dip reading** (`POST .../dip-readings`) for `FUEL_MANAGE` / `FUEL_OPERATIONS_MANAGE`. A reading above the tank's capacity is refused on the phone.
+- **Online only, on purpose.** The dip and receive endpoints take no client request id, so queueing them offline could save a reading twice after a lost reply. Without signal the screen says so and the reading is written down and entered later. If a save fails with no signal and the driver tries again, the app first checks the tank's latest readings for the same time and litres and says "already saved" instead of posting again. To make dips work offline, the backend needs a `clientRequestId` on `DipReadingRequest` (same pattern as deliveries). That is a backend change I have not made.
+- Receiving fuel into a tank is not in the app: it needs price, supplier and purchase order, and has the same idempotency gap.
+- A user with only `FUEL_STOCK_MANAGE` (no `FUEL_READ`) sees the Depot tile but the server will refuse the tank list.
+
 ## App-side rules (not on the server)
 
 - The delivery form requires "received by". The server does not. Change `validateComplete` if you disagree.
@@ -30,7 +38,7 @@
 
 ## Checks run
 
-`npx tsc --noEmit` clean; `npx jest` 60 tests passing. Not run on a device or emulator. `package-lock.json` is not included: run `npm install` once.
+`npx tsc --noEmit` clean; `npx jest` 74 tests passing. Not run on a device or emulator. `package-lock.json` is not included: run `npm install` once.
 
 ## To apply
 

@@ -20,6 +20,7 @@ export function HomeScreen() {
 
   function open(m: Mode) {
     if (m.id === "driver") nav.navigate("DriverLoads");
+    else if (m.id === "depot") nav.navigate("DepotTanks");
     else nav.navigate("ModePlanned", { mode: m.id });
   }
 

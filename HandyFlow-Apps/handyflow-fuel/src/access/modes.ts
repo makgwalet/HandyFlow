@@ -21,7 +21,7 @@ const RULES: Rule[] = [
     anyOf: ["FUEL_FORECOURT", "FUEL_FORECOURT_MANAGE", "FUEL_MANAGE"] },
   { id: "truckstop", title: "Truck stop", blurb: "Bays, stays and driver tabs.", available: false,
     anyOf: ["FUEL_TRUCKSTOP_MANAGE", "FUEL_MANAGE"] },
-  { id: "depot", title: "Depot", blurb: "Tank dips, receipts and loading.", available: false,
+  { id: "depot", title: "Depot", blurb: "Tank levels and dip readings.", available: true,
     anyOf: ["FUEL_STOCK_MANAGE", "FUEL_OPERATIONS_MANAGE", "FUEL_DISTRIBUTION_MANAGE", "FUEL_MANAGE"] },
   { id: "manager", title: "Overview", blurb: "Stock levels, deliveries and alerts.", available: false,
     anyOf: ["FUEL_READ", "FUEL_MANAGE"] },

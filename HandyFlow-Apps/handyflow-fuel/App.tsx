@@ -6,6 +6,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { DarkTheme, NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { CompleteScreen, FailedAttemptScreen, LoadDetailScreen, MyLoadsScreen } from "@driver/index";
+import { TankDetailScreen, TanksScreen } from "@depot/index";
 import { AuthProvider, useAuth } from "@/auth/AuthContext";
 import { OutboxProvider } from "@/offline/OutboxProvider";
 import { HomeScreen } from "@/screens/HomeScreen";
@@ -31,6 +32,8 @@ function SignedIn() {
           <Stack.Screen name="LoadDetail" component={LoadDetailScreen} options={{ title: "Load" }} />
           <Stack.Screen name="CompleteLoad" component={CompleteScreen} options={{ title: "Record delivery" }} />
           <Stack.Screen name="FailedAttempt" component={FailedAttemptScreen} options={{ title: "Could not deliver" }} />
+          <Stack.Screen name="DepotTanks" component={TanksScreen} options={{ title: "Tanks" }} />
+          <Stack.Screen name="TankDetail" component={TankDetailScreen} options={{ title: "Tank" }} />
         </Stack.Navigator>
       </NavigationContainer>
     </OutboxProvider>

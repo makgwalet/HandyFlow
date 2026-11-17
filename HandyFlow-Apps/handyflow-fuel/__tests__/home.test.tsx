@@ -21,6 +21,12 @@ describe("HomeScreen", () => {
     await fireEvent.press(screen.getByLabelText("My loads"));
     expect(mockNavigate).toHaveBeenCalledWith("DriverLoads");
   });
+  it("opens Tanks for a depot user", async () => {
+    mockPermissions = ["FUEL_OPERATIONS_MANAGE"];
+    await render(<HomeScreen />);
+    await fireEvent.press(screen.getByLabelText("Depot"));
+    expect(mockNavigate).toHaveBeenCalledWith("DepotTanks");
+  });
   it("says plainly when a mode is not built yet", async () => {
     mockPermissions = ["FUEL_MANAGE"];
     await render(<HomeScreen />);

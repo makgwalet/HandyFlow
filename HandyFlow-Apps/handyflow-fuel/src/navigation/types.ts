@@ -9,4 +9,6 @@ export type RootStackParamList = {
   LoadDetail: { loadId: string };
   CompleteLoad: { loadId: string };
   FailedAttempt: { loadId: string };
+  DepotTanks: undefined;
+  TankDetail: { tankId: string };
 };
