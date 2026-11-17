@@ -39,9 +39,11 @@ class FuelTruckStopStayServiceTest {
     @Mock FuelTruckStopStayRepository stays;
     @Mock FuelTruckStopParkingRepository parking;
     @Mock za.co.handyflow.platform.fuel.domain.repository.FuelCustomerAccountRepository accounts;
+    @Mock za.co.handyflow.platform.fuel.domain.repository.FuelTruckStopBayRepository bayRepo;
     @InjectMocks FuelTruckStopStayService service;
 
     final List<FuelTruckStopStay> saved = new ArrayList<>();
+    final Map<UUID, za.co.handyflow.platform.fuel.domain.model.FuelTruckStopBay> bayStore = new HashMap<>();
     FuelTruckStopParking settings;
 
     @BeforeEach
@@ -52,6 +54,8 @@ class FuelTruckStopStayServiceTest {
         when(stays.findRecent(eq(T), any())).thenAnswer(i -> new ArrayList<>(saved));
         when(stays.save(any())).thenAnswer(i -> { FuelTruckStopStay s = i.getArgument(0); if (!saved.contains(s)) saved.add(s); return s; });
         when(stays.saveAndFlush(any())).thenAnswer(i -> i.getArgument(0));
+        when(bayRepo.save(any())).thenAnswer(i -> { var b = (za.co.handyflow.platform.fuel.domain.model.FuelTruckStopBay) i.getArgument(0); bayStore.put(b.getId(), b); return b; });
+        when(bayRepo.findOwned(eq(T), any())).thenAnswer(i -> Optional.ofNullable(bayStore.get(i.getArgument(1))));
         when(stays.findOwned(eq(T), any())).thenAnswer(i -> saved.stream().filter(s -> s.getId().equals(i.getArgument(1))).findFirst());
         // Same rule as the repository query: holding a bay, starting before 'to', and either ending after 'from' or still in the yard.
         when(stays.findHoldingBays(eq(T), any(), any())).thenAnswer(i -> {
@@ -293,5 +297,52 @@ class FuelTruckStopStayServiceTest {
         service.checkIn(T, v.id(), TODAY);
         service.checkOut(T, v.id(), null, TODAY);
         assertThrows(IllegalStateException.class, () -> service.setAccount(T, v.id(), new AccountRequest(a.getId()), TODAY));
+    }
+
+    // ── named bays ───────────────────────────────────────────────────────────
+
+    private UUID bay(String name) { return service.addBay(T, new za.co.handyflow.platform.fuel.dto.StayDtos.BayRequest(name)).id(); }
+    private StayView assign(StayView v, UUID bayId) { return service.assignBay(T, v.id(), new za.co.handyflow.platform.fuel.dto.StayDtos.BayAssignRequest(bayId), TODAY); }
+
+    @Test @DisplayName("a truck can be put in a named bay and taken out of it again")
+    void assignAndClear() {
+        rate("150", null);
+        UUID b1 = bay("Bay 1");
+        StayView s = book("GP 1", 0, 2);
+        assertEquals(b1, assign(s, b1).bayId());
+        assertNull(assign(s, null).bayId());
+    }
+
+    @Test @DisplayName("two trucks cannot be given the same bay on a night they overlap, but can on different nights")
+    void bayClash() {
+        rate("150", null);
+        UUID b1 = bay("Bay 1");
+        StayView a = book("GP 1", 0, 3), clash = book("GP 2", 2, 4), later = book("GP 3", 3, 5);
+        assign(a, b1);
+        var ex = assertThrows(IllegalStateException.class, () -> assign(clash, b1));
+        assertTrue(ex.getMessage().contains("GP 1"));
+        assertEquals(b1, assign(later, b1).bayId());
+    }
+
+    @Test @DisplayName("a switched-off bay cannot be assigned, and a bay with a truck in it cannot be switched off")
+    void bayOff() {
+        rate("150", null);
+        UUID b1 = bay("Bay 1"), b2 = bay("Bay 2");
+        StayView s = book("GP 1", 0, 2);
+        service.setBayActive(T, b2, false, TODAY);
+        assertThrows(IllegalStateException.class, () -> assign(s, b2));
+        assign(s, b1);
+        assertThrows(IllegalStateException.class, () -> service.setBayActive(T, b1, false, TODAY));
+    }
+
+    @Test @DisplayName("a stay that has ended cannot change bay, and a bay name can be used once")
+    void endedAndDuplicate() {
+        rate("150", null);
+        UUID b1 = bay("Bay 1");
+        when(bayRepo.nameInUse(T, "Bay 1")).thenReturn(true);
+        assertThrows(IllegalStateException.class, () -> bay("Bay 1"));
+        StayView s = book("GP 1", 0, 2);
+        service.cancel(T, s.id(), new za.co.handyflow.platform.fuel.dto.StayDtos.CancelRequest("changed plans"), TODAY);
+        assertThrows(IllegalStateException.class, () -> assign(s, b1));
     }
 }

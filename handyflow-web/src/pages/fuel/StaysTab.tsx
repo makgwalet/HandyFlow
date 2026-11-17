@@ -5,7 +5,7 @@ import { apiClient } from "../../api/client"
 import { usePermissions } from "../../hooks/usePermission"
 import { Modal, btnPrimary, btnGhost, card, inputStyle, labelStyle, Chip } from "../warehousing/whseUi"
 import { fmtR } from "./orderOps"
-import { emptyStay, validateStay, validateSettings, nightsText, stayActions, nightState, firstFullNight, chargeText, invoiceText, canRaiseInvoice, chargeableAccounts, STATUS_LABEL, type StayAccount, type Stay, type StayForm, type ParkingSettings, type Occupancy, type Capacity } from "./stayOps"
+import { emptyStay, validateStay, validateSettings, nightsText, stayActions, nightState, firstFullNight, chargeText, invoiceText, canRaiseInvoice, chargeableAccounts, onlyBays, bayName, canChangeBay, STATUS_LABEL, type Bay, type StayAccount, type Stay, type StayForm, type ParkingSettings, type Occupancy, type Capacity } from "./stayOps"
 
 const unwrap = (r: any) => r.data?.data ?? r.data
 const msg = (e: any, fb: string) => e?.response?.data?.message ?? fb
@@ -27,8 +27,14 @@ export default function StaysTab() {
   const settings = useQuery<ParkingSettings>({ queryKey: ["fuel-stay-settings"], queryFn: async () => unwrap(await apiClient.get("/api/v1/fuel/truck-stop/parking-settings")) })
   const occ = useQuery<Occupancy>({ queryKey: ["fuel-stay-occupancy"], queryFn: async () => unwrap(await apiClient.get("/api/v1/fuel/truck-stop/stays/occupancy")) })
   const capacity = useQuery<Capacity>({ queryKey: ["fuel-stay-capacity"], queryFn: async () => unwrap(await apiClient.get("/api/v1/fuel/truck-stop/stays/capacity?days=14")) })
+  const bayQ = useQuery<Bay[]>({ queryKey: ["fuel-stay-bays"], retry: false, queryFn: async () => onlyBays(unwrap(await apiClient.get("/api/v1/fuel/truck-stop/bays"))) })
+  const bayList: Bay[] = bayQ.data ?? []
   const stays = useQuery<Stay[]>({ queryKey: ["fuel-stays"], queryFn: async () => unwrap(await apiClient.get("/api/v1/fuel/truck-stop/stays")) })
-  const refresh = () => { for (const k of ["fuel-stays", "fuel-stay-occupancy", "fuel-stay-settings", "fuel-stay-capacity"]) qc.invalidateQueries({ queryKey: [k] }) }
+  const setBay = useMutation({
+    mutationFn: (a: { id: string; bayId: string | null }) => apiClient.put(`/api/v1/fuel/truck-stop/stays/${a.id}/bay`, { bayId: a.bayId }),
+    onSuccess: () => { setErr(""); refresh() }, onError: (e: any) => setErr(msg(e, "Could not change the bay")),
+  })
+  const refresh = () => { for (const k of ["fuel-stay-bays", "fuel-stays", "fuel-stay-occupancy", "fuel-stay-settings", "fuel-stay-capacity"]) qc.invalidateQueries({ queryKey: [k] }) }
   const act = useMutation({ mutationFn: (v: { id: string; path: string }) => apiClient.post(`/api/v1/fuel/truck-stop/stays/${v.id}/${v.path}`), onSuccess: (r: any) => { setErr(""); setNotice(r?.data?.message ?? ""); refresh() }, onError: (e: any) => setErr(msg(e, "That did not work")) })
   const rows = stays.data ?? []
   const rateSet = settings.data?.nightlyRate != null
@@ -38,6 +44,7 @@ export default function StaysTab() {
         Overnight parking. Each night from arrival up to the departure date is charged at the nightly rate in force when the stay was booked, with a minimum of one night. A stay charged to a customer account gets a draft invoice when it checks out (it is never issued from here); a driver with no account pays at the gate.
       </p>
       <SettingsBox settings={settings.data} canManage={canManage} onSaved={refresh} />
+      {(canManage || bayList.length > 0) && <BaysBox bays={bayList} canManage={canManage} onChanged={refresh} />}
       {occ.data && (
         <div style={{ ...card, padding: "10px 14px", marginBottom: 12, display: "flex", gap: 24, flexWrap: "wrap", fontSize: 13 }}>
           <span><strong>{occ.data.inYard}</strong> in the yard today</span>
@@ -55,7 +62,7 @@ export default function StaysTab() {
       ) : (
         <div style={{ ...card, overflowX: "auto" }}>
           <table style={{ width: "100%", borderCollapse: "collapse" }}>
-            <thead><tr><th style={th}>Truck</th><th style={th}>Arrives</th><th style={th}>Leaves</th><th style={th}>Nights</th><th style={th}>Amount</th><th style={th}>Charged to</th><th style={th}>Status</th><th style={th} /></tr></thead>
+            <thead><tr><th style={th}>Truck</th><th style={th}>Arrives</th><th style={th}>Leaves</th><th style={th}>Nights</th><th style={th}>Amount</th><th style={th}>Bay</th><th style={th}>Charged to</th><th style={th}>Status</th><th style={th} /></tr></thead>
             <tbody>{rows.map(s => (
               <tr key={s.id} style={{ borderTop: "1px solid var(--hf-border)" }}>
                 <td style={td}><strong>{s.vehicleRegistration}</strong><div style={{ fontSize: 11, color: "var(--hf-text-muted)" }}>{[s.driverName, s.driverPhone].filter(Boolean).join(" · ")}</div></td>
@@ -63,6 +70,10 @@ export default function StaysTab() {
                 <td style={td}>{s.actualDepartureDate ?? s.departureDate}{s.actualDepartureDate && s.actualDepartureDate !== s.departureDate && <div style={{ fontSize: 11, color: "var(--hf-text-muted)" }}>planned {s.departureDate}</div>}</td>
                 <td style={td}>{nightsText(s)}</td>
                 <td style={td}>{fmtR(s.amount)}<div style={{ fontSize: 11, color: "var(--hf-text-muted)" }}>{fmtR(s.ratePerNight)} a night</div></td>
+                <td style={td}>{canManage && bayList.length > 0 && canChangeBay(s)
+                  ? <select aria-label={`Bay for ${s.vehicleRegistration}`} value={s.bayId ?? ""} style={{ ...inputStyle, width: 110 }} onChange={e => setBay.mutate({ id: s.id, bayId: e.target.value || null })}>
+                      <option value="">No bay</option>{bayList.filter(b => b.active || b.id === s.bayId).map(b => <option key={b.id} value={b.id}>{b.name}</option>)}</select>
+                  : bayName(s, bayList)}</td>
                 <td style={td}>{chargeText(s, accountList)}{invoiceText(s) && <div style={{ fontSize: 11, color: s.invoiceState === "FAILED" || s.invoiceState === "LINK_FAILED" ? "var(--hf-danger-text)" : "var(--hf-text-muted)" }}>{invoiceText(s)}</div>}</td>
                 <td style={td}><Chip bg={s.status === "CHECKED_IN" ? "var(--hf-success-soft-strong)" : s.status === "BOOKED" ? "var(--hf-warning-soft)" : "var(--hf-surface-muted)"} fg={s.status === "CHECKED_IN" ? "var(--hf-success-text-strong)" : s.status === "BOOKED" ? "var(--hf-warning-text)" : "var(--hf-text-muted)"}>{STATUS_LABEL[s.status]}</Chip>
                   {s.overstaying && <> <Chip bg="var(--hf-danger-soft)" fg="var(--hf-danger-text)">Past its departure date</Chip></>}
@@ -214,5 +225,30 @@ function CancelDialog({ stay, onDone, onClose }: { stay: Stay; onDone: () => voi
         <button style={btnPrimary} disabled={save.isPending} onClick={() => { if (!reason.trim()) return setErr("Give a reason for cancelling the stay."); setErr(""); save.mutate() }}>Cancel stay</button>
       </div>
     </Modal>
+  )
+}
+
+/** Optional named bays. Switch a bay off rather than deleting it, so past stays keep its name. */
+function BaysBox({ bays, canManage, onChanged }: { bays: Bay[]; canManage: boolean; onChanged: () => void }) {
+  const [name, setName] = useState(""); const [err, setErr] = useState("")
+  const add = useMutation({ mutationFn: () => apiClient.post("/api/v1/fuel/truck-stop/bays", { name: name.trim() }), onSuccess: () => { setName(""); setErr(""); onChanged() }, onError: (e: any) => setErr(msg(e, "Could not add the bay")) })
+  const toggle = useMutation({ mutationFn: (b: Bay) => apiClient.put(`/api/v1/fuel/truck-stop/bays/${b.id}/active`, { active: !b.active }), onSuccess: () => { setErr(""); onChanged() }, onError: (e: any) => setErr(msg(e, "Could not change the bay")) })
+  return (
+    <div style={{ ...card, padding: 12, marginBottom: 12 }} aria-label="Named bays">
+      <div style={{ fontWeight: 700, fontSize: 13 }}>Named bays <span style={{ fontWeight: 400, color: "var(--hf-text-muted)" }}>(optional: put each truck in a bay; the bay count above still sets capacity)</span></div>
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", margin: "8px 0" }}>
+        {bays.map(b => (
+          <span key={b.id} style={{ display: "inline-flex", gap: 6, alignItems: "center", border: "1px solid var(--hf-border)", borderRadius: 8, padding: "3px 8px", fontSize: 12.5, opacity: b.active ? 1 : 0.6 }}>
+            {b.name}{!b.active && " (off)"}
+            {canManage && <button style={{ ...btnGhost, padding: "1px 6px", fontSize: 11 }} onClick={() => toggle.mutate(b)}>{b.active ? "Switch off" : "Switch on"}</button>}
+          </span>))}
+        {bays.length === 0 && <span style={{ fontSize: 12.5, color: "var(--hf-text-muted)" }}>No bays named yet.</span>}
+      </div>
+      {canManage && <div style={{ display: "flex", gap: 8 }}>
+        <input aria-label="Bay name" placeholder="Bay name, e.g. Bay 1" value={name} maxLength={40} onChange={e => setName(e.target.value)} style={{ ...inputStyle, width: 200 }} />
+        <button style={btnPrimary} disabled={!name.trim() || add.isPending} onClick={() => add.mutate()}>Add bay</button>
+      </div>}
+      {err && <p role="alert" style={{ color: "var(--hf-danger-text)", fontSize: 12.5, margin: "6px 0 0" }}>{err}</p>}
+    </div>
   )
 }

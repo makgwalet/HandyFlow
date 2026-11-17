@@ -118,4 +118,29 @@ describe("StaysTab", () => {
     fireEvent.click(screen.getByText("Raise invoice"))
     await waitFor(() => expect(post).toHaveBeenCalledWith("/api/v1/fuel/truck-stop/stays/s2/invoice"))
   })
+
+  it("assigns a truck to a named bay, adds a bay and switches one off", async () => {
+    const bays = [{ id: "b1", name: "Bay 1", active: true }, { id: "b2", name: "Bay 2", active: true }]
+    const base = get.getMockImplementation()!
+    get.mockImplementation(async (u: string, ...r: unknown[]) => u.includes("/truck-stop/bays") ? { data: { data: bays } } : base(u, ...r))
+    put.mockResolvedValue({ data: { data: {} } }); post.mockResolvedValue({ data: { data: {} } })
+    mount()
+    const sel = await screen.findByLabelText("Bay for GP 12 AB") as HTMLSelectElement
+    fireEvent.change(sel, { target: { value: "b2" } })
+    await waitFor(() => expect(put).toHaveBeenCalledWith("/api/v1/fuel/truck-stop/stays/s1/bay", { bayId: "b2" }))
+    fireEvent.change(screen.getByLabelText("Bay name"), { target: { value: "Bay 3" } })
+    fireEvent.click(screen.getByRole("button", { name: "Add bay" }))
+    await waitFor(() => expect(post).toHaveBeenCalledWith("/api/v1/fuel/truck-stop/bays", { name: "Bay 3" }))
+    fireEvent.click(screen.getAllByRole("button", { name: "Switch off" })[0])
+    await waitFor(() => expect(put).toHaveBeenCalledWith("/api/v1/fuel/truck-stop/bays/b1/active", { active: false }))
+  })
+
+  it("shows the bay name read-only without the manage permission, and ignores a non-bay answer", async () => {
+    can = false
+    const base = get.getMockImplementation()!
+    get.mockImplementation(async (u: string, ...r: unknown[]) => u.includes("/truck-stop/bays") ? { data: { data: [{ id: "b1", name: "Bay 1", active: true }] } } : u.includes("/truck-stop/stays") && !u.includes("/stays/") ? { data: { data: [stay({ bayId: "b1" })] } } : base(u, ...r))
+    mount()
+    expect(await screen.findByText("Bay 1", { selector: "td" })).toBeTruthy()
+    expect(screen.queryByLabelText("Bay for GP 12 AB")).toBeNull()
+  })
 })

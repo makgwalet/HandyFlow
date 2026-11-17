@@ -99,6 +99,34 @@ public class FuelTruckStopStayController {
         return ResponseEntity.ok(ApiResponse.success("Draft invoice raised", invoicing.invoice(TenantContext.getTenantIdAsObject(), id)));
     }
 
+    @GetMapping("/bays")
+    @PreAuthorize("hasAnyAuthority('FUEL_READ','FUEL_MANAGE','FUEL_TRUCKSTOP_MANAGE')")
+    public ResponseEntity<ApiResponse<List<BayView>>> bays() {
+        featureGuard.requireModule("fuel");
+        return ResponseEntity.ok(ApiResponse.success(service.bays(TenantContext.getTenantIdAsObject())));
+    }
+
+    @PostMapping("/bays")
+    @PreAuthorize("hasAnyAuthority('FUEL_MANAGE','FUEL_TRUCKSTOP_MANAGE')")
+    public ResponseEntity<ApiResponse<BayView>> addBay(@jakarta.validation.Valid @RequestBody BayRequest req) {
+        featureGuard.requireModule("fuel");
+        return ResponseEntity.ok(ApiResponse.success("Bay added", service.addBay(TenantContext.getTenantIdAsObject(), req)));
+    }
+
+    @PutMapping("/bays/{id}/active")
+    @PreAuthorize("hasAnyAuthority('FUEL_MANAGE','FUEL_TRUCKSTOP_MANAGE')")
+    public ResponseEntity<ApiResponse<BayView>> bayActive(@PathVariable UUID id, @RequestBody BayActiveRequest req) {
+        featureGuard.requireModule("fuel");
+        return ResponseEntity.ok(ApiResponse.success("Bay saved", service.setBayActive(TenantContext.getTenantIdAsObject(), id, req.active(), today())));
+    }
+
+    @PutMapping("/stays/{id}/bay")
+    @PreAuthorize("hasAnyAuthority('FUEL_MANAGE','FUEL_TRUCKSTOP_MANAGE')")
+    public ResponseEntity<ApiResponse<StayView>> bay(@PathVariable UUID id, @RequestBody BayAssignRequest req) {
+        featureGuard.requireModule("fuel");
+        return ResponseEntity.ok(ApiResponse.success("Bay saved", service.assignBay(TenantContext.getTenantIdAsObject(), id, req, today())));
+    }
+
     @PutMapping("/stays/{id}/account")
     @PreAuthorize("hasAnyAuthority('FUEL_MANAGE','FUEL_TRUCKSTOP_MANAGE')")
     public ResponseEntity<ApiResponse<StayView>> account(@PathVariable UUID id, @RequestBody AccountRequest req) {

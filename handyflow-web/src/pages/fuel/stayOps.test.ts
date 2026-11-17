@@ -69,3 +69,17 @@ describe("charging a stay to an account", () => {
   })
   it("leaves accounts on credit hold out of the choices", () => { expect(chargeableAccounts(accts).map(a => a.id)).toEqual(["a1"]) })
 })
+
+import { onlyBays, bayName, canChangeBay } from "./stayOps"
+describe("named bays", () => {
+  it("keeps only real bays from whatever the server sent", () => {
+    expect(onlyBays([{ id: "b", name: "Bay 1", active: true }, { id: "s1", vehicleRegistration: "X" }, null])).toHaveLength(1)
+    expect(onlyBays({})).toEqual([])
+  })
+  it("names the bay and allows a change only while booked or in the yard", () => {
+    expect(bayName({ bayId: "b" } as any, [{ id: "b", name: "Bay 1", active: false }])).toBe("Bay 1")
+    expect(bayName({ bayId: null } as any, [])).toBe("")
+    expect(canChangeBay({ status: "BOOKED" } as any)).toBe(true)
+    expect(canChangeBay({ status: "CHECKED_OUT" } as any)).toBe(false)
+  })
+})

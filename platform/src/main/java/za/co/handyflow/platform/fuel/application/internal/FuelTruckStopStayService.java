@@ -32,6 +32,7 @@ public class FuelTruckStopStayService {
     private final FuelTruckStopStayRepository stays;
     private final FuelTruckStopParkingRepository parking;
     private final FuelCustomerAccountRepository accounts;
+    private final za.co.handyflow.platform.fuel.domain.repository.FuelTruckStopBayRepository bays;
 
     @Transactional(readOnly = true)
     public SettingsView settings(TenantId tenantId) {
@@ -124,6 +125,53 @@ public class FuelTruckStopStayService {
         return view(stays.save(s), today);
     }
 
+    // ── named bays ───────────────────────────────────────────────────────────
+
+    @Transactional(readOnly = true)
+    public List<BayView> bays(TenantId tenantId) {
+        return bays.findAllForTenant(tenantId).stream().map(b -> new BayView(b.getId(), b.getName(), b.isActive())).toList();
+    }
+
+    @Transactional
+    public BayView addBay(TenantId tenantId, BayRequest req) {
+        var b = za.co.handyflow.platform.fuel.domain.model.FuelTruckStopBay.of(tenantId, req.name());
+        if (bays.nameInUse(tenantId, b.getName())) throw new IllegalStateException("A bay called " + b.getName() + " already exists.");
+        bays.save(b);
+        return new BayView(b.getId(), b.getName(), true);
+    }
+
+    /** A bay with a truck booked or in it cannot be switched off. */
+    @Transactional
+    public BayView setBayActive(TenantId tenantId, UUID id, boolean active, LocalDate today) {
+        var b = bays.findOwned(tenantId, id).orElseThrow(() -> new ResourceNotFoundException("Bay", id.toString()));
+        if (!active && stays.findHoldingBays(tenantId, today.minusYears(1), today.plusYears(5)).stream().anyMatch(s -> id.equals(s.getBayId())))
+            throw new IllegalStateException("A truck is booked or in " + b.getName() + ". Move it to another bay first.");
+        b.setActive(active);
+        bays.save(b);
+        return new BayView(b.getId(), b.getName(), b.isActive());
+    }
+
+    /** Puts a truck in a named bay, or clears it. The bay must be active and free on every night of the stay. */
+    @Transactional
+    public StayView assignBay(TenantId tenantId, UUID stayId, BayAssignRequest req, LocalDate today) {
+        parking.lockForTenant(tenantId); // serialise with bookings, so one bay is not given to two trucks
+        FuelTruckStopStay s = find(tenantId, stayId);
+        if (req.bayId() != null) {
+            var b = bays.findOwned(tenantId, req.bayId()).orElseThrow(() -> new ResourceNotFoundException("Bay", req.bayId().toString()));
+            if (!b.isActive()) throw new IllegalStateException(b.getName() + " is switched off.");
+            LocalDate end = FuelTruckStopStay.CHECKED_IN.equals(s.getStatus()) && today.isAfter(s.getDepartureDate()) ? today.plusDays(1) : s.getDepartureDate();
+            var others = stays.findHoldingBays(tenantId, s.getArrivalDate(), end).stream().filter(o -> !o.getId().equals(s.getId()) && req.bayId().equals(o.getBayId())).toList();
+            for (LocalDate night = s.getArrivalDate(); night.isBefore(end); night = night.plusDays(1)) {
+                final LocalDate n = night;
+                var clash = others.stream().filter(o -> occupies(o, n, today)).findFirst();
+                if (clash.isPresent()) throw new IllegalStateException(b.getName() + " is taken on the night of " + n + " by " + clash.get().getVehicleRegistration() + ".");
+            }
+        }
+        s.assignBay(req.bayId());
+        stays.save(s);
+        return view(s, today);
+    }
+
     @Transactional(readOnly = true)
     public Occupancy occupancy(TenantId tenantId, LocalDate date) {
         Integer bays = parking.findForTenant(tenantId).map(FuelTruckStopParking::getBays).orElse(null);
@@ -190,6 +238,6 @@ public class FuelTruckStopStayService {
     static StayView view(FuelTruckStopStay s, LocalDate today) {
         return new StayView(s.getId(), s.getVehicleRegistration(), s.getDriverName(), s.getDriverPhone(), s.getArrivalDate(), s.getDepartureDate(), s.getActualDepartureDate(),
                 s.getStatus(), s.getRatePerNight(), s.nights(), s.amount(), s.getNote(), s.getCancelledReason(), s.isOverstaying(today), s.getCheckedInAt(), s.getCheckedOutAt(),
-                s.getAccountId(), s.getInvoiceState(), s.getInvoiceNumber(), s.getInvoiceError());
+                s.getAccountId(), s.getInvoiceState(), s.getInvoiceNumber(), s.getInvoiceError(), s.getBayId());
     }
 }

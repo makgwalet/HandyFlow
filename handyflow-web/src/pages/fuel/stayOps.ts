@@ -3,7 +3,7 @@ export type StayStatus = "BOOKED" | "CHECKED_IN" | "CHECKED_OUT" | "CANCELLED" |
 export interface Stay {
   id: string; vehicleRegistration: string; driverName: string | null; driverPhone: string | null; arrivalDate: string; departureDate: string; actualDepartureDate: string | null
   status: StayStatus; ratePerNight: number; nights: number; amount: number; note: string | null; cancelledReason: string | null; overstaying: boolean; checkedInAt: string | null; checkedOutAt: string | null
-  accountId?: string | null; invoiceState?: InvoiceState | null; invoiceNumber?: string | null; invoiceError?: string | null
+  accountId?: string | null; invoiceState?: InvoiceState | null; invoiceNumber?: string | null; invoiceError?: string | null; bayId?: string | null
 }
 export type InvoiceState = "PENDING" | "CLAIMED" | "INVOICED" | "FAILED" | "LINK_FAILED"
 export interface StayAccount { id: string; customerName: string; creditHold: boolean }
@@ -78,3 +78,14 @@ export const canRaiseInvoice = (s: Stay): boolean => s.status === "CHECKED_OUT" 
 
 /** Accounts a stay can be charged to: not on credit hold. */
 export const chargeableAccounts = (a: StayAccount[]): StayAccount[] => a.filter(x => !x.creditHold)
+
+// Named bays: optional. The bay count in the settings still decides capacity.
+export interface Bay { id: string; name: string; active: boolean }
+
+/** The list may come back as something else from an old server or a test double; keep only real bays. */
+export function onlyBays(x: unknown): Bay[] { return Array.isArray(x) ? x.filter((b: any) => b && typeof b.id === "string" && typeof b.name === "string" && typeof b.active === "boolean") : [] }
+
+export function bayName(s: Stay, bays: Bay[]): string { return s.bayId ? (bays.find(b => b.id === s.bayId)?.name ?? "Bay") : "" }
+
+/** A stay can change bay only while it is booked or in the yard. */
+export function canChangeBay(s: Stay): boolean { return s.status === "BOOKED" || s.status === "CHECKED_IN" }

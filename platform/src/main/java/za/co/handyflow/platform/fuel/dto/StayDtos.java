@@ -35,7 +35,24 @@ public final class StayDtos {
     public record StayView(UUID id, String vehicleRegistration, String driverName, String driverPhone, LocalDate arrivalDate, LocalDate departureDate,
                            LocalDate actualDepartureDate, String status, BigDecimal ratePerNight, int nights, BigDecimal amount, String note,
                            String cancelledReason, boolean overstaying, Instant checkedInAt, Instant checkedOutAt,
-                           UUID accountId, String invoiceState, String invoiceNumber, String invoiceError) {}
+                           UUID accountId, String invoiceState, String invoiceNumber, String invoiceError, UUID bayId) {
+        public StayView(UUID id, String vehicleRegistration, String driverName, String driverPhone, LocalDate arrivalDate, LocalDate departureDate,
+                        LocalDate actualDepartureDate, String status, BigDecimal ratePerNight, int nights, BigDecimal amount, String note,
+                        String cancelledReason, boolean overstaying, Instant checkedInAt, Instant checkedOutAt,
+                        UUID accountId, String invoiceState, String invoiceNumber, String invoiceError) {
+            this(id, vehicleRegistration, driverName, driverPhone, arrivalDate, departureDate, actualDepartureDate, status, ratePerNight, nights, amount, note,
+                    cancelledReason, overstaying, checkedInAt, checkedOutAt, accountId, invoiceState, invoiceNumber, invoiceError, null);
+        }
+    }
+
+    public record BayRequest(@NotBlank @Size(max = 40) String name) {}
+
+    public record BayActiveRequest(boolean active) {}
+
+    /** bayId null removes the truck from its bay. */
+    public record BayAssignRequest(UUID bayId) {}
+
+    public record BayView(UUID id, String name, boolean active) {}
 
     /** One night in the capacity view. free is null when no bay count is set. */
     public record NightView(LocalDate date, int used, int arrivals, int departures, Integer free) {}

@@ -69,6 +69,10 @@ public class FuelTruckStopStay {
     @Column(name = "account_id")
     private UUID accountId;
 
+    /** The named bay the truck is in or booked into. Optional. */
+    @Column(name = "bay_id")
+    private UUID bayId;
+
     public static final String PENDING = "PENDING", CLAIMED = "CLAIMED", INVOICED = "INVOICED", FAILED = "FAILED", LINK_FAILED = "LINK_FAILED";
 
     /** Null for a stay paid at the gate. Otherwise PENDING, CLAIMED, INVOICED, FAILED or LINK_FAILED. The invoice columns are changed by guarded updates, not by this entity. */
@@ -108,6 +112,12 @@ public class FuelTruckStopStay {
         s.driverName = clean(driverName, 120); s.driverPhone = clean(driverPhone, 40); s.note = clean(note, 300);
         s.arrivalDate = arrival; s.departureDate = departure; s.ratePerNight = ratePerNight; s.createdBy = by;
         return s;
+    }
+
+    /** Puts the truck in a named bay, or clears it with null; only while the stay has not ended. */
+    public void assignBay(UUID bayId) {
+        requireStatus("change the bay of", BOOKED, CHECKED_IN);
+        this.bayId = bayId; this.updatedAt = Instant.now();
     }
 
     /** Charges the stay to a customer account; only while it has not ended. */
