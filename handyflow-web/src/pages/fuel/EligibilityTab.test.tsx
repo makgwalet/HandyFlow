@@ -9,6 +9,7 @@ vi.mock("../../api/client", () => ({ apiClient: { get: (...a: unknown[]) => get(
 vi.mock("../../hooks/usePermission", () => ({ usePermissions: () => can }))
 
 const rule = (o: any = {}) => ({ siteId: "s1", hasRule: false, maxCapacityLitres: null, maxGvmKg: null, maxLengthM: null, maxWidthM: null, maxHeightM: null, approvedTypes: [], accessNotes: null, approvedTankers: [], requireApprovedDrivers: false, requiredTraining: null, ...o })
+let overrideRows: any[] = []
 let ruleNow: any, approvals: any[], ratings: any[], changeovers: any[], reqRating: boolean
 function mount() { render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><EligibilityTab /></QueryClientProvider>) }
 
@@ -21,7 +22,7 @@ describe("EligibilityTab", () => {
       u.endsWith("/customer-accounts") ? [{ id: "a1", customerName: "Gold Mine Ltd" }] : u.endsWith("/customer-accounts/a1") ? { id: "a1", sites: [{ id: "s1", name: "Mine Gate 2" }] }
       : u.endsWith("/access-rule") ? ruleNow : u.endsWith("/driver-approvals") ? approvals : u.endsWith("/tankers") ? [{ id: "t1", registration: "GP 12 AB", active: true, compartments: [] }]
       : u.endsWith("/drivers") ? [{ id: "e1", name: "Moses Sithole" }] : u.endsWith("/specs") ? { tankerType: null, gvmKg: null, lengthM: null, widthM: null, heightM: null }
-      : u.endsWith("/compartment-ratings") ? ratings : u.endsWith("/cleanings") ? [] : u.endsWith("/changeover-rules") ? changeovers : u.endsWith("/eligibility/settings") ? { requireCompartmentRating: reqRating } : null } }))
+      : u.endsWith("/compartment-ratings") ? ratings : u.endsWith("/cleanings") ? [] : u.endsWith("/changeover-rules") ? changeovers : u.endsWith("/eligibility/settings") ? { requireCompartmentRating: reqRating } : u.endsWith("/eligibility/overrides") ? overrideRows : null } }))
     put.mockResolvedValue({ data: { data: {} } }); post.mockResolvedValue({ data: { data: {} } }); del.mockResolvedValue({ data: { data: null } })
   })
   afterEach(cleanup)
@@ -107,5 +108,20 @@ describe("EligibilityTab", () => {
     fireEvent.click(screen.getByText("Remove")); await waitFor(() => expect(del).toHaveBeenCalledWith("/api/v1/fuel/changeover-rules/r1"))
     fireEvent.click(await screen.findByLabelText("Require ratings"))
     await waitFor(() => expect(put).toHaveBeenCalledWith("/api/v1/fuel/eligibility/settings", { requireCompartmentRating: true }))
+  })
+
+  it("shows the review decisions to a person who may see them, with who decided and why", async () => {
+    overrideRows = [{ id: "o1", deliveryId: "d1", tankerId: "t1", tankerRegistration: "GP 12 AB", driverEmployeeId: "e1", findings: "Induction not recorded", reason: "Inducted on paper", approvedBy: "u1", approvedByName: "Thabo M", createdAt: "2026-11-17T10:30:00Z" }]
+    mount()
+    fireEvent.click(await screen.findByRole("tab", { name: "Review decisions" }))
+    expect(await screen.findByText(/GP 12 AB · Thabo M/)).toBeTruthy()
+    expect(screen.getByText(/Inducted on paper/)).toBeTruthy()
+  })
+
+  it("does not offer the review decisions to someone without permission", async () => {
+    can = false
+    mount()
+    await screen.findByRole("tab", { name: "Customer sites" })
+    expect(screen.queryByRole("tab", { name: "Review decisions" })).toBeNull()
   })
 })

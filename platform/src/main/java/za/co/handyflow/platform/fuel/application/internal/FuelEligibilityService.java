@@ -45,6 +45,7 @@ public class FuelEligibilityService {
     private final FuelDeliveryCompartmentRepository loadSplits;
     private final FuelTankerCompartmentRepository tankerCompartments;
     private final FuelSettingsRepository settings;
+    private final za.co.handyflow.platform.notifications.application.TenantAdminRecipients userLookup;
 
     private static final ZoneId SAST = ZoneId.of("Africa/Johannesburg");
 
@@ -427,5 +428,23 @@ public class FuelEligibilityService {
         FuelSettings s = settings.findByTenant(tenantId).orElseGet(() -> FuelSettings.forTenant(tenantId));
         s.updateRequireCompartmentRating(req.requireCompartmentRating());
         return new EligibilitySettings(settings.save(s).isRequireCompartmentRating());
+    }
+
+    /** The decisions to allocate a load with open review points, newest first. Read only. A name that cannot be found is left empty. */
+    @Transactional(readOnly = true)
+    public List<OverrideView> recentOverrides(TenantId tenantId, int limit) {
+        List<FuelEligibilityOverride> rows = overrides.findRecent(tenantId, org.springframework.data.domain.PageRequest.of(0, Math.max(1, Math.min(limit, 200))));
+        Map<UUID, String> regs = new HashMap<>();
+        for (FuelTanker t : tankers.findAllById(rows.stream().map(FuelEligibilityOverride::getTankerId).collect(Collectors.toSet()))) regs.put(t.getId(), t.getRegistration());
+        Map<UUID, String> names = new HashMap<>();
+        try {
+            for (var r : userLookup.resolveUsers(tenantId, rows.stream().map(FuelEligibilityOverride::getApprovedBy).collect(Collectors.toSet()))) {
+                if (r.userId() != null) names.put(r.userId(), r.displayName());
+            }
+        } catch (RuntimeException ex) {
+            log.debug("Could not look up names for the override log: {}", ex.getMessage());
+        }
+        return rows.stream().map(o -> new OverrideView(o.getId(), o.getDeliveryId(), o.getTankerId(), regs.get(o.getTankerId()), o.getDriverEmployeeId(),
+                o.getFindings(), o.getReason(), o.getApprovedBy(), names.get(o.getApprovedBy()), o.getCreatedAt())).toList();
     }
 }

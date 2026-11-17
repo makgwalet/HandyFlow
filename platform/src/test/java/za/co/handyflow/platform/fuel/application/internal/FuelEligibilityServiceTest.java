@@ -48,6 +48,7 @@ class FuelEligibilityServiceTest {
     @Mock FuelDeliveryCompartmentRepository loadSplits;
     @Mock FuelTankerCompartmentRepository tankerCompartments;
     @Mock FuelSettingsRepository settings;
+    @Mock za.co.handyflow.platform.notifications.application.TenantAdminRecipients userLookup;
     @InjectMocks FuelEligibilityService service;
 
     FuelTanker tanker; FuelCustomerSite site; FuelSiteAccessRule rule; FuelDelivery load; FuelTankerCompartment c1, c2;
@@ -433,5 +434,30 @@ class FuelEligibilityServiceTest {
         assertThrows(IllegalStateException.class, () -> service.addChangeoverRule(T, new ChangeoverRuleRequest("diesel", "paraffin", null)));
         when(tankerCompartments.findByTanker(T, tanker.getId())).thenReturn(List.of(c1));
         assertThrows(ResourceNotFoundException.class, () -> service.saveCompartmentRating(T, tanker.getId(), UUID.randomUUID(), new CompartmentRatingRequest(List.of("DIESEL"))));
+    }
+
+    @Test @DisplayName("the override log shows tanker registration and the approver's name, newest first")
+    void overrideLog() {
+        UUID approver = UUID.randomUUID();
+        var o = FuelEligibilityOverride.of(T, load.getId(), tanker.getId(), UUID.randomUUID(), "Induction not recorded", "Driver inducted on paper", approver);
+        when(overrides.findRecent(eq(T), any())).thenReturn(List.of(o));
+        when(tankers.findAllById(any())).thenReturn(List.of(tanker));
+        when(userLookup.resolveUsers(eq(T), any())).thenReturn(List.of(za.co.handyflow.platform.notifications.application.Recipient.user(approver, "Thabo M", "t@x.co", null)));
+        var v = service.recentOverrides(T, 50).get(0);
+        assertEquals(tanker.getRegistration(), v.tankerRegistration());
+        assertEquals("Thabo M", v.approvedByName());
+        assertEquals("Driver inducted on paper", v.reason());
+    }
+
+    @Test @DisplayName("the override log still shows when names cannot be looked up, and the limit is kept between 1 and 200")
+    void overrideLogSurvivesLookupFailure() {
+        var o = FuelEligibilityOverride.of(T, load.getId(), tanker.getId(), UUID.randomUUID(), "x", "y", UUID.randomUUID());
+        when(overrides.findRecent(eq(T), any())).thenReturn(List.of(o));
+        when(tankers.findAllById(any())).thenReturn(List.of(tanker));
+        when(userLookup.resolveUsers(eq(T), any())).thenThrow(new RuntimeException("down"));
+        assertNull(service.recentOverrides(T, 5000).get(0).approvedByName());
+        var page = org.mockito.ArgumentCaptor.forClass(org.springframework.data.domain.Pageable.class);
+        verify(overrides).findRecent(eq(T), page.capture());
+        assertEquals(200, page.getValue().getPageSize());
     }
 }

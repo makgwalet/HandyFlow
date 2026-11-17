@@ -40,3 +40,16 @@ describe("specs, products, changeover and cleaning", () => {
     expect(validateCleaning("2026-11-14T10:00", "", " ", now)).toMatch(/certificate/); expect(validateCleaning("2026-11-14T10:00", "C1", "", now)).toBeNull(); expect(validateCleaning("2026-11-14T10:00", "", "Steam cleaned, inspected", now)).toBeNull()
   })
 })
+
+import { onlyOverrides, overrideLine } from "./eligibilityOps"
+describe("override log", () => {
+  it("keeps only rows shaped like log entries", () => {
+    expect(onlyOverrides([{ id: "x" }, { id: "o1", reason: "r", findings: "f" }])).toHaveLength(1)
+    expect(onlyOverrides({})).toEqual([])
+  })
+  it("names the tanker and the approver, and falls back to a short id", () => {
+    const base = { id: "o1", deliveryId: "d", findings: "f", reason: "r", approvedBy: "abcdef1234567", createdAt: "2026-11-17T10:30:00Z", tankerRegistration: "GP 12 AB", approvedByName: "Thabo M" }
+    expect(overrideLine(base)).toBe("GP 12 AB · Thabo M · 2026-11-17 10:30")
+    expect(overrideLine({ ...base, approvedByName: null, tankerRegistration: null })).toBe("Tanker · User abcdef12 · 2026-11-17 10:30")
+  })
+})

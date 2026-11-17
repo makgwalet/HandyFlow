@@ -5,6 +5,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import { usePermissions } from "../../hooks/usePermission"
 import { btnPrimary, btnGhost, card, inputStyle, labelStyle, Chip } from "../warehousing/whseUi"
+import OverrideLog from "./OverrideLog"
 import type { CustomerAccount, CustomerSite } from "./customerOps"
 import type { Tanker, Driver } from "./transportOps"
 import {
@@ -21,19 +22,21 @@ const field: React.CSSProperties = { flex: "1 1 140px", minWidth: 120 }
 
 export default function EligibilityTab() {
   const canManage = usePermissions(["FUEL_MANAGE", "FUEL_TRANSPORT_MANAGE"])
-  const [part, setPart] = useState<"sites" | "tankers" | "rules">("sites")
+  const canSeeLog = usePermissions(["FUEL_ELIGIBILITY_REVIEW", "FUEL_COMPLIANCE_MANAGE", "FUEL_TRANSPORT_MANAGE", "FUEL_MANAGE"])
+  const [part, setPart] = useState<"sites" | "tankers" | "rules" | "log">("sites")
   return (
     <div>
       <p style={{ fontSize: 12.5, color: "var(--hf-text-muted)", margin: "0 0 12px", maxWidth: 760 }}>
         What a customer site lets in, and what each tanker compartment may carry. These are your own and your customers' rules. A load is blocked, with no override, when a rule is broken; it needs a person with the review permission and a reason when something the rule needs is not recorded. A site or compartment with nothing set is not restricted.
       </p>
       <div role="tablist" style={{ display: "flex", gap: 8, marginBottom: 12 }}>
-        {([["sites", "Customer sites"], ["tankers", "Tankers and compartments"], ["rules", "Changeover rules"]] as const).map(([id, label]) =>
+        {([["sites", "Customer sites"], ["tankers", "Tankers and compartments"], ["rules", "Changeover rules"], ...(canSeeLog ? [["log", "Review decisions"] as const] : [])] as const).map(([id, label]) =>
           <button key={id} role="tab" aria-selected={part === id} onClick={() => setPart(id)} style={part === id ? btnPrimary : btnGhost}>{label}</button>)}
       </div>
       {part === "sites" && <SitesPart canManage={canManage} />}
       {part === "tankers" && <TankersPart canManage={canManage} />}
       {part === "rules" && <RulesPart canManage={canManage} />}
+      {part === "log" && <OverrideLog />}
     </div>
   )
 }

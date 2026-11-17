@@ -61,4 +61,8 @@ public final class EligibilityDtos {
     public record CleaningRequest(java.time.Instant cleanedAt, @Size(max = 120) String method, @Size(max = 120) String certificateRef, @Size(max = 300) String evidenceNote) {}
     public record CleaningView(UUID id, UUID compartmentId, java.time.Instant cleanedAt, String method, String certificateRef, String evidenceNote, UUID recordedBy) {}
     public record EligibilitySettings(boolean requireCompartmentRating) {}
+
+    /** One decision to allocate a load although something the check needs was not recorded. */
+    public record OverrideView(UUID id, UUID deliveryId, UUID tankerId, String tankerRegistration, UUID driverEmployeeId, String findings, String reason,
+                               UUID approvedBy, String approvedByName, java.time.Instant createdAt) {}
 }

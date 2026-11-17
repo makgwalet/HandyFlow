@@ -12,6 +12,7 @@ import za.co.handyflow.platform.fuel.dto.EligibilityDtos.*;
 import za.co.handyflow.platform.shared.ApiResponse;
 import za.co.handyflow.platform.shared.TenantContext;
 
+import java.util.List;
 import java.util.UUID;
 
 /** Eligibility set-up: what a delivery site lets in, and the specifications of a tanker the site rules are checked against. */
@@ -139,5 +140,13 @@ public class FuelEligibilityController {
     public ResponseEntity<ApiResponse<EligibilitySettings>> saveSettings(@Valid @RequestBody EligibilitySettings req) {
         featureGuard.requireModule("fuel");
         return ResponseEntity.ok(ApiResponse.success("Saved", eligibility.saveEligibilitySettings(TenantContext.getTenantIdAsObject(), req)));
+    }
+
+    /** The log of loads allocated with review points open. Read only, for the people who make and check those decisions. */
+    @GetMapping("/eligibility/overrides")
+    @PreAuthorize("hasAnyAuthority('FUEL_ELIGIBILITY_REVIEW','FUEL_COMPLIANCE_MANAGE','FUEL_TRANSPORT_MANAGE','FUEL_MANAGE')")
+    public ResponseEntity<ApiResponse<List<za.co.handyflow.platform.fuel.dto.EligibilityDtos.OverrideView>>> overrides(@RequestParam(defaultValue = "50") int limit) {
+        featureGuard.requireModule("fuel");
+        return ResponseEntity.ok(ApiResponse.success(eligibility.recentOverrides(TenantContext.getTenantIdAsObject(), limit)));
     }
 }

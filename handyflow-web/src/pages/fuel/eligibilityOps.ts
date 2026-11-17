@@ -91,3 +91,17 @@ export function validateCleaning(cleanedAt: string, cert: string, evidence: stri
   if (!cert.trim() && !evidence.trim()) return "Give the certificate reference, or describe the evidence."
   return null
 }
+
+export type OverrideRow = { id: string; deliveryId: string; tankerRegistration: string | null; findings: string; reason: string; approvedByName: string | null; approvedBy: string; createdAt: string }
+
+/** Other tests answer every URL with generic data; keep only rows that really look like override log entries. */
+export function onlyOverrides(raw: unknown): OverrideRow[] {
+  if (!Array.isArray(raw)) return []
+  return raw.filter((o: any) => o && typeof o.id === "string" && typeof o.reason === "string" && typeof o.findings === "string") as OverrideRow[]
+}
+
+export function overrideLine(o: OverrideRow): string {
+  const who = o.approvedByName ?? `User ${o.approvedBy.slice(0, 8)}`
+  const when = (o.createdAt ?? "").slice(0, 16).replace("T", " ")
+  return `${o.tankerRegistration ?? "Tanker"} · ${who} · ${when}`
+}
