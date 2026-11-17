@@ -38,13 +38,15 @@ class FuelForecourtSupplyReconciliationServiceTest {
     @Mock FuelShiftRepository shifts;
     @Mock FuelShiftReadingRepository readings;
     @Mock FuelDepotSupplyShareRepository shareRepo;
+    @Mock FuelSettingsRepository settingsRepo;
+    @Mock FuelPosImportRepository importsRepo;
     FuelForecourtSupplyReconciliationService svc;
 
     FuelDepot terminal, other, fc;
     FuelTank tTerminal, tOther, tFc, tFc2;
 
     @BeforeEach void setUp() {
-        svc = new FuelForecourtSupplyReconciliationService(transfers, receipts, pumps, tanks, depots, shifts, readings, shareRepo);
+        svc = new FuelForecourtSupplyReconciliationService(transfers, receipts, pumps, tanks, depots, shifts, readings, shareRepo, new FuelShiftReportClock(settingsRepo, importsRepo));
         terminal = depot("Terminal", null);
         other = depot("Other depot", null);
         fc = depot("Forecourt", terminal.getId());

@@ -1,7 +1,16 @@
 // Phase 8d: forecourt sales grouped by the depot that supplies each forecourt.
 export type FcRow = { depotId: string | null; name: string; shifts: number; litresSold: number; salesValue: number | null }
 export type FcSupplier = { supplierId: string | null; name: string; unassigned: boolean; forecourts: FcRow[]; litresSold: number; salesValue: number | null }
-export type FcReport = { from: string; to: string; moneyShown: boolean; suppliers: FcSupplier[]; totalLitres: number; totalSales: number | null; readingsLeftOut: number }
+/** How a shifts-by-date report dated its shifts. SYSTEM is the system's own closing time (the default); PROVIDER is the pump/POS provider's. */
+export type ShiftBasis = { basis: "SYSTEM" | "PROVIDER"; timezone: string; systemTimeFallbacks: number }
+export type FcReport = { from: string; to: string; moneyShown: boolean; suppliers: FcSupplier[]; totalLitres: number; totalSales: number | null; readingsLeftOut: number; shiftBasis?: ShiftBasis | null }
+
+/** One line saying how shifts were dated, only when it is not the usual way. */
+export function basisNote(b?: ShiftBasis | null): string | null {
+  if (!b || b.basis !== "PROVIDER") return null
+  const base = `Shifts are dated by the closing time the pump or POS provider reported, in ${b.timezone}.`
+  return b.systemTimeFallbacks > 0 ? `${base} ${b.systemTimeFallbacks} imported ${b.systemTimeFallbacks === 1 ? "shift" : "shifts"} had no provider time, so the system time was used.` : base
+}
 
 /** The page also shows reports from other endpoints in tests and old servers; only render what has the expected shape. */
 export function isFcReport(x: any): x is FcReport { return !!x && Array.isArray(x.suppliers) && typeof x.totalLitres === "number" }
@@ -10,18 +19,20 @@ export function supplyCaveat(r: FcReport): string | null {
   const parts: string[] = []
   if (r.suppliers.some(s => s.unassigned)) parts.push("Some forecourt sales have no supplying depot set. Set it under Stock > Depots.")
   if (r.readingsLeftOut > 0) parts.push(`${r.readingsLeftOut} meter reading(s) had no litres and were left out.`)
+  const bn = basisNote(r.shiftBasis); if (bn) parts.push(bn)
   return parts.length ? parts.join(" ") : null
 }
 
 // Forecourt supply reconciliation: where each forecourt's fuel came from, against litres sold. Litres only.
 export type FcInbound = { depotId: string; name: string; supplierId: string | null; supplierName: string | null; fromSupplierDepot: number; fromOtherDepots: number; fromSuppliers: number; totalIn: number; supplierDepotSharePct: number | null; litresSold: number }
-export type FcRecon = { from: string; to: string; forecourts: FcInbound[]; totalIn: number; totalSold: number }
+export type FcRecon = { from: string; to: string; forecourts: FcInbound[]; totalIn: number; totalSold: number; shiftBasis?: ShiftBasis | null }
 
 export function isFcRecon(x: any): x is FcRecon { return !!x && Array.isArray(x.forecourts) && typeof x.totalIn === "number" && typeof x.totalSold === "number" }
 
 /** One plain sentence per forecourt that needs a look; empty when supply follows the supplier on record. */
 export function reconNotes(r: FcRecon): string[] {
   const out: string[] = []
+  const bn = basisNote(r.shiftBasis); if (bn) out.push(bn)
   for (const f of r.forecourts) {
     if (f.totalIn === 0) continue
     if (!f.supplierId) out.push(`${f.name} has no supplying depot set, so none of its fuel can be matched to a supplier.`)

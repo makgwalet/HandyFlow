@@ -17,6 +17,7 @@ import za.co.handyflow.platform.fuel.dto.ForecourtSupplyDtos.Supplier;
 import za.co.handyflow.platform.shared.TenantId;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.*;
@@ -37,6 +38,7 @@ public class FuelForecourtSupplyReportService {
     private final FuelTankRepository tanks;
     private final FuelDepotRepository depots;
     private final za.co.handyflow.platform.fuel.domain.repository.FuelDepotSupplyShareRepository supplyShares;
+    private final FuelShiftReportClock clock;
 
     public Report report(TenantId tenantId, int days, boolean includeMoney) { return report(tenantId, days, includeMoney, null); }
 
@@ -47,12 +49,17 @@ public class FuelForecourtSupplyReportService {
     @Transactional(readOnly = true)
     public Report report(TenantId tenantId, int days, boolean includeMoney, Set<UUID> allowedDepotIds) {
         int span = Math.max(1, Math.min(days, 366));
-        LocalDate to = LocalDate.now(SAST), from = to.minusDays(span - 1L);
-        var fromInstant = from.atStartOfDay(SAST).toInstant();
-        var toInstant = to.plusDays(1).atStartOfDay(SAST).toInstant();
+        var basis = clock.basis(tenantId);
+        LocalDate to = LocalDate.now(basis.zone()), from = to.minusDays(span - 1L);
+        var fromInstant = from.atStartOfDay(basis.zone()).toInstant();
+        var toInstant = to.plusDays(1).atStartOfDay(basis.zone()).toInstant();
 
         List<FuelShift> closed = new ArrayList<>();
-        for (FuelShift s : shifts.findClosedSince(tenantId, fromInstant)) if (s.getClosedAt() != null && s.getClosedAt().isBefore(toInstant)) closed.add(s);
+        // The system's closing time is always on or after the provider's (an import is accepted afterwards), so this query never misses a shift whose provider time is in range.
+        for (FuelShift s : shifts.findClosedSince(tenantId, fromInstant)) {
+            Instant at = basis.closedFor(s);
+            if (at != null && !at.isBefore(fromInstant) && at.isBefore(toInstant)) closed.add(s);
+        }
         Map<UUID, FuelDepot> depotById = new HashMap<>();
         for (FuelDepot d : depots.findAllActive(tenantId)) depotById.put(d.getId(), d);
         Map<UUID, UUID> tankDepot = new HashMap<>();
@@ -116,7 +123,7 @@ public class FuelForecourtSupplyReportService {
         }
         // Real suppliers first by litres, the "no supplier" bucket last.
         out.sort(Comparator.comparing(Supplier::unassigned).thenComparing(Supplier::litresSold, Comparator.reverseOrder()).thenComparing(Supplier::name));
-        return new Report(from, to, includeMoney, out, totalLitres, includeMoney ? totalSales : null, left);
+        return new Report(from, to, includeMoney, out, totalLitres, includeMoney ? totalSales : null, left, clock.describe(tenantId, basis, closed));
     }
 
     private static final class Acc {

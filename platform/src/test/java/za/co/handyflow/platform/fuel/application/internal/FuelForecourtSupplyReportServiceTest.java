@@ -35,9 +35,11 @@ class FuelForecourtSupplyReportServiceTest {
     @Mock FuelTankRepository tanks;
     @Mock FuelDepotRepository depots;
     @Mock FuelDepotSupplyShareRepository shareRepo;
+    @Mock FuelSettingsRepository settingsRepo;
+    @Mock FuelPosImportRepository importsRepo;
     FuelForecourtSupplyReportService svc;
 
-    @BeforeEach void setUp() { svc = new FuelForecourtSupplyReportService(shifts, readings, tanks, depots, shareRepo); }
+    @BeforeEach void setUp() { svc = new FuelForecourtSupplyReportService(shifts, readings, tanks, depots, shareRepo, new FuelShiftReportClock(settingsRepo, importsRepo)); }
 
     private FuelDepot depot(String name, UUID supplier) {
         FuelDepot d = mock(FuelDepot.class);
@@ -186,5 +188,75 @@ class FuelForecourtSupplyReportServiceTest {
         assertEquals(0, bd("2300.01").compareTo(r.totalSales()));
         var big = r.suppliers().stream().filter(x -> x.name().equals("Depot A")).findFirst().orElseThrow();
         assertEquals(0, bd("70.01").compareTo(big.litresSold()));
+    }
+
+    private FuelShift providerShift(UUID id, Instant systemClosed, Instant providerClosed) {
+        FuelShift s = mock(FuelShift.class);
+        when(s.getId()).thenReturn(id); when(s.getClosedAt()).thenReturn(systemClosed); when(s.getProviderClosedAt()).thenReturn(providerClosed);
+        return s;
+    }
+    private void providerBasis(boolean on) {
+        FuelSettings st = FuelSettings.forTenant(T); st.updateReportBasis(on, null);
+        when(settingsRepo.findByTenant(T)).thenReturn(Optional.of(st));
+    }
+
+    @Test @DisplayName("with provider times on, an imported shift is dated by the provider's closing time, not the day it was accepted")
+    void providerTimesDateTheShift() {
+        providerBasis(true);
+        FuelDepot fc = depot("Forecourt", null); FuelTank t = tank(fc);
+        UUID inId = UUID.randomUUID(), outId = UUID.randomUUID();
+        Instant now = Instant.now();
+        FuelShift accepted = providerShift(inId, now.minusSeconds(60), now.minusSeconds(7200));              // provider closed 2h ago: in the last 30 days
+        FuelShift old = providerShift(outId, now.minusSeconds(60), now.minusSeconds(86400L * 45));           // accepted just now, but the provider closed 45 days ago
+        when(depots.findAllActive(T)).thenReturn(List.of(fc)); when(tanks.findAllActive(T)).thenReturn(List.of(t));
+        when(shifts.findClosedSince(eq(T), any())).thenReturn(List.of(accepted, old));
+        when(readings.findByShifts(eq(T), any())).thenAnswer(a -> {
+            Collection<UUID> ids = a.getArgument(1);
+            return ids.contains(inId) ? List.of(reading(inId, t, "100", "2300")) : List.of();
+        });
+        Report r = svc.report(T, 30, true);
+        assertEquals(0, bd("100").compareTo(r.totalLitres()));
+        assertEquals("PROVIDER", r.shiftBasis().basis());
+        assertEquals("Africa/Johannesburg", r.shiftBasis().timezone());
+    }
+
+    @Test @DisplayName("with provider times off (the default) the system's closing time dates the shift, exactly as before, and nothing is flagged")
+    void systemTimesByDefault() {
+        FuelDepot fc = depot("Forecourt", null); FuelTank t = tank(fc);
+        UUID id = UUID.randomUUID();
+        Instant now = Instant.now();
+        FuelShift s = providerShift(id, now.minusSeconds(60), now.minusSeconds(86400L * 45));
+        when(depots.findAllActive(T)).thenReturn(List.of(fc)); when(tanks.findAllActive(T)).thenReturn(List.of(t));
+        when(shifts.findClosedSince(eq(T), any())).thenReturn(List.of(s));
+        when(readings.findByShifts(eq(T), any())).thenReturn(List.of(reading(id, t, "40", "920")));
+        Report r = svc.report(T, 30, true);
+        assertEquals(0, bd("40").compareTo(r.totalLitres()));
+        assertEquals("SYSTEM", r.shiftBasis().basis());
+        assertEquals(0, r.shiftBasis().systemTimeFallbacks());
+    }
+
+    @Test @DisplayName("an imported shift with no provider closing time falls back to the system time and is counted; a manual shift is not")
+    void fallbackIsCounted() {
+        providerBasis(true);
+        FuelDepot fc = depot("Forecourt", null); FuelTank t = tank(fc);
+        UUID importedId = UUID.randomUUID(), manualId = UUID.randomUUID();
+        Instant now = Instant.now();
+        FuelShift imported = providerShift(importedId, now.minusSeconds(3600), null), manual = providerShift(manualId, now.minusSeconds(3600), null);
+        when(depots.findAllActive(T)).thenReturn(List.of(fc)); when(tanks.findAllActive(T)).thenReturn(List.of(t));
+        when(shifts.findClosedSince(eq(T), any())).thenReturn(List.of(imported, manual));
+        when(readings.findByShifts(eq(T), any())).thenReturn(List.of(reading(importedId, t, "10", "230")));
+        when(importsRepo.findShiftIdsAmong(eq(T), any())).thenReturn(List.of(importedId));
+        Report r = svc.report(T, 30, true);
+        assertEquals(1, r.shiftBasis().systemTimeFallbacks());
+        assertEquals(0, bd("10").compareTo(r.totalLitres()), "the shift is still counted, by its system time");
+    }
+
+    @Test @DisplayName("an unknown timezone falls back to Africa/Johannesburg, and the setting refuses one on save")
+    void timezone() {
+        assertEquals("Africa/Johannesburg", FuelShiftReportClock.zoneOf("Not/AZone").getId());
+        assertEquals("Africa/Johannesburg", FuelShiftReportClock.zoneOf(null).getId());
+        assertEquals("Africa/Harare", FuelShiftReportClock.zoneOf("Africa/Harare").getId());
+        FuelSettings st = FuelSettings.forTenant(T);
+        assertThrows(IllegalArgumentException.class, () -> st.updateReportBasis(true, "Mars/Olympus"));
     }
 }

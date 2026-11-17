@@ -30,5 +30,9 @@ public final class GroupReportDtos {
     }
 
     public record Report(LocalDate from, LocalDate to, LocalDate previousFrom, LocalDate previousTo, boolean moneyShown,
-                         List<Row> entities, Row total, long deliveriesLeftOut) {}
+                         List<Row> entities, Row total, long deliveriesLeftOut, ForecourtSupplyDtos.ShiftBasis shiftBasis) {
+        public Report(LocalDate from, LocalDate to, LocalDate previousFrom, LocalDate previousTo, boolean moneyShown, List<Row> entities, Row total, long deliveriesLeftOut) {
+            this(from, to, previousFrom, previousTo, moneyShown, entities, total, deliveriesLeftOut, null);
+        }
+    }
 }

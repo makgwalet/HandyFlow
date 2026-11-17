@@ -15,7 +15,14 @@ public final class ForecourtSupplyDtos {
     /** One supplying depot with the forecourts it supplies. supplierId is null for forecourts with no supplier set (and for tanks in no depot). */
     public record Supplier(UUID supplierId, String name, boolean unassigned, List<Forecourt> forecourts, BigDecimal litresSold, BigDecimal salesValue) {}
 
-    public record Report(LocalDate from, LocalDate to, boolean moneyShown, List<Supplier> suppliers, BigDecimal totalLitres, BigDecimal totalSales, long readingsLeftOut) {}
+    /** How a shifts-by-date report dated its shifts: {@code basis} SYSTEM or PROVIDER, the timezone, and how many imported shifts had no provider time and used the system time. */
+    public record ShiftBasis(String basis, String timezone, long systemTimeFallbacks) {}
+
+    public record Report(LocalDate from, LocalDate to, boolean moneyShown, List<Supplier> suppliers, BigDecimal totalLitres, BigDecimal totalSales, long readingsLeftOut, ShiftBasis shiftBasis) {
+        public Report(LocalDate from, LocalDate to, boolean moneyShown, List<Supplier> suppliers, BigDecimal totalLitres, BigDecimal totalSales, long readingsLeftOut) {
+            this(from, to, moneyShown, suppliers, totalLitres, totalSales, readingsLeftOut, null);
+        }
+    }
 
     /**
      * Reconciliation for one forecourt: where its fuel came from in the period. All litres, no money.
@@ -25,7 +32,9 @@ public final class ForecourtSupplyDtos {
                           BigDecimal fromSupplierDepot, BigDecimal fromOtherDepots, BigDecimal fromSuppliers, BigDecimal totalIn,
                           BigDecimal supplierDepotSharePct, BigDecimal litresSold) {}
 
-    public record Reconciliation(LocalDate from, LocalDate to, List<Inbound> forecourts, BigDecimal totalIn, BigDecimal totalSold) {}
+    public record Reconciliation(LocalDate from, LocalDate to, List<Inbound> forecourts, BigDecimal totalIn, BigDecimal totalSold, ShiftBasis shiftBasis) {
+        public Reconciliation(LocalDate from, LocalDate to, List<Inbound> forecourts, BigDecimal totalIn, BigDecimal totalSold) { this(from, to, forecourts, totalIn, totalSold, null); }
+    }
 
     /** One line of a forecourt's supply split, as saved. */
     public record ShareLine(UUID supplyingDepotId, BigDecimal percentage) {}

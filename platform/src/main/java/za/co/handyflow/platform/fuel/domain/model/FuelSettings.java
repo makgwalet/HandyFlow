@@ -92,6 +92,14 @@ public class FuelSettings {
     @Column(name = "require_verified_cleaning", nullable = false)
     private boolean requireVerifiedCleaning = false;
 
+    /** When on, imported shifts are dated in shifts-by-date reports by the closing time their provider reported. */
+    @Column(name = "shift_report_use_provider_times", nullable = false)
+    private boolean shiftReportUseProviderTimes = false;
+
+    /** The timezone that decides which day a shift belongs to in those reports. Null: Africa/Johannesburg. */
+    @Column(name = "report_timezone", length = 60)
+    private String reportTimezone;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt = Instant.now();
 
@@ -180,6 +188,11 @@ public class FuelSettings {
         this.varianceReviewDays = days; this.updatedAt = Instant.now();
     }
 
+    public void updateReportBasis(boolean useProviderTimes, String timezone) {
+        String tz = timezone == null || timezone.isBlank() ? null : timezone.trim();
+        if (tz != null) { try { java.time.ZoneId.of(tz); } catch (RuntimeException e) { throw new IllegalArgumentException("Unknown timezone: " + tz); } }
+        this.shiftReportUseProviderTimes = useProviderTimes; this.reportTimezone = tz; this.updatedAt = Instant.now();
+    }
     public void updateRequireVerifiedCleaning(boolean on) { this.requireVerifiedCleaning = on; this.updatedAt = Instant.now(); }
     public void updateRequireCompartmentRating(boolean on) { this.requireCompartmentRating = on; this.updatedAt = Instant.now(); }
 

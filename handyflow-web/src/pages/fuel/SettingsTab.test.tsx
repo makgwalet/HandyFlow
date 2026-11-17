@@ -114,4 +114,22 @@ describe("SettingsTab", () => {
     expect((await screen.findAllByRole("alert")).some(a => /cash tolerance/.test(a.textContent ?? ""))).toBe(true)
     expect(put).not.toHaveBeenCalledWith("/api/v1/fuel/settings/controls", expect.anything())
   })
+
+  it("shows the report dating choice to people who can configure, and saves it", async () => {
+    perms = ["FUEL_MANAGE", "FUEL_CONFIGURATION_MANAGE"]
+    get.mockImplementation(async (u: string) => u.includes("/report-basis") ? { data: { data: { useProviderTimes: false, timezone: "Africa/Johannesburg" } } } : u.includes("/controls") ? { data: { data: { requireSupplierApproval: false, adjustmentThresholdLitres: null } } } : { data: { data: saved } })
+    mount()
+    fireEvent.click(await screen.findByLabelText("Use provider times"))
+    fireEvent.change(screen.getByLabelText("Timezone that decides the day"), { target: { value: "Africa/Harare" } })
+    fireEvent.click(screen.getByText("Save report dating"))
+    await waitFor(() => expect(put).toHaveBeenCalledWith("/api/v1/fuel/report-basis", { useProviderTimes: true, timezone: "Africa/Harare" }))
+  })
+
+  it("without the configuration permission the report dating is read-only", async () => {
+    perms = ["FUEL_MANAGE"]
+    get.mockImplementation(async (u: string) => u.includes("/report-basis") ? { data: { data: { useProviderTimes: true, timezone: "Africa/Johannesburg" } } } : u.includes("/controls") ? { data: { data: { requireSupplierApproval: false, adjustmentThresholdLitres: null } } } : { data: { data: saved } })
+    mount()
+    expect((await screen.findByLabelText("Use provider times") as HTMLInputElement).disabled).toBe(true)
+    expect(screen.queryByText("Save report dating")).toBeNull()
+  })
 })

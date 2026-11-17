@@ -19,6 +19,35 @@ const FIELDS: { key: keyof SettingsForm; label: string; hint: string; group: "co
   { key: "poOverTolerancePct", label: "Supplier delivery tolerance (%)", hint: "How far over the litres ordered a receipt may go before it is refused. 0 to 10.", group: "po" },
 ]
 
+/** Which time dates a shift in the shifts-by-date reports, and the timezone that decides the day. */
+function ReportBasisCard() {
+  const canConfigure = usePermissions(["FUEL_CONFIGURATION_MANAGE"])
+  const qc = useQueryClient()
+  const q = useQuery<{ useProviderTimes: boolean; timezone: string }>({ queryKey: ["fuel-report-basis"], retry: false, queryFn: async () => unwrap(await apiClient.get("/api/v1/fuel/report-basis")) })
+  const [on, setOn] = useState(false); const [tz, setTz] = useState("Africa/Johannesburg"); const [err, setErr] = useState(""); const [saved, setSaved] = useState(false)
+  useEffect(() => { if (q.data && typeof q.data.useProviderTimes === "boolean") { setOn(q.data.useProviderTimes); setTz(q.data.timezone ?? "Africa/Johannesburg") } }, [q.data])
+  const save = useMutation({
+    mutationFn: () => apiClient.put("/api/v1/fuel/report-basis", { useProviderTimes: on, timezone: tz.trim() || null }),
+    onSuccess: () => { setErr(""); setSaved(true); qc.invalidateQueries({ queryKey: ["fuel-report-basis"] }); qc.invalidateQueries({ queryKey: ["fuel-forecourt-supply"] }); qc.invalidateQueries({ queryKey: ["fuel-forecourt-recon"] }) },
+    onError: (e: any) => { setSaved(false); setErr(msg(e, "Could not save")) },
+  })
+  if (!q.data || typeof q.data.useProviderTimes !== "boolean") return null
+  return (
+    <div style={{ ...card, padding: 16, marginBottom: 14 }}>
+      <h3 style={{ margin: "0 0 4px", fontSize: 14 }}>Shift dates in reports</h3>
+      <label style={{ fontSize: 13 }}>
+        <input type="checkbox" aria-label="Use provider times" disabled={!canConfigure} checked={on} onChange={e => { setSaved(false); setOn(e.target.checked) }} /> Date imported shifts by the times their pump or POS provider reported</label>
+      <div style={{ fontSize: 11, color: "var(--hf-text-muted)", margin: "3px 0 10px" }}>Off by default: shifts are dated by the system's own closing time. When on, an imported shift counts on the day its provider closed it, even if it was accepted later. The system times are kept and not changed. An imported shift with no provider time still uses the system time, and the report says how many.</div>
+      <label style={labelStyle} htmlFor="rb-tz">Timezone that decides the day</label>
+      <input id="rb-tz" value={tz} onChange={e => { setSaved(false); setTz(e.target.value) }} disabled={!canConfigure} style={{ ...inputStyle, maxWidth: 280 }} />
+      <div style={{ fontSize: 11, color: "var(--hf-text-muted)", margin: "3px 0 10px" }}>For example Africa/Johannesburg. It decides which day a shift belongs to in the supply and group reports.</div>
+      {err && <p role="alert" style={{ color: "var(--hf-danger-text)", fontSize: 12 }}>{err}</p>}
+      {saved && <p role="status" style={{ color: "var(--hf-success-text-strong)", fontSize: 12 }}>Saved.</p>}
+      {canConfigure && <button style={btnPrimary} disabled={save.isPending} onClick={() => { if (!tz.trim()) { setErr("Give a timezone, for example Africa/Johannesburg."); return } setErr(""); save.mutate() }}>Save report dating</button>}
+    </div>
+  )
+}
+
 function ControlsCard() {
   const canConfigure = usePermissions(["FUEL_CONFIGURATION_MANAGE"])
   const qc = useQueryClient()
@@ -113,6 +142,7 @@ export default function SettingsTab() {
   return (
     <div>
       <ControlsCard />
+      <ReportBasisCard />
       {block("cost", "Cost to serve", "Rates used to turn margin into net margin on the Cost to serve page. Leave a rate at 0 to leave that cost out.")}
       {block("po", "Purchasing", "Applies to receipts against purchase orders.")}
       {err && <p role="alert" style={{ color: "var(--hf-danger-text)", fontSize: 12 }}>{err}</p>}

@@ -8,6 +8,9 @@ import java.math.BigDecimal;
 public final class FuelSettingsDtos {
     private FuelSettingsDtos() {}
 
+    /** How shifts-by-date reports date a shift: the provider's closing time for imported shifts, or the system's; and the timezone that decides the day. */
+    public record ReportBasis(boolean useProviderTimes, String timezone) {}
+
     public record SettingsRequest(
             @DecimalMin("0") BigDecimal driverCostPerHour,
             @DecimalMin("0") BigDecimal vehicleCostPerKm,

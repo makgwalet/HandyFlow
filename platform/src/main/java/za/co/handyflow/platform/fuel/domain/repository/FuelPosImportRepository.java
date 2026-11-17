@@ -15,6 +15,10 @@ public interface FuelPosImportRepository extends JpaRepository<FuelPosImport, UU
     @Query("SELECT i FROM FuelPosImport i WHERE i.tenantId = :tenantId AND i.source = :source AND i.externalId = :externalId")
     Optional<FuelPosImport> findByRef(TenantId tenantId, String source, String externalId);
 
+    /** Which of these shifts were created by accepting an import. */
+    @Query("SELECT i.shiftId FROM FuelPosImport i WHERE i.tenantId = :tenantId AND i.shiftId IN :shiftIds")
+    List<java.util.UUID> findShiftIdsAmong(TenantId tenantId, java.util.Collection<java.util.UUID> shiftIds);
+
     @Query("SELECT i FROM FuelPosImport i WHERE i.tenantId = :tenantId AND i.id = :id")
     Optional<FuelPosImport> findByTenantAndId(TenantId tenantId, UUID id);
 

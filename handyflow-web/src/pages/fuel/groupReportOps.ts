@@ -1,4 +1,5 @@
 // Phase 6a helpers: the group report across legal entities. Display only; the server decides what money a reader may see.
+import { basisNote, type ShiftBasis } from "./forecourtSupplyOps"
 export interface GroupRow {
   legalEntityId: string | null; name: string; unassigned: boolean
   deliveries: number; litres: number; revenue: number | null; margin: number | null; deliveriesWithoutCost: number
@@ -8,7 +9,7 @@ export interface GroupRow {
 }
 export interface GroupReport {
   from: string; to: string; previousFrom: string; previousTo: string; moneyShown: boolean
-  entities: GroupRow[]; total: GroupRow; deliveriesLeftOut: number
+  entities: GroupRow[]; total: GroupRow; deliveriesLeftOut: number; shiftBasis?: ShiftBasis | null
 }
 
 /** "+12.5%" / "-8.0%" against the previous period; "new" when there was nothing before; null when neither period has anything. */
@@ -22,6 +23,7 @@ export function changeText(now: number | null | undefined, before: number | null
 /** What the figures leave out, in words, so nobody reads a floor as a total. */
 export function caveats(r: GroupReport): string[] {
   const out: string[] = []
+  const bn = basisNote(r.shiftBasis); if (bn) out.push(bn)
   if (r.total.deliveriesWithoutCost > 0) out.push(`${r.total.deliveriesWithoutCost} ${r.total.deliveriesWithoutCost === 1 ? "delivery has" : "deliveries have"} no cost at sale, so ${r.total.deliveriesWithoutCost === 1 ? "it is" : "they are"} in revenue and litres but not in margin.`)
   if (r.total.tanksWithoutCost > 0) out.push(`${r.total.tanksWithoutCost} ${r.total.tanksWithoutCost === 1 ? "tank holds" : "tanks hold"} fuel with no known cost, so stock value is a floor.`)
   if (r.deliveriesLeftOut > 0) out.push(`${r.deliveriesLeftOut} reversed ${r.deliveriesLeftOut === 1 ? "delivery is" : "deliveries are"} left out.`)

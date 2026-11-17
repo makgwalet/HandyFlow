@@ -15,6 +15,7 @@ import za.co.handyflow.platform.shared.TenantId;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.*;
@@ -38,6 +39,7 @@ public class FuelGroupReportService {
     private final FuelLegalEntityRepository legalEntities;
     private final FuelShiftRepository shifts;
     private final FuelShiftReadingRepository readings;
+    private final FuelShiftReportClock clock;
 
     public Report report(TenantId tenantId, int days, boolean includeMoney) { return report(tenantId, days, includeMoney, null); }
 
@@ -48,7 +50,9 @@ public class FuelGroupReportService {
     @Transactional(readOnly = true)
     public Report report(TenantId tenantId, int days, boolean includeMoney, Set<UUID> allowedTankIds) {
         int span = Math.max(1, Math.min(days, 366));
-        LocalDate to = LocalDate.now(SAST), from = to.minusDays(span - 1L);
+        var basis = clock.basis(tenantId);
+        final java.time.ZoneId zone = basis.zone();
+        LocalDate to = LocalDate.now(zone), from = to.minusDays(span - 1L);
         LocalDate prevTo = from.minusDays(1), prevFrom = prevTo.minusDays(span - 1L);
 
         Map<UUID, UUID> depotEntity = new HashMap<>();
@@ -57,9 +61,9 @@ public class FuelGroupReportService {
         Map<UUID, FuelTank> tankById = new HashMap<>();
         for (FuelTank t : activeTanks) tankById.put(t.getId(), t);
 
-        List<FuelDelivery> current = deliveries.findDeliveredBetween(tenantId, from.atStartOfDay(SAST).toInstant(), to.plusDays(1).atStartOfDay(SAST).toInstant()).stream()
+        List<FuelDelivery> current = deliveries.findDeliveredBetween(tenantId, from.atStartOfDay(zone).toInstant(), to.plusDays(1).atStartOfDay(zone).toInstant()).stream()
                 .filter(d -> allowedTankIds == null || allowedTankIds.contains(d.getTankId())).toList();
-        List<FuelDelivery> previous = deliveries.findDeliveredBetween(tenantId, prevFrom.atStartOfDay(SAST).toInstant(), prevTo.plusDays(1).atStartOfDay(SAST).toInstant()).stream()
+        List<FuelDelivery> previous = deliveries.findDeliveredBetween(tenantId, prevFrom.atStartOfDay(zone).toInstant(), prevTo.plusDays(1).atStartOfDay(zone).toInstant()).stream()
                 .filter(d -> allowedTankIds == null || allowedTankIds.contains(d.getTankId())).toList();
 
         // Tanks removed since a delivery was made still own that history: look them up too, but only this tenant's.
@@ -88,10 +92,14 @@ public class FuelGroupReportService {
         }
 
         // Forecourt sales in the period, by the entity of each pump's tank. A tank that has since been removed falls in the not-assigned bucket.
-        var fromInstant = from.atStartOfDay(SAST).toInstant();
-        var toInstant = to.plusDays(1).atStartOfDay(SAST).toInstant();
+        var fromInstant = from.atStartOfDay(zone).toInstant();
+        var toInstant = to.plusDays(1).atStartOfDay(zone).toInstant();
         Set<UUID> shiftIds = new HashSet<>();
-        for (var s : shifts.findClosedSince(tenantId, fromInstant)) if (s.getClosedAt() != null && s.getClosedAt().isBefore(toInstant)) shiftIds.add(s.getId());
+        List<za.co.handyflow.platform.fuel.domain.model.FuelShift> counted = new ArrayList<>();
+        for (var s : shifts.findClosedSince(tenantId, fromInstant)) {
+            Instant at = basis.closedFor(s);
+            if (at != null && !at.isBefore(fromInstant) && at.isBefore(toInstant)) { shiftIds.add(s.getId()); counted.add(s); }
+        }
         if (!shiftIds.isEmpty()) {
             for (var r : readings.findByShifts(tenantId, shiftIds)) {
                 if (r.getLitresSold() == null) continue;
@@ -124,7 +132,7 @@ public class FuelGroupReportService {
         if (unassigned.hasAnything()) { rows.add(unassigned.row(null, "Not assigned to a legal entity", true, includeMoney)); total.addAll(unassigned); }
         // Busiest first by litres, so the entities that matter lead the page.
         rows.sort(Comparator.comparing(Row::litres).reversed().thenComparing(Row::name));
-        return new Report(from, to, prevFrom, prevTo, includeMoney, rows, total.row(null, "Whole group", false, includeMoney), left);
+        return new Report(from, to, prevFrom, prevTo, includeMoney, rows, total.row(null, "Whole group", false, includeMoney), left, clock.describe(tenantId, basis, counted));
     }
 
     private static List<FuelDelivery> concat(List<FuelDelivery> a, List<FuelDelivery> b) { List<FuelDelivery> l = new ArrayList<>(a); l.addAll(b); return l; }

@@ -52,6 +52,20 @@ public class FuelSettingsService {
     }
 
     @Transactional(readOnly = true)
+    public za.co.handyflow.platform.fuel.dto.FuelSettingsDtos.ReportBasis reportBasis(TenantId tenantId) {
+        FuelSettings s = current(tenantId);
+        return new za.co.handyflow.platform.fuel.dto.FuelSettingsDtos.ReportBasis(s.isShiftReportUseProviderTimes(), s.getReportTimezone() == null ? FuelShiftReportClock.DEFAULT_ZONE.getId() : s.getReportTimezone());
+    }
+
+    @Transactional
+    public za.co.handyflow.platform.fuel.dto.FuelSettingsDtos.ReportBasis updateReportBasis(TenantId tenantId, za.co.handyflow.platform.fuel.dto.FuelSettingsDtos.ReportBasis req) {
+        FuelSettings s = settings.findByTenant(tenantId).orElseGet(() -> FuelSettings.forTenant(tenantId));
+        s.updateReportBasis(req.useProviderTimes(), req.timezone());
+        FuelSettings saved = settings.save(s);
+        return new za.co.handyflow.platform.fuel.dto.FuelSettingsDtos.ReportBasis(saved.isShiftReportUseProviderTimes(), saved.getReportTimezone() == null ? FuelShiftReportClock.DEFAULT_ZONE.getId() : saved.getReportTimezone());
+    }
+
+    @Transactional(readOnly = true)
     public ControlsResponse controls(TenantId tenantId) {
         FuelSettings s = current(tenantId);
         return toControls(s);

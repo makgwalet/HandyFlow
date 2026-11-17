@@ -11,6 +11,7 @@ import za.co.handyflow.platform.shared.TenantId;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.*;
@@ -35,13 +36,15 @@ public class FuelForecourtSupplyReconciliationService {
     private final FuelShiftRepository shifts;
     private final FuelShiftReadingRepository readings;
     private final FuelDepotSupplyShareRepository supplyShares;
+    private final FuelShiftReportClock clock;
 
     @Transactional(readOnly = true)
     public Reconciliation report(TenantId tenantId, int days, Set<UUID> allowedDepotIds) {
         int span = Math.max(1, Math.min(days, 366));
-        LocalDate to = LocalDate.now(SAST), from = to.minusDays(span - 1L);
-        var fromI = from.atStartOfDay(SAST).toInstant();
-        var toI = to.plusDays(1).atStartOfDay(SAST).toInstant();
+        var basis = clock.basis(tenantId);
+        LocalDate to = LocalDate.now(basis.zone()), from = to.minusDays(span - 1L);
+        var fromI = from.atStartOfDay(basis.zone()).toInstant();
+        var toI = to.plusDays(1).atStartOfDay(basis.zone()).toInstant();
 
         Map<UUID, FuelDepot> depotById = new HashMap<>();
         for (FuelDepot d : depots.findAllActive(tenantId)) depotById.put(d.getId(), d);
@@ -84,9 +87,13 @@ public class FuelForecourtSupplyReconciliationService {
             Acc a = in == null ? null : acc.get(in);
             if (a != null) a.fromSuppliers = a.fromSuppliers.add(r.getLitresReceived());
         }
+        List<FuelShift> counted = new ArrayList<>();
         if (!forecourts.isEmpty()) {
             Set<UUID> ids = new HashSet<>();
-            for (FuelShift s : shifts.findClosedSince(tenantId, fromI)) if (s.getClosedAt() != null && s.getClosedAt().isBefore(toI)) ids.add(s.getId());
+            for (FuelShift s : shifts.findClosedSince(tenantId, fromI)) {
+                Instant at = basis.closedFor(s);
+                if (at != null && !at.isBefore(fromI) && at.isBefore(toI)) { ids.add(s.getId()); counted.add(s); }
+            }
             if (!ids.isEmpty()) {
                 for (FuelShiftReading r : readings.findByShifts(tenantId, ids)) {
                     if (r.getLitresSold() == null) continue;
@@ -121,7 +128,7 @@ public class FuelForecourtSupplyReconciliationService {
             totalIn = totalIn.add(in); totalSold = totalSold.add(a.sold);
         }
         rows.sort(Comparator.comparing(Inbound::totalIn).reversed().thenComparing(Inbound::name));
-        return new Reconciliation(from, to, rows, totalIn, totalSold);
+        return new Reconciliation(from, to, rows, totalIn, totalSold, clock.describe(tenantId, basis, counted));
     }
 
     private static final class Acc {
