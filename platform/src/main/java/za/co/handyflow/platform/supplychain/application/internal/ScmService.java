@@ -2,6 +2,8 @@ package za.co.handyflow.platform.supplychain.application.internal;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.*;
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -15,6 +17,7 @@ import za.co.handyflow.platform.approvals.dto.ApprovalStepResponse;
 import za.co.handyflow.platform.ap.application.ApFacade;
 import za.co.handyflow.platform.ap.domain.model.ApBill;
 import za.co.handyflow.platform.shared.HandyFlowException;
+import za.co.handyflow.platform.shared.TenantContext;
 import za.co.handyflow.platform.shared.TenantId;
 import za.co.handyflow.platform.shared.TenantSequenceService;
 import za.co.handyflow.platform.shared.VatRateProvider;
@@ -24,7 +27,6 @@ import za.co.handyflow.platform.supplychain.domain.repository.*;
 import za.co.handyflow.platform.supplychain.dto.*;
 
 import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -43,21 +45,24 @@ public class ScmService {
     private final ScGoodsReceiptRepository    grRepo;
     private final ScGrLineRepository          grLineRepo;
     private final ScSupplierInvoiceRepository invoiceRepo;
-    // NEW: backs supplier invoice attachments (upload/list/download/delete).
+    // NEW (chunk 1): invoice lines + line-level matching.
+    private final ScSupplierInvoiceLineRepository invoiceLineRepo;
+    private final InvoiceMatchingService      matchingService;
+    // NEW (chunk 2): controlled goods receiving.
+    private final GoodsReceivingService       receivingService;
+    // NEW (chunk 3): PO revision history.
+    private final PoVersionService              poVersionService;
+    // NEW (chunk 4): supplier audit trail.
+    private final SupplierAuditService          supplierAudit;
+    // NEW (chunk 7): budget check + commitment when a PO is approved.
+    private final BudgetService                 budgetService;
     private final ScSupplierInvoiceAttachmentRepository attachmentRepo;
     private final ScPoLineRepository          poLineRepo;
-    // FIX (Supply Chain -> AP hand-off, product owner's own explicit
-    // design decision): the bridge between ScSupplierInvoice and ApBill
-    // — see ApFacade.createBillFromSupplyChainInvoice()'s own doc
-    // comment for the fuller design.
     private final ApFacade apFacade;
     private final ScSupplierItemRepository    supplierItemRepo;
     private final ScmNotificationService      notificationService;
-    // NEW: backs generatePoPdf() below — same jdbc-based tenant-lookup
-    // pattern already used in ScmNotificationService/SubscriptionController.
     private final JdbcTemplate                jdbc;
     private final ScPoPdfGenerator            poPdfGenerator;
-    // NEW: backs generateGrnPdf()/generateRemittanceAdvicePdf() below.
     private final ScGrnPdfGenerator           grnPdfGenerator;
     private final ScRemittanceAdvicePdfGenerator remittanceAdvicePdfGenerator;
 
@@ -65,25 +70,27 @@ public class ScmService {
     private final za.co.handyflow.platform.controls.application.ControlExceptionFacade controlExceptionFacade;
 
     private final ApprovalFacade approvalFacade;
-    // FIX (VAT sweep, module 2): replaces AddPoLineRequest.vatRate()'s
-    // "defaults to 15% if null" fallback below, which was falling
-    // through unresolved to ScPoLine's own hardcoded default.
     private final VatRateProvider vatRateProvider;
+
+    /**
+     * NEW (chunk 1): segregation of duties. When true, the person who created a PO
+     * cannot approve it, and the person who captured a supplier invoice cannot approve
+     * (or override-approve) it. Defaults to false so a sole-trader tenant — one user
+     * doing everything — isn't locked out; switch on for production tenants with
+     * more than one user: app.scm.sod.enforce=true
+     */
+    @Value("${app.scm.sod.enforce:false}")
+    private boolean enforceSegregationOfDuties;
+
+    /** app.scm.supplier.require-approval=true -> new suppliers start PENDING_APPROVAL and cannot be used until approved. */
+    @Value("${app.scm.supplier.require-approval:false}")
+    private boolean requireSupplierApproval;
 
     private static final String PO_APPROVALS_MODULE = "supplychain";
     private static final String PO_APPROVALS_ENTITY_TYPE = "PURCHASE_ORDER";
 
-    /** Tolerance for 3-way match: invoice may differ from PO by up to this fraction. */
-    private static final BigDecimal MATCH_TOLERANCE = new BigDecimal("0.02"); // 2%
-
     // ── Summary ───────────────────────────────────────────────────────────────
 
-    /**
-     * WHY COUNT queries instead of list.size()?
-     * Previously: inventoryRepo.findLowStock().size() loaded all entity columns
-     * of every low-stock row just to count them. SELECT COUNT(*) returns one integer.
-     * For 500 SKUs with 50 low-stock items that's ~50× less data over the network.
-     */
     @Transactional(readOnly = true)
     public ScmSummaryResponse getSummary(TenantId tenantId) {
         UUID tid = tenantId.getValue();
@@ -92,8 +99,8 @@ public class ScmService {
                 List.of(PoStatus.APPROVED, PoStatus.SENT, PoStatus.ACKNOWLEDGED, PoStatus.PARTIALLY_RECEIVED));
         long pendingInvoices  = invoiceRepo.countByTenantIdAndStatus(tid, InvoiceStatus.RECEIVED);
         long approvalInvoices = invoiceRepo.countByTenantIdAndStatus(tid, InvoiceStatus.APPROVED);
-        long lowStockItems    = inventoryRepo.countLowStock(tid);    // FIX C-2: was .size()
-        long overdueInvoices  = invoiceRepo.countOverdue(tid);       // FIX C-2: was .size()
+        long lowStockItems    = inventoryRepo.countLowStock(tid);
+        long overdueInvoices  = invoiceRepo.countOverdue(tid);
         return new ScmSummaryResponse(totalSuppliers, openPOs, pendingInvoices,
                 approvalInvoices, lowStockItems, overdueInvoices);
     }
@@ -120,33 +127,69 @@ public class ScmService {
 
     @Transactional
     public ScSupplier createSupplier(TenantId tenantId, UUID userId, CreateSupplierRequest req) {
+        // CHANGED (chunk 4): bank details validated and normalised (digits only) at the door, so
+        // duplicate-account detection and later comparisons are reliable.
+        SupplierBankRules.Bank bank = SupplierBankRules.validateOptional(req.bankAccount(), req.bankBranchCode());
         ScSupplier s = ScSupplier.create(
                 tenantId.getValue(), req.name(), req.registrationNumber(), req.vatNumber(),
                 req.bbbeeLevel(), req.bbbeeExpiry(), req.contactName(),
                 req.contactEmail(), req.contactPhone(), req.website(),
                 req.street(), req.suburb(), req.city(), req.province(), req.postalCode(),
-                req.bankName(), req.bankAccount(), req.bankBranchCode(),
+                req.bankName(), bank.account(), bank.branch(),
                 req.paymentTermsDays() != null ? req.paymentTermsDays() : 30,
                 req.currency(), req.notes(), userId);
-        return supplierRepo.save(s);
+        if (requireSupplierApproval) s.requireApproval();
+        ScSupplier saved = supplierRepo.save(s);
+        supplierAudit.record(tenantId.getValue(), saved.getId(), "CREATED", null, saved.getStatus().name(),
+                "Supplier registered", userId, TenantContext.getCurrentUserName());
+        if (bank.account() != null
+                && supplierRepo.countOtherWithBankAccount(tenantId.getValue(), bank.account(), saved.getId()) > 0) {
+            controlExceptionFacade.raise(tenantId, "supplychain", "SUPPLIER_DUPLICATE_BANK_ACCOUNT",
+                    "ScSupplier", saved.getId(), "CRITICAL",
+                    "Supplier " + saved.getName() + " was registered with a bank account already used by another supplier");
+        }
+        return saved;
     }
 
     @Transactional
     public ScSupplier updateSupplier(TenantId tenantId, UUID id, UpdateSupplierRequest req) {
         ScSupplier s = getSupplier(tenantId, id);
-        SupplierStatus statusEnum = req.status() != null
-                ? SupplierStatus.valueOf(req.status().toUpperCase()) : null;
+        // CHANGED (chunk 4): status is no longer editable here. It used to be settable by any
+        // SCM_ADMIN with no reason or audit — including flipping BLACKLISTED back to ACTIVE.
+        if (req.status() != null && !req.status().equalsIgnoreCase(s.getStatus().name())) {
+            throw new HandyFlowException("Supplier status can only be changed with the lifecycle actions "
+                    + "(approve / suspend / block / reinstate / deactivate), which require a reason and are audited",
+                    HttpStatus.BAD_REQUEST, "USE_LIFECYCLE_ENDPOINTS");
+        }
+        List<String> changed = new ArrayList<>();
+        if (req.name() != null && !req.name().equals(s.getName())) changed.add("name");
+        if (req.contactName() != null && !req.contactName().equals(s.getContactName())) changed.add("contactName");
+        if (req.contactPhone() != null && !req.contactPhone().equals(s.getContactPhone())) changed.add("contactPhone");
+        if (req.paymentTermsDays() != null && req.paymentTermsDays() != s.getPaymentTermsDays()) changed.add("paymentTermsDays");
+        boolean emailChanged = req.contactEmail() != null && !req.contactEmail().equalsIgnoreCase(s.getContactEmail());
+        String oldEmail = s.getContactEmail();
+
         s.update(req.name(), req.contactName(), req.contactEmail(), req.contactPhone(),
-                req.bbbeeLevel(), req.bbbeeExpiry(), req.paymentTermsDays(),
-                statusEnum, req.notes());
-        return supplierRepo.save(s);
+                req.bbbeeLevel(), req.bbbeeExpiry(), req.paymentTermsDays(), req.notes());
+        ScSupplier saved = supplierRepo.save(s);
+
+        String actor = TenantContext.getCurrentUserName();
+        UUID actorId = currentUserIdOrNull();
+        if (!changed.isEmpty())
+            supplierAudit.record(tenantId.getValue(), id, "UPDATED", null, null, "Changed: " + String.join(", ", changed), actorId, actor);
+        // A changed contact e-mail is audited on its own: it is the address bank-change alerts go to,
+        // so attackers change it first. SupplierBankChangeService warns when a bank change follows within 14 days.
+        if (emailChanged)
+            supplierAudit.record(tenantId.getValue(), id, "CONTACT_EMAIL_CHANGED", null, null,
+                    (oldEmail != null ? oldEmail : "none") + " -> " + req.contactEmail(), actorId, actor);
+        return saved;
     }
 
     // ── Supplier items (pricing catalogue) ────────────────────────────────────
 
     @Transactional(readOnly = true)
     public List<ScSupplierItem> getSupplierItems(TenantId tenantId, UUID supplierId) {
-        getSupplier(tenantId, supplierId); // verify supplier belongs to tenant
+        getSupplier(tenantId, supplierId);
         return supplierItemRepo.findBySupplierId(supplierId);
     }
 
@@ -199,13 +242,7 @@ public class ScmService {
 
     /**
      * Sets opening stock for an item at a location.
-     *
-     * FIX C-3 / C-4: Uses upsertInventoryRow() to safely create or skip-create
-     * the inventory record. This is atomic at the DB level — two concurrent requests
-     * for the same item+location will not crash.
-     *
-     * FIX M-7: Zero-delta guard — if requested qty equals current qty, no movement
-     * is created. The reorder levels and bin location are still updated.
+     * FIX C-3 / C-4: atomic upsertInventoryRow(). FIX M-7: zero-delta guard.
      */
     @Transactional
     public ScInventory openingStock(TenantId tenantId, UUID userId, String userName,
@@ -214,7 +251,6 @@ public class ScmService {
         locationRepo.findActiveByTenantIdAndId(tid, req.locationId())
                 .orElseThrow(() -> new HandyFlowException("Location not found", HttpStatus.NOT_FOUND, "NOT_FOUND"));
 
-        // Atomic upsert — safe under concurrent requests (FIX C-3)
         inventoryRepo.upsertInventoryRow(UUID.randomUUID(), tid, req.locationId(), req.catalogueItemId());
         ScInventory inv = inventoryRepo.findByTenantIdAndLocationIdAndCatalogueItemId(
                 tid, req.locationId(), req.catalogueItemId()).orElseThrow();
@@ -225,7 +261,6 @@ public class ScmService {
 
         BigDecimal delta = req.qty().subtract(before);
 
-        // Zero-delta guard (FIX M-7)
         if (delta.compareTo(BigDecimal.ZERO) == 0) {
             log.info("[SCM] Opening stock: no qty change for inventory={} — reorder levels updated only", inv.getId());
             return inventoryRepo.save(inv);
@@ -240,10 +275,7 @@ public class ScmService {
         return inv;
     }
 
-    /**
-     * Returns stock movement history for a specific inventory record.
-     * FIX H-5: verify the inventory record belongs to this tenant before returning data.
-     */
+    /** FIX H-5: verify the inventory record belongs to this tenant before returning data. */
     @Transactional(readOnly = true)
     public List<ScStockMovement> getMovements(TenantId tenantId, UUID inventoryId, Pageable pageable) {
         inventoryRepo.findByTenantIdAndId(tenantId.getValue(), inventoryId)
@@ -273,16 +305,8 @@ public class ScmService {
 
     /**
      * Creates a purchase order.
-     *
-     * FIX C-1: PO number from TenantSequenceService.nextValue() — atomic PostgreSQL upsert.
-     * FIX H-1: createdByName from TenantContext.getCurrentUserName() — not userId.toString().
-     * FIX Guard: rejects orders against BLACKLISTED suppliers.
-     *
-     * WHY check supplier status here and not in the controller?
-     * Business rules belong in the service (or domain) layer. The controller's
-     * job is to translate HTTP ↔ service calls. If the blacklist check lived in
-     * the controller, a developer adding a CLI or batch job that calls the service
-     * directly would bypass it. In the service, it's enforced for every caller.
+     * FIX C-1: atomic PO number. FIX H-1: createdByName from TenantContext.
+     * Guard: rejects orders against suppliers that aren't orderable (blacklisted/inactive).
      */
     @Transactional
     public ScPurchaseOrder createPurchaseOrder(TenantId tenantId, UUID userId, String userName,
@@ -294,11 +318,6 @@ public class ScmService {
                     HttpStatus.BAD_REQUEST, "SUPPLIER_NOT_ORDERABLE");
         }
 
-        // FIX C-1: atomic sequence — no race condition.
-        // Delegates to shared.TenantSequenceService (see HandyFlow BOS
-        // Discovery doc, Section 27/28/29) rather than Projects' own
-        // SequenceService — avoids the supplychain -> projects boundary
-        // dependency entirely.
         long seq = sequenceService.nextValue(tenantId, "PO");
         String orderNumber = "PO-" + String.format("%05d", seq);
 
@@ -319,24 +338,19 @@ public class ScmService {
                     HttpStatus.BAD_REQUEST, "NO_LINES");
         po.submit();
         ScPurchaseOrder saved = poRepo.save(po);
-        // FIX: backlog 1.1 — was previously nothing here; a submitted PO
-        // never actually reached any approval gate the engine can see.
         approvalFacade.submit(tenantId, PO_APPROVALS_MODULE, PO_APPROVALS_ENTITY_TYPE, id, null, Map.of());
         return saved;
     }
 
     /**
-     * FIX: backlog 1.1 — migrated onto the shared approval engine. Same
-     * shape as ChangeOrderService.approveChangeOrder() (genuinely
-     * single-step: no threshold, no maker-checker) — see that class's
-     * own Javadoc for the full rationale. po.approve(...) and everything
-     * after it is completely unchanged; only gated behind the engine
-     * confirming APPROVED first.
+     * Migrated onto the shared approval engine (backlog 1.1) — see ChangeOrderService.
+     * NEW (chunk 1): segregation-of-duties check before anything else.
      */
     @Transactional
     public ScPurchaseOrder approvePurchaseOrder(TenantId tenantId, UUID id,
                                                 UUID approverId, String approverName) {
         ScPurchaseOrder po = getPurchaseOrder(tenantId, id);
+        enforceSegregation(po.getCreatedBy(), approverId, "purchase order");
 
         var existing = approvalFacade.getLatestRequestForEntity(tenantId, PO_APPROVALS_MODULE, PO_APPROVALS_ENTITY_TYPE, id);
         ApprovalRequestResponse result;
@@ -364,8 +378,13 @@ public class ScmService {
         }
 
         po.approve(approverId, approverName);
+        // NEW (chunk 7): budget check (409 BUDGET_EXCEEDED on an un-overridden hard stop) and commitment.
+        // Throwing here rolls the whole approval back.
+        budgetService.commitForPo(tenantId, po, approverId, approverName);
         log.info("[SCM] PO {} approved by {}", po.getOrderNumber(), approverName);
         ScPurchaseOrder saved = poRepo.save(po);
+        // NEW (chunk 3): immutable revision snapshot of exactly what was approved.
+        poVersionService.recordApproval(saved, approverId, approverName);
         notificationService.notifyPoApproved(tenantId.getValue(), po.getOrderNumber(),
                 po.getSupplierName(), po.getTotalAmount(), approverName);
         return saved;
@@ -384,29 +403,27 @@ public class ScmService {
 
         po.reject(reason);
         ScPurchaseOrder saved = poRepo.save(po);
-        // FIX (Tier 1 gap analysis): notifyPoRejected existed but was never
-        // called — a buyer's PO was silently returned to DRAFT with no alert.
         notificationService.notifyPoRejected(tenantId.getValue(), po.getOrderNumber(), reason);
         return saved;
     }
+
     @Transactional
     public ScPurchaseOrder markSent(TenantId tenantId, UUID id) {
         ScPurchaseOrder po = getPurchaseOrder(tenantId, id);
+
+        // NEW (chunk 1): a supplier blocked/deactivated AFTER the PO was approved must not
+        // receive it. The PO stays APPROVED so it can be re-sourced or the block lifted.
+        ScSupplier supplier = getSupplier(tenantId, po.getSupplierId());
+        if (!supplier.isOrderable()) {
+            throw new HandyFlowException(
+                    "Cannot send this PO — supplier " + supplier.getName() + " is now " + supplier.getStatus(),
+                    HttpStatus.CONFLICT, "SUPPLIER_NOT_ORDERABLE");
+        }
+
         po.send();
         ScPurchaseOrder saved = poRepo.save(po);
 
-        // FIX (Tier 1 gap analysis): "Mark Sent" was previously just a
-        // status flip — the supplier never received anything unless
-        // someone manually emailed them outside the system. Fetches the
-        // supplier's contactEmail and sends directly to them.
-        ScSupplier supplier = getSupplier(tenantId, po.getSupplierId());
-
-        // NEW: attach the actual PO PDF. Deliberately caught here rather
-        // than left to propagate — a PDF-rendering failure must never
-        // block the PO's own send() transition (already committed above)
-        // or prevent the supplier from being notified at all.
-        // notifyPoSentToSupplier() falls back to a plain email when
-        // pdfBytes is null.
+        // PDF failure must never block the send transition or the supplier email.
         byte[] pdfBytes = null;
         try {
             pdfBytes = buildPoPdfBytes(tenantId, po, supplier);
@@ -439,23 +456,15 @@ public class ScmService {
         return poRepo.save(po);
     }
 
-    @Transactional(readOnly = true)   // FIX M-2: missing @Transactional
+    @Transactional(readOnly = true)
     public List<ScPoLine> getPurchaseOrderLines(TenantId tenantId, UUID poId) {
-        getPurchaseOrder(tenantId, poId);  // tenant isolation check
+        getPurchaseOrder(tenantId, poId);
         return poLineRepo.findByPurchaseOrderId(poId);
     }
 
     /**
-     * NEW: generates the formal Purchase Order PDF — flagged in the gap
-     * analysis as "the single most common missing artifact" for a
-     * procurement system. Deliberately does NOT attempt to fetch a flat
-     * tenant address — Tenant.address is a JSONB map (see identity
-     * module's Tenant.java), and guessing at its key names for a raw SQL
-     * extraction risked producing a wrong or malformed address on a
-     * document that goes out to real suppliers. tenantVat IS a flat
-     * column, so that's included; ContractPdfGenerator (this codebase's
-     * other PDF generator) follows the exact same scope for the same
-     * reason.
+     * Formal Purchase Order PDF. Tenant address deliberately not attempted — Tenant.address
+     * is a JSONB map with unverified key names; tenantVat IS a flat column.
      */
     @Transactional(readOnly = true)
     public byte[] generatePoPdf(TenantId tenantId, UUID poId) {
@@ -464,12 +473,6 @@ public class ScmService {
         return buildPoPdfBytes(tenantId, po, supplier);
     }
 
-    /**
-     * NEW: shared by generatePoPdf() and markSent() — the latter already
-     * has po and supplier loaded (it needs them for the transition and
-     * the email itself), so this avoids a redundant tenant-isolation
-     * re-fetch of both on that path.
-     */
     private byte[] buildPoPdfBytes(TenantId tenantId, ScPurchaseOrder po, ScSupplier supplier) {
         List<ScPoLine> lines = poLineRepo.findByPurchaseOrderId(po.getId());
         String[] tenantDetails = findTenantDetails(tenantId.getValue());
@@ -477,15 +480,7 @@ public class ScmService {
                 formatSupplierAddress(supplier), supplier.getContactName(), supplier.getContactPhone());
     }
 
-    /**
-     * NEW: generates the Goods Received Note PDF — flagged in the gap
-     * analysis "for warehouse/delivery sign-off and dispute evidence".
-     * Same tenant-address scoping decision as generatePoPdf() — see that
-     * method's own comment for why tenant address is deliberately not
-     * attempted (Tenant.address is a JSONB map with unverified key names).
-     * The GR's own "deliver to" location DOES have a flat address column,
-     * so that's used directly.
-     */
+    /** Goods Received Note PDF — see generatePoPdf() for the tenant-address scoping decision. */
     @Transactional(readOnly = true)
     public byte[] generateGrnPdf(TenantId tenantId, UUID grId) {
         UUID tid = tenantId.getValue();
@@ -526,116 +521,26 @@ public class ScmService {
         return grRepo.findByTenantId(tenantId.getValue(), pageable);
     }
 
-    // NEW: backs the goods-receipt picker in the Record Invoice form —
-    // see ScGoodsReceiptRepository.findByTenantIdAndPurchaseOrderId()'s
-    // own comment for why this exists. Same tenant-isolation-check
-    // pattern as getPurchaseOrderLines() just below.
     @Transactional(readOnly = true)
     public List<ScGoodsReceipt> getGoodsReceiptsForPurchaseOrder(TenantId tenantId, UUID poId) {
         getPurchaseOrder(tenantId, poId);
         return grRepo.findByTenantIdAndPurchaseOrderId(tenantId.getValue(), poId);
     }
 
+    // CHANGED (chunk 2): receiving logic moved to GoodsReceivingService (inspection, partial /
+    // rejected quantities, over-receipt protection, locking, reversal). Signatures unchanged so
+    // ScmController keeps working as-is.
+
     @Transactional
     public ScGoodsReceipt createGoodsReceipt(TenantId tenantId, UUID userId, String userName,
                                              CreateGoodsReceiptRequest req) {
-        ScPurchaseOrder po = getPurchaseOrder(tenantId, req.purchaseOrderId());
-        if (!po.canReceive())
-            throw new HandyFlowException("PO is not in a receivable state — current: " + po.getStatus(),
-                    HttpStatus.BAD_REQUEST, "INVALID_STATE");
-
-        // FIX C-1: atomic sequence for GR number — see PO number generation
-        // above for why this goes through TenantSequenceService.
-        long seq = sequenceService.nextValue(tenantId, "GR");
-        String receiptNumber = "GR-" + String.format("%05d", seq);
-
-        ScGoodsReceipt gr = ScGoodsReceipt.create(tenantId.getValue(), receiptNumber, po.getId(),
-                po.getSupplierId(), req.receivedToLocation(), req.deliveryNoteRef(),
-                userId, userName,
-                req.receivedDate() != null ? req.receivedDate() : LocalDate.now(),
-                req.notes());
-        return grRepo.save(gr);
+        return receivingService.create(tenantId, userId, userName, req);
     }
 
-    /**
-     * Posts a goods receipt: creates stock movements, updates inventory,
-     * writes GR line records, and transitions the PO status.
-     *
-     * FIX C-4: inventory creation uses upsertInventoryRow() — race-safe.
-     * FIX H-4: ScGrLine records created for line-level audit trail.
-     * FIX H-6: ScPoLine.qtyReceived updated; PO transitions to FULLY_RECEIVED
-     *           when all lines are done.
-     */
     @Transactional
     public ScGoodsReceipt postGoodsReceipt(TenantId tenantId, UUID grId, UUID userId, String userName,
                                            List<PostGrLineRequest> lines) {
-        UUID tid = tenantId.getValue();
-        ScGoodsReceipt gr = grRepo.findByTenantIdAndId(tid, grId)
-                .orElseThrow(() -> new HandyFlowException("Goods receipt not found",
-                        HttpStatus.NOT_FOUND, "NOT_FOUND"));
-
-        if (lines == null || lines.isEmpty())
-            throw new HandyFlowException("Cannot post a goods receipt with no lines",
-                    HttpStatus.BAD_REQUEST, "NO_LINES");
-
-        UUID locationId = gr.getReceivedTo();
-
-        for (PostGrLineRequest line : lines) {
-            if (line.qtyReceived() == null || line.qtyReceived().compareTo(BigDecimal.ZERO) <= 0)
-                continue;
-
-            UUID catItemId = line.catalogueItemId();
-
-            // FIX C-4: atomic upsert — safe under concurrent GR postings
-            inventoryRepo.upsertInventoryRow(UUID.randomUUID(), tid, locationId, catItemId);
-            ScInventory inv = inventoryRepo
-                    .findByTenantIdAndLocationIdAndCatalogueItemId(tid, locationId, catItemId)
-                    .orElseThrow();
-
-            BigDecimal unitCost = line.unitCost() != null ? line.unitCost() : BigDecimal.ZERO;
-
-            // FIX H-4: create ScGrLine for audit trail
-            // Find the PO line to link (match by catalogueItemId)
-            List<ScPoLine> poLines = poLineRepo.findByPoAndCatalogueItem(gr.getPurchaseOrderId(), catItemId);
-            UUID poLineId = null;
-            if (!poLines.isEmpty()) {
-                ScPoLine poLine = poLines.get(0);
-                poLineId = poLine.getId();
-                // FIX H-6: update PO line received quantity
-                poLine.recordReceived(line.qtyReceived());
-                poLineRepo.save(poLine);
-            }
-
-            ScGrLine grLine = ScGrLine.create(tid, grId, poLineId, catItemId,
-                    line.itemName() != null ? line.itemName() : inv.getCatalogueItemId().toString(),
-                    poLines.isEmpty() ? line.qtyReceived() : poLines.get(0).getQtyOrdered(),
-                    line.qtyReceived(), unitCost, "GOOD");
-            grLineRepo.save(grLine);
-
-            ScStockMovement mv = ScStockMovement.record(tid, inv, "PURCHASE",
-                    line.qtyReceived(), unitCost,
-                    "GOODS_RECEIPT", gr.getId(), gr.getReceiptNumber(), userId, userName);
-            inv.adjustQty(line.qtyReceived(), unitCost);
-            inventoryRepo.save(inv);
-            movementRepo.save(mv);
-        }
-
-        gr.post();
-        gr = grRepo.save(gr);
-
-        // FIX H-2 / H-6: transition PO to FULLY_RECEIVED if all lines done
-        ScPurchaseOrder po = getPurchaseOrder(tenantId, gr.getPurchaseOrderId());
-        long notReceived = poLineRepo.countNotFullyReceived(po.getId());
-        if (notReceived == 0) {
-            po.fullyReceive();
-            log.info("[SCM] PO {} now FULLY_RECEIVED", po.getOrderNumber());
-        } else {
-            po.partiallyReceive();
-        }
-        poRepo.save(po);
-
-        log.info("[SCM] GR {} posted — {} lines, PO status → {}", gr.getReceiptNumber(), lines.size(), po.getStatus());
-        return gr;
+        return receivingService.post(tenantId, grId, userId, userName, lines);
     }
 
     // ── Supplier Invoices ─────────────────────────────────────────────────────
@@ -651,83 +556,89 @@ public class ScmService {
     }
 
     /**
-     * Creates a supplier invoice and performs real 3-way matching.
-     *
-     * FIX C-1: invoice number from TenantSequenceService — atomic.
-     * FIX H-3: real 3-way match compares invoice amount to PO amount within tolerance.
+     * Captures a supplier invoice and runs line-level three-way matching.
+     * <p>
+     * CHANGED (chunk 1):
+     *  - validates supplier (tenant-scoped — previously any supplierId was accepted),
+     *    PO existence, required fields and subtotal + VAT = total;
+     *  - blocks duplicates (same supplier + same supplier invoice ref) with a 409, both
+     *    via an explicit check (friendly message) and a DB unique index (race-safe);
+     *  - stores invoice lines (totals computed server-side) when supplied;
+     *  - records who captured it, for the capturer-cannot-approve control;
+     *  - matching is delegated to InvoiceMatchingService (engine + persisted exceptions).
      */
     @Transactional
     public ScSupplierInvoice createSupplierInvoice(TenantId tenantId, CreateSupplierInvoiceRequest req) {
         UUID tid = tenantId.getValue();
 
-        // FIX C-1: atomic sequence — via shared.TenantSequenceService, which
-        // takes the TenantId value object, not the raw UUID `tid` used
-        // elsewhere in this method for repository calls.
+        if (req.supplierId() == null)
+            throw invalidInvoice("supplierId is required");
+        if (req.invoiceDate() == null || req.dueDate() == null)
+            throw invalidInvoice("invoiceDate and dueDate are required");
+        if (req.subtotal() == null || req.totalAmount() == null)
+            throw invalidInvoice("subtotal and totalAmount are required");
+        BigDecimal vat = req.vatAmount() != null ? req.vatAmount() : BigDecimal.ZERO;
+        if (req.subtotal().add(vat).subtract(req.totalAmount()).abs().compareTo(new BigDecimal("0.02")) > 0)
+            throw invalidInvoice("subtotal + VAT must equal the total amount");
+
+        getSupplier(tenantId, req.supplierId());                       // 404 if not this tenant's supplier
+        if (req.purchaseOrderId() != null)
+            getPurchaseOrder(tenantId, req.purchaseOrderId());         // 404 if unknown PO
+
+        String ref = req.supplierInvoiceRef() != null ? req.supplierInvoiceRef().trim() : null;
+        if (ref != null && !ref.isEmpty()
+                && invoiceRepo.countActiveWithRef(tid, req.supplierId(), ref, InvoiceStatus.CANCELLED) > 0) {
+            throw new HandyFlowException(
+                    "Supplier invoice '" + ref + "' has already been captured for this supplier",
+                    HttpStatus.CONFLICT, "DUPLICATE_INVOICE");
+        }
+
         long seq = sequenceService.nextValue(tenantId, "SINV");
         String invoiceNumber = "SINV-" + String.format("%05d", seq);
 
         ScSupplierInvoice inv = ScSupplierInvoice.create(tid, invoiceNumber,
                 req.supplierId(), req.purchaseOrderId(), req.goodsReceiptId(),
-                req.supplierInvoiceRef(), req.invoiceDate(), req.dueDate(),
-                req.currency(), req.subtotal(), req.vatAmount(), req.totalAmount(),
-                req.notes());
+                ref, req.invoiceDate(), req.dueDate(),
+                req.currency(), req.subtotal(), vat, req.totalAmount(),
+                req.notes(), currentUserIdOrNull());
 
-        // FIX H-3: real 3-way match
-        if (req.purchaseOrderId() != null) {
-            performThreeWayMatch(tenantId, inv, req.purchaseOrderId(), req.goodsReceiptId());
+        List<ScSupplierInvoiceLine> lines = buildInvoiceLines(tid, inv.getId(), req.lines());
+
+        ScSupplierInvoice saved;
+        try {
+            saved = invoiceRepo.saveAndFlush(inv);
+        } catch (DataIntegrityViolationException e) {
+            // Lost a race against the unique index on (tenant, supplier, ref).
+            throw new HandyFlowException(
+                    "Supplier invoice '" + ref + "' has already been captured for this supplier",
+                    HttpStatus.CONFLICT, "DUPLICATE_INVOICE");
         }
+        if (!lines.isEmpty()) invoiceLineRepo.saveAll(lines);
 
-        ScSupplierInvoice saved = invoiceRepo.save(inv);
-        log.info("[SCM] Supplier invoice {} created matchStatus={}", invoiceNumber, saved.getMatchStatus());
-
-        // FIX (Tier 1 gap analysis): notifyInvoiceDisputed existed but was
-        // never called — a disputed invoice sat with no alert until someone
-        // happened to open the Invoices tab. Only fetches the supplier when
-        // actually needed (dispute case), not on every invoice creation.
-        if (saved.getMatchStatus() == MatchStatus.DISPUTE) {
-            String supplierName = supplierRepo.findByTenantIdAndId(tid, saved.getSupplierId())
-                    .map(ScSupplier::getName)
-                    .orElse("Unknown supplier");
-            notificationService.notifyInvoiceDisputed(tid, saved.getInvoiceNumber(),
-                    supplierName, saved.getMatchNotes());
-
-            // NEW: Stage 1, Option C — SCM's own matchStatus stays exactly
-            // as it was, untouched, still the real source of truth for
-            // SCM's own screens. This is an ADDITIONAL parallel record for
-            // the shared cross-module "needs attention" board, raised at
-            // the same moment the existing notification already fires.
-            controlExceptionFacade.raise(tenantId, "supplychain", "THREE_WAY_MATCH_DISPUTE",
-                            "ScSupplierInvoice", saved.getId(), "WARNING",
-                           "Invoice " + saved.getInvoiceNumber() + " from " + supplierName
-                                   + " — " + saved.getMatchNotes());
-        }
-
+        saved = matchingService.runMatch(tenantId, saved);
+        log.info("[SCM] Supplier invoice {} created matchStatus={} lines={}",
+                invoiceNumber, saved.getMatchStatus(), lines.size());
         return saved;
     }
 
+    /**
+     * CHANGED (chunk 1): approval now requires a cleared match and respects segregation
+     * of duties. The AP hand-off is idempotent and shared with the override path.
+     */
     @Transactional
     public ScSupplierInvoice approveSupplierInvoice(TenantId tenantId, UUID id,
                                                     UUID approverId, String approverName) {
         ScSupplierInvoice inv = invoiceRepo.findByTenantIdAndId(tenantId.getValue(), id)
                 .orElseThrow(() -> new HandyFlowException("Invoice not found",
                         HttpStatus.NOT_FOUND, "NOT_FOUND"));
+
+        requireMatchClearedForApproval(inv);
+        enforceSegregation(inv.getCapturedBy(), approverId, "supplier invoice");
+
         inv.approve(approverId, approverName);
         log.info("[SCM] Supplier invoice {} approved by {}", inv.getInvoiceNumber(), approverName);
 
-        // FIX (Supply Chain -> AP hand-off, product owner's own explicit
-        // design): "Step 4 — Match approved... Step 5 — AP handoff" —
-        // the hand-off happens immediately, in the same transaction as
-        // approval, so there's never a window where an approved invoice
-        // exists without its corresponding AP bill. Starts the bill at
-        // DRAFT — AP's own normal approval workflow takes over from
-        // here, matching "AP owns payment lifecycle from here" exactly.
-        String supplierName = supplierRepo.findByTenantIdAndId(tenantId.getValue(), inv.getSupplierId())
-                .map(ScSupplier::getName).orElse("Unknown Supplier");
-        ApBill bill = apFacade.createBillFromSupplyChainInvoice(tenantId, inv.getSupplierId(), supplierName,
-                inv.getInvoiceNumber(), inv.getInvoiceDate(), inv.getDueDate(),
-                inv.getSubtotal(), inv.getVatAmount(), approverId);
-        inv.recordApBillHandOff(bill.getId());
-
+        handOffToAp(tenantId, inv, approverId);
         return invoiceRepo.save(inv);
     }
 
@@ -739,25 +650,12 @@ public class ScmService {
         try {
             inv.markPaid(paymentRef);
         } catch (IllegalStateException e) {
-            // FIX (Supply Chain -> AP hand-off): translates
-            // ScSupplierInvoice.markPaid()'s own new guard (refuses once
-            // apBillId is set) into a clean 409 rather than letting a raw
-            // IllegalStateException propagate — matching how every other
-            // domain-level state-machine violation in this codebase is
-            // surfaced to the caller.
             throw new HandyFlowException(e.getMessage(), HttpStatus.CONFLICT, "ALREADY_HANDED_OFF");
         }
         return invoiceRepo.save(inv);
     }
 
-    /**
-     * NEW: generates a remittance advice PDF — flagged in the gap
-     * analysis as a missing notification when an invoice is marked paid.
-     * Guarded to PAID invoices only — a "remittance advice" for an
-     * invoice that hasn't actually been paid would be actively
-     * misleading, not just premature, so this throws rather than
-     * generating a document that claims a payment that didn't happen.
-     */
+    /** Remittance advice — PAID invoices only; see ScRemittanceAdvicePdfGenerator. */
     @Transactional(readOnly = true)
     public byte[] generateRemittanceAdvicePdf(TenantId tenantId, UUID invoiceId) {
         ScSupplierInvoice inv = invoiceRepo.findByTenantIdAndId(tenantId.getValue(), invoiceId)
@@ -776,30 +674,34 @@ public class ScmService {
     }
 
     /**
-     * NEW (Tier 1 gap analysis): resolves a DISPUTED invoice by overriding
-     * the match and approving it anyway — see ScSupplierInvoice.
-     * overrideDisputeAndApprove()'s own Javadoc for the full reasoning.
+     * Resolves a DISPUTED invoice by override-approve.
+     * CHANGED (chunk 1):
+     *  - FIX: this path previously approved the invoice WITHOUT handing it to AP, leaving
+     *    an approved invoice with no AP bill — and markPaid() would then succeed inside
+     *    Supply Chain (apBillId was null), bypassing AP entirely. It now hands off exactly
+     *    like normal approval.
+     *  - a written reason is mandatory; segregation of duties applies.
      */
     @Transactional
     public ScSupplierInvoice overrideDisputedInvoice(TenantId tenantId, UUID id,
                                                      UUID approverId, String approverName, String reason) {
+        if (reason == null || reason.isBlank())
+            throw new HandyFlowException("An override reason is required", HttpStatus.BAD_REQUEST, "REASON_REQUIRED");
+
         ScSupplierInvoice inv = invoiceRepo.findByTenantIdAndId(tenantId.getValue(), id)
                 .orElseThrow(() -> new HandyFlowException("Invoice not found",
                         HttpStatus.NOT_FOUND, "NOT_FOUND"));
-        inv.overrideDisputeAndApprove(approverId, approverName, reason);
+        enforceSegregation(inv.getCapturedBy(), approverId, "supplier invoice");
+
+        inv.overrideDisputeAndApprove(approverId, approverName, reason.trim());
         controlExceptionFacade.resolveForEntity(tenantId, "ScSupplierInvoice", id,
-                  approverId, approverName, "Overridden: " + reason);
+                approverId, approverName, "Overridden: " + reason);
+        handOffToAp(tenantId, inv, approverId);
         log.info("[SCM] Invoice {} dispute overridden and approved by {}", inv.getInvoiceNumber(), approverName);
         return invoiceRepo.save(inv);
     }
 
-    /**
-     * NEW (Tier 1 gap analysis): the other real resolution for a DISPUTED
-     * invoice — reject it rather than override-approve it. Written
-     * generally rather than DISPUTED-only since there was previously no
-     * cancel path for ANY invoice status (except PAID, which the entity
-     * itself still blocks).
-     */
+    /** Rejects a supplier invoice (any status except PAID). */
     @Transactional
     public ScSupplierInvoice cancelSupplierInvoice(TenantId tenantId, UUID id, String reason) {
         ScSupplierInvoice inv = invoiceRepo.findByTenantIdAndId(tenantId.getValue(), id)
@@ -807,25 +709,14 @@ public class ScmService {
                         HttpStatus.NOT_FOUND, "NOT_FOUND"));
         inv.cancel(reason);
         controlExceptionFacade.resolveForEntity(tenantId, "ScSupplierInvoice", id,
-        null, "System", "Invoice cancelled: " + reason);
+                null, "System", "Invoice cancelled: " + reason);
         log.info("[SCM] Invoice {} cancelled: {}", inv.getInvoiceNumber(), reason);
         return invoiceRepo.save(inv);
     }
 
     // ── Supplier invoice attachments ────────────────────────────────────────
-    // NEW: gap-analysis item — "No file attachments — can't attach a
-    // supplier's actual invoice PDF/photo to ScSupplierInvoice, so there's
-    // no OCR/document trail for AP audit." Base64-in-DB, following
-    // Creative's own proven working pattern (CreProof/CreDeliverable) since
-    // there's no S3/object storage available in this environment yet — see
-    // ScSupplierInvoiceAttachment's class Javadoc for the two real gaps in
-    // Creative's version that are fixed here (honest column naming, an
-    // actual file-size cap).
+    // Base64-in-DB (no object storage yet) — see ScSupplierInvoiceAttachment's Javadoc.
 
-    // Creative's equivalent upload path has no size check anywhere at all —
-    // confirmed by reading its whole service layer. 10MB is a reasonable
-    // ceiling for a scanned invoice or delivery-note photo; tune if that's
-    // wrong for real usage.
     private static final long MAX_ATTACHMENT_BYTES = 10L * 1024 * 1024;
 
     @Transactional
@@ -836,11 +727,7 @@ public class ScmService {
                 .orElseThrow(() -> new HandyFlowException("Invoice not found",
                         HttpStatus.NOT_FOUND, "NOT_FOUND"));
 
-        // Base64 is ~4/3 the size of the raw bytes it encodes — this is an
-        // estimate, not an exact decode-then-measure, deliberately: decoding
-        // a potentially-huge string just to reject it wastes exactly the
-        // work this check exists to avoid. Close enough to catch anything
-        // meaningfully over the limit.
+        // Base64 is ~4/3 the size of the raw bytes — an estimate, deliberately not decoded.
         long approxDecodedBytes = (req.fileContentBase64().length() * 3L) / 4;
         if (approxDecodedBytes > MAX_ATTACHMENT_BYTES) {
             throw new IllegalArgumentException(
@@ -862,8 +749,6 @@ public class ScmService {
         invoiceRepo.findByTenantIdAndId(tenantId.getValue(), invoiceId)
                 .orElseThrow(() -> new HandyFlowException("Invoice not found",
                         HttpStatus.NOT_FOUND, "NOT_FOUND"));
-        // Uses the projection query — never fetches file_content_base64 for
-        // a list call. See AttachmentSummaryProjection's own comment.
         return attachmentRepo.findSummariesByInvoice(tenantId.getValue(), invoiceId).stream()
                 .map(p -> new AttachmentResponse(p.getId(), p.getFileName(), p.getContentType(),
                         p.getFileSizeBytes(), p.getUploadedByName(), p.getCreatedAt()))
@@ -912,6 +797,85 @@ public class ScmService {
 
     // ── Private helpers ───────────────────────────────────────────────────────
 
+    private HandyFlowException invalidInvoice(String msg) {
+        return new HandyFlowException(msg, HttpStatus.BAD_REQUEST, "INVALID_INVOICE");
+    }
+
+    /** Builds invoice lines; totals are computed in ScSupplierInvoiceLine.create(), never taken from the client. */
+    private List<ScSupplierInvoiceLine> buildInvoiceLines(UUID tid, UUID invoiceId,
+                                                          List<CreateSupplierInvoiceRequest.InvoiceLineRequest> reqLines) {
+        if (reqLines == null || reqLines.isEmpty()) return List.of();
+        List<ScSupplierInvoiceLine> out = new ArrayList<>();
+        int n = 1;
+        for (var l : reqLines) {
+            if (l.quantity() == null || l.quantity().compareTo(BigDecimal.ZERO) <= 0)
+                throw invalidInvoice("Line " + n + ": quantity must be greater than zero");
+            if (l.unitPrice() == null || l.unitPrice().compareTo(BigDecimal.ZERO) < 0)
+                throw invalidInvoice("Line " + n + ": unitPrice is required");
+
+            ScPoLine poLine = l.poLineId() != null
+                    ? poLineRepo.findByIdAndTenantId(l.poLineId(), tid).orElse(null) : null;
+            String name = l.itemName() != null && !l.itemName().isBlank() ? l.itemName()
+                    : poLine != null ? poLine.getItemName() : null;
+            if (name == null) throw invalidInvoice("Line " + n + ": itemName is required");
+
+            // Default VAT to the PO line's own rate when linked — falling back to the global
+            // rate would raise false TAX_VARIANCE findings on zero-rated/exempt PO lines.
+            BigDecimal vatRate = l.vatRate() != null ? l.vatRate()
+                    : poLine != null ? poLine.getVatRate() : vatRateProvider.ratePercent();
+
+            out.add(ScSupplierInvoiceLine.create(tid, invoiceId, n++, l.poLineId(), name,
+                    l.quantity(), l.unitPrice(), vatRate));
+        }
+        return out;
+    }
+
+    /** Only a cleared match (or a genuine non-PO invoice) may be approved for payment. */
+    private void requireMatchClearedForApproval(ScSupplierInvoice inv) {
+        MatchStatus ms = inv.getMatchStatus();
+        if (ms == MatchStatus.MATCHED || ms == MatchStatus.OVERRIDDEN) return;
+        if (ms == MatchStatus.PENDING && inv.getPurchaseOrderId() == null) return;
+        String why = switch (ms) {
+            case PARTIAL_MATCH -> "is on hold — goods/receipt/detail still outstanding (" + inv.getMatchNotes() + ")";
+            case DISPUTE -> "is disputed (" + inv.getMatchNotes() + ") — use override or cancel";
+            default -> "has not completed matching — re-run the match first";
+        };
+        throw new HandyFlowException("Invoice " + inv.getInvoiceNumber() + " cannot be approved: it " + why,
+                HttpStatus.CONFLICT, "MATCH_NOT_CLEARED");
+    }
+
+    /** Idempotent: if a bill already exists for this invoice, never create a second one. */
+    private void handOffToAp(TenantId tenantId, ScSupplierInvoice inv, UUID approverId) {
+        if (inv.getApBillId() != null) {
+            log.info("[SCM] Invoice {} already handed off to AP bill {} — skipping", inv.getInvoiceNumber(), inv.getApBillId());
+            return;
+        }
+        String supplierName = supplierRepo.findByTenantIdAndId(tenantId.getValue(), inv.getSupplierId())
+                .map(ScSupplier::getName).orElse("Unknown Supplier");
+        ApBill bill = apFacade.createBillFromSupplyChainInvoice(tenantId, inv.getSupplierId(), supplierName,
+                inv.getInvoiceNumber(), inv.getInvoiceDate(), inv.getDueDate(),
+                inv.getSubtotal(), inv.getVatAmount(), approverId);
+        inv.recordApBillHandOff(bill.getId());
+    }
+
+    private void enforceSegregation(UUID creator, UUID actor, String what) {
+        if (!enforceSegregationOfDuties || creator == null || actor == null) return;
+        if (creator.equals(actor)) {
+            throw new HandyFlowException(
+                    "Segregation of duties: you cannot approve a " + what + " that you created/captured yourself",
+                    HttpStatus.FORBIDDEN, "SEGREGATION_OF_DUTIES");
+        }
+    }
+
+    private UUID currentUserIdOrNull() {
+        try {
+            String id = TenantContext.getUserId();
+            return id != null ? UUID.fromString(id) : null;
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
     private boolean isPoApprovalOpen(ApprovalRequestResponse r) {
         return "SUBMITTED".equals(r.status()) || "IN_PROGRESS".equals(r.status());
     }
@@ -922,7 +886,6 @@ public class ScmService {
                 .min(Comparator.comparingInt(ApprovalStepResponse::stepOrder));
     }
 
-    /** Same SecurityContextHolder pattern established in ApService/PosService/ChangeOrderService for this exact purpose. */
     private List<String> currentUserAuthorities() {
         var auth = SecurityContextHolder.getContext().getAuthentication();
         if (auth == null) return List.of();
@@ -944,13 +907,7 @@ public class ScmService {
         po.recalculateTotals(sub, vat, sub.add(vat));
     }
 
-    /**
-     * NEW: backs generatePoPdf(). Returns [tenantName, tenantVat] — same
-     * jdbc.queryForMap() pattern already used in SubscriptionController.
-     * fetchTenantDetails(), and the same tenant_id column reference
-     * already proven correct in ScmNotificationService.findAdminEmail()/
-     * findTenantName().
-     */
+    /** Returns [tenantName, tenantVat]. */
     private String[] findTenantDetails(UUID tenantId) {
         try {
             var row = jdbc.queryForMap(
@@ -965,79 +922,12 @@ public class ScmService {
         }
     }
 
-    /** NEW: backs generatePoPdf() — ScSupplier's address fields ARE flat columns, unlike Tenant's JSONB one. */
     private String formatSupplierAddress(ScSupplier s) {
         return Stream.of(s.getStreet(), s.getSuburb(), s.getCity(), s.getProvince(), s.getPostalCode())
                 .filter(v -> v != null && !v.isBlank())
                 .collect(Collectors.joining(", "));
     }
 
-    /**
-     * Real 3-way match logic (FIX H-3).
-     *
-     * WHY 2% tolerance and not 0%?
-     * Rounding differences, currency conversion, and minor pricing adjustments
-     * mean exact matches are rare in practice. A 2% tolerance is the industry
-     * standard for automated matching — anything larger triggers human review.
-     *
-     * Match rules:
-     *   1. Invoice supplier must match PO supplier.
-     *   2. Invoice total must be within ±2% of PO total_amount.
-     *   3. If a GR is linked, it must be POSTED (goods physically received).
-     *   4. If all checks pass → MATCHED; partial checks → PARTIAL_MATCH; variance > 2% → DISPUTE.
-     */
-    private void performThreeWayMatch(TenantId tenantId, ScSupplierInvoice invoice,
-                                      UUID purchaseOrderId, UUID goodsReceiptId) {
-        try {
-            ScPurchaseOrder po = poRepo.findByTenantIdAndId(tenantId.getValue(), purchaseOrderId)
-                    .orElse(null);
-            if (po == null) {
-                invoice.updateMatchResult(MatchStatus.PENDING, "Linked PO not found");
-                return;
-            }
-
-            // Check 1: supplier must match
-            if (!po.getSupplierId().equals(invoice.getSupplierId())) {
-                invoice.updateMatchResult(MatchStatus.DISPUTE,
-                        "Invoice supplier does not match PO supplier");
-                return;
-            }
-
-            // Check 2: amount variance
-            if (po.getTotalAmount().compareTo(BigDecimal.ZERO) > 0) {
-                BigDecimal variance = invoice.getTotalAmount().subtract(po.getTotalAmount()).abs();
-                BigDecimal toleranceAmount = po.getTotalAmount()
-                        .multiply(MATCH_TOLERANCE).setScale(2, RoundingMode.HALF_UP);
-
-                if (variance.compareTo(toleranceAmount) > 0) {
-                    String notes = String.format(
-                            "Invoice total R %.2f vs PO total R %.2f — variance R %.2f exceeds 2%% tolerance",
-                            invoice.getTotalAmount(), po.getTotalAmount(), variance);
-                    invoice.updateMatchResult(MatchStatus.DISPUTE, notes);
-                    return;
-                }
-            }
-
-            // Check 3: GR must be posted if provided
-            if (goodsReceiptId != null) {
-                ScGoodsReceipt gr = grRepo.findByTenantIdAndId(tenantId.getValue(), goodsReceiptId)
-                        .orElse(null);
-                if (gr == null || !"POSTED".equals(gr.getStatus())) {
-                    invoice.updateMatchResult(MatchStatus.PARTIAL_MATCH,
-                            "GR linked but not yet posted — goods may not be received");
-                    return;
-                }
-            }
-
-            // All checks passed
-            invoice.updateMatchResult(MatchStatus.MATCHED,
-                    goodsReceiptId != null ? "PO + GR + invoice all matched within tolerance"
-                            : "PO + invoice matched — no GR linked");
-
-        } catch (Exception e) {
-            // 3-way match failure must not block invoice creation
-            log.warn("[SCM] 3-way match error for invoice={}: {}", invoice.getInvoiceNumber(), e.getMessage());
-            invoice.updateMatchResult(MatchStatus.PENDING, "Match evaluation error: " + e.getMessage());
-        }
-    }
+    // performThreeWayMatch() and MATCH_TOLERANCE were removed — see InvoiceMatchingService,
+    // ThreeWayMatchEngine and ScmMatchTolerances.
 }

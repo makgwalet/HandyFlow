@@ -3,16 +3,14 @@
                 "shared",
                 "identity",
                 "billing",
-                "approvals", "approvals::*",
-                "notifications", "notifications::*",
-                // FIX (Supply Chain -> AP hand-off, product owner's own
-                // explicit design decision): needed for ApFacade
-                // .createBillFromSupplyChainInvoice() — see ScmService's
-                // own comment on approveSupplierInvoice() for the fuller
-                // design.
-                "ap", "ap::*",
-                // Raises control exceptions through ControlExceptionFacade.
-                "controls", "controls::*"
+                "approvals",
+                "notifications",
+                // Supply Chain -> AP hand-off (ApFacade.createBillFromSupplyChainInvoice)
+                "ap",
+                // ControlExceptionFacade
+                "controls",
+                // NEW (chunk 5): supplier compliance documents are stored through EvidenceFacade
+                "evidence"
         }
 )
 package za.co.handyflow.platform.supplychain;

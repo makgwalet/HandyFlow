@@ -32,15 +32,14 @@ public interface ScSupplierRepository extends JpaRepository<ScSupplier, UUID> {
     @Query("SELECT COUNT(s) FROM ScSupplier s WHERE s.tenantId = :tenantId AND s.status = :status AND s.deletedAt IS NULL")
     long countByTenantIdAndStatus(@Param("tenantId") UUID tenantId, @Param("status") SupplierStatus status);
 
+    /** NEW (chunk 4): fraud signal — the same bank account on another live supplier record. */
+    @Query("SELECT COUNT(s) FROM ScSupplier s WHERE s.tenantId = :tenantId AND s.bankAccount = :account AND s.id <> :excludeId AND s.deletedAt IS NULL")
+    long countOtherWithBankAccount(@Param("tenantId") UUID tenantId,
+                                   @Param("account") String account,
+                                   @Param("excludeId") UUID excludeId);
+
     /**
-     * NEW (Tier 1 gap analysis): cross-tenant query for the weekly BBBEE
-     * certificate expiry digest. bbbeeExpiry is captured on every supplier
-     * record but nothing previously watched it. Returns suppliers whose
-     * certificate expires within the next 30 days and hasn't already
-     * lapsed. Same reasoning as ScSupplierInvoiceRepository.
-     * findAllOverdueGroupedByTenant() for why this is native SQL rather
-     * than a normal tenant-scoped JPQL method — a scheduled job needs to
-     * scan across every tenant, not one.
+     * Cross-tenant query for the weekly BBBEE certificate expiry digest.
      * Returns [tenant_id, supplier_id, name, bbbee_expiry].
      */
     @Query(value = """

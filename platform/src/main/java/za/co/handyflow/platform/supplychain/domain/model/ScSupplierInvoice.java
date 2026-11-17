@@ -32,10 +32,7 @@ public class ScSupplierInvoice {
     @Column(name = "vat_amount",   nullable = false, precision = 15, scale = 2) BigDecimal vatAmount   = BigDecimal.ZERO;
     @Column(name = "total_amount", nullable = false, precision = 15, scale = 2) BigDecimal totalAmount;
 
-    /**
-     * Three-way match result — set by ScmService.performThreeWayMatch().
-     * This is NOT the same as invoice approval status.
-     */
+    /** Three-way match result — set by InvoiceMatchingService. NOT the same as approval status. */
     @Enumerated(EnumType.STRING)
     @Column(name = "match_status", nullable = false, length = 20)
     MatchStatus matchStatus = MatchStatus.PENDING;
@@ -46,6 +43,9 @@ public class ScSupplierInvoice {
     @Column(nullable = false, length = 20)
     InvoiceStatus status = InvoiceStatus.RECEIVED;
 
+    // NEW: who captured this invoice — basis for the "capturer cannot approve" control.
+    @Column(name = "captured_by") UUID capturedBy;
+
     @Column(name = "approved_by")       UUID    approvedBy;
     @Column(name = "approved_by_name")  String  approvedByName;
     @Column(name = "approved_at")       Instant approvedAt;
@@ -53,15 +53,7 @@ public class ScSupplierInvoice {
     @Column(name = "payment_reference") String  paymentReference;
     @Column(name = "journal_entry_id")  UUID    journalEntryId;
 
-    // FIX (Supply Chain -> AP hand-off, product owner's own explicit
-    // design): set the moment this invoice is approved (three-way
-    // matched, cleared for payment) — see ApFacade
-    // .createBillFromSupplyChainInvoice()'s own doc comment for the
-    // fuller design. This field IS the "handed off" fact — markPaid()
-    // below refuses to run once it's set, since AP now owns payment for
-    // this invoice; paying it again here would be exactly the
-    // duplicate-liability risk the product owner explicitly warned
-    // against.
+    // Set the moment this invoice is handed to AP — see ApFacade.createBillFromSupplyChainInvoice().
     @Column(name = "ap_bill_id") UUID apBillId;
     String notes;
     @Column(name = "created_at", nullable = false) Instant createdAt;
@@ -69,18 +61,13 @@ public class ScSupplierInvoice {
 
     // ── Factory ───────────────────────────────────────────────────────────────
 
-    /**
-     * Creates a new supplier invoice.
-     * matchStatus is set to PENDING — the caller must invoke
-     * ScmService.performThreeWayMatch() to evaluate and update it.
-     */
     public static ScSupplierInvoice create(UUID tenantId, String invoiceNumber,
                                            UUID supplierId, UUID purchaseOrderId,
                                            UUID goodsReceiptId, String supplierInvoiceRef,
                                            LocalDate invoiceDate, LocalDate dueDate,
                                            String currency, BigDecimal subtotal,
                                            BigDecimal vatAmount, BigDecimal totalAmount,
-                                           String notes) {
+                                           String notes, UUID capturedBy) {
         ScSupplierInvoice inv = new ScSupplierInvoice();
         inv.id                 = UUID.randomUUID();
         inv.tenantId           = tenantId;
@@ -97,6 +84,7 @@ public class ScSupplierInvoice {
         inv.vatAmount          = vatAmount != null ? vatAmount : BigDecimal.ZERO;
         inv.totalAmount        = totalAmount;
         inv.notes              = notes;
+        inv.capturedBy         = capturedBy;
         inv.status             = InvoiceStatus.RECEIVED;
         inv.matchStatus        = MatchStatus.PENDING;  // always start PENDING — match evaluated separately
         inv.createdAt          = Instant.now();
@@ -126,15 +114,33 @@ public class ScSupplierInvoice {
     }
 
     /**
-     * NEW (Tier 1 gap analysis): previously a DISPUTED invoice was a
-     * genuine dead end — approve() only accepts RECEIVED/UNDER_REVIEW, so
-     * a disputed invoice could never be approved even if a manager
-     * decided the variance was acceptable. MatchStatus.OVERRIDDEN already
-     * existed in the enum specifically for this ("manager forced approval
-     * despite mismatch — reason in match_notes") but nothing ever set it.
-     * The override reason is appended to matchNotes rather than replacing
-     * it, so the original dispute reason stays in the audit trail
-     * alongside why it was overridden.
+     * NEW: applies a match outcome AND keeps the workflow status consistent with it.
+     * <p>
+     * FIX: the old matching code only called updateMatchResult(DISPUTE, ...), which set
+     * matchStatus but left status = RECEIVED. Two real consequences: (1) approve()
+     * accepted a "disputed" invoice, so the dispute blocked nothing; (2)
+     * overrideDisputeAndApprove() requires status == DISPUTED, so the override path
+     * could never be used on an auto-disputed invoice. A DISPUTE outcome now moves the
+     * invoice to DISPUTED, and a later clean re-match moves it back to RECEIVED.
+     * Refused once the invoice is APPROVED/PAID/CANCELLED — matching must not rewrite
+     * history after approval.
+     */
+    public void applyMatchOutcome(MatchStatus outcome, String notes) {
+        if (status == InvoiceStatus.APPROVED || status == InvoiceStatus.PAID || status == InvoiceStatus.CANCELLED)
+            throw new IllegalStateException("Cannot re-match an invoice in state: " + status);
+        this.matchStatus = outcome;
+        this.matchNotes  = notes;
+        if (outcome == MatchStatus.DISPUTE) {
+            this.status = InvoiceStatus.DISPUTED;
+        } else if (this.status == InvoiceStatus.DISPUTED) {
+            this.status = InvoiceStatus.RECEIVED;
+        }
+        touch();
+    }
+
+    /**
+     * Resolves a DISPUTED invoice by manager override. The override reason is appended
+     * to matchNotes so the original dispute reason stays in the audit trail.
      */
     public void overrideDisputeAndApprove(UUID approverId, String approverName, String overrideReason) {
         if (status != InvoiceStatus.DISPUTED)
@@ -148,14 +154,6 @@ public class ScSupplierInvoice {
         touch();
     }
 
-    /**
-     * NEW (Tier 1 gap analysis): there was previously no way to cancel a
-     * supplier invoice in ANY status — not just DISPUTED ones. Needed as
-     * the second real resolution option for a dispute (reject the invoice
-     * back to the supplier, as opposed to overriding and paying it
-     * anyway), but written generally since the gap applied to every
-     * status, not only DISPUTED.
-     */
     public void cancel(String reason) {
         if (status == InvoiceStatus.PAID)
             throw new IllegalStateException("Cannot cancel a PAID invoice");
@@ -165,13 +163,6 @@ public class ScSupplierInvoice {
     }
 
     public void markPaid(String paymentReference) {
-        // FIX (Supply Chain -> AP hand-off): once this invoice has been
-        // handed off, AP owns payment — paying it again here would be
-        // exactly the duplicate-financial-liability risk the product
-        // owner explicitly warned against. This path is now only ever
-        // reachable for the (increasingly rare, pre-hand-off-design)
-        // case of an invoice approved and paid entirely within Supply
-        // Chain without ever going through AP.
         if (apBillId != null)
             throw new IllegalStateException(
                     "This invoice has been handed off to AP (bill " + apBillId + ") — complete payment through Accounts Payable, not here");
@@ -183,27 +174,19 @@ public class ScSupplierInvoice {
         touch();
     }
 
-    /**
-     * FIX (Supply Chain -> AP hand-off): called immediately after
-     * approve() succeeds, in the same transaction — see
-     * ScmService.approveSupplierInvoice()'s own comment. Setting this
-     * is what "handed off" means for this entity; nothing else changes
-     * about its own status (it stays APPROVED, it does not become PAID
-     * here — AP's own bill carries the payment status from now on).
-     */
+    /** Setting this IS the "handed off" fact; status stays APPROVED — AP's bill carries payment status from here. */
     public void recordApBillHandOff(UUID apBillId) {
         this.apBillId = apBillId;
         touch();
     }
 
-    /** Called by ScmService.performThreeWayMatch() after evaluating the match. */
+    /** Legacy setter kept for compatibility; prefer applyMatchOutcome(). */
     public void updateMatchResult(MatchStatus matchStatus, String notes) {
         this.matchStatus = matchStatus;
         this.matchNotes  = notes;
         touch();
     }
 
-    /** True if this invoice is past its due date and not yet paid or cancelled. */
     public boolean isOverdue() {
         return status != InvoiceStatus.PAID
                 && status != InvoiceStatus.CANCELLED

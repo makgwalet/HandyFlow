@@ -22,17 +22,12 @@ public class ScPoLine {
     @Column(name = "item_name",         nullable = false) String itemName;
     @Column(name = "supplier_sku")      String supplierSku;
     @Column(name = "qty_ordered",       nullable = false, precision = 12, scale = 3) BigDecimal qtyOrdered;
+    /** Accepted quantity only — rejected goods never count as received against the PO. */
     @Column(name = "qty_received",      nullable = false, precision = 12, scale = 3) BigDecimal qtyReceived   = BigDecimal.ZERO;
     @Column(name = "qty_invoiced",      nullable = false, precision = 12, scale = 3) BigDecimal qtyInvoiced   = BigDecimal.ZERO;
     @Column(name = "unit_cost",         nullable = false, precision = 15, scale = 2) BigDecimal unitCost;
-    // FIX (VAT sweep, module 2): ScmService now always resolves a
-    // concrete default via VatRateProvider before calling create()
-    // below, so this field-level default (a JPA no-arg-constructor
-    // safety net) and the factory's own null-coalescing fallback are
-    // both effectively unreachable via the real application flow —
-    // left in place as defensive backstops rather than wired to
-    // VatRateProvider directly, since a domain entity shouldn't reach
-    // into Spring-managed config.
+    // ScmService always resolves a concrete default via VatRateProvider before calling create();
+    // this field default and the factory fallback are defensive backstops only.
     @Column(name = "vat_rate",          nullable = false, precision = 5,  scale = 2) BigDecimal vatRate       = BigDecimal.valueOf(15);
     @Column(name = "vat_amount",        nullable = false, precision = 15, scale = 2) BigDecimal vatAmount     = BigDecimal.ZERO;
     @Column(name = "line_total",        nullable = false, precision = 15, scale = 2) BigDecimal lineTotal     = BigDecimal.ZERO;
@@ -60,6 +55,25 @@ public class ScPoLine {
 
     public void recordReceived(BigDecimal qty) {
         this.qtyReceived = this.qtyReceived.add(qty);
+        this.isFullyReceived = this.qtyReceived.compareTo(this.qtyOrdered) >= 0;
+    }
+
+    /** NEW (chunk 2): undoes a receipt when a posted GR is reversed. Never goes below zero. */
+    public void reverseReceived(BigDecimal qty) {
+        this.qtyReceived = this.qtyReceived.subtract(qty).max(BigDecimal.ZERO);
+        this.isFullyReceived = this.qtyReceived.compareTo(this.qtyOrdered) >= 0;
+    }
+
+    /**
+     * NEW (chunk 3): applies an approved amendment. Null arguments leave that field as is.
+     * Totals and the fully-received flag are recomputed. The service has already validated
+     * that qty is not below what has been received.
+     */
+    public void amend(BigDecimal qty, BigDecimal newUnitCost, BigDecimal newVatRate) {
+        if (qty != null) this.qtyOrdered = qty;
+        if (newUnitCost != null) this.unitCost = newUnitCost;
+        if (newVatRate != null) this.vatRate = newVatRate;
+        recalculate();
         this.isFullyReceived = this.qtyReceived.compareTo(this.qtyOrdered) >= 0;
     }
 

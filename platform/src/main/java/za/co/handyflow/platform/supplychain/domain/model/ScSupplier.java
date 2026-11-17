@@ -1,5 +1,6 @@
 package za.co.handyflow.platform.supplychain.domain.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -40,8 +41,11 @@ public class ScSupplier {
     @Column(name = "postal_code") String postalCode;
     String country = "South Africa";
 
-    // Banking (for payment runs — stored encrypted in production via column-level encryption)
+    // Banking. CHANGED (chunk 4): bankAccount is never serialised to API clients (it was
+    // previously returned in full to every SCM_READ user) — they get bankAccountMasked.
+    // After creation these fields change ONLY via a verified SupplierBankChange.
     @Column(name = "bank_name")        String bankName;
+    @JsonIgnore
     @Column(name = "bank_account")     String bankAccount;
     @Column(name = "bank_branch_code") String bankBranchCode;
 
@@ -55,15 +59,15 @@ public class ScSupplier {
     @Column(name = "late_deliveries")    int lateDeliveries    = 0;
     @Column(name = "defect_count")       int defectCount       = 0;
 
-    /**
-     * WHY @Enumerated(EnumType.STRING)?
-     * EnumType.ORDINAL stores 0, 1, 2 ... Adding a new enum value in the
-     * middle shifts all ordinals and corrupts existing data silently.
-     * EnumType.STRING stores "ACTIVE", "INACTIVE" — safe to reorder enum values.
-     */
+    /** EnumType.STRING: safe to reorder/extend the enum without corrupting stored data. */
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     SupplierStatus status = SupplierStatus.ACTIVE;
+
+    // NEW (chunk 4): why / when / by whom the supplier last changed status.
+    @Column(name = "status_reason", length = 500) String statusReason;
+    @Column(name = "status_changed_at") Instant statusChangedAt;
+    @Column(name = "status_changed_by") UUID statusChangedBy;
 
     @Column(name = "preferred_categories") String preferredCategories;
     String notes;
@@ -114,9 +118,14 @@ public class ScSupplier {
 
     // ── Domain methods ────────────────────────────────────────────────────────
 
+    /**
+     * Profile edit. CHANGED (chunk 4): no longer takes a status — status was editable here
+     * by anyone with SCM_ADMIN, which let a BLACKLISTED supplier be flipped back to ACTIVE
+     * with no reason and no audit. Use transitionTo() via SupplierLifecycleService.
+     */
     public void update(String name, String contactName, String contactEmail,
                        String contactPhone, Integer bbbeeLevel, LocalDate bbbeeExpiry,
-                       Integer paymentTermsDays, SupplierStatus status, String notes) {
+                       Integer paymentTermsDays, String notes) {
         if (name            != null) this.name             = name;
         if (contactName     != null) this.contactName      = contactName;
         if (contactEmail    != null) this.contactEmail     = contactEmail;
@@ -124,8 +133,34 @@ public class ScSupplier {
         if (bbbeeLevel      != null) this.bbbeeLevel       = bbbeeLevel;
         if (bbbeeExpiry     != null) this.bbbeeExpiry      = bbbeeExpiry;
         if (paymentTermsDays!= null) this.paymentTermsDays = paymentTermsDays;
-        if (status          != null) this.status           = status;
         if (notes           != null) this.notes            = notes;
+        this.updatedAt = Instant.now();
+    }
+
+    /** Validated lifecycle move; the service has already checked reasons, actor and segregation of duties. */
+    public void transitionTo(SupplierStatus target, String reason, UUID by) {
+        if (!status.canTransitionTo(target))
+            throw new IllegalStateException("A " + status + " supplier cannot move to " + target
+                    + " (allowed: " + status.allowedNext() + ")");
+        this.status = target;
+        this.statusReason = reason != null && reason.length() > 500 ? reason.substring(0, 500) : reason;
+        this.statusChangedAt = Instant.now();
+        this.statusChangedBy = by;
+        this.updatedAt = Instant.now();
+    }
+
+    /** Called straight after create() when the tenant requires supplier approval before first use. */
+    public void requireApproval() {
+        this.status = SupplierStatus.PENDING_APPROVAL;
+        this.statusReason = "Awaiting approval";
+        this.statusChangedAt = Instant.now();
+    }
+
+    /** Only ever called by SupplierBankChangeService after independent verification. */
+    public void applyBankDetails(String bankName, String bankAccount, String bankBranchCode) {
+        this.bankName = bankName;
+        this.bankAccount = bankAccount;
+        this.bankBranchCode = bankBranchCode;
         this.updatedAt = Instant.now();
     }
 
@@ -134,6 +169,13 @@ public class ScSupplier {
         this.status    = SupplierStatus.INACTIVE;
         this.deletedAt = Instant.now();
         this.updatedAt = Instant.now();
+    }
+
+    /** What API clients see instead of the account number, e.g. "****4321". */
+    public String getBankAccountMasked() {
+        if (bankAccount == null || bankAccount.isBlank()) return null;
+        String digits = bankAccount.trim();
+        return digits.length() <= 4 ? "****" : "****" + digits.substring(digits.length() - 4);
     }
 
     /** @return on-time delivery rate as a percentage, or null if no orders yet. */

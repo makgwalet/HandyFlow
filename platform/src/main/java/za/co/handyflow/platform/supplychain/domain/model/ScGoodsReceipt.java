@@ -14,6 +14,10 @@ import java.util.UUID;
 @NoArgsConstructor
 public class ScGoodsReceipt {
 
+    public static final String DRAFT = "DRAFT";
+    public static final String POSTED = "POSTED";
+    public static final String REVERSED = "REVERSED";
+
     @Id UUID id;
     @Column(name = "tenant_id",        nullable = false) UUID tenantId;
     @Column(name = "receipt_number",   nullable = false, length = 20) String receiptNumber;
@@ -24,8 +28,13 @@ public class ScGoodsReceipt {
     @Column(name = "received_by")      UUID receivedBy;
     @Column(name = "received_by_name") String receivedByName;
     @Column(name = "received_date",    nullable = false) LocalDate receivedDate;
-    @Column(nullable = false, length = 20) String status = "DRAFT";
+    @Column(nullable = false, length = 20) String status = DRAFT;
     @Column(name = "posted_at")        Instant postedAt;
+    // NEW (chunk 2): reversal audit trail. A posted GR is never edited or deleted —
+    // it is reversed, with who/when/why recorded here and offsetting stock movements.
+    @Column(name = "reversed_at")      Instant reversedAt;
+    @Column(name = "reversed_by")      UUID reversedBy;
+    @Column(name = "reversal_reason", length = 500) String reversalReason;
     String notes;
     @Column(name = "created_at")       Instant createdAt;
     @Column(name = "updated_at")       Instant updatedAt;
@@ -47,16 +56,28 @@ public class ScGoodsReceipt {
         gr.receivedByName = receivedByName;
         gr.receivedDate = receivedDate != null ? receivedDate : LocalDate.now();
         gr.notes = notes;
-        gr.status = "DRAFT";
+        gr.status = DRAFT;
         gr.createdAt = Instant.now();
         gr.updatedAt = Instant.now();
         return gr;
     }
 
     public void post() {
-        if (!"DRAFT".equals(status)) throw new IllegalStateException("GR already posted");
-        this.status = "POSTED";
+        if (!DRAFT.equals(status)) throw new IllegalStateException("GR already " + status);
+        this.status = POSTED;
         this.postedAt = Instant.now();
+        this.updatedAt = Instant.now();
+    }
+
+    public void reverse(UUID reversedBy, String reason) {
+        if (!POSTED.equals(status))
+            throw new IllegalStateException("Only POSTED goods receipts can be reversed — current: " + status);
+        if (reason == null || reason.isBlank())
+            throw new IllegalArgumentException("A reversal reason is required");
+        this.status = REVERSED;
+        this.reversedAt = Instant.now();
+        this.reversedBy = reversedBy;
+        this.reversalReason = reason.length() > 500 ? reason.substring(0, 500) : reason;
         this.updatedAt = Instant.now();
     }
 }

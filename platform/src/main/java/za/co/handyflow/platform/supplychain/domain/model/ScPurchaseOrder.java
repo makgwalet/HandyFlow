@@ -52,6 +52,8 @@ public class ScPurchaseOrder {
     @Column(name = "created_at", nullable = false) Instant createdAt;
     @Column(name = "updated_at", nullable = false) Instant updatedAt;
     @Column(name = "cancelled_at")      Instant cancelledAt;
+    // NEW (chunk 3): increments each time an approval or an applied amendment changes the PO.
+    @Column(name = "revision_number", nullable = false) int revisionNumber = 1;
 
     // ── Factory ───────────────────────────────────────────────────────────────
 
@@ -127,6 +129,41 @@ public class ScPurchaseOrder {
         touch();
     }
 
+    /**
+     * NEW (chunk 2): called after a goods receipt is reversed. Recomputes the PO status
+     * from what is still received: some left -> PARTIALLY_RECEIVED; nothing left -> back
+     * to SENT (if it had been sent) or APPROVED. Only valid from a received state —
+     * an INVOICED/CANCELLED PO must never be silently pulled back.
+     */
+    public void revertReceiptStatus(boolean anyQuantityStillReceived) {
+        if (status != PoStatus.PARTIALLY_RECEIVED && status != PoStatus.FULLY_RECEIVED)
+            throw new IllegalStateException("Cannot revert receipt status of a PO in state: " + status);
+        status = anyQuantityStillReceived
+                ? PoStatus.PARTIALLY_RECEIVED
+                : (sentAt != null ? PoStatus.SENT : PoStatus.APPROVED);
+        touch();
+    }
+
+    public void nextRevision() {
+        revisionNumber++;
+        touch();
+    }
+
+    /** NEW (chunk 3): applies header changes from an approved amendment. Null = leave unchanged. */
+    public void applyAmendedHeader(LocalDate requiredByDate, UUID deliverToLocation, String notes, String terms) {
+        if (requiredByDate != null) this.requiredByDate = requiredByDate;
+        if (deliverToLocation != null) this.deliverToLocation = deliverToLocation;
+        if (notes != null) this.notes = notes;
+        if (terms != null) this.terms = terms;
+        touch();
+    }
+
+    /** NEW (chunk 6): traceability — which approved requisition this PO was raised from. */
+    public void linkRequisition(UUID requisitionId) {
+        this.requisitionId = requisitionId;
+        touch();
+    }
+
     public void cancel() {
         if (status == PoStatus.FULLY_RECEIVED || status == PoStatus.INVOICED)
             throw new IllegalStateException("Cannot cancel a " + status + " order");
@@ -135,10 +172,7 @@ public class ScPurchaseOrder {
         touch();
     }
 
-    /**
-     * Updates PO totals after lines are added or removed.
-     * Called by ScmService after each ScPoLine save.
-     */
+    /** Updates PO totals after lines are added or removed. */
     public void recalculateTotals(BigDecimal subtotal, BigDecimal vatAmount, BigDecimal totalAmount) {
         this.subtotal    = subtotal;
         this.vatAmount   = vatAmount;
