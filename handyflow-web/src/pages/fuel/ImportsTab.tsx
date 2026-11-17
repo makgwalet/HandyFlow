@@ -1,6 +1,7 @@
 import { useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
+import AutoAcceptSettings from "./AutoAcceptSettings"
 import { usePermissions } from "../../hooks/usePermission"
 import { btnGhost, btnPrimary, card, Chip, ErrorLine, ReasonModal, inputStyle } from "../warehousing/whseUi"
 import { fmtL, fmtR } from "./orderOps"
@@ -12,6 +13,7 @@ const B = "/api/v1/fuel/forecourt/imports"
 
 export default function ImportsTab() {
   const canReview = usePermissions(["FUEL_SHIFT_SUPERVISE", "FUEL_FORECOURT_MANAGE"])
+  const canConfigure = usePermissions(["FUEL_CONFIGURATION_MANAGE"])
   const canKeys = usePermissions(["FUEL_MANAGE", "FUEL_FORECOURT_MANAGE"])
   const qc = useQueryClient()
   const [status, setStatus] = useState("PENDING")
@@ -95,6 +97,8 @@ export default function ImportsTab() {
       )}
 
       {canKeys && <PumpLabels seenSources={list.data ?? []} />}
+
+      {canConfigure && <AutoAcceptSettings />}
 
       {rejecting && <ReasonModal title="Reject this shift" intro={`${rejecting.shift.attendantName} · ${rejecting.externalId}. It stays on record as rejected.`} confirmLabel="Reject" pending={reject.isPending} error={reject.error}
         onConfirm={reason => reject.mutate({ id: rejecting.id, reason })} onClose={() => setRejecting(null)} />}

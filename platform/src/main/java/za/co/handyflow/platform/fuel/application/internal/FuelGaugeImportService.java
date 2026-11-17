@@ -106,6 +106,14 @@ public class FuelGaugeImportService {
         return view(g, t);
     }
 
+    /** How far the staged level is from the tank's book level, in litres (absolute). Null when the tank cannot be resolved. */
+    @Transactional(readOnly = true)
+    public java.math.BigDecimal differenceFromBook(TenantId tenantId, UUID id) {
+        FuelGaugeReading g = find(tenantId, id);
+        FuelTank t = resolve(tenantId, g.getSource(), g.getTankLabel());
+        return t == null || t.getCurrentLitres() == null ? null : g.getLitres().subtract(t.getCurrentLitres()).abs();
+    }
+
     @Transactional
     public GaugeView reject(TenantId tenantId, UUID id, String reason, UUID by) {
         FuelGaugeReading g = find(tenantId, id);

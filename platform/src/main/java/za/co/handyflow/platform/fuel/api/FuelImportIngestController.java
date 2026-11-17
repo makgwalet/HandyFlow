@@ -24,6 +24,7 @@ import za.co.handyflow.platform.shared.ApiResponse;
 public class FuelImportIngestController {
 
     private final FuelPosImportService imports;
+    private final za.co.handyflow.platform.fuel.application.internal.FuelImportAutoAcceptService autoAccept;
 
     @PostMapping("/pos-shifts")
     @Operation(summary = "Send one finished shift. Header X-Fuel-Import-Key is the company's key. Safe to repeat: the same source and externalId is staged once. "
@@ -31,6 +32,6 @@ public class FuelImportIngestController {
     public ResponseEntity<ApiResponse<IngestResult>> receive(
             @RequestHeader(value = "X-Fuel-Import-Key", required = false) String apiKey,
             @Valid @RequestBody IncomingShift shift) {
-        return ResponseEntity.ok(ApiResponse.success(imports.ingest(apiKey, shift)));
+        return ResponseEntity.ok(ApiResponse.success(autoAccept.afterShift(imports.ingest(apiKey, shift))));
     }
 }

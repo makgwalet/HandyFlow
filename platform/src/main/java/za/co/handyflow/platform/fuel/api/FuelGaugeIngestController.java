@@ -23,6 +23,7 @@ import za.co.handyflow.platform.shared.ApiResponse;
 public class FuelGaugeIngestController {
 
     private final FuelGaugeImportService gauges;
+    private final za.co.handyflow.platform.fuel.application.internal.FuelImportAutoAcceptService autoAccept;
 
     @PostMapping("/tank-gauges")
     @Operation(summary = "Send one tank level. Header X-Fuel-Import-Key is the company's key. Safe to repeat: the same source and externalId is staged once. "
@@ -30,6 +31,6 @@ public class FuelGaugeIngestController {
     public ResponseEntity<ApiResponse<IngestResult>> receive(
             @RequestHeader(value = "X-Fuel-Import-Key", required = false) String apiKey,
             @Valid @RequestBody IncomingGauge reading) {
-        return ResponseEntity.ok(ApiResponse.success(gauges.ingest(apiKey, reading)));
+        return ResponseEntity.ok(ApiResponse.success(autoAccept.afterGauge(gauges.ingest(apiKey, reading))));
     }
 }
