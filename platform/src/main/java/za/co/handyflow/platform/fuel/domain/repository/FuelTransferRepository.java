@@ -22,7 +22,10 @@ public interface FuelTransferRepository extends JpaRepository<FuelTransfer, UUID
     @Query("SELECT t FROM FuelTransfer t WHERE t.tenantId = :tenantId AND (t.fromTankId IN :tankIds OR t.toTankId IN :tankIds) ORDER BY t.createdAt DESC")
     Page<FuelTransfer> findInvolving(TenantId tenantId, java.util.Collection<UUID> tankIds, Pageable pageable);
 
+    @Query("SELECT t FROM FuelTransfer t WHERE t.tenantId = :tenantId AND t.id = :id")
+    Optional<FuelTransfer> findOne(TenantId tenantId, UUID id);
+
     /** Transfers made inside a period, oldest first. Backs the forecourt supply reconciliation. */
-    @Query("SELECT t FROM FuelTransfer t WHERE t.tenantId = :tenantId AND t.createdAt >= :from AND t.createdAt < :to ORDER BY t.createdAt ASC")
+    @Query("SELECT t FROM FuelTransfer t WHERE t.tenantId = :tenantId AND t.reversedAt IS NULL AND t.createdAt >= :from AND t.createdAt < :to ORDER BY t.createdAt ASC")
     List<FuelTransfer> findBetween(TenantId tenantId, Instant from, Instant to);
 }

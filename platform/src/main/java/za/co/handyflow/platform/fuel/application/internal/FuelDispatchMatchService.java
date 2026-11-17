@@ -89,6 +89,12 @@ public class FuelDispatchMatchService {
             String fromTank = from0 == null ? "Tank" : from0.getName();
             String fuel = from0 == null ? "" : from0.getFuelType();
             a.dispatched = a.dispatched.add(d.getLitresDispensed());
+            if (d.isDeliveredByTransfer()) {
+                // Already in the forecourt tank by a stock transfer: nothing to match, and no receipt may be linked or the fuel would count twice.
+                a.received = a.received.add(d.getLitresDispensed());
+                a.matched.add(new Matched(d.getId(), d.getDispatchedAt(), fromTank, fuel, d.getLitresDispensed(), d.getLitresDispensed(), BigDecimal.ZERO, List.of(), true));
+                continue;
+            }
             List<FuelDispatchReceiptMatch> linked = byDispatch.getOrDefault(d.getId(), List.of());
             if (linked.isEmpty()) { a.open.add(new OpenDispatch(d.getId(), d.getDispatchedAt(), fromTank, fuel, d.getLitresDispensed())); continue; }
             BigDecimal got = BigDecimal.ZERO;
@@ -128,6 +134,7 @@ public class FuelDispatchMatchService {
         if (d.isReversed()) throw new IllegalStateException("That dispatch has been reversed.");
         if (r.getReversedAt() != null) throw new IllegalStateException("That receipt has been reversed.");
         if (d.getDestinationDepotId() == null) throw new IllegalArgumentException("That dispatch has no destination forecourt.");
+        if (d.isDeliveredByTransfer()) throw new IllegalStateException("That dispatch was delivered into the forecourt tank by a stock transfer. Linking a receipt would count the fuel twice.");
         FuelTank rt = tanks.findActiveById(tenantId, r.getTankId()).orElseThrow(() -> new ResourceNotFoundException("Tank", r.getTankId().toString()));
         FuelTank dt = tanks.findActiveById(tenantId, d.getTankId()).orElseThrow(() -> new ResourceNotFoundException("Tank", d.getTankId().toString()));
         if (!d.getDestinationDepotId().equals(rt.getDepotId())) throw new IllegalArgumentException("That receipt is not in a tank of the forecourt the dispatch was delivered to.");

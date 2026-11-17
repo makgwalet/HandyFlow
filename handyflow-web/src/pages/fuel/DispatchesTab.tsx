@@ -5,6 +5,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import ReverseModal from "./ReverseModal"
 import { Plus, Fuel, X, AlertCircle, AlertTriangle, List, BarChart3, Download } from "lucide-react"
+import { forecourtTankChoices } from "./forecourtSupplyOps"
 
 const unwrap     = (r: any) => { const p = r.data?.data ?? r.data; return p?.content ?? p ?? [] }
 const unwrapList = (r: any): any[] => { const d = r.data?.data ?? r.data; return Array.isArray(d) ? d : (d?.content ?? []) }
@@ -12,7 +13,7 @@ const fmtDate    = (iso: string) => new Date(iso).toLocaleDateString("en-ZA", { 
 const fmtTime    = (iso: string) => new Date(iso).toLocaleTimeString("en-ZA", { hour: "2-digit", minute: "2-digit" })
 const fmtRTotal  = (n: any)     => `R ${Number(n ?? 0).toLocaleString("en-ZA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
-const EMPTY_FORM = { tankId: "", litresDispensed: "", pricePerLitre: "", recipientName: "", authorisedBy: "", odometerReading: "", hoursReading: "", notes: "", destinationDepotId: "" }
+const EMPTY_FORM = { tankId: "", litresDispensed: "", pricePerLitre: "", recipientName: "", authorisedBy: "", odometerReading: "", hoursReading: "", notes: "", destinationDepotId: "", destinationTankId: "" }
 
 export default function DispatchesTab() {
   const qc = useQueryClient()
@@ -64,6 +65,11 @@ export default function DispatchesTab() {
     queryKey: ["fuel-depots"], retry: false,
     queryFn: async () => { const d = (await apiClient.get("/api/v1/fuel/depots")).data; const l = d?.data ?? d; return Array.isArray(l) ? l : [] },
   })
+  // The tanks by depot, so a supply run can go straight into a forecourt tank as one stock transfer.
+  const { data: stockTanks = [] } = useQuery<any[]>({
+    queryKey: ["fuel-availability-tanks"], retry: false, enabled: depotList.length > 1,
+    queryFn: async () => { const d = (await apiClient.get("/api/v1/fuel/availability")).data; const l = (d?.data ?? d)?.tanks; return Array.isArray(l) ? l : [] },
+  })
   const { data: tanks = [] } = useQuery<any[]>({
     queryKey: ["tanks"],
     queryFn: async () => unwrapList(await apiClient.get("/api/v1/fuel/tanks")),
@@ -83,6 +89,7 @@ export default function DispatchesTab() {
   const reversedCount = inMonth.length - filtered.length
   const logRows = showReversed ? inMonth : filtered
   const selectedTank = (tanks as any[]).find(t => t.id === form.tankId)
+  const intoTanks = forecourtTankChoices(stockTanks as any[], form.destinationDepotId, selectedTank)
 
   const totalLitres = filtered.reduce((s, d) => s + Number(d.litresDispensed ?? 0), 0)
 
@@ -231,7 +238,7 @@ export default function DispatchesTab() {
                 <Fragment key={d.id}>
                 <tr style={{ borderBottom: expandedApprovalId === d.id || i < logRows.length - 1 ? "1px solid var(--hf-border-subtle)" : "none", background: "var(--hf-surface)", opacity: d.reversedAt ? 0.55 : 1 }}>
                   <td style={{ padding: "12px 14px" }}>
-                    <div style={{ fontWeight: 600, color: "var(--hf-text)" }}>{d.recipientName || "—"}</div>
+                    <div style={{ fontWeight: 600, color: "var(--hf-text)" }}>{d.recipientName || "—"}{d.transferId && <span style={{ fontWeight: 400, fontSize: 11, color: "var(--hf-text-muted)" }}> · delivered by transfer</span>}</div>
                   </td>
                   <td style={{ padding: "12px 14px", fontWeight: 700, color: "var(--hf-danger-text)", whiteSpace: "nowrap" }}>
                     −{Number(d.litresDispensed).toLocaleString()} L
@@ -347,10 +354,18 @@ export default function DispatchesTab() {
                 </div>
                 {depotList.length > 1 && <div>
                   <label style={lbl} htmlFor="dsp-dest">Delivering to forecourt</label>
-                  <select id="dsp-dest" value={form.destinationDepotId} onChange={e => setForm(f => ({ ...f, destinationDepotId: e.target.value }))} style={inp}>
+                  <select id="dsp-dest" value={form.destinationDepotId} onChange={e => setForm(f => ({ ...f, destinationDepotId: e.target.value, destinationTankId: "" }))} style={inp}>
                     <option value="">Not a supply run</option>
                     {depotList.map(x => <option key={x.id} value={x.id}>{x.code} - {x.name}</option>)}
                   </select>
+                </div>}
+                {form.destinationDepotId && intoTanks.length > 0 && <div>
+                  <label style={lbl} htmlFor="dsp-dest-tank">Into forecourt tank</label>
+                  <select id="dsp-dest-tank" value={form.destinationTankId} onChange={e => setForm(f => ({ ...f, destinationTankId: e.target.value }))} style={inp}>
+                    <option value="">The forecourt will record a receipt</option>
+                    {intoTanks.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                  </select>
+                  {form.destinationTankId && <p role="note" style={{ fontSize: 11.5, color: "var(--hf-text-muted)", margin: "4px 0 0" }}>The fuel moves straight into that tank as one stock transfer. The forecourt must not also record a receipt for this run.</p>}
                 </div>}
                 <div>
                   <label style={lbl}>Authorised By</label>
@@ -380,7 +395,7 @@ export default function DispatchesTab() {
             <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 20 }}>
               <button onClick={() => { setShowDispatch(false); setError("") }} style={{ padding: "9px 18px", border: "1px solid var(--hf-border)", borderRadius: 9, background: "var(--hf-surface)", fontSize: 14, cursor: "pointer", color: "var(--hf-text-secondary)" }}>Cancel</button>
               <button
-                onClick={() => dispatchFuel.mutate({ tankId: form.tankId, body: { litresDispensed: Number(form.litresDispensed), pricePerLitre: form.pricePerLitre ? Number(form.pricePerLitre) : null, dispatchedAt: new Date().toISOString(), recipientName: form.recipientName || null, authorisedBy: form.authorisedBy || null, odometerReading: form.odometerReading ? Number(form.odometerReading) : null, hoursReading: form.hoursReading ? Number(form.hoursReading) : null, notes: form.notes || null, ...(form.destinationDepotId ? { destinationDepotId: form.destinationDepotId } : {}) } })}
+                onClick={() => dispatchFuel.mutate({ tankId: form.tankId, body: { litresDispensed: Number(form.litresDispensed), pricePerLitre: form.pricePerLitre ? Number(form.pricePerLitre) : null, dispatchedAt: new Date().toISOString(), recipientName: form.recipientName || null, authorisedBy: form.authorisedBy || null, odometerReading: form.odometerReading ? Number(form.odometerReading) : null, hoursReading: form.hoursReading ? Number(form.hoursReading) : null, notes: form.notes || null, ...(form.destinationDepotId ? { destinationDepotId: form.destinationDepotId } : {}), ...(form.destinationDepotId && form.destinationTankId ? { destinationTankId: form.destinationTankId } : {}) } })}
                 disabled={!form.tankId || !form.litresDispensed || !form.recipientName || Number(form.litresDispensed) > Number(selectedTank?.currentLitres ?? 0) || dispatchFuel.isPending}
                 style={{ padding: "9px 22px", background: "var(--hf-primary)", color: "var(--hf-text-on-solid)", border: "none", borderRadius: 9, fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
                 {dispatchFuel.isPending ? "Dispatching..." : "Dispatch Fuel"}

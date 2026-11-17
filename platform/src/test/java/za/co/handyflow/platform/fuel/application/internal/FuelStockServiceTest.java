@@ -97,6 +97,36 @@ class FuelStockServiceTest {
                 () -> service.transfer(TENANT, new TransferRequest(a.getId(), a.getId(), bd("10"), "Same tank")));
     }
 
+    private FuelTransfer moved(FuelTank from, FuelTank to, String litres) {
+        FuelTransfer t = FuelTransfer.of(TENANT, from.getId(), to.getId(), bd(litres), "Supply run", null);
+        when(transfers.findOne(TENANT, t.getId())).thenReturn(Optional.of(t));
+        return t;
+    }
+
+    @Test @DisplayName("reversing a transfer takes the fuel back out of the destination, returns it to the source, marks it reversed and posts two reversal lines")
+    void reverseTransferMovesFuelBack() {
+        service.transfer(TENANT, new TransferRequest(a.getId(), b.getId(), bd("1500"), "Supply run"));
+        FuelTransfer t = moved(a, b, "1500");
+        service.reverseTransfer(TENANT, t.getId(), "Wrong tank");
+        assertEquals(0, bd("5000").compareTo(a.getCurrentLitres()));
+        assertEquals(0, bd("1000").compareTo(b.getCurrentLitres()));
+        assertTrue(t.isReversed());
+        verify(ledger).post(eq(b), eq(FuelStockMovement.Type.REVERSAL), eq(bd("-1500")), eq("TRANSFER"), eq(t.getId()), eq("Wrong tank"));
+        verify(ledger).post(eq(a), eq(FuelStockMovement.Type.REVERSAL), eq(bd("1500")), eq("TRANSFER"), eq(t.getId()), eq("Wrong tank"));
+    }
+
+    @Test @DisplayName("a transfer cannot be reversed once the destination tank no longer holds the fuel, or twice")
+    void reverseTransferRefusals() {
+        FuelTransfer t = moved(a, b, "1500");          // b holds only 1000
+        assertThrows(IllegalStateException.class, () -> service.reverseTransfer(TENANT, t.getId(), "Too late"));
+        assertFalse(t.isReversed());
+        assertEquals(0, bd("1000").compareTo(b.getCurrentLitres()));
+        FuelTransfer ok = moved(a, b, "400");
+        service.reverseTransfer(TENANT, ok.getId(), "Once");
+        assertThrows(IllegalStateException.class, () -> service.reverseTransfer(TENANT, ok.getId(), "Twice"));
+        assertThrows(za.co.handyflow.platform.shared.ResourceNotFoundException.class, () -> service.reverseTransfer(TENANT, UUID.randomUUID(), "Unknown"));
+    }
+
     @Test @DisplayName("a transfer larger than the source holds is refused and nothing moves")
     void transferTooMuch() {
         assertThrows(IllegalArgumentException.class,

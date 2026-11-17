@@ -49,7 +49,7 @@ export function splitProblem(lines: SplitLine[]): string | null {
 
 // Matching a forecourt's receipts to the dispatches that supplied it.
 export type FcLinkedReceipt = { matchId: string; receiptId: string; receivedAt: string; litres: number; deliveryNote: string | null }
-export type FcMatched = { dispatchId: string; dispatchedAt: string; fromTank: string; fuelType: string; litresDispatched: number; litresReceived: number; difference: number; receipts: FcLinkedReceipt[] }
+export type FcMatched = { dispatchId: string; dispatchedAt: string; fromTank: string; fuelType: string; litresDispatched: number; litresReceived: number; difference: number; receipts: FcLinkedReceipt[]; byTransfer?: boolean }
 export type FcOpenDispatch = { dispatchId: string; dispatchedAt: string; fromTank: string; fuelType: string; litres: number }
 export type FcOpenReceipt = { receiptId: string; receivedAt: string; tank: string; fuelType: string; litres: number; deliveryNote: string | null }
 export type FcMatching = { depotId: string; name: string; matched: FcMatched[]; openDispatches: FcOpenDispatch[]; openReceipts: FcOpenReceipt[]; dispatchedLitres: number; receivedLitres: number }
@@ -67,4 +67,10 @@ export function differenceText(m: FcMatched): string {
   const d = Math.round(m.difference * 100) / 100
   if (d === 0) return "Received in full"
   return d > 0 ? `${d.toLocaleString("en-ZA")} L less received than dispatched` : `${(-d).toLocaleString("en-ZA")} L more received than dispatched`
+}
+
+/** Tanks a supply run can be delivered straight into: at the chosen forecourt, the same fuel as the source tank, and not the source tank itself. */
+export function forecourtTankChoices(tanks: { id: string; name: string; fuelType: string; depotId?: string | null }[], depotId: string, source?: { id: string; fuelType: string }): { id: string; name: string }[] {
+  if (!depotId || !source) return []
+  return tanks.filter(t => t.depotId === depotId && t.id !== source.id && String(t.fuelType).toUpperCase() === String(source.fuelType).toUpperCase()).map(t => ({ id: t.id, name: t.name }))
 }

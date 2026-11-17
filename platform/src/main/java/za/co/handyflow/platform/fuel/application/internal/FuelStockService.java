@@ -133,6 +133,35 @@ public class FuelStockService {
         return new TransferResponse(t.getId(), t.getFromTankId(), t.getToTankId(), t.getLitres(), t.getReason(), t.getCreatedAt());
     }
 
+    /**
+     * Undoes a transfer made for a dispatch (the dispatch is reversed). The fuel must still be in the destination tank and not reserved for others,
+     * the same rule as reversing a receipt. The transfer is kept and marked reversed, and a reversal line is posted on both tanks.
+     */
+    @Transactional
+    public void reverseTransfer(TenantId tenantId, UUID transferId, String reason) {
+        FuelTransfer t = transferRepository.findOne(tenantId, transferId).orElseThrow(() -> new ResourceNotFoundException("Transfer", transferId.toString()));
+        UUID first = t.getFromTankId().compareTo(t.getToTankId()) < 0 ? t.getFromTankId() : t.getToTankId();
+        UUID second = first.equals(t.getFromTankId()) ? t.getToTankId() : t.getFromTankId();
+        FuelTank a = lockTank(tenantId, first);
+        FuelTank b = lockTank(tenantId, second);
+        FuelTank from = a.getId().equals(t.getFromTankId()) ? a : b;
+        FuelTank to = a.getId().equals(t.getToTankId()) ? a : b;
+        if (t.isReversed()) throw new IllegalStateException("This transfer has already been reversed.");
+        if (to.getCurrentLitres().compareTo(t.getLitres()) < 0) {
+            throw new IllegalStateException("Cannot reverse this delivery: " + to.getName() + " holds " + to.getCurrentLitres().toPlainString() + "L but "
+                    + t.getLitres().toPlainString() + "L would be taken back. Some of that fuel has already been sold or moved.");
+        }
+        ledger.requireUnreserved(to, t.getLitres(), BigDecimal.ZERO);
+        to.removeStock(t.getLitres());
+        from.restoreStock(t.getLitres());
+        tankRepository.save(to);
+        tankRepository.save(from);
+        t.markReversed();
+        transferRepository.save(t);
+        ledger.post(to, FuelStockMovement.Type.REVERSAL, t.getLitres().negate(), "TRANSFER", t.getId(), reason);
+        ledger.post(from, FuelStockMovement.Type.REVERSAL, t.getLitres(), "TRANSFER", t.getId(), reason);
+    }
+
     @Transactional(readOnly = true)
     public Page<TransferResponse> getTransfers(TenantId tenantId, Pageable pageable) { return getTransfers(tenantId, null, pageable); }
 
@@ -141,7 +170,7 @@ public class FuelStockService {
     public Page<TransferResponse> getTransfers(TenantId tenantId, Set<UUID> allowedTankIds, Pageable pageable) {
         if (allowedTankIds != null && allowedTankIds.isEmpty()) return Page.empty(pageable);
         return (allowedTankIds == null ? transferRepository.findAllForTenant(tenantId, pageable) : transferRepository.findInvolving(tenantId, allowedTankIds, pageable))
-                .map(t -> new TransferResponse(t.getId(), t.getFromTankId(), t.getToTankId(), t.getLitres(), t.getReason(), t.getCreatedAt()));
+                .map(t -> new TransferResponse(t.getId(), t.getFromTankId(), t.getToTankId(), t.getLitres(), t.getReason(), t.getCreatedAt(), t.getReversedAt()));
     }
 
     // ── Reservations ─────────────────────────────────────────────────────────

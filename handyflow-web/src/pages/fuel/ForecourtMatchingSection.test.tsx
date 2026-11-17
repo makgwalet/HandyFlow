@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
 import { render, screen, cleanup, fireEvent, waitFor } from "@testing-library/react"
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import ForecourtMatchingSection from "./ForecourtMatchingSection"
-import { differenceText, isFcMatching, receiptChoices } from "./forecourtSupplyOps"
+import { differenceText, isFcMatching, receiptChoices, forecourtTankChoices } from "./forecourtSupplyOps"
 
 const get = vi.fn(); const post = vi.fn(); const del = vi.fn()
 let perms: string[] = []
@@ -68,5 +68,21 @@ describe("ForecourtMatchingSection", () => {
     expect(differenceText(m)).toBe("Received in full")
     expect(differenceText({ difference: -50 } as any)).toMatch(/more received/)
     expect(receiptChoices(rep().forecourts[0] as any, rep().forecourts[0].openDispatches[0] as any).length).toBe(1)
+  })
+
+  it("a run delivered by stock transfer says so, needs no receipt and has nothing to unlink", async () => {
+    get.mockResolvedValue({ data: { data: rep({ forecourts: [{ depotId: "f1", name: "Forecourt One", dispatchedLitres: 8000, receivedLitres: 8000, openDispatches: [], openReceipts: [],
+      matched: [{ dispatchId: "d9", dispatchedAt: "2026-11-15T08:00:00Z", fromTank: "Terminal diesel", fuelType: "DIESEL", litresDispatched: 8000, litresReceived: 8000, difference: 0, receipts: [], byTransfer: true }] }] }) } })
+    mount()
+    expect(await screen.findByText(/delivered by stock transfer, no receipt needed/)).toBeTruthy()
+    expect(screen.queryByText(/Unlink/)).toBeNull()
+    expect(screen.queryByText(/No receipt linked/)).toBeNull()
+  })
+
+  it("offers only tanks at the chosen forecourt that hold the same fuel as the source tank", () => {
+    const tanks = [{ id: "a", name: "Terminal diesel", fuelType: "DIESEL", depotId: "t" }, { id: "b", name: "FC diesel", fuelType: "diesel", depotId: "f" }, { id: "c", name: "FC petrol", fuelType: "PETROL", depotId: "f" }, { id: "d", name: "Other diesel", fuelType: "DIESEL", depotId: "x" }]
+    expect(forecourtTankChoices(tanks, "f", { id: "a", fuelType: "DIESEL" })).toEqual([{ id: "b", name: "FC diesel" }])
+    expect(forecourtTankChoices(tanks, "", { id: "a", fuelType: "DIESEL" })).toEqual([])
+    expect(forecourtTankChoices(tanks, "f", undefined)).toEqual([])
   })
 })

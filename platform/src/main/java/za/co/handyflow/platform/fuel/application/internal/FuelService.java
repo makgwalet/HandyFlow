@@ -77,6 +77,7 @@ public class FuelService {
     private final FuelCustomerAccountRepository accountRepository;
     private final FuelCustomerSiteRepository siteRepository;
     private final FuelOrderFulfilment orderFulfilment;
+    private final FuelStockService stockService;
 
     @Value("${fuel.forecast.lookback-days:30}")
     private int forecastLookbackDays = 30;
@@ -468,6 +469,7 @@ public class FuelService {
     public DispatchResponse dispatchFuel(TenantId tenantId, UUID tankId,
                                          DispatchFuelRequest req, UUID actingUserId) {
         requireCustomer(tenantId, req.customerId());
+        if (req.destinationTankId() != null) return dispatchIntoForecourtTank(tenantId, tankId, req, actingUserId);
         FuelTank tank = findActiveTankForUpdate(tenantId, tankId);
         var levelBefore = tank.getCurrentLitres();
         boolean wasLow = tank.isLow();
@@ -529,6 +531,44 @@ public class FuelService {
         log.info("Fuel dispatched tank={} litres={} to={}",
                 tank.getName(), req.litresDispensed(),
                 req.recipientName() != null ? req.recipientName() : req.vehicleId());
+        return toDispatchResponse(dispatch);
+    }
+
+    /**
+     * A supply run from a depot straight into a forecourt tank: ONE stock transfer, linked to the dispatch. The transfer moves the stock and posts the
+     * ledger lines; the dispatch records the run (litres, levels, cost snapshot, review) and posts no stock line of its own, so nothing counts twice.
+     * The forecourt must not also record a receipt for it (matching refuses). Different legal entities are an inter-entity transfer, which is not
+     * built, so they are refused here; use a dispatch and a receipt for those.
+     */
+    private DispatchResponse dispatchIntoForecourtTank(TenantId tenantId, UUID tankId, DispatchFuelRequest req, UUID actingUserId) {
+        if (req.destinationDepotId() == null) throw new IllegalArgumentException("Choose the forecourt the fuel is delivered to.");
+        if (req.vehicleId() != null || req.assetId() != null || req.customerId() != null)
+            throw new IllegalArgumentException("A delivery into a forecourt tank cannot also be issued to a vehicle, asset or customer.");
+        FuelTank source = findActiveTank(tenantId, tankId);
+        FuelTank dest = findActiveTank(tenantId, req.destinationTankId());
+        var forecourt = depotRepository.findActiveById(tenantId, req.destinationDepotId())
+                .orElseThrow(() -> new za.co.handyflow.platform.shared.ResourceNotFoundException("Depot", req.destinationDepotId().toString()));
+        if (!req.destinationDepotId().equals(dest.getDepotId())) throw new IllegalArgumentException("That tank is not at the forecourt the fuel is delivered to.");
+        if (req.destinationDepotId().equals(source.getDepotId())) throw new IllegalArgumentException("The destination is the depot the fuel leaves. Choose the forecourt it is delivered to.");
+        if (!source.getFuelType().equalsIgnoreCase(dest.getFuelType()))
+            throw new IllegalArgumentException("Cannot deliver " + source.getFuelType() + " into a " + dest.getFuelType() + " tank.");
+        var fromDepot = source.getDepotId() == null ? null : depotRepository.findActiveById(tenantId, source.getDepotId()).orElse(null);
+        if (fromDepot != null && fromDepot.getLegalEntityId() != null && forecourt.getLegalEntityId() != null && !fromDepot.getLegalEntityId().equals(forecourt.getLegalEntityId()))
+            throw new IllegalArgumentException("These depots belong to different legal entities. That is an inter-entity transfer, which is not available yet. Record a dispatch and let the forecourt record a receipt.");
+        boolean wasLow = source.isLow();
+        var before = source.getCurrentLitres();
+        // The transfer locks both tanks in a fixed order, enforces reservations and posts the ledger. A short tank refuses here, before anything is recorded.
+        var moved = stockService.transfer(tenantId, new TransferRequest(tankId, req.destinationTankId(), req.litresDispensed(), "Supply run to " + forecourt.getName()));
+        FuelTank tank = findActiveTankForUpdate(tenantId, tankId);
+        FuelDispatch dispatch = FuelDispatch.create(tenantId, tankId, null, null, null, req.recipientName(), req.litresDispensed(), req.pricePerLitre(),
+                req.dispatchedAt(), req.odometerReading(), req.hoursReading(), req.authorisedBy(), req.notes(), before, tank.getCurrentLitres());
+        dispatch.recordCostSnapshot(tank.getCostPerLitreWac());
+        dispatch.setDestinationDepot(req.destinationDepotId());
+        dispatch.linkTransfer(moved.id());
+        dispatchRepository.save(dispatch);
+        if (!wasLow && tank.isLow()) notifyLowStock(tenantId, tank);
+        submitDispatchForReview(tenantId, dispatch, actingUserId);
+        log.info("Supply run dispatched tank={} litres={} to forecourt={} tank={} transfer={}", tank.getName(), req.litresDispensed(), forecourt.getName(), dest.getName(), moved.id());
         return toDispatchResponse(dispatch);
     }
 
@@ -783,8 +823,16 @@ public class FuelService {
                                             ReverseRequest req, UUID actingUserId) {
         FuelDispatch d = dispatchRepository.findActiveById(tenantId, dispatchId)
                 .orElseThrow(() -> new ResourceNotFoundException("Dispatch", dispatchId.toString()));
-        FuelTank tank = findActiveTankForUpdate(tenantId, d.getTankId());
         if (d.isReversed()) throw new IllegalStateException("This dispatch has already been reversed.");
+        if (d.isDeliveredByTransfer()) {
+            // The transfer put the fuel into the forecourt tank: take it back out and return it to the supplying tank, then mark the run reversed.
+            stockService.reverseTransfer(tenantId, d.getTransferId(), req.reason().trim());
+            d.reverse(actingUserId, req.reason().trim());
+            dispatchRepository.save(d);
+            log.info("Supply run reversed id={} litres={} transfer={}", dispatchId, d.getLitresDispensed(), d.getTransferId());
+            return toDispatchResponse(d);
+        }
+        FuelTank tank = findActiveTankForUpdate(tenantId, d.getTankId());
         tank.restoreStock(d.getLitresDispensed());
         tankRepository.save(tank);
         d.reverse(actingUserId, req.reason().trim());
@@ -850,7 +898,7 @@ public class FuelService {
                 d.getLitresDispensed(), d.getPricePerLitre(), d.getDispatchedAt(),
                 d.getOdometerReading(), d.getHoursReading(), d.getAuthorisedBy(),
                 d.getLevelBefore(), d.getLevelAfter(), d.getCreatedAt(),
-                d.getReversedAt(), d.getReversalReason(), d.getDestinationDepotId());
+                d.getReversedAt(), d.getReversalReason(), d.getDestinationDepotId(), d.getTransferId());
     }
 
     private DipReadingResponse toDipResponse(DipReading d) {

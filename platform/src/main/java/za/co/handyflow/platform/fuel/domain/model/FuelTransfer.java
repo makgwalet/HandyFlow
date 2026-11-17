@@ -41,6 +41,16 @@ public class FuelTransfer {
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
+    @Column(name = "reversed_at")
+    private Instant reversedAt;
+
+    public boolean isReversed() { return reversedAt != null; }
+
+    public void markReversed() {
+        if (reversedAt != null) throw new IllegalStateException("This transfer has already been reversed.");
+        this.reversedAt = Instant.now();
+    }
+
     public static FuelTransfer of(TenantId tenantId, UUID from, UUID to, BigDecimal litres, String reason, UUID by) {
         FuelTransfer t = new FuelTransfer();
         t.tenantId = tenantId; t.fromTankId = from; t.toTankId = to;

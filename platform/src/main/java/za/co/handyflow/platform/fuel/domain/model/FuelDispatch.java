@@ -130,6 +130,14 @@ public class FuelDispatch {
 
     public void setDestinationDepot(UUID depotId) { this.destinationDepotId = depotId; }
 
+    /** The stock transfer that moved this supply run into a forecourt tank. Null when the fuel is received separately (a receipt) or the dispatch is not a supply run. */
+    @Column(name = "transfer_id", updatable = false)
+    private UUID transferId;
+
+    public void linkTransfer(UUID transferId) { this.transferId = transferId; }
+
+    public boolean isDeliveredByTransfer() { return transferId != null; }
+
     public boolean isDeleted() { return deletedAt != null; }
 
     public boolean isReversed() { return reversedAt != null; }

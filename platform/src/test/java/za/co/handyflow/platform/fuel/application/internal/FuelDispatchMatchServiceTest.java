@@ -145,4 +145,26 @@ class FuelDispatchMatchServiceTest {
         svc.match(T, d.getId(), r.getId(), null, Set.of(fc.getId()));
         verify(matches, times(1)).save(any());
     }
+
+    @Test @DisplayName("a dispatch delivered by stock transfer counts as received in full, needs no receipt and is flagged byTransfer")
+    void deliveredByTransferIsAlreadyReceived() {
+        FuelDispatch d = dispatch("1000", fc.getId());
+        when(d.isDeliveredByTransfer()).thenReturn(true);
+        when(dispatches.findToDepotsBetween(eq(T), any(), any(), any())).thenReturn(List.of(d));
+        var f = svc.report(T, 7, null).forecourts().stream().filter(x -> x.name().equals("Forecourt")).findFirst().orElseThrow();
+        assertEquals(1, f.matched().size());
+        assertTrue(f.matched().get(0).byTransfer());
+        assertEquals(0, bd("1000").compareTo(f.receivedLitres()));
+        assertEquals(0, BigDecimal.ZERO.compareTo(f.matched().get(0).difference()));
+        assertTrue(f.openDispatches().isEmpty());
+    }
+
+    @Test @DisplayName("a receipt cannot be linked to a dispatch that was already delivered by transfer, or the fuel would count twice")
+    void cannotLinkReceiptToTransferDelivery() {
+        FuelDispatch d = dispatch("1000", fc.getId());
+        when(d.isDeliveredByTransfer()).thenReturn(true);
+        FuelReceipt r = receipt(tFc, "1000");
+        assertThrows(IllegalStateException.class, () -> svc.match(T, d.getId(), r.getId(), UUID.randomUUID(), null));
+        verify(matches, never()).save(any());
+    }
 }

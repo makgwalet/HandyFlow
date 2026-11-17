@@ -40,7 +40,7 @@ export default function ForecourtMatchingSection({ days }: { days: number }) {
               {f.matched.map(m => (
                 <tr key={m.dispatchId} style={{ borderTop: "1px solid var(--hf-border-subtle)" }}>
                   <td style={td}>{when(m.dispatchedAt)}</td><td style={td}>{m.fromTank} ({m.fuelType})</td><td style={td}>{fmtL(m.litresDispatched)}</td>
-                  <td style={td}>{fmtL(m.litresReceived)} <span style={{ color: "var(--hf-text-muted)" }}>({differenceText(m)})</span></td>
+                  <td style={td}>{m.byTransfer ? <>{fmtL(m.litresReceived)} <span style={{ color: "var(--hf-text-muted)" }}>(delivered by stock transfer, no receipt needed)</span></> : <>{fmtL(m.litresReceived)} <span style={{ color: "var(--hf-text-muted)" }}>({differenceText(m)})</span></>}</td>
                   <td style={td}>{canManage && m.receipts.map(r => <button key={r.matchId} style={{ ...btnGhost, padding: "2px 8px", marginRight: 4 }} onClick={() => unlink.mutate(r.matchId)}>Unlink {fmtL(r.litres)}</button>)}</td>
                 </tr>))}
               {f.openDispatches.map(o => {

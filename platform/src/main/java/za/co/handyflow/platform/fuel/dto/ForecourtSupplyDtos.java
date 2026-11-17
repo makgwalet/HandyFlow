@@ -34,7 +34,11 @@ public final class ForecourtSupplyDtos {
     public record Share(UUID supplyingDepotId, String name, BigDecimal percentage) {}
 
     /** A dispatch to a forecourt with the receipts linked to it. difference = litres dispatched minus litres received (positive: less arrived than left). */
-    public record Matched(UUID dispatchId, java.time.Instant dispatchedAt, String fromTank, String fuelType, BigDecimal litresDispatched, BigDecimal litresReceived, BigDecimal difference, List<LinkedReceipt> receipts) {}
+    public record Matched(UUID dispatchId, java.time.Instant dispatchedAt, String fromTank, String fuelType, BigDecimal litresDispatched, BigDecimal litresReceived, BigDecimal difference, List<LinkedReceipt> receipts, boolean byTransfer) {
+        public Matched(UUID dispatchId, java.time.Instant dispatchedAt, String fromTank, String fuelType, BigDecimal litresDispatched, BigDecimal litresReceived, BigDecimal difference, List<LinkedReceipt> receipts) {
+            this(dispatchId, dispatchedAt, fromTank, fuelType, litresDispatched, litresReceived, difference, receipts, false);
+        }
+    }
 
     public record LinkedReceipt(UUID matchId, UUID receiptId, java.time.Instant receivedAt, BigDecimal litres, String deliveryNote) {}
 
