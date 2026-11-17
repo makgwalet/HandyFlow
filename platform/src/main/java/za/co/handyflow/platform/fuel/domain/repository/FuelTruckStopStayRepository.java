@@ -50,4 +50,8 @@ public interface FuelTruckStopStayRepository extends JpaRepository<FuelTruckStop
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("UPDATE FuelTruckStopStay s SET s.invoiceState = 'LINK_FAILED', s.invoiceId = :invoiceId, s.invoiceNumber = :number, s.invoiceError = :message WHERE s.tenantId = :tenantId AND s.id = :id")
     int markLinkFailed(TenantId tenantId, UUID id, UUID invoiceId, String number, String message);
+
+    /** Stays charged to an account that left within [from, to], oldest first. */
+    @Query("SELECT s FROM FuelTruckStopStay s WHERE s.tenantId = :tenantId AND s.accountId = :accountId AND s.status = 'CHECKED_OUT' AND s.actualDepartureDate >= :from AND s.actualDepartureDate <= :to ORDER BY s.actualDepartureDate, s.createdAt")
+    List<FuelTruckStopStay> findChargedToAccount(TenantId tenantId, UUID accountId, LocalDate from, LocalDate to);
 }

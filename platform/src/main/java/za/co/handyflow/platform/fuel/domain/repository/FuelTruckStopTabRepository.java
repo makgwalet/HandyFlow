@@ -43,4 +43,8 @@ public interface FuelTruckStopTabRepository extends JpaRepository<FuelTruckStopT
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("UPDATE FuelTruckStopTab t SET t.invoiceState = 'LINK_FAILED', t.invoiceId = :invoiceId, t.invoiceNumber = :number, t.invoiceError = :message WHERE t.tenantId = :tenantId AND t.id = :id")
     int markLinkFailed(TenantId tenantId, UUID id, UUID invoiceId, String number, String message);
+
+    /** Tabs charged to an account that were settled in [from, to), oldest first. */
+    @Query("SELECT t FROM FuelTruckStopTab t WHERE t.tenantId = :tenantId AND t.accountId = :accountId AND t.status = 'SETTLED' AND t.paymentMethod = 'ACCOUNT' AND t.settledAt >= :from AND t.settledAt < :to ORDER BY t.settledAt")
+    List<FuelTruckStopTab> findChargedToAccount(TenantId tenantId, UUID accountId, Instant from, Instant to);
 }
