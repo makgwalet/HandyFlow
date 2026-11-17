@@ -10,13 +10,16 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import za.co.handyflow.platform.fuel.domain.model.FuelAlertRecipient;
+import za.co.handyflow.platform.fuel.domain.model.FuelAlertTopicSetting;
 import za.co.handyflow.platform.fuel.domain.repository.FuelAlertRecipientRepository;
+import za.co.handyflow.platform.fuel.domain.repository.FuelAlertTopicSettingRepository;
 import za.co.handyflow.platform.notifications.application.Recipient;
 import za.co.handyflow.platform.notifications.application.TenantAdminRecipients;
 import za.co.handyflow.platform.shared.HandyFlowException;
 import za.co.handyflow.platform.shared.TenantId;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -31,6 +34,7 @@ class FuelAlertRecipientServiceTest {
     static final TenantId T = TenantId.of(UUID.randomUUID());
     @Mock FuelAlertRecipientRepository repo;
     @Mock TenantAdminRecipients admins;
+    @Mock FuelAlertTopicSettingRepository settings;
     @InjectMocks FuelAlertRecipientService service;
 
     final Recipient admin = Recipient.user(UUID.randomUUID(), "Admin", "a@x.co", null);
@@ -92,5 +96,56 @@ class FuelAlertRecipientServiceTest {
         assertThrows(IllegalArgumentException.class, () -> service.replace(T, "NOPE", List.of(), null));
         List<UUID> eleven = java.util.stream.IntStream.range(0, 11).mapToObj(i -> UUID.randomUUID()).toList();
         assertThrows(IllegalArgumentException.class, () -> service.replace(T, "VARIANCE", eleven, null));
+    }
+
+    private void excluded(boolean on) {
+        when(settings.findOne(T.getValue(), "VARIANCE")).thenReturn(Optional.of(FuelAlertTopicSetting.of(T, "VARIANCE", on, null)));
+    }
+
+    @Test @DisplayName("with administrators left off, only the chosen people are told")
+    void adminsLeftOff() {
+        when(admins.resolveTenantAdmins(T)).thenReturn(List.of(admin));
+        when(repo.findByTopic(T, "VARIANCE")).thenReturn(List.of(FuelAlertRecipient.of(T, "VARIANCE", other.userId(), null)));
+        when(admins.resolveUsers(eq(T), any())).thenReturn(List.of(other));
+        excluded(true);
+        assertEquals(List.of(other), service.recipientsFor(T, "VARIANCE"));
+    }
+
+    @Test @DisplayName("if the chosen people cannot be reached, administrators are told anyway")
+    void adminsBackWhenNobodyReachable() {
+        when(admins.resolveTenantAdmins(T)).thenReturn(List.of(admin));
+        when(repo.findByTopic(T, "VARIANCE")).thenReturn(List.of(FuelAlertRecipient.of(T, "VARIANCE", other.userId(), null)));
+        when(admins.resolveUsers(eq(T), any())).thenReturn(List.of());
+        excluded(true);
+        assertEquals(List.of(admin), service.recipientsFor(T, "VARIANCE"));
+        when(admins.resolveUsers(eq(T), any())).thenThrow(new RuntimeException("down"));
+        assertEquals(List.of(admin), service.recipientsFor(T, "VARIANCE"));
+    }
+
+    @Test @DisplayName("leaving administrators off needs someone else chosen")
+    void excludeNeedsSomeoneElse() {
+        assertThrows(IllegalArgumentException.class, () -> service.replace(T, "VARIANCE", List.of(), true, null));
+        verify(settings, never()).save(any());
+    }
+
+    @Test @DisplayName("choosing people and leaving administrators off saves the setting")
+    void savesExclusion() {
+        UUID u = UUID.randomUUID();
+        when(admins.resolveUsers(eq(T), any())).thenReturn(List.of(Recipient.user(u, "U", "u@x.co", null)));
+        when(settings.findOne(T.getValue(), "VARIANCE")).thenReturn(Optional.empty());
+        var t = service.replace(T, "VARIANCE", List.of(u), true, UUID.randomUUID());
+        assertTrue(t.excludeAdmins());
+        ArgumentCaptor<FuelAlertTopicSetting> c = ArgumentCaptor.forClass(FuelAlertTopicSetting.class);
+        verify(settings).save(c.capture());
+        assertTrue(c.getValue().isExcludeAdmins());
+    }
+
+    @Test @DisplayName("removing every other person puts administrators back on")
+    void removingEveryoneRestoresAdmins() {
+        excluded(true);
+        FuelAlertRecipient row = FuelAlertRecipient.of(T, "VARIANCE", UUID.randomUUID(), null);
+        when(repo.findByTopic(T, "VARIANCE")).thenReturn(List.of(row));
+        var t = service.replace(T, "VARIANCE", List.of(), null, null);
+        assertFalse(t.excludeAdmins());
     }
 }

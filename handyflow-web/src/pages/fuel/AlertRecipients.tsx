@@ -14,13 +14,14 @@ export default function AlertRecipients({ users }: { users: UserOption[] }) {
   const q = useQuery<AlertTopic[]>({ queryKey: ["fuel-alert-recipients"], queryFn: async () => onlyTopics(unwrap(await apiClient.get("/api/v1/fuel/alert-recipients"))) })
   const [topic, setTopic] = useState("")
   const [ids, setIds] = useState<string[]>([])
+  const [excl, setExcl] = useState(false)
   const [err, setErr] = useState("")
   const topics = q.data ?? []
 
-  useEffect(() => { setIds(topics.find(t => t.topic === topic)?.userIds ?? []) }, [topic, q.data])
+  useEffect(() => { const t = topics.find(x => x.topic === topic); setIds(t?.userIds ?? []); setExcl(!!t?.excludeAdmins) }, [topic, q.data])
 
   const save = useMutation({
-    mutationFn: () => apiClient.put(`/api/v1/fuel/alert-recipients/${topic}`, { userIds: ids }),
+    mutationFn: () => apiClient.put(`/api/v1/fuel/alert-recipients/${topic}`, { userIds: ids, excludeAdmins: ids.length > 0 && excl }),
     onSuccess: () => { setErr(""); setTopic(""); qc.invalidateQueries({ queryKey: ["fuel-alert-recipients"] }) },
     onError: (e: any) => setErr(msg(e, "Could not save")),
   })
@@ -32,7 +33,7 @@ export default function AlertRecipients({ users }: { users: UserOption[] }) {
     <div style={{ ...card, padding: 16, marginTop: 14 }}>
       <h3 style={{ margin: "0 0 4px", fontSize: 14 }}>Who is told about alerts</h3>
       <p style={{ margin: "0 0 12px", fontSize: 12.5, color: "var(--hf-text-muted)" }}>
-        Administrators are always told. Add people here who should be told as well. Only active users with an email address can be added.
+        Administrators are told by default. Add people here who should be told as well, and you can leave administrators off the routine notification once someone else is chosen. Administrators still see the alert in the app, and security or compliance escalations are not affected. Only active users with an email address can be added.
       </p>
       {topics.map(t => (
         <div key={t.topic} style={{ display: "flex", gap: 10, alignItems: "center", padding: "8px 0", borderTop: "1px solid var(--hf-border)" }}>
@@ -52,6 +53,9 @@ export default function AlertRecipients({ users }: { users: UserOption[] }) {
               <input type="checkbox" checked={ids.includes(u.id)} onChange={() => setIds(toggle(ids, u.id))} /> {u.name}
             </label>
           ))}
+          <label style={{ display: "block", fontSize: 13, marginTop: 8 }}>
+            <input type="checkbox" checked={excl && ids.length > 0} disabled={ids.length === 0} onChange={e => setExcl(e.target.checked)} /> Leave administrators off this notification
+          </label>
           {err && <p role="alert" style={{ color: "var(--hf-danger-text)", fontSize: 12 }}>{err}</p>}
           <button style={{ ...btnPrimary, marginTop: 8 }} disabled={save.isPending} onClick={() => save.mutate()}>Save</button>
         </fieldset>

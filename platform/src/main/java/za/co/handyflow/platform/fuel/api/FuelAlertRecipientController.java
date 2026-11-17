@@ -35,6 +35,6 @@ public class FuelAlertRecipientController {
     public ResponseEntity<ApiResponse<Topic>> replace(@PathVariable String topic, @RequestBody SaveRequest req) {
         featureGuard.requireModule("fuel");
         return ResponseEntity.ok(ApiResponse.success("Recipients saved",
-                service.replace(TenantContext.getTenantIdAsObject(), topic.toUpperCase(java.util.Locale.ROOT), req.userIds(), TenantContext.getCurrentUserId())));
+                service.replace(TenantContext.getTenantIdAsObject(), topic.toUpperCase(java.util.Locale.ROOT), req.userIds(), req.excludeAdmins(), TenantContext.getCurrentUserId())));
     }
 }

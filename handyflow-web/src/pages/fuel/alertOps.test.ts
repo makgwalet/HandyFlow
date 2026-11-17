@@ -9,6 +9,9 @@ describe("alertOps", () => {
   it("names the people added, and falls back to a short id for unknown users", () => {
     expect(topicSummary({ topic: "VARIANCE", label: "x", userIds: ["u1", "abcdef123456"] }, users)).toBe("Administrators and Thabo M, User abcdef12")
   })
+  it("says when administrators are left off", () => {
+    expect(topicSummary({ topic: "VARIANCE", label: "x", userIds: ["u1"], excludeAdmins: true }, users)).toContain("administrators left off")
+  })
   it("keeps only rows shaped like alert topics", () => {
     expect(onlyTopics([{ id: "x" }, { topic: "VARIANCE", label: "L", userIds: [] }])).toHaveLength(1)
     expect(onlyTopics({})).toEqual([])

@@ -5,6 +5,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import za.co.handyflow.platform.fuel.domain.model.FuelAlertRecipient;
+import za.co.handyflow.platform.fuel.domain.model.FuelAlertTopicSetting;
+import za.co.handyflow.platform.fuel.domain.repository.FuelAlertTopicSettingRepository;
 import za.co.handyflow.platform.fuel.domain.repository.FuelAlertRecipientRepository;
 import za.co.handyflow.platform.fuel.dto.AlertRecipientDtos.Topic;
 import za.co.handyflow.platform.notifications.application.Recipient;
@@ -15,8 +17,10 @@ import za.co.handyflow.platform.shared.TenantId;
 import java.util.*;
 
 /**
- * Who is told about a Fuel alert. Administrators are always told, exactly as before; a company may add named users per topic.
- * A company that adds nobody gets the administrators only, so nothing changes until someone is chosen.
+ * Who is told about a Fuel alert. Administrators are told, exactly as before, and a company may add named users per topic.
+ * A company may leave administrators off the routine notification, but only while at least one other person is told; if nobody
+ * else can be reached the administrators are told anyway, so an alert never goes unseen. Excluding an administrator only affects
+ * this notification: they still see the alert where it is shown in the app, and mandatory escalations do not use this list.
  */
 @Service
 @RequiredArgsConstructor
@@ -30,19 +34,28 @@ public class FuelAlertRecipientService {
 
     private final FuelAlertRecipientRepository repo;
     private final TenantAdminRecipients adminRecipients;
+    private final FuelAlertTopicSettingRepository settings;
 
     @Transactional(readOnly = true)
     public List<Topic> list(TenantId tenant) {
+        Map<String, Boolean> excl = new HashMap<>();
+        for (FuelAlertTopicSetting st : settings.findAllForTenant(tenant.getValue())) excl.put(st.getTopic(), st.isExcludeAdmins());
         Map<String, List<UUID>> by = new HashMap<>();
         for (FuelAlertRecipient r : repo.findAllForTenant(tenant)) by.computeIfAbsent(r.getTopic(), k -> new ArrayList<>()).add(r.getUserId());
         List<Topic> out = new ArrayList<>();
-        TOPICS.forEach((k, label) -> out.add(new Topic(k, label, by.getOrDefault(k, List.of()))));
+        TOPICS.forEach((k, label) -> out.add(new Topic(k, label, by.getOrDefault(k, List.of()), excl.getOrDefault(k, false))));
         return out;
     }
 
     /** Replaces the extra recipients for a topic. An empty list clears them. Every user must be an active user of this company with an email. */
     @Transactional
     public Topic replace(TenantId tenant, String topic, List<UUID> userIds, UUID by) {
+        return replace(tenant, topic, userIds, null, by);
+    }
+
+    /** excludeAdmins null keeps the current setting. Excluding administrators needs at least one other person chosen. */
+    @Transactional
+    public Topic replace(TenantId tenant, String topic, List<UUID> userIds, Boolean excludeAdmins, UUID by) {
         String label = TOPICS.get(topic == null ? "" : topic);
         if (label == null) throw new IllegalArgumentException("Unknown alert type.");
         Set<UUID> wanted = new LinkedHashSet<>(userIds == null ? List.of() : userIds);
@@ -55,6 +68,14 @@ public class FuelAlertRecipientService {
                         HttpStatus.UNPROCESSABLE_ENTITY, "FUEL_ALERT_RECIPIENT_INVALID");
             }
         }
+        FuelAlertTopicSetting setting = settings.findOne(tenant.getValue(), topic).orElse(null);
+        boolean exclude = excludeAdmins != null ? excludeAdmins : setting != null && setting.isExcludeAdmins();
+        if (exclude && wanted.isEmpty()) {
+            if (excludeAdmins != null && excludeAdmins) throw new IllegalArgumentException("Choose at least one other person before leaving administrators off, so the alert is always seen.");
+            exclude = false;   // the others were all removed: administrators go back on
+        }
+        if (setting == null) { if (exclude) settings.save(FuelAlertTopicSetting.of(tenant, topic, true, by)); }
+        else if (setting.isExcludeAdmins() != exclude) setting.set(exclude, by);
         List<FuelAlertRecipient> current = repo.findByTopic(tenant, topic);
         Set<UUID> have = new HashSet<>();
         for (FuelAlertRecipient r : current) {
@@ -62,23 +83,33 @@ public class FuelAlertRecipientService {
             else repo.delete(r);
         }
         for (UUID u : wanted) if (!have.contains(u)) repo.save(FuelAlertRecipient.of(tenant, topic, u, by));
-        return new Topic(topic, label, new ArrayList<>(wanted));
+        return new Topic(topic, label, new ArrayList<>(wanted), exclude);
     }
 
     /** Administrators plus the company's chosen extras, each person once. Never throws; falls back to the administrators. */
     public List<Recipient> recipientsFor(TenantId tenant, String topic) {
         List<Recipient> admins = adminRecipients.resolveTenantAdmins(tenant);
         List<UUID> extra;
+        boolean exclude;
         try {
             extra = repo.findByTopic(tenant, topic).stream().map(FuelAlertRecipient::getUserId).toList();
+            exclude = !extra.isEmpty() && settings.findOne(tenant.getValue(), topic).map(FuelAlertTopicSetting::isExcludeAdmins).orElse(false);
         } catch (RuntimeException ex) {
             return admins;
         }
         if (extra.isEmpty()) return admins;
+        List<Recipient> chosen;
+        try {
+            chosen = adminRecipients.resolveUsers(tenant, extra);
+        } catch (RuntimeException ex) {
+            return admins;
+        }
         Set<UUID> seen = new HashSet<>();
         List<Recipient> out = new ArrayList<>();
-        for (Recipient r : admins) { if (r.userId() == null || seen.add(r.userId())) out.add(r); }
-        for (Recipient r : adminRecipients.resolveUsers(tenant, extra)) { if (r.userId() == null || seen.add(r.userId())) out.add(r); }
+        if (!exclude || chosen.isEmpty()) {
+            for (Recipient r : admins) { if (r.userId() == null || seen.add(r.userId())) out.add(r); }
+        }
+        for (Recipient r : chosen) { if (r.userId() == null || seen.add(r.userId())) out.add(r); }
         return out;
     }
 }

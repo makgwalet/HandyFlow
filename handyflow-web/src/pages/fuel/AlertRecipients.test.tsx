@@ -28,7 +28,20 @@ describe("AlertRecipients", () => {
     fireEvent.click(await screen.findByLabelText("Change who is told about Delivery variances"))
     fireEvent.click(await screen.findByLabelText(/Lerato K/))
     fireEvent.click(screen.getByRole("button", { name: "Save" }))
-    await waitFor(() => expect(put).toHaveBeenCalledWith("/api/v1/fuel/alert-recipients/VARIANCE", { userIds: ["u2"] }))
+    await waitFor(() => expect(put).toHaveBeenCalledWith("/api/v1/fuel/alert-recipients/VARIANCE", { userIds: ["u2"], excludeAdmins: false }))
+  })
+
+  it("can leave administrators off once someone else is chosen", async () => {
+    get.mockImplementation(() => ok([{ topic: "VARIANCE", label: "Delivery variances", userIds: [] }]))
+    mount()
+    fireEvent.click(await screen.findByLabelText("Change who is told about Delivery variances"))
+    const box = await screen.findByLabelText(/Leave administrators off/) as HTMLInputElement
+    expect(box.disabled).toBe(true)
+    fireEvent.click(await screen.findByLabelText(/Lerato K/))
+    expect(box.disabled).toBe(false)
+    fireEvent.click(box)
+    fireEvent.click(screen.getByRole("button", { name: "Save" }))
+    await waitFor(() => expect(put).toHaveBeenCalledWith("/api/v1/fuel/alert-recipients/VARIANCE", { userIds: ["u2"], excludeAdmins: true }))
   })
 
   it("shows the server's reason when a person is refused", async () => {
