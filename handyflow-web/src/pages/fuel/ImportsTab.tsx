@@ -8,6 +8,7 @@ import { usePermissions } from "../../hooks/usePermission"
 import { btnGhost, btnPrimary, card, Chip, ErrorLine, ReasonModal, inputStyle } from "../warehousing/whseUi"
 import { fmtL, fmtR } from "./orderOps"
 import PumpLabels from "./PumpLabels"
+import ImportTransactions from "./ImportTransactions"
 import { STATUS_FILTERS, statusLabel, totalLitres, totalTendered, type CreatedKey, type ImportView, type KeyView } from "./importOps"
 
 const unwrap = (r: any) => r.data?.data ?? r.data
@@ -62,6 +63,7 @@ export default function ImportsTab() {
                   <tbody>{i.shift.readings.map(r => <tr key={r.pumpName}><td style={{ padding: "2px 12px 2px 0" }}>{r.pumpName}</td><td>{r.openingMeter}</td><td>{r.closingMeter}</td><td>{r.testLitres ?? 0}</td><td>{r.closingMeter - r.openingMeter - (r.testLitres ?? 0)}</td></tr>)}</tbody>
                 </table>
                 <p style={{ margin: "6px 0 0" }}>Cash {fmtR(i.shift.cash)} · Card {fmtR(i.shift.card)} · Account {fmtR(i.shift.account)} · Other {fmtR(i.shift.other)}{i.shift.fleetCard != null ? ` · Fleet card ${fmtR(i.shift.fleetCard)}` : ""}</p>
+                <ImportTransactions importId={i.id} />
                 {i.decisionNote && <p style={{ margin: "6px 0 0", color: "var(--hf-text-muted)" }}>{i.decisionNote}</p>}
                 {i.status === "PENDING" && canReview && (
                   <div style={{ marginTop: 8, display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>

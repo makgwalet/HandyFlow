@@ -39,6 +39,7 @@ import AccessLimitsTab from "./AccessLimitsTab"
 import TabsTab from "./TabsTab"
 import StatementsTab from "./StatementsTab"
 import ImportsTab from "./ImportsTab"
+import StayRequestsTab from "./StayRequestsTab"
 import GaugeImportsTab from "./GaugeImportsTab"
 import LegalEntitiesTab from "./LegalEntitiesTab"
 import EligibilityTab from "./EligibilityTab"
@@ -98,6 +99,7 @@ export function FuelPage() {
         case "margin":     return <MarginTab />
         case "cost-to-serve": return <CostToServeTab onNavigate={goTo} />
         case "overnight-stays": return <StaysTab />
+        case "stay-requests": return <StayRequestsTab />
         case "driver-tabs": return <TabsTab />
         case "account-statements": return <StatementsTab />
         case "contracts": return <ContractsTab />

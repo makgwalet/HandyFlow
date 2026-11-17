@@ -28,3 +28,29 @@ export function aliasProblem(source: string, alias: string, pumpId: string, exis
 export function knownSources(imports: { source: string }[]): string[] {
   return Array.from(new Set(imports.map(i => i.source))).sort()
 }
+
+// Live transactions (sales, refunds, voids) a sender sent for a staged shift. They take effect only when the shift is accepted.
+export type TxView = { id: string; externalId: string; kind: "SALE" | "REFUND" | "VOID"; originalExternalId: string | null; pumpLabel: string | null; litres: number | null; amount: number
+  tender: string | null; occurredAt: string | null; reason: string | null; status: "RECEIVED" | "APPLIED" | "NOT_APPLIED"; problems: string[]; adjustmentId: string | null }
+export type TxSummary = { sales: number; salesLitres: number; salesAmount: number; refundsAmount: number; voidsAmount: number; netAmount: number; netByTender: Record<string, number>
+  meterLitres: number | null; litresDifference: number | null; notApplied: number }
+export type ShiftTransactions = { transactions: TxView[]; summary: TxSummary }
+
+/** The answer is an object with a list; anything else (an error body, an empty reply) is treated as no transactions. */
+export function asShiftTransactions(v: unknown): ShiftTransactions | null {
+  const o = v as any
+  if (!o || Array.isArray(o) || !Array.isArray(o.transactions) || !o.summary) return null
+  return o as ShiftTransactions
+}
+
+export function txKindLabel(k: string): string { return k === "SALE" ? "Sale" : k === "REFUND" ? "Refund" : k === "VOID" ? "Void" : k }
+
+/** One line saying how the sender's litres compare with the meters. Empty when the shift has not been received. */
+export function litresCheckText(s: TxSummary): string {
+  if (s.litresDifference == null || s.meterLitres == null) return ""
+  const d = Math.round(s.litresDifference * 1000) / 1000
+  if (d === 0) return "Sales litres match the meters."
+  return `Sales litres are ${Math.abs(d)} L ${d > 0 ? "more" : "less"} than the meters.`
+}
+
+export function problemCount(t: ShiftTransactions): number { return t.transactions.reduce((n, x) => n + x.problems.length, 0) }
