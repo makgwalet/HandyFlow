@@ -10,7 +10,7 @@ import type { Controls } from "./wholesaleOps"
 import {
   fmtL, fmtR, validatePump, validateOpen, validateClose, expectedTotals, takings, needsReason, varianceText, pumpTotals, awaitingReview,
   approvedAdjustmentTotal, pendingAdjustments, VARIANCE_TOLERANCE, validateNozzle, nozzleFields, nozzleLabel,
-  type Pump, type Shift, type ShiftAdjustment, type ForecourtSummary, type CloseRow,
+  providerTimesText, type Pump, type Shift, type ShiftAdjustment, type ForecourtSummary, type CloseRow,
 } from "./forecourtOps"
 
 const unwrap = (r: any) => r.data?.data ?? r.data
@@ -109,6 +109,7 @@ export default function ForecourtTab() {
                             </tr>))}
                           </tbody>
                         </table>
+                        {providerTimesText(sh) && <p style={{ fontSize: 12.5, color: "var(--hf-text-muted)", margin: "8px 0 0" }}>{providerTimesText(sh)}</p>}
                         {sh.status !== "OPEN" && (
                           <p style={{ fontSize: 12.5, color: "var(--hf-text-muted)", margin: "8px 0 0" }}>
                             Cash {fmtR(sh.cash)} · Card {fmtR(sh.card)} · Fleet card {fmtR(sh.fleetCard ?? 0)} · Account {fmtR(sh.account)} · Other {fmtR(sh.other)}

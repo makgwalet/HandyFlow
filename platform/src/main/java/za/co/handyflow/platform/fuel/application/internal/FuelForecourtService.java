@@ -276,6 +276,12 @@ public class FuelForecourtService {
     private boolean isOnOpenShift(TenantId tenantId, UUID pumpId) { return !readings.findOpenForPumps(tenantId, List.of(pumpId)).isEmpty(); }
 
     private FuelPump pump(TenantId t, UUID id) { return pumps.findActiveById(t, id).orElseThrow(() -> new ResourceNotFoundException("Pump", id.toString())); }
+    /** Notes the times an import's provider reported. Does not change the system's own opened and closed times. */
+    @Transactional
+    public void recordProviderTimes(TenantId tenantId, UUID shiftId, Instant opened, Instant closed) {
+        shift(tenantId, shiftId).recordProviderTimes(opened, closed);
+    }
+
     private FuelShift shift(TenantId t, UUID id) { return shifts.findByTenantAndId(t, id).orElseThrow(() -> new ResourceNotFoundException("Shift", id.toString())); }
     private FuelTank tank(TenantId t, UUID id) { return tanks.findActiveById(t, id).orElseThrow(() -> new ResourceNotFoundException("Tank", id.toString())); }
 
@@ -301,6 +307,6 @@ public class FuelForecourtService {
         return new ShiftResponse(s.getId(), s.getShiftNumber(), s.getAttendantName(), s.getStatus(), s.getOpenedAt(), s.getClosedAt(),
                 s.getCashAmount(), s.getCardAmount(), s.getAccountAmount(), s.getOtherAmount(), s.getExpectedAmount(), s.getLitresSold(),
                 s.getVarianceAmount(), s.getVarianceReason(), s.getNotes(), s.getReverseReason(), rr, s.getFleetCardAmount(), s.getAdjustmentsAmount(),
-                s.getToleranceApplied(), s.getReviewStatus(), s.getReviewNote(), s.getReviewedAt());
+                s.getToleranceApplied(), s.getReviewStatus(), s.getReviewNote(), s.getReviewedAt(), s.getProviderOpenedAt(), s.getProviderClosedAt());
     }
 }

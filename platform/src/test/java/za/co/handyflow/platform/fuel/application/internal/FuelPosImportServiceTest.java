@@ -208,6 +208,29 @@ class FuelPosImportServiceTest {
         assertEquals(shiftId, v.shiftId());
     }
 
+    @Test @DisplayName("accept notes the provider's own opened and closed times on the shift, beside the system times")
+    void acceptRecordsProviderTimes() {
+        FuelPosImport i = staged("T1", "Pump 1", "1100");
+        UUID shiftId = UUID.randomUUID();
+        when(forecourt.openShift(eq(T), any(OpenShiftRequest.class), any())).thenReturn(opened(shiftId));
+        svc.accept(T, i.getId(), null, USER);
+        verify(forecourt).recordProviderTimes(T, shiftId, Instant.parse("2026-11-12T06:00:00Z"), Instant.parse("2026-11-12T14:00:00Z"));
+    }
+
+    @Test @DisplayName("a shift sent without times records none")
+    void acceptWithoutProviderTimes() {
+        svc.ingest(raw, new IncomingShift("ACME-POS", "T2", "Thabo", null, null, d("2000"), d("350"), d("0"), d("0"), null, null,
+                List.of(new IncomingReading("Pump 1", d("1000"), d("1100"), null))));
+        ArgumentCaptor<FuelPosImport> cap = ArgumentCaptor.forClass(FuelPosImport.class);
+        verify(imports, atLeastOnce()).save(cap.capture());
+        FuelPosImport i = cap.getValue();
+        when(imports.findByTenantAndId(T, i.getId())).thenReturn(Optional.of(i));
+        UUID shiftId = UUID.randomUUID();
+        when(forecourt.openShift(eq(T), any(OpenShiftRequest.class), any())).thenReturn(opened(shiftId));
+        svc.accept(T, i.getId(), null, USER);
+        verify(forecourt, never()).recordProviderTimes(any(), any(), any(), any());
+    }
+
     @Test @DisplayName("accept with a pump that is not set up is refused and posts nothing")
     void acceptUnknownPump() {
         FuelPosImport i = staged("A3", "Pump 9", "1100");

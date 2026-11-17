@@ -51,6 +51,8 @@ public class FuelShift {
     @Column(name = "reversed_at") private Instant reversedAt;
     @Column(name = "reversed_by") private UUID reversedBy;
     @Column(name = "reverse_reason", length = 500) private String reverseReason;
+    @Column(name = "provider_opened_at") private Instant providerOpenedAt;
+    @Column(name = "provider_closed_at") private Instant providerClosedAt;
     @Version private Long version;
 
     public static FuelShift open(TenantId tenantId, String shiftNumber, String attendantName, UUID openedBy, String notes) {
@@ -63,6 +65,12 @@ public class FuelShift {
         s.openedAt = Instant.now();
         s.notes = notes == null || notes.isBlank() ? null : notes.trim();
         return s;
+    }
+
+    /** What the pump/POS provider said the shift's times were. Recorded beside the system times, which are not changed. */
+    public void recordProviderTimes(Instant opened, Instant closed) {
+        if (opened != null && closed != null && closed.isBefore(opened)) throw new IllegalArgumentException("The provider's closing time is before its opening time.");
+        this.providerOpenedAt = opened; this.providerClosedAt = closed;
     }
 
     public boolean isOpen() { return "OPEN".equals(status); }

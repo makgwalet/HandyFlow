@@ -53,7 +53,18 @@ public final class ForecourtDtos {
                                 BigDecimal cash, BigDecimal card, BigDecimal account, BigDecimal other, BigDecimal expected,
                                 BigDecimal litresSold, BigDecimal variance, String varianceReason, String notes, String reverseReason,
                                 List<ReadingResponse> readings, BigDecimal fleetCard, BigDecimal adjustments, BigDecimal tolerance,
-                                String reviewStatus, String reviewNote, Instant reviewedAt) {}
+                                String reviewStatus, String reviewNote, Instant reviewedAt, Instant providerOpenedAt, Instant providerClosedAt) {
+
+        /** Before provider times existed. */
+        public ShiftResponse(UUID id, String shiftNumber, String attendantName, String status, Instant openedAt, Instant closedAt,
+                             BigDecimal cash, BigDecimal card, BigDecimal account, BigDecimal other, BigDecimal expected,
+                             BigDecimal litresSold, BigDecimal variance, String varianceReason, String notes, String reverseReason,
+                             List<ReadingResponse> readings, BigDecimal fleetCard, BigDecimal adjustments, BigDecimal tolerance,
+                             String reviewStatus, String reviewNote, Instant reviewedAt) {
+            this(id, shiftNumber, attendantName, status, openedAt, closedAt, cash, card, account, other, expected, litresSold, variance, varianceReason, notes,
+                    reverseReason, readings, fleetCard, adjustments, tolerance, reviewStatus, reviewNote, reviewedAt, null, null);
+        }
+    }
 
     public record AdjustmentRequest(@NotBlank @Pattern(regexp = "REFUND|VOID|DISCOUNT", message = "Kind must be REFUND, VOID or DISCOUNT") String kind,
                                     @NotNull @Positive @DecimalMax("1000000") BigDecimal amount,

@@ -14,6 +14,7 @@ export interface Shift {
   variance: number | null; varianceReason: string | null; notes: string | null; reverseReason: string | null; readings: ShiftReading[]
   fleetCard?: number | null; adjustments?: number | null; tolerance?: number | null
   reviewStatus?: "NONE" | "PENDING_REVIEW" | "REVIEWED"; reviewNote?: string | null; reviewedAt?: string | null
+  providerOpenedAt?: string | null; providerClosedAt?: string | null
 }
 export interface ShiftAdjustment {
   id: string; shiftId: string; kind: "REFUND" | "VOID" | "DISCOUNT"; amount: number; reason: string; status: "PENDING" | "APPROVED" | "REJECTED" | "WITHDRAWN"
@@ -127,3 +128,12 @@ export const approvedAdjustmentTotal = (l: ShiftAdjustment[] | undefined) => rou
 export const canDecideAdjustment = (a: ShiftAdjustment, me: string | undefined) => a.status === "PENDING" && !!me && a.recordedBy !== me
 export const canWithdrawAdjustment = (a: ShiftAdjustment, me: string | undefined) => a.status === "PENDING" && !!me && a.recordedBy === me
 export const awaitingReview = (l: Shift[] | undefined) => (l ?? []).filter(s => s.status === "CLOSED" && s.reviewStatus === "PENDING_REVIEW").length
+
+/** For an imported shift: what the pump/POS provider said the times were. The system's own times stay the ones used everywhere else. */
+export function providerTimesText(s: { providerOpenedAt?: string | null; providerClosedAt?: string | null }): string | null {
+  const f = (v: string) => new Date(v).toLocaleString("en-ZA", { dateStyle: "short", timeStyle: "short" })
+  const parts: string[] = []
+  if (s.providerOpenedAt) parts.push(`opened ${f(s.providerOpenedAt)}`)
+  if (s.providerClosedAt) parts.push(`closed ${f(s.providerClosedAt)}`)
+  return parts.length ? "Provider times: " + parts.join(", ") : null
+}

@@ -242,6 +242,7 @@ public class FuelPosImportService {
         ShiftResponse opened = forecourt.openShift(tenantId, new OpenShiftRequest(in.attendantName().trim(), notes, open), null);
         forecourt.closeShift(tenantId, opened.id(),
                 new CloseShiftRequest(in.cash(), in.card(), in.account(), in.other(), req == null ? null : req.varianceReason(), close, in.fleetCard()), by);
+        if (in.openedAt() != null || in.closedAt() != null) forecourt.recordProviderTimes(tenantId, opened.id(), in.openedAt(), in.closedAt());
         imp.accept(by, opened.id(), req == null ? null : req.note());
         imports.save(imp);
         log.info("Fuel POS import accepted id={} shift={} by={}", id, opened.id(), by);

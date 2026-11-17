@@ -205,6 +205,19 @@ describe("ForecourtTab", () => {
     await waitFor(() => expect(post).toHaveBeenCalledWith("/api/v1/fuel/forecourt/shifts/s1/review", { reason: "CCTV checked, drive-off" }))
   })
 
+  it("shows an imported shift's provider times in its detail, and nothing for other shifts", async () => {
+    shifts = [shift({ providerOpenedAt: "2026-11-12T06:00:00Z", providerClosedAt: "2026-11-12T14:00:00Z" })]
+    mount()
+    fireEvent.click(await screen.findByText("SH-2026-00001"))
+    expect(await screen.findByText(/Provider times: opened/)).toBeTruthy()
+    cleanup()
+    shifts = [shift()]
+    mount()
+    fireEvent.click(await screen.findByText("SH-2026-00001"))
+    await waitFor(() => screen.getByText("Refunds, voids and discounts"))
+    expect(screen.queryByText(/Provider times/)).toBeNull()
+  })
+
   it("records a refund on an open shift", async () => {
     mount()
     fireEvent.click(await screen.findByText("SH-2026-00001"))

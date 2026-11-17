@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { validateNozzle, nozzleFields, nozzleLabel, validatePump, validateOpen, validateClose, pumpTotals, expectedTotals, takings, needsReason, varianceText, validateAdjustment, pendingAdjustments, approvedAdjustmentTotal, canDecideAdjustment, canWithdrawAdjustment, awaitingReview, type CloseRow, type ShiftAdjustment, type Shift } from "./forecourtOps"
+import { validateNozzle, nozzleFields, nozzleLabel, validatePump, validateOpen, validateClose, pumpTotals, expectedTotals, takings, needsReason, varianceText, validateAdjustment, pendingAdjustments, approvedAdjustmentTotal, canDecideAdjustment, canWithdrawAdjustment, awaitingReview, type CloseRow, type ShiftAdjustment, type Shift, providerTimesText } from "./forecourtOps"
 
 const row = (o: Partial<CloseRow> = {}): CloseRow => ({ pumpId: "p1", name: "Pump 1", opening: 1000, price: 20, closing: "1210", test: "10", ...o })
 
@@ -92,5 +92,16 @@ describe("forecourtOps", () => {
     expect(nozzleFields("Island 1", "", true)).toEqual({ dispenserLabel: "Island 1" })
     expect(nozzleLabel({ dispenserLabel: "Island 1", nozzleNumber: 2 })).toBe("Island 1, nozzle 2")
     expect(nozzleLabel({ dispenserLabel: null, nozzleNumber: null })).toBe("–")
+  })
+})
+
+describe("providerTimesText", () => {
+  it("is empty for a shift that was not imported", () => {
+    expect(providerTimesText({})).toBeNull()
+    expect(providerTimesText({ providerOpenedAt: null, providerClosedAt: null })).toBeNull()
+  })
+  it("names whichever provider times exist", () => {
+    expect(providerTimesText({ providerOpenedAt: "2026-11-12T06:00:00Z" })).toMatch(/^Provider times: opened /)
+    expect(providerTimesText({ providerOpenedAt: "2026-11-12T06:00:00Z", providerClosedAt: "2026-11-12T14:00:00Z" })).toMatch(/opened .*, closed /)
   })
 })
