@@ -33,6 +33,7 @@ public class FuelVarianceNotificationScheduler {
     private final FeatureGuard featureGuard;
     private final NotificationService notifications;
     private final TenantAdminRecipients adminRecipients;
+    private final FuelAlertRecipientService alertRecipients;
 
     @Value("${fuel.variance.alerts.enabled:true}")
     private boolean enabled = true;
@@ -53,7 +54,7 @@ public class FuelVarianceNotificationScheduler {
                 if (!featureGuard.hasModuleFor(tenant, "fuel")) continue;
                 var overdue = variances.overdueNotAlerted(tenant, s.getVarianceReviewDays());
                 if (overdue.isEmpty()) continue;
-                List<Recipient> recipients = adminRecipients.resolveTenantAdmins(tenant);
+                List<Recipient> recipients = alertRecipients.recipientsFor(tenant, FuelAlertRecipientService.VARIANCE);
                 if (recipients.isEmpty()) continue;
                 int n = overdue.size();
                 notifications.send(NotificationRequest.builder()
@@ -85,7 +86,7 @@ public class FuelVarianceNotificationScheduler {
                 if (!featureGuard.hasModuleFor(tenant, "fuel")) continue;
                 int created = variances.raiseNew(tenant);
                 if (created <= 0) continue;
-                List<Recipient> recipients = adminRecipients.resolveTenantAdmins(tenant);
+                List<Recipient> recipients = alertRecipients.recipientsFor(tenant, FuelAlertRecipientService.VARIANCE);
                 if (recipients.isEmpty()) continue;
                 notifications.send(NotificationRequest.builder()
                         .tenantId(tenant)

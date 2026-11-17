@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import { usePermissions } from "../../hooks/usePermission"
 import { btnGhost, btnPrimary, card, Chip } from "../warehousing/whseUi"
+import AlertRecipients from "./AlertRecipients"
 import { DIVISION_CHOICES, describeScope, toggle, userLabel, type UserOption, type UserScope } from "./scopeOps"
 
 const unwrap = (r: any) => r.data?.data ?? r.data
@@ -100,6 +101,7 @@ export default function AccessLimitsTab() {
           )}
         </div>
       )}
+      {canManage && <AlertRecipients users={known} />}
     </div>
   )
 }

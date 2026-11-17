@@ -38,7 +38,15 @@ class FuelVarianceNotificationSchedulerTest {
     @Mock NotificationService notifications;
     @Mock TenantAdminRecipients adminRecipients;
     final Recipient admin = Recipient.user(UUID.randomUUID(), "Admin", "a@x.co", null);
+    /** The scheduler asks this for its recipients; here it hands back whatever the administrators mock returns, as a company with no extras would get. */
+    @Mock FuelAlertRecipientService alertRecipients;
     @InjectMocks FuelVarianceNotificationScheduler scheduler;
+
+    @org.junit.jupiter.api.BeforeEach
+    void alertRecipientsDefaultToAdmins() {
+        when(alertRecipients.recipientsFor(any(), eq(FuelAlertRecipientService.VARIANCE)))
+                .thenAnswer(inv -> adminRecipients.resolveTenantAdmins((za.co.handyflow.platform.shared.TenantId) inv.getArgument(0)));
+    }
 
     @Test @DisplayName("a tenant with new variances is alerted once, with the count and a pointer to the list")
     void alertsOnNewVariances() {

@@ -80,6 +80,33 @@ public class TenantAdminRecipientsImpl implements TenantAdminRecipients {
         }
     }
 
+    @Override
+    @Transactional(propagation = Propagation.REQUIRES_NEW, readOnly = true)
+    public List<Recipient> resolveUsers(TenantId tenantId, java.util.Collection<UUID> userIds) {
+        if (userIds == null || userIds.isEmpty()) return List.of();
+        try {
+            String marks = String.join(",", java.util.Collections.nCopies(userIds.size(), "?"));
+            List<Object> args = new java.util.ArrayList<>();
+            args.add(tenantId.getValue());
+            args.addAll(userIds);
+            return jdbc.query("""
+                    SELECT u.id AS user_id, u.email, u.first_name, u.last_name, u.phone
+                    FROM users u
+                    WHERE u.tenant_id = ? AND u.status = 'ACTIVE' AND u.email IS NOT NULL AND u.id IN (%s)
+                    ORDER BY u.created_at
+                    """.formatted(marks),
+                    (rs, rowNum) -> Recipient.user(
+                            UUID.fromString(rs.getString("user_id")),
+                            trim(rs.getString("first_name")) + " " + trim(rs.getString("last_name")),
+                            rs.getString("email"),
+                            rs.getString("phone")),
+                    args.toArray());
+        } catch (Exception e) {
+            log.warn("Could not resolve named recipients for tenant={}: {}", tenantId.getValue(), e.getMessage());
+            return List.of();
+        }
+    }
+
     private static String trim(String s) {
         return s != null ? s.trim() : "";
     }

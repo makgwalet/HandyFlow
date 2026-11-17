@@ -48,4 +48,12 @@ public interface TenantAdminRecipients {
     default List<za.co.handyflow.platform.notifications.application.Recipient> resolveTenantAdmins(UUID tenantId) {
         return resolveTenantAdmins(TenantId.of(tenantId));
     }
+
+    /**
+     * Contact details for specific, named users of this tenant (active, with an email). A user who is not in this tenant,
+     * or is not active, is simply absent from the result. Default is empty so existing implementations are unaffected.
+     */
+    default List<Recipient> resolveUsers(TenantId tenantId, java.util.Collection<UUID> userIds) {
+        return List.of();
+    }
 }
