@@ -83,4 +83,29 @@ public class FuelImportReviewController {
         featureGuard.requireModule("fuel");
         return ResponseEntity.ok(ApiResponse.success("Key revoked", imports.revokeKey(TenantContext.getTenantIdAsObject(), id)));
     }
+
+    // ── pump labels: what a sender calls a pump ─────────────────────────────
+
+    @GetMapping("/aliases")
+    @PreAuthorize(REVIEW)
+    public ResponseEntity<ApiResponse<List<AliasView>>> aliases() {
+        featureGuard.requireModule("fuel");
+        return ResponseEntity.ok(ApiResponse.success(imports.listAliases(TenantContext.getTenantIdAsObject())));
+    }
+
+    @PostMapping("/aliases")
+    @PreAuthorize(KEYS)
+    public ResponseEntity<ApiResponse<AliasView>> addAlias(@Valid @RequestBody AliasRequest req) {
+        featureGuard.requireModule("fuel");
+        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success("Pump label saved",
+                imports.addAlias(TenantContext.getTenantIdAsObject(), TenantContext.getCurrentUserId(), req)));
+    }
+
+    @DeleteMapping("/aliases/{id}")
+    @PreAuthorize(KEYS)
+    public ResponseEntity<ApiResponse<Void>> removeAlias(@PathVariable UUID id) {
+        featureGuard.requireModule("fuel");
+        imports.removeAlias(TenantContext.getTenantIdAsObject(), id);
+        return ResponseEntity.ok(ApiResponse.success("Pump label removed", null));
+    }
 }

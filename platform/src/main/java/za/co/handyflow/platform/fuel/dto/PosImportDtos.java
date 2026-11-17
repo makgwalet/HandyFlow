@@ -48,4 +48,8 @@ public final class PosImportDtos {
 
     /** The plaintext key is shown once, here, and is not stored. */
     public record CreatedKey(KeyView key, String apiKey) {}
+
+    public record AliasRequest(@NotBlank @Size(max = 40) String source, @NotBlank @Size(max = 40) String alias, @jakarta.validation.constraints.NotNull UUID pumpId) {}
+
+    public record AliasView(UUID id, String source, String alias, UUID pumpId, String pumpName, Instant createdAt) {}
 }

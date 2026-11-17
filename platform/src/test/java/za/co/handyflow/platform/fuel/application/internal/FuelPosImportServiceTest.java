@@ -13,6 +13,9 @@ import org.mockito.quality.Strictness;
 import org.springframework.web.server.ResponseStatusException;
 import za.co.handyflow.platform.billing.FeatureGuard;
 import za.co.handyflow.platform.fuel.domain.model.FuelImportKey;
+import za.co.handyflow.platform.fuel.domain.model.FuelImportPumpAlias;
+import za.co.handyflow.platform.fuel.domain.repository.FuelImportPumpAliasRepository;
+import za.co.handyflow.platform.shared.ResourceNotFoundException;
 import za.co.handyflow.platform.fuel.domain.model.FuelPosImport;
 import za.co.handyflow.platform.fuel.domain.model.FuelPump;
 import za.co.handyflow.platform.fuel.domain.repository.FuelImportKeyRepository;
@@ -44,6 +47,7 @@ class FuelPosImportServiceTest {
     @Mock FuelImportKeyRepository keys;
     @Mock FuelPosImportRepository imports;
     @Mock FuelPumpRepository pumps;
+    @Mock FuelImportPumpAliasRepository aliasRepo;
     @Mock FuelForecourtService forecourt;
     @Mock FuelDivisionGuard divisions;
     @Mock FeatureGuard featureGuard;
@@ -53,7 +57,7 @@ class FuelPosImportServiceTest {
     FuelPump pump1;
 
     @BeforeEach void setUp() {
-        svc = new FuelPosImportService(keys, imports, pumps, forecourt, divisions, featureGuard, new ObjectMapper().findAndRegisterModules());
+        svc = new FuelPosImportService(keys, imports, pumps, aliasRepo, forecourt, divisions, featureGuard, new ObjectMapper().findAndRegisterModules());
         raw = "hf_fuel_testkey";
         key = FuelImportKey.create(T, "Site POS", FuelPosImportService.hashKey(raw), raw.substring(0, 12), USER);
         when(keys.findByKeyHash(FuelPosImportService.hashKey(raw))).thenReturn(Optional.of(key));
@@ -253,5 +257,44 @@ class FuelPosImportServiceTest {
         when(keys.findByTenantAndId(T, key.getId())).thenReturn(Optional.of(key));
         assertNotNull(svc.revokeKey(T, key.getId()).revokedAt());
         assertThrows(ResponseStatusException.class, () -> svc.ingest(raw, shift("D1", "Pump 1", "1100")));
+    }
+
+    // ── pump labels ──────────────────────────────────────────────────────────
+
+    @Test @DisplayName("a label mapped for the sender's source finds the pump, so the shift has no problem listed")
+    void aliasResolves() {
+        var a = FuelImportPumpAlias.of(T, "acme-pos", "P-01", pump1.getId(), USER);
+        when(aliasRepo.findBySource(T, "acme-pos")).thenReturn(List.of(a));
+        IngestResult r = svc.ingest(raw, shift("B1", "p-01", "1100"));
+        assertTrue(r.problems().isEmpty());
+    }
+
+    @Test @DisplayName("a label mapped for another source does not apply")
+    void aliasIsPerSource() {
+        when(aliasRepo.findBySource(T, "other-pos")).thenReturn(List.of(FuelImportPumpAlias.of(T, "other-pos", "P-01", pump1.getId(), USER)));
+        assertEquals(1, svc.ingest(raw, shift("B2", "P-01", "1100")).problems().size());
+    }
+
+    @Test @DisplayName("two labels that point at the same pump are listed as a problem")
+    void twoLabelsSamePump() {
+        when(aliasRepo.findBySource(T, "acme-pos")).thenReturn(List.of(FuelImportPumpAlias.of(T, "acme-pos", "P-01", pump1.getId(), USER)));
+        IncomingShift in = new IncomingShift("ACME-POS", "B3", "Thabo", null, null, d("0"), d("0"), d("0"), d("0"), null, null,
+                List.of(new IncomingReading("Pump 1", d("1000"), d("1100"), null), new IncomingReading("P-01", d("500"), d("600"), null)));
+        assertTrue(svc.ingest(raw, in).problems().stream().anyMatch(p -> p.contains("same pump")));
+    }
+
+    @Test @DisplayName("adding a label needs an active pump and refuses a label already mapped for that source")
+    void addAlias() {
+        var v = svc.addAlias(T, USER, new AliasRequest(" ACME-POS ", " P-01 ", pump1.getId()));
+        assertEquals("acme-pos", v.source()); assertEquals("p-01", v.alias()); assertEquals("Pump 1", v.pumpName());
+        assertThrows(ResourceNotFoundException.class, () -> svc.addAlias(T, USER, new AliasRequest("acme-pos", "x", UUID.randomUUID())));
+        when(aliasRepo.findOne(T, "acme-pos", "p-01")).thenReturn(Optional.of(mock(FuelImportPumpAlias.class)));
+        assertThrows(IllegalStateException.class, () -> svc.addAlias(T, USER, new AliasRequest("acme-pos", "P-01", pump1.getId())));
+    }
+
+    @Test @DisplayName("removing a label that does not exist is a not-found")
+    void removeMissing() {
+        when(aliasRepo.findById(eq(T), any(UUID.class))).thenReturn(Optional.empty());
+        assertThrows(ResourceNotFoundException.class, () -> svc.removeAlias(T, UUID.randomUUID()));
     }
 }

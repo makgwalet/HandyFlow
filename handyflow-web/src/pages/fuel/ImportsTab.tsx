@@ -4,6 +4,7 @@ import { apiClient } from "../../api/client"
 import { usePermissions } from "../../hooks/usePermission"
 import { btnGhost, btnPrimary, card, Chip, ErrorLine, ReasonModal, inputStyle } from "../warehousing/whseUi"
 import { fmtL, fmtR } from "./orderOps"
+import PumpLabels from "./PumpLabels"
 import { STATUS_FILTERS, statusLabel, totalLitres, totalTendered, type CreatedKey, type ImportView, type KeyView } from "./importOps"
 
 const unwrap = (r: any) => r.data?.data ?? r.data
@@ -92,6 +93,8 @@ export default function ImportsTab() {
           ))}
         </div>
       )}
+
+      {canKeys && <PumpLabels seenSources={list.data ?? []} />}
 
       {rejecting && <ReasonModal title="Reject this shift" intro={`${rejecting.shift.attendantName} · ${rejecting.externalId}. It stays on record as rejected.`} confirmLabel="Reject" pending={reject.isPending} error={reject.error}
         onConfirm={reason => reject.mutate({ id: rejecting.id, reason })} onClose={() => setRejecting(null)} />}

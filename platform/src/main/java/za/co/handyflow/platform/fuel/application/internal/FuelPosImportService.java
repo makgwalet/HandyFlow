@@ -13,6 +13,7 @@ import za.co.handyflow.platform.billing.FeatureGuard;
 import za.co.handyflow.platform.fuel.domain.model.FuelDivision;
 import za.co.handyflow.platform.fuel.domain.model.FuelImportKey;
 import za.co.handyflow.platform.fuel.domain.model.FuelPosImport;
+import za.co.handyflow.platform.fuel.domain.model.FuelImportPumpAlias;
 import za.co.handyflow.platform.fuel.domain.model.FuelPump;
 import za.co.handyflow.platform.fuel.domain.repository.FuelImportKeyRepository;
 import za.co.handyflow.platform.fuel.domain.repository.FuelPosImportRepository;
@@ -53,6 +54,7 @@ public class FuelPosImportService {
     private final FuelImportKeyRepository keys;
     private final FuelPosImportRepository imports;
     private final FuelPumpRepository pumps;
+    private final za.co.handyflow.platform.fuel.domain.repository.FuelImportPumpAliasRepository aliases;
     private final FuelForecourtService forecourt;
     private final FuelDivisionGuard divisions;
     private final FeatureGuard featureGuard;
@@ -157,18 +159,53 @@ public class FuelPosImportService {
     private static String hash(String s) { return hashKey(s); }
 
     private List<String> problemsFor(TenantId tenantId, IncomingShift in) {
-        Map<String, FuelPump> byName = pumpsByName(tenantId);
+        Map<String, FuelPump> byName = pumpsFor(tenantId, in.source());
         List<String> problems = new ArrayList<>();
+        Set<UUID> used = new HashSet<>();
         for (IncomingReading r : in.readings()) {
-            if (!byName.containsKey(r.pumpName().trim().toLowerCase(Locale.ROOT))) problems.add("Pump \"" + r.pumpName().trim() + "\" is not set up in Fuel.");
+            FuelPump p = byName.get(r.pumpName().trim().toLowerCase(Locale.ROOT));
+            if (p == null) problems.add("Pump \"" + r.pumpName().trim() + "\" is not set up in Fuel. Add it, or map it under Imported shifts > Pump labels.");
+            else if (!used.add(p.getId())) problems.add("Two labels in this shift point to the same pump (" + p.getName() + ").");
         }
         return problems;
     }
 
-    private Map<String, FuelPump> pumpsByName(TenantId tenantId) {
+    /** Pumps by the label a source may send: the Fuel pump name, overridden by any alias set for that source. */
+    private Map<String, FuelPump> pumpsFor(TenantId tenantId, String source) {
         Map<String, FuelPump> m = new HashMap<>();
-        for (FuelPump p : pumps.findAllActive(tenantId)) m.put(p.getName().trim().toLowerCase(Locale.ROOT), p);
+        Map<UUID, FuelPump> byId = new HashMap<>();
+        for (FuelPump p : pumps.findAllActive(tenantId)) { m.put(p.getName().trim().toLowerCase(Locale.ROOT), p); byId.put(p.getId(), p); }
+        for (var a : aliases.findBySource(tenantId, FuelImportPumpAlias.normalise(source))) {
+            FuelPump p = byId.get(a.getPumpId());
+            if (p != null) m.put(a.getAlias(), p); // an alias pointing at a pump that is no longer active is ignored
+        }
         return m;
+    }
+
+    // ── pump labels ──────────────────────────────────────────────────────────
+
+    @Transactional(readOnly = true)
+    public List<AliasView> listAliases(TenantId tenantId) {
+        Map<UUID, String> names = new HashMap<>();
+        for (FuelPump p : pumps.findAllActive(tenantId)) names.put(p.getId(), p.getName());
+        List<AliasView> out = new ArrayList<>();
+        for (var a : aliases.findAllForTenant(tenantId)) out.add(new AliasView(a.getId(), a.getSource(), a.getAlias(), a.getPumpId(), names.getOrDefault(a.getPumpId(), "Inactive pump"), a.getCreatedAt()));
+        return out;
+    }
+
+    @Transactional
+    public AliasView addAlias(TenantId tenantId, UUID by, AliasRequest req) {
+        FuelPump pump = pumps.findAllActive(tenantId).stream().filter(p -> p.getId().equals(req.pumpId())).findFirst()
+                .orElseThrow(() -> new ResourceNotFoundException("Pump", String.valueOf(req.pumpId())));
+        var x = FuelImportPumpAlias.of(tenantId, req.source(), req.alias(), pump.getId(), by);
+        if (aliases.findOne(tenantId, x.getSource(), x.getAlias()).isPresent()) throw new IllegalStateException("That label is already mapped for this source.");
+        aliases.save(x);
+        return new AliasView(x.getId(), x.getSource(), x.getAlias(), pump.getId(), pump.getName(), x.getCreatedAt());
+    }
+
+    @Transactional
+    public void removeAlias(TenantId tenantId, UUID id) {
+        aliases.delete(aliases.findById(tenantId, id).orElseThrow(() -> new ResourceNotFoundException("Pump label", id.toString())));
     }
 
     // ── review ───────────────────────────────────────────────────────────────
@@ -189,12 +226,12 @@ public class FuelPosImportService {
         FuelPosImport imp = find(tenantId, id);
         if (!imp.isPending()) throw new IllegalStateException("This import is already " + imp.getStatus().toLowerCase() + ".");
         IncomingShift in = parse(imp);
-        Map<String, FuelPump> byName = pumpsByName(tenantId);
+        Map<String, FuelPump> byName = pumpsFor(tenantId, imp.getSource());
         List<OpenReading> open = new ArrayList<>();
         List<CloseReading> close = new ArrayList<>();
         for (IncomingReading r : in.readings()) {
             FuelPump p = byName.get(r.pumpName().trim().toLowerCase(Locale.ROOT));
-            if (p == null) throw new IllegalArgumentException("Pump \"" + r.pumpName().trim() + "\" is not set up in Fuel. Add it under Forecourt > Pumps, then accept again.");
+            if (p == null) throw new IllegalArgumentException("Pump \"" + r.pumpName().trim() + "\" is not set up in Fuel. Add it under Forecourt > Pumps, or map it under Imported shifts > Pump labels, then accept again.");
             open.add(new OpenReading(p.getId(), r.openingMeter()));
             close.add(new CloseReading(p.getId(), r.closingMeter(), r.testLitres()));
         }

@@ -4,17 +4,17 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import ImportsTab from "./ImportsTab"
 import { litres, totalLitres, totalTendered } from "./importOps"
 
-const get = vi.fn(); const post = vi.fn()
+const get = vi.fn(); const post = vi.fn(); const del = vi.fn()
 let perms: string[] = []
-vi.mock("../../api/client", () => ({ apiClient: { get: (...a: unknown[]) => get(...a), post: (...a: unknown[]) => post(...a) } }))
+vi.mock("../../api/client", () => ({ apiClient: { get: (...a: unknown[]) => get(...a), post: (...a: unknown[]) => post(...a), delete: (...a: unknown[]) => del(...a) } }))
 vi.mock("../../hooks/usePermission", () => ({ usePermissions: (ps: string[]) => ps.some(p => perms.includes(p)) }))
 
 const ok = (d: unknown) => Promise.resolve({ data: { data: d } })
 const imp = (o: any = {}) => ({ id: "i1", source: "ACME-POS", externalId: "S-1", status: "PENDING", receivedAt: "2026-11-12T14:05:00Z", problems: [], decidedBy: null, decidedAt: null, decisionNote: null, shiftId: null,
   shift: { source: "ACME-POS", externalId: "S-1", attendantName: "Thabo", openedAt: null, closedAt: null, cash: 2000, card: 350, account: 0, other: 0, fleetCard: null, notes: null,
     readings: [{ pumpName: "Pump 1", openingMeter: 1000, closingMeter: 1100, testLitres: 5 }] }, ...o })
-function routes(items: unknown[], keys: unknown[] = []) {
-  get.mockImplementation((url: string) => url.includes("/keys") ? ok(keys) : ok(items))
+function routes(items: unknown[], keys: unknown[] = [], labels: unknown[] = [], pumps: unknown[] = []) {
+  get.mockImplementation((url: string) => url.includes("/keys") ? ok(keys) : url.includes("/aliases") ? ok(labels) : url.includes("/forecourt/pumps") ? ok(pumps) : ok(items))
 }
 function mount() {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } })
@@ -22,7 +22,7 @@ function mount() {
 }
 
 describe("ImportsTab", () => {
-  beforeEach(() => { get.mockReset(); post.mockReset(); perms = ["FUEL_SHIFT_SUPERVISE", "FUEL_MANAGE"]; post.mockResolvedValue({ data: { data: {} } }) })
+  beforeEach(() => { get.mockReset(); post.mockReset(); del.mockReset(); del.mockResolvedValue({ data: {} }); perms = ["FUEL_SHIFT_SUPERVISE", "FUEL_MANAGE"]; post.mockResolvedValue({ data: { data: {} } }) })
   afterEach(cleanup)
 
   it("lists waiting shifts with litres and takings, and asks for PENDING by default", async () => {
@@ -111,5 +111,32 @@ describe("ImportsTab", () => {
     expect(litres({ pumpName: "p", openingMeter: 10, closingMeter: 10, testLitres: 5 })).toBe(0)
     expect(totalLitres(imp().shift)).toBe(95)
     expect(totalTendered(imp().shift)).toBe(2350)
+  })
+
+  it("maps a sender's pump label to a Fuel pump and lists existing labels", async () => {
+    routes([imp()], [], [{ id: "a1", source: "acme-pos", alias: "p-02", pumpId: "pm2", pumpName: "Pump 2", createdAt: "2026-11-17T08:00:00Z" }], [{ id: "pm1", name: "Pump 1", active: true }])
+    mount()
+    expect(await screen.findByText(/is Pump 2/)).toBeTruthy()
+    fireEvent.change(screen.getByLabelText("Source"), { target: { value: "ACME-POS" } })
+    fireEvent.change(screen.getByLabelText("Label the sender uses"), { target: { value: "P-01" } })
+    await waitFor(() => expect(screen.getByRole("option", { name: "Pump 1" })).toBeTruthy())
+    fireEvent.change(screen.getByLabelText("Fuel pump"), { target: { value: "pm1" } })
+    fireEvent.click(screen.getByRole("button", { name: "Add label" }))
+    await waitFor(() => expect(post).toHaveBeenCalledWith("/api/v1/fuel/forecourt/imports/aliases", { source: "ACME-POS", alias: "P-01", pumpId: "pm1" }))
+  })
+
+  it("refuses a label already mapped for that source and removes a label", async () => {
+    routes([imp()], [], [{ id: "a1", source: "acme-pos", alias: "p-02", pumpId: "pm2", pumpName: "Pump 2", createdAt: "x" }], [{ id: "pm1", name: "Pump 1" }])
+    mount()
+    await screen.findByText(/is Pump 2/)
+    fireEvent.change(screen.getByLabelText("Source"), { target: { value: "ACME-POS" } })
+    fireEvent.change(screen.getByLabelText("Label the sender uses"), { target: { value: "P-02" } })
+    await waitFor(() => expect(screen.getByRole("option", { name: "Pump 1" })).toBeTruthy())
+    fireEvent.change(screen.getByLabelText("Fuel pump"), { target: { value: "pm1" } })
+    expect(screen.getByRole("alert").textContent).toMatch(/already mapped/)
+    expect((screen.getByRole("button", { name: "Add label" }) as HTMLButtonElement).disabled).toBe(true)
+    const row = screen.getByText(/is Pump 2/).parentElement!
+    fireEvent.click(row.querySelector("button")!)
+    await waitFor(() => expect(del).toHaveBeenCalledWith("/api/v1/fuel/forecourt/imports/aliases/a1"))
   })
 })

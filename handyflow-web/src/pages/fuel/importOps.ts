@@ -11,3 +11,20 @@ export function litres(r: ImportReading): number { return Math.max(0, r.closingM
 export function totalLitres(s: ImportShift): number { return s.readings.reduce((a, r) => a + litres(r), 0) }
 export function totalTendered(s: ImportShift): number { return s.cash + s.card + s.account + s.other + (s.fleetCard ?? 0) }
 export function statusLabel(s: string): string { return STATUS_FILTERS.find(f => f[0] === s)?.[1] ?? s }
+
+// What a sender calls a pump, mapped to the Fuel pump. Per source; without a label the pump is matched by its name.
+export type AliasView = { id: string; source: string; alias: string; pumpId: string; pumpName: string; createdAt: string }
+
+/** Null when the label can be saved. */
+export function aliasProblem(source: string, alias: string, pumpId: string, existing: AliasView[]): string | null {
+  if (!source.trim()) return "Enter the source, as the sender names itself."
+  if (!alias.trim()) return "Enter the pump label the sender uses."
+  if (!pumpId) return "Choose the Fuel pump."
+  const s = source.trim().toLowerCase(), a = alias.trim().toLowerCase()
+  return existing.some(x => x.source === s && x.alias === a) ? "That label is already mapped for this source." : null
+}
+
+/** Sources seen on staged shifts, so the person can pick one instead of typing it. */
+export function knownSources(imports: { source: string }[]): string[] {
+  return Array.from(new Set(imports.map(i => i.source))).sort()
+}
