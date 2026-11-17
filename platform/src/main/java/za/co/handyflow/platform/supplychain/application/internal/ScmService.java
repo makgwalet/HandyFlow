@@ -252,7 +252,7 @@ public class ScmService {
                 .orElseThrow(() -> new HandyFlowException("Location not found", HttpStatus.NOT_FOUND, "NOT_FOUND"));
 
         inventoryRepo.upsertInventoryRow(UUID.randomUUID(), tid, req.locationId(), req.catalogueItemId());
-        ScInventory inv = inventoryRepo.findByTenantIdAndLocationIdAndCatalogueItemId(
+        ScInventory inv = inventoryRepo.lockByTenantIdAndLocationIdAndCatalogueItemId(
                 tid, req.locationId(), req.catalogueItemId()).orElseThrow();
 
         BigDecimal before = inv.getQtyOnHand();

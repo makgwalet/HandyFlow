@@ -166,7 +166,7 @@ public class GoodsReceivingService {
                 // PO but create no inventory movement — there is no stock record to update.
                 if (catItemId != null) {
                     inventoryRepo.upsertInventoryRow(UUID.randomUUID(), tid, gr.getReceivedTo(), catItemId);
-                    ScInventory inv = inventoryRepo.findByTenantIdAndLocationIdAndCatalogueItemId(
+                    ScInventory inv = inventoryRepo.lockByTenantIdAndLocationIdAndCatalogueItemId(
                             tid, gr.getReceivedTo(), catItemId).orElseThrow();
                     ScStockMovement mv = ScStockMovement.record(tid, inv, "PURCHASE", accepted, unitCost,
                             "GOODS_RECEIPT", gr.getId(), gr.getReceiptNumber(), userId, userName);
@@ -268,7 +268,7 @@ public class GoodsReceivingService {
         // Offsetting stock movements (history preserved — nothing is deleted).
         for (ScStockMovement m : movementRepo.findByReference("GOODS_RECEIPT", grId)) {
             if (!tid.equals(m.getTenantId()) || m.getQtyChange().signum() <= 0) continue;
-            ScInventory inv = inventoryRepo.findByTenantIdAndId(tid, m.getInventoryId())
+            ScInventory inv = inventoryRepo.lockByTenantIdAndId(tid, m.getInventoryId())
                     .orElseThrow(() -> new HandyFlowException("Inventory record not found", HttpStatus.NOT_FOUND, "NOT_FOUND"));
             BigDecimal delta = m.getQtyChange().negate();
             if (inv.getQtyOnHand().add(delta).signum() < 0)

@@ -18,6 +18,16 @@ public interface ScInventoryRepository extends JpaRepository<ScInventory, UUID> 
     @Query("SELECT i FROM ScInventory i WHERE i.tenantId = :tenantId AND i.id = :id")
     Optional<ScInventory> findByTenantIdAndId(@Param("tenantId") UUID tenantId, @Param("id") UUID id);
 
+    /** Row-locked lookup for anything that changes quantity on hand (receipts, reversals, opening stock). */
+    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT i FROM ScInventory i WHERE i.tenantId = :tenantId AND i.locationId = :locationId AND i.catalogueItemId = :itemId")
+    Optional<ScInventory> lockByTenantIdAndLocationIdAndCatalogueItemId(
+            @Param("tenantId") UUID tenantId, @Param("locationId") UUID locationId, @Param("itemId") UUID catalogueItemId);
+
+    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT i FROM ScInventory i WHERE i.tenantId = :tenantId AND i.id = :id")
+    Optional<ScInventory> lockByTenantIdAndId(@Param("tenantId") UUID tenantId, @Param("id") UUID id);
+
     @Query("SELECT i FROM ScInventory i WHERE i.tenantId = :tenantId AND i.locationId = :locationId")
     List<ScInventory> findByTenantIdAndLocation(@Param("tenantId") UUID tenantId,
                                                 @Param("locationId") UUID locationId);
