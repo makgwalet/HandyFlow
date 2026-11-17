@@ -93,7 +93,7 @@ const STATUS_TONE: Record<string, Tone> = {
   COMPLETED: "green", DELIVERED: "green", PAID: "green", POSTED: "green", APPROVED: "green", ACTIVE: "green", OK: "green", CLOSED: "slate",
   IN_TRANSIT: "amber", DISPATCHED: "blue", LOADING: "blue", ARRIVED: "violet", OFFLOADING: "violet", OPEN: "blue",
   SCHEDULED: "blue", PLANNED: "blue", PENDING: "amber", DRAFT: "slate",
-  CANCELLED: "red", FAILED: "red", REJECTED: "red", OVERDUE: "red", LOW: "red", BLOCKED: "red",
+  CANCELLED: "red", REVERSED: "red", FAILED: "red", REJECTED: "red", OVERDUE: "red", LOW: "red", BLOCKED: "red",
 }
 
 export const toneForStatus = (status: string | null | undefined): Tone => STATUS_TONE[(status ?? "").toUpperCase()] ?? "slate"

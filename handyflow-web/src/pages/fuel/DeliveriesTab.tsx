@@ -1,3 +1,4 @@
+import { KpiGrid, KpiTile, StatusPill } from "./fuelUi"
 import type { CustomerAccount } from "./customerOps"
 import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
@@ -152,6 +153,15 @@ export default function DeliveriesTab() {
 
   return (
     <div>
+      <div style={{ marginBottom: 18 }}>
+        <KpiGrid>
+          <KpiTile label="Scheduled" tone="blue" icon={Truck} value={deliveries.filter(d => d.status === "SCHEDULED").length} hint="waiting to leave" />
+          <KpiTile label="In transit" tone="amber" icon={Truck} value={deliveries.filter(d => d.status === "IN_TRANSIT").length} hint="on the road" />
+          <KpiTile label="Delivered" tone="green" icon={CheckCircle} value={deliveries.filter(d => d.status === "DELIVERED").length} hint={`${deliveries.filter(d => d.status === "DELIVERED").reduce((sum, d) => sum + Number(d.litresDelivered ?? d.litresOrdered ?? 0), 0).toLocaleString("en-ZA")}\u00a0L received`} />
+          <KpiTile label="Reversed / cancelled" tone="slate" icon={X} value={deliveries.filter(d => d.status === "CANCELLED" || d.status === "REVERSED").length} />
+        </KpiGrid>
+      </div>
+
       {/* Toolbar */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
         <div style={{ display: "flex", gap: 6 }}>
@@ -220,7 +230,7 @@ export default function DeliveriesTab() {
                       <div style={{ fontWeight: 700, color: "var(--hf-text)" }}>{fmtR(d.totalAmount)}</div>
                       {d.receiptNumber && <div style={{ fontSize: 11, color: "var(--hf-text-faint)" }}>{d.receiptNumber}</div>}
                     </div>
-                    <span style={{ background: cfg.bg, color: cfg.color, padding: "4px 12px", borderRadius: 20, fontSize: 12, fontWeight: 600 }}>{cfg.label}</span>
+                    <StatusPill status={d.status} label={cfg.label} />
                     {d.status === "SCHEDULED" && (
                       <button onClick={() => { setShowDispatch(d); setError("") }} style={{ display: "flex", alignItems: "center", gap: 5, background: "var(--hf-warning-soft)", color: "var(--hf-warning-text-strong)", border: "1px solid var(--hf-warning-border)", borderRadius: 7, padding: "7px 14px", fontSize: 13, fontWeight: 500, cursor: "pointer" }}>
                         <Truck size={13} /> Mark In Transit
