@@ -25,7 +25,24 @@ export function reconNotes(r: FcRecon): string[] {
   for (const f of r.forecourts) {
     if (f.totalIn === 0) continue
     if (!f.supplierId) out.push(`${f.name} has no supplying depot set, so none of its fuel can be matched to a supplier.`)
-    else if (f.fromOtherDepots > 0 || f.fromSuppliers > 0) out.push(`${f.name}: ${Math.round(f.totalIn - f.fromSupplierDepot).toLocaleString("en-ZA")} L of ${Math.round(f.totalIn).toLocaleString("en-ZA")} L did not come from ${f.supplierName}.`)
+    else if (f.fromOtherDepots > 0 || f.fromSuppliers > 0) out.push(`${f.name}: ${Math.round(f.totalIn - f.fromSupplierDepot).toLocaleString("en-ZA")} L of ${Math.round(f.totalIn).toLocaleString("en-ZA")} L did not come from its supplying depot (${f.supplierName}).`)
   }
   return out
+}
+
+// Splitting a forecourt's supply across several supplying depots.
+export type SplitLine = { supplyingDepotId: string; percentage: string }
+
+export function splitTotal(lines: SplitLine[]): number {
+  return Math.round(lines.reduce((s, l) => s + (Number(l.percentage) || 0), 0) * 100) / 100
+}
+
+/** Null when the lines can be saved. No lines is fine: it removes the split. */
+export function splitProblem(lines: SplitLine[]): string | null {
+  if (lines.length === 0) return null
+  if (lines.some(l => !l.supplyingDepotId)) return "Choose a depot on every line."
+  if (new Set(lines.map(l => l.supplyingDepotId)).size !== lines.length) return "Each depot can appear only once."
+  if (lines.some(l => !(Number(l.percentage) > 0) || Number(l.percentage) > 100)) return "Each percentage must be above 0 and at most 100."
+  const t = splitTotal(lines)
+  return t === 100 ? null : `The percentages must total 100. They total ${t}.`
 }

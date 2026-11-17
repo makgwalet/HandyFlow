@@ -26,7 +26,7 @@ describe("ForecourtReconciliationSection", () => {
   })
   it("says when part of the fuel did not come from the supplying depot", async () => {
     mount()
-    expect((await screen.findByRole("status")).textContent).toMatch(/did not come from Terminal/)
+    expect((await screen.findByRole("status")).textContent).toMatch(/did not come from its supplying depot \(Terminal\)/)
   })
   it("warns when a forecourt has no supplying depot", () => {
     expect(reconNotes(rec({ forecourts: [row({ supplierId: null, supplierName: null })] }) as any)[0]).toMatch(/no supplying depot/)

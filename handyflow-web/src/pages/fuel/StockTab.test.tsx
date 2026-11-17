@@ -137,4 +137,28 @@ describe("StockTab", () => {
     fireEvent.click(within(dlg).getByRole("button", { name: "Save" }))
     await waitFor(() => expect(put).toHaveBeenCalledWith("/api/v1/fuel/depots/d2", { name: "Forecourt One", code: "FC1", address: null, supplyingDepotId: null }))
   })
+
+  it("shows the saved split, validates the total and saves the lines", async () => {
+    perms = ["FUEL_MANAGE"]
+    const base = get.getMockImplementation()!
+    get.mockImplementation(async (u: string, ...r: unknown[]) => u.includes("/supply-shares")
+      ? { data: { data: [{ supplyingDepotId: "d1", name: "Witbank Depot", percentage: 70 }] } }
+      : u.includes("/depots")
+        ? { data: { data: [{ id: "d1", code: "WIT", name: "Witbank Depot", tankCount: 2 }, { id: "d2", code: "FC1", name: "Forecourt One", tankCount: 1 }, { id: "d3", code: "SEC", name: "Secunda Depot", tankCount: 1 }] } }
+        : base(u, ...r))
+    mount(); await waitFor(() => screen.getByText("Diesel 1"))
+    fireEvent.click(screen.getByRole("button", { name: "Depots" }))
+    await waitFor(() => screen.getByText("Forecourt One"))
+    fireEvent.click(screen.getAllByRole("button", { name: "Edit" })[1])
+    const dlg = await screen.findByRole("dialog")
+    await waitFor(() => expect((within(dlg).getByLabelText("Percentage 1") as HTMLInputElement).value).toBe("70"))
+    fireEvent.click(within(dlg).getByRole("button", { name: "Add a supplying depot" }))
+    fireEvent.change(within(dlg).getByLabelText("Supplying depot 2"), { target: { value: "d3" } })
+    fireEvent.change(within(dlg).getByLabelText("Percentage 2"), { target: { value: "20" } })
+    expect(within(dlg).getByRole("alert").textContent).toMatch(/total 100\. They total 90/)
+    expect((within(dlg).getByRole("button", { name: "Save split" }) as HTMLButtonElement).disabled).toBe(true)
+    fireEvent.change(within(dlg).getByLabelText("Percentage 2"), { target: { value: "30" } })
+    fireEvent.click(within(dlg).getByRole("button", { name: "Save split" }))
+    await waitFor(() => expect(put).toHaveBeenCalledWith("/api/v1/fuel/depots/d2/supply-shares", [{ supplyingDepotId: "d1", percentage: 70 }, { supplyingDepotId: "d3", percentage: 30 }]))
+  })
 })

@@ -37,13 +37,14 @@ class FuelForecourtSupplyReconciliationServiceTest {
     @Mock FuelDepotRepository depots;
     @Mock FuelShiftRepository shifts;
     @Mock FuelShiftReadingRepository readings;
+    @Mock FuelDepotSupplyShareRepository shareRepo;
     FuelForecourtSupplyReconciliationService svc;
 
     FuelDepot terminal, other, fc;
     FuelTank tTerminal, tOther, tFc, tFc2;
 
     @BeforeEach void setUp() {
-        svc = new FuelForecourtSupplyReconciliationService(transfers, receipts, pumps, tanks, depots, shifts, readings);
+        svc = new FuelForecourtSupplyReconciliationService(transfers, receipts, pumps, tanks, depots, shifts, readings, shareRepo);
         terminal = depot("Terminal", null);
         other = depot("Other depot", null);
         fc = depot("Forecourt", terminal.getId());
@@ -111,5 +112,18 @@ class FuelForecourtSupplyReconciliationServiceTest {
     void limited() {
         assertTrue(svc.report(T, 30, Set.of(other.getId())).forecourts().isEmpty());
         assertEquals(1, svc.report(T, 30, Set.of(fc.getId())).forecourts().size());
+    }
+
+    @Test @DisplayName("with a saved split, transfers from any depot in the split count as from the supplying depots")
+    void split() {
+        FuelDepotSupplyShare a = mock(FuelDepotSupplyShare.class), b = mock(FuelDepotSupplyShare.class);
+        when(a.getDepotId()).thenReturn(fc.getId()); when(a.getSupplyingDepotId()).thenReturn(terminal.getId()); when(a.getPercentage()).thenReturn(bd("70"));
+        when(b.getDepotId()).thenReturn(fc.getId()); when(b.getSupplyingDepotId()).thenReturn(other.getId()); when(b.getPercentage()).thenReturn(bd("30"));
+        when(shareRepo.findAllForTenant(T)).thenReturn(List.of(a, b));
+        when(transfers.findBetween(eq(T), any(), any())).thenReturn(List.of(transfer(tTerminal, tFc, "700"), transfer(tOther, tFc, "300")));
+        var f = svc.report(T, 30, null).forecourts().get(0);
+        assertEquals(0, bd("1000").compareTo(f.fromSupplierDepot()));
+        assertEquals(0, BigDecimal.ZERO.compareTo(f.fromOtherDepots()));
+        assertEquals("Terminal 70%, Other depot 30%", f.supplierName());
     }
 }

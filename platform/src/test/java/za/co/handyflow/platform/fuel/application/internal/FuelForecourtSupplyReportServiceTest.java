@@ -34,9 +34,10 @@ class FuelForecourtSupplyReportServiceTest {
     @Mock FuelShiftReadingRepository readings;
     @Mock FuelTankRepository tanks;
     @Mock FuelDepotRepository depots;
+    @Mock FuelDepotSupplyShareRepository shareRepo;
     FuelForecourtSupplyReportService svc;
 
-    @BeforeEach void setUp() { svc = new FuelForecourtSupplyReportService(shifts, readings, tanks, depots); }
+    @BeforeEach void setUp() { svc = new FuelForecourtSupplyReportService(shifts, readings, tanks, depots, shareRepo); }
 
     private FuelDepot depot(String name, UUID supplier) {
         FuelDepot d = mock(FuelDepot.class);
@@ -163,5 +164,27 @@ class FuelForecourtSupplyReportServiceTest {
         var rd0 = reading(s.getId(), t, "10", "230");
         when(readings.findByShifts(eq(T), any())).thenReturn(List.of(rd0));
         assertTrue(svc.report(T, 30, true).suppliers().get(0).unassigned());
+    }
+
+    @Test @DisplayName("a forecourt with a saved split has its litres and sales shared out by percentage, and the totals still add up")
+    void splitShared() {
+        FuelDepot a = depot("Depot A", null), b = depot("Depot B", null);
+        FuelDepot fc = depot("Forecourt", null);
+        FuelTank t = tank(fc);
+        FuelShift s = shift(UUID.randomUUID());
+        FuelDepotSupplyShare s1 = mock(FuelDepotSupplyShare.class), s2 = mock(FuelDepotSupplyShare.class);
+        when(s1.getDepotId()).thenReturn(fc.getId()); when(s1.getSupplyingDepotId()).thenReturn(a.getId()); when(s1.getPercentage()).thenReturn(bd("70"));
+        when(s2.getDepotId()).thenReturn(fc.getId()); when(s2.getSupplyingDepotId()).thenReturn(b.getId()); when(s2.getPercentage()).thenReturn(bd("30"));
+        when(shareRepo.findAllForTenant(T)).thenReturn(List.of(s1, s2));
+        when(depots.findAllActive(T)).thenReturn(List.of(a, b, fc));
+        when(tanks.findAllActive(T)).thenReturn(List.of(t));
+        when(shifts.findClosedSince(eq(T), any())).thenReturn(List.of(s));
+        when(readings.findByShifts(eq(T), any())).thenReturn(List.of(reading(s.getId(), t, "100.01", "2300.01")));
+        Report r = svc.report(T, 30, true);
+        assertEquals(2, r.suppliers().size());
+        assertEquals(0, bd("100.01").compareTo(r.totalLitres()));
+        assertEquals(0, bd("2300.01").compareTo(r.totalSales()));
+        var big = r.suppliers().stream().filter(x -> x.name().equals("Depot A")).findFirst().orElseThrow();
+        assertEquals(0, bd("70.01").compareTo(big.litresSold()));
     }
 }

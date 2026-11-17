@@ -26,4 +26,10 @@ public final class ForecourtSupplyDtos {
                           BigDecimal supplierDepotSharePct, BigDecimal litresSold) {}
 
     public record Reconciliation(LocalDate from, LocalDate to, List<Inbound> forecourts, BigDecimal totalIn, BigDecimal totalSold) {}
+
+    /** One line of a forecourt's supply split, as saved. */
+    public record ShareLine(UUID supplyingDepotId, BigDecimal percentage) {}
+
+    /** One line of a forecourt's supply split, as read back. */
+    public record Share(UUID supplyingDepotId, String name, BigDecimal percentage) {}
 }

@@ -11,6 +11,7 @@ import {
   fmtL, movementLabel, mismatches, validateAdjust, validateTransfer, validateReserve,
   type Availability, type TankLine,
 } from "./stockOps"
+import { splitProblem, type SplitLine } from "./forecourtSupplyOps"
 
 const unwrap = (r: any) => r.data?.data ?? r.data
 const page = (r: any): any[] => { const d = unwrap(r); return Array.isArray(d) ? d : (d?.content ?? []) }
@@ -278,6 +279,44 @@ function PlaceDialog({ tank, onClose }: { tank: TankLine; onClose: () => void })
   )
 }
 
+/** Optional: share a forecourt's supply across several supplying depots by percentage. Saved on its own; with no lines the depot uses its single supplier. */
+function SupplySplit({ depotId, options }: { depotId: string; options: any[] }) {
+  const qc = useQueryClient()
+  const [lines, setLines] = useState<SplitLine[] | null>(null)
+  const q = useQuery<any[]>({
+    queryKey: ["fuel-supply-split", depotId], retry: false,
+    queryFn: async () => { const d = unwrap(await apiClient.get(`/api/v1/fuel/depots/${depotId}/supply-shares`)); return Array.isArray(d) ? d.filter(x => x && x.percentage != null && x.supplyingDepotId) : [] },
+  })
+  const m = useMutation({
+    mutationFn: () => apiClient.put(`/api/v1/fuel/depots/${depotId}/supply-shares`, (lines ?? []).map(l => ({ supplyingDepotId: l.supplyingDepotId, percentage: Number(l.percentage) }))),
+    onSuccess: () => { setLines(null); qc.invalidateQueries({ queryKey: ["fuel-supply-split", depotId] }); qc.invalidateQueries({ queryKey: ["fuel-forecourt-supply"] }); qc.invalidateQueries({ queryKey: ["fuel-forecourt-recon"] }) },
+  })
+  if (!q.data) return null
+  const shown: SplitLine[] = lines ?? q.data.map(x => ({ supplyingDepotId: x.supplyingDepotId, percentage: String(x.percentage) }))
+  const set = (next: SplitLine[]) => setLines(next)
+  const problem = splitProblem(shown)
+  return (
+    <section aria-label="Split supply across depots" style={{ marginTop: 16, borderTop: "1px solid var(--hf-border)", paddingTop: 10 }}>
+      <div style={{ fontWeight: 700, fontSize: 13 }}>Split supply across several depots</div>
+      <p style={{ fontSize: 11.5, color: "var(--hf-text-muted)", margin: "2px 0 8px" }}>Optional. When set, forecourt sales are shared out by these percentages in the supply report, and they replace "Supplied by" there. Percentages must total 100.</p>
+      {shown.map((l, i) => (
+        <div key={i} style={{ display: "flex", gap: 8, marginBottom: 6 }}>
+          <select aria-label={`Supplying depot ${i + 1}`} style={{ ...inputStyle, flex: 1 }} value={l.supplyingDepotId} onChange={e => set(shown.map((x, j) => j === i ? { ...x, supplyingDepotId: e.target.value } : x))}>
+            <option value="">Choose…</option>{options.map(x => <option key={x.id} value={x.id}>{x.code} - {x.name}</option>)}
+          </select>
+          <input aria-label={`Percentage ${i + 1}`} style={{ ...inputStyle, width: 80 }} inputMode="decimal" value={l.percentage} onChange={e => set(shown.map((x, j) => j === i ? { ...x, percentage: e.target.value } : x))} />
+          <button type="button" style={{ ...btnGhost, padding: "4px 10px" }} onClick={() => set(shown.filter((_, j) => j !== i))}>Remove</button>
+        </div>))}
+      <button type="button" style={{ ...btnGhost, padding: "4px 10px" }} onClick={() => set([...shown, { supplyingDepotId: "", percentage: "" }])}>Add a supplying depot</button>
+      {lines && <>
+        {problem && <p role="alert" style={{ fontSize: 12, color: "var(--hf-danger-text)", margin: "6px 0 0" }}>{problem}</p>}
+        <ErrorLine error={m.error} fallback="Could not save the split" />
+        <div style={{ marginTop: 8 }}><button type="button" style={btnPrimary} disabled={!!problem || m.isPending} onClick={() => m.mutate()}>Save split</button></div>
+      </>}
+    </section>
+  )
+}
+
 function ReserveDialog({ tanks, initial, onClose }: { tanks: TankLine[]; initial?: TankLine; onClose: () => void }) {
   const [tankId, setTankId] = useState(initial?.tankId ?? ""); const [litres, setLitres] = useState(""); const [note, setNote] = useState("")
   const done = useDone([["fuel-availability"], ["fuel-reservations"]], onClose)
@@ -336,6 +375,7 @@ function DepotDialog({ depot, onClose }: { depot?: any; onClose: () => void }) {
       </select>
       <p style={{ fontSize: 11.5, color: "var(--hf-text-muted)", margin: "4px 0 0" }}>For a forecourt: the depot its fuel comes from. Used to report forecourt sales by supplying depot.</p>
       <Footer problem={problem} error={m.error} pending={m.isPending} label="Save" onSubmit={() => m.mutate()} onClose={onClose} />
+      {depot && <SupplySplit depotId={depot.id} options={(others.data ?? []).filter(x => x.id !== depot.id)} />}
     </Modal>
   )
 }

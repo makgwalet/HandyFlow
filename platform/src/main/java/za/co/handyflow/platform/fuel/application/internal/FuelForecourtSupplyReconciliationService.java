@@ -17,7 +17,7 @@ import java.util.*;
 
 /**
  * Forecourt supply reconciliation: for each forecourt (a depot whose tanks have active pumps), how many litres came in during the period and from where:
- * the depot recorded as its supplier, any other depot, or a supplier receipt. Compared with litres sold on closed shifts.
+ * the depot recorded as its supplier (or the depots in its saved supply split), any other depot, or a supplier receipt. Compared with litres sold on closed shifts.
  * A transfer is one record, so this is not a sent-versus-received check; it shows whether the supply actually follows the supplier on record.
  * Transfers between tanks of the same depot are ignored. Read-only; litres only.
  */
@@ -34,6 +34,7 @@ public class FuelForecourtSupplyReconciliationService {
     private final FuelDepotRepository depots;
     private final FuelShiftRepository shifts;
     private final FuelShiftReadingRepository readings;
+    private final FuelDepotSupplyShareRepository supplyShares;
 
     @Transactional(readOnly = true)
     public Reconciliation report(TenantId tenantId, int days, Set<UUID> allowedDepotIds) {
@@ -55,6 +56,19 @@ public class FuelForecourtSupplyReconciliationService {
             if (d != null && depotById.containsKey(d) && (allowedDepotIds == null || allowedDepotIds.contains(d))) forecourts.add(d);
         }
 
+        // The depots that count as a forecourt's supplier: its saved split if it has one, otherwise its single supplier.
+        Map<UUID, Set<UUID>> suppliersOf = new HashMap<>();
+        Map<UUID, List<FuelDepotSupplyShare>> splits = new HashMap<>();
+        for (FuelDepotSupplyShare sh : supplyShares.findAllForTenant(tenantId)) {
+            if (!depotById.containsKey(sh.getSupplyingDepotId())) continue;
+            suppliersOf.computeIfAbsent(sh.getDepotId(), k -> new HashSet<>()).add(sh.getSupplyingDepotId());
+            splits.computeIfAbsent(sh.getDepotId(), k -> new ArrayList<>()).add(sh);
+        }
+        for (UUID f : forecourts) if (!suppliersOf.containsKey(f)) {
+            UUID one = depotById.get(f).getSupplyingDepotId();
+            if (one != null && depotById.containsKey(one)) suppliersOf.put(f, Set.of(one));
+        }
+
         Map<UUID, Acc> acc = new HashMap<>();
         for (UUID f : forecourts) acc.put(f, new Acc());
 
@@ -62,7 +76,7 @@ public class FuelForecourtSupplyReconciliationService {
             UUID in = tankDepot.get(t.getToTankId()), out = tankDepot.get(t.getFromTankId());
             Acc a = in == null ? null : acc.get(in);
             if (a == null || in.equals(out)) continue; // not a forecourt, or moved within the same depot
-            if (out != null && out.equals(depotById.get(in).getSupplyingDepotId())) a.fromSupplierDepot = a.fromSupplierDepot.add(t.getLitres());
+            if (out != null && suppliersOf.getOrDefault(in, Set.of()).contains(out)) a.fromSupplierDepot = a.fromSupplierDepot.add(t.getLitres());
             else a.fromOtherDepots = a.fromOtherDepots.add(t.getLitres());
         }
         for (FuelReceipt r : receipts.findReceivedBetween(tenantId, fromI, toI)) {
@@ -88,11 +102,21 @@ public class FuelForecourtSupplyReconciliationService {
         for (UUID f : forecourts) {
             Acc a = acc.get(f);
             FuelDepot fd = depotById.get(f);
+            List<FuelDepotSupplyShare> split = splits.get(f);
             UUID sup = fd.getSupplyingDepotId();
             FuelDepot supDepot = sup == null ? null : depotById.get(sup);
+            String supName = supDepot == null ? null : supDepot.getName();
+            if (split != null && split.size() > 1) {
+                split.sort(Comparator.comparing(FuelDepotSupplyShare::getPercentage).reversed());
+                StringBuilder sb = new StringBuilder();
+                for (FuelDepotSupplyShare sh : split) sb.append(sb.length() == 0 ? "" : ", ").append(depotById.get(sh.getSupplyingDepotId()).getName()).append(" ").append(sh.getPercentage().stripTrailingZeros().toPlainString()).append("%");
+                supName = sb.toString();
+            } else if (split != null && split.size() == 1) {
+                supDepot = depotById.get(split.get(0).getSupplyingDepotId()); supName = supDepot.getName();
+            }
             BigDecimal in = a.fromSupplierDepot.add(a.fromOtherDepots).add(a.fromSuppliers);
             BigDecimal share = in.signum() == 0 ? null : a.fromSupplierDepot.multiply(BigDecimal.valueOf(100)).divide(in, 1, RoundingMode.HALF_UP);
-            rows.add(new Inbound(f, fd.getName(), supDepot == null ? null : supDepot.getId(), supDepot == null ? null : supDepot.getName(),
+            rows.add(new Inbound(f, fd.getName(), supDepot == null && split == null ? null : (supDepot != null ? supDepot.getId() : split.get(0).getSupplyingDepotId()), supName,
                     a.fromSupplierDepot, a.fromOtherDepots, a.fromSuppliers, in, share, a.sold));
             totalIn = totalIn.add(in); totalSold = totalSold.add(a.sold);
         }

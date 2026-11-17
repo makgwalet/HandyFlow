@@ -24,7 +24,7 @@ import java.util.*;
 /**
  * Phase 8d: forecourt sales grouped by supplying depot. A forecourt is the depot that holds the pump tanks; each depot may record the depot that
  * supplies it. A reading belongs to the depot of its tank; a tank with no depot, or a depot with no supplier, goes in "No supplier set" so
- * nothing drops out of the totals. Only closed, not-reversed shifts count. Read-only; it changes nothing.
+ * nothing drops out of the totals. A forecourt with a saved supply split (percentages across several supplying depots) has its litres and sales shared out by those percentages. Only closed, not-reversed shifts count. Read-only; it changes nothing.
  */
 @Service
 @RequiredArgsConstructor
@@ -36,6 +36,7 @@ public class FuelForecourtSupplyReportService {
     private final FuelShiftReadingRepository readings;
     private final FuelTankRepository tanks;
     private final FuelDepotRepository depots;
+    private final za.co.handyflow.platform.fuel.domain.repository.FuelDepotSupplyShareRepository supplyShares;
 
     public Report report(TenantId tenantId, int days, boolean includeMoney) { return report(tenantId, days, includeMoney, null); }
 
@@ -56,6 +57,9 @@ public class FuelForecourtSupplyReportService {
         for (FuelDepot d : depots.findAllActive(tenantId)) depotById.put(d.getId(), d);
         Map<UUID, UUID> tankDepot = new HashMap<>();
         for (FuelTank t : tanks.findAllActive(tenantId)) tankDepot.put(t.getId(), t.getDepotId());
+        // A forecourt with a saved split has its sales shared out by percentage; every other forecourt uses its single supplier.
+        Map<UUID, List<za.co.handyflow.platform.fuel.domain.model.FuelDepotSupplyShare>> splits = new HashMap<>();
+        for (var sh : supplyShares.findAllForTenant(tenantId)) if (depotById.containsKey(sh.getSupplyingDepotId())) splits.computeIfAbsent(sh.getDepotId(), k -> new ArrayList<>()).add(sh);
 
         // supplier id (null = none) -> forecourt depot id (null = tank in no depot) -> totals
         Map<UUID, Map<UUID, Acc>> grouped = new LinkedHashMap<>();
@@ -69,6 +73,22 @@ public class FuelForecourtSupplyReportService {
                 UUID forecourt = tankDepot.get(r.getTankId());
                 if (allowedDepotIds != null && (forecourt == null || !allowedDepotIds.contains(forecourt))) continue;
                 FuelDepot fd = forecourt == null ? null : depotById.get(forecourt);
+                var split = fd == null ? null : splits.get(fd.getId());
+                if (split != null && !split.isEmpty()) {
+                    // Share litres and sales by percentage; the last line takes the rounding remainder so the pieces add back to the reading.
+                    BigDecimal litLeft = r.getLitresSold(), salesLeft = r.getSalesValue();
+                    for (int i = 0; i < split.size(); i++) {
+                        var sh = split.get(i);
+                        boolean last = i == split.size() - 1;
+                        BigDecimal lit = last ? litLeft : r.getLitresSold().multiply(sh.getPercentage()).divide(BigDecimal.valueOf(100), 2, java.math.RoundingMode.HALF_UP);
+                        BigDecimal sal = salesLeft == null ? null : (last ? salesLeft : r.getSalesValue().multiply(sh.getPercentage()).divide(BigDecimal.valueOf(100), 2, java.math.RoundingMode.HALF_UP));
+                        litLeft = litLeft.subtract(lit); if (salesLeft != null) salesLeft = salesLeft.subtract(sal);
+                        Acc a = grouped.computeIfAbsent(sh.getSupplyingDepotId(), k -> new LinkedHashMap<>()).computeIfAbsent(fd.getId(), k -> new Acc());
+                        a.litres = a.litres.add(lit); if (sal != null) a.sales = a.sales.add(sal);
+                        a.shiftIds.add(r.getShiftId());
+                    }
+                    continue;
+                }
                 UUID supplier = fd == null ? null : fd.getSupplyingDepotId();
                 if (supplier != null && !depotById.containsKey(supplier)) supplier = null; // supplier since deactivated
                 Acc a = grouped.computeIfAbsent(supplier, k -> new LinkedHashMap<>()).computeIfAbsent(fd == null ? null : fd.getId(), k -> new Acc());

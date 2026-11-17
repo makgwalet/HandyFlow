@@ -32,6 +32,7 @@ public class FuelStockController {
     private final FuelStockService stock;
     private final FuelStockAdjustmentApprovalService adjustments;
     private final FeatureGuard featureGuard;
+    private final za.co.handyflow.platform.fuel.application.internal.FuelDepotSupplyShareService supplyShares;
     private final za.co.handyflow.platform.fuel.application.internal.FuelScopeService scopeService;
 
     // ── Depots ───────────────────────────────────────────────────────────────
@@ -63,6 +64,22 @@ public class FuelStockController {
         featureGuard.requireModule("fuel");
         return ResponseEntity.ok(ApiResponse.success("Depot updated",
                 stock.updateDepot(TenantContext.getTenantIdAsObject(), id, req)));
+    }
+
+    /** The forecourt's supply split across several supplying depots. Empty means the depot uses its single supplier. */
+    @GetMapping("/depots/{id}/supply-shares")
+    @PreAuthorize("hasAuthority('FUEL_READ')")
+    public ResponseEntity<ApiResponse<List<za.co.handyflow.platform.fuel.dto.ForecourtSupplyDtos.Share>>> supplyShares(@PathVariable UUID id) {
+        featureGuard.requireModule("fuel");
+        return ResponseEntity.ok(ApiResponse.success(supplyShares.get(TenantContext.getTenantIdAsObject(), id)));
+    }
+
+    @PutMapping("/depots/{id}/supply-shares")
+    @PreAuthorize("hasAnyAuthority('FUEL_MANAGE','FUEL_STOCK_MANAGE')")
+    public ResponseEntity<ApiResponse<List<za.co.handyflow.platform.fuel.dto.ForecourtSupplyDtos.Share>>> saveSupplyShares(
+            @PathVariable UUID id, @RequestBody List<za.co.handyflow.platform.fuel.dto.ForecourtSupplyDtos.ShareLine> lines) {
+        featureGuard.requireModule("fuel");
+        return ResponseEntity.ok(ApiResponse.success("Supply split saved", supplyShares.replace(TenantContext.getTenantIdAsObject(), id, lines)));
     }
 
     @PostMapping("/depots/{id}/deactivate")
