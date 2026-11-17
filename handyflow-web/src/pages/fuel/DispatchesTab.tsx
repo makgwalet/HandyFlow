@@ -1,10 +1,11 @@
 // src/pages/fuel/DispatchesTab.tsx
 // KEY FIX: res.data?.data?.content — was res.data.content which skips ApiResponse wrapper
+import { KpiGrid, KpiTile } from "./fuelUi"
 import { useState, Fragment } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import ReverseModal from "./ReverseModal"
-import { Plus, Fuel, X, AlertCircle, AlertTriangle, List, BarChart3, Download } from "lucide-react"
+import { Plus, Fuel, Droplets, Users, X, AlertCircle, AlertTriangle, List, BarChart3, Download } from "lucide-react"
 import { forecourtTankChoices } from "./forecourtSupplyOps"
 
 const unwrap     = (r: any) => { const p = r.data?.data ?? r.data; return p?.content ?? p ?? [] }
@@ -129,17 +130,12 @@ export default function DispatchesTab() {
   return (
     <div>
       {/* Stats */}
-      <div style={{ display: "flex", gap: 12, marginBottom: 22 }}>
-        {[
-          { label: "Total dispatches",  value: filtered.length,                           color: "var(--hf-primary-text)" },
-          { label: "Total litres out",  value: `${totalLitres.toLocaleString()} L`,       color: "var(--hf-danger-text)" },
-          { label: "Unique recipients", value: new Set(filtered.map(d => d.recipientName)).size, color: "var(--hf-accent-text)" },
-        ].map(s => (
-          <div key={s.label} style={{ flex: 1, background: "var(--hf-surface-muted)", border: "1px solid var(--hf-border)", borderRadius: 10, padding: "12px 16px" }}>
-            <div style={{ fontSize: 22, fontWeight: 700, color: s.color }}>{s.value}</div>
-            <div style={{ fontSize: 11, color: "var(--hf-text-muted)", marginTop: 2 }}>{s.label}</div>
-          </div>
-        ))}
+      <div style={{ marginBottom: 22 }}>
+        <KpiGrid>
+          <KpiTile label="Total dispatches" tone="blue" icon={Fuel} value={filtered.length} />
+          <KpiTile label="Total litres out" tone="violet" icon={Droplets} value={`${totalLitres.toLocaleString()} L`} />
+          <KpiTile label="Unique recipients" tone="green" icon={Users} value={new Set(filtered.map(d => d.recipientName)).size} />
+        </KpiGrid>
       </div>
 
       {/* Toolbar */}

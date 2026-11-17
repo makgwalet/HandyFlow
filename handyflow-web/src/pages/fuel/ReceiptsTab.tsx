@@ -1,10 +1,11 @@
 // src/pages/fuel/ReceiptsTab.tsx
 // NEW tab — stock-in history across all tanks with supplier details and totals
+import { KpiGrid, KpiTile } from "./fuelUi"
 import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import ReverseModal from "./ReverseModal"
 import { apiClient } from "../../api/client"
-import { ArrowDownToLine, List, TrendingUp } from "lucide-react"
+import { ArrowDownToLine, Droplets, List, TrendingUp, Wallet } from "lucide-react"
 import { usePermissions } from "../../hooks/usePermission"
 import { Modal, btnPrimary, btnGhost, inputStyle, labelStyle } from "../warehousing/whseUi"
 import { validateFreight, adjustmentText, type ReceiptFreight } from "./freightOps"
@@ -53,17 +54,12 @@ export default function ReceiptsTab() {
     <div>
       {/* Stats */}
       {filtered.length > 0 && (
-        <div style={{ display: "flex", gap: 12, marginBottom: 22 }}>
-          {[
-            { label: "Stock-in events", value: filtered.length,                           color: "var(--hf-primary-text)" },
-            { label: "Total litres",    value: `${totalLitres.toLocaleString()} L`,       color: "var(--hf-accent-text)" },
-            { label: "Total cost",      value: `R ${totalCost.toLocaleString("en-ZA", { minimumFractionDigits: 2 })}`, color: "var(--hf-danger-text)" },
-          ].map(s => (
-            <div key={s.label} style={{ flex: 1, background: "var(--hf-surface-muted)", border: "1px solid var(--hf-border)", borderRadius: 10, padding: "12px 16px" }}>
-              <div style={{ fontSize: 20, fontWeight: 700, color: s.color }}>{s.value}</div>
-              <div style={{ fontSize: 11, color: "var(--hf-text-muted)", marginTop: 2 }}>{s.label}</div>
-            </div>
-          ))}
+        <div style={{ marginBottom: 22 }}>
+          <KpiGrid>
+            <KpiTile label="Stock-in events" tone="blue" icon={ArrowDownToLine} value={filtered.length} />
+            <KpiTile label="Total litres" tone="green" icon={Droplets} value={`${totalLitres.toLocaleString()} L`} />
+            <KpiTile label="Total cost" tone="amber" icon={Wallet} value={`R ${totalCost.toLocaleString("en-ZA", { minimumFractionDigits: 2 })}`} hint={totalLitres > 0 ? `R ${(totalCost / totalLitres).toFixed(2)} per litre` : undefined} />
+          </KpiGrid>
         </div>
       )}
 

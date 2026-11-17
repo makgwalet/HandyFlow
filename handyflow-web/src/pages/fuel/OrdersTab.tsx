@@ -1,4 +1,5 @@
 // Stage 2: quotations and sales orders: credit check, allocation, loads, loading record.
+import { KpiGrid, KpiTile, StatusPill, type Tone } from "./fuelUi"
 import { Fragment, useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
@@ -18,11 +19,7 @@ const FUELS = ["DIESEL", "DIESEL_50PPM", "DIESEL_500PPM", "PETROL_95", "PETROL_9
 
 type Dialog = { kind: "quote"; order?: Order } | { kind: "confirm"; order: Order } | { kind: "load"; order: Order } | { kind: "cancel"; order: Order } | { kind: "loading"; delivery: DeliveryLine } | null
 
-function tone(s: string) {
-  if (s === "DELIVERED") return { bg: "var(--hf-success-soft-strong)", fg: "var(--hf-success-text-strong)" }
-  if (s === "CANCELLED") return { bg: "var(--hf-danger-soft)", fg: "var(--hf-danger-text)" }
-  return { bg: "var(--hf-surface-alt)", fg: "var(--hf-text)" }
-}
+const ORDER_TONE: Record<string, Tone> = { QUOTE: "slate", CONFIRMED: "blue", PART_DELIVERED: "amber", DELIVERED: "green", CANCELLED: "red" }
 const Err = ({ text }: { text: string }) => text ? <p role="alert" style={{ color: "var(--hf-danger-text)", fontSize: 12, margin: "8px 0 0" }}>{text}</p> : null
 
 export default function OrdersTab() {
@@ -45,6 +42,15 @@ export default function OrdersTab() {
         </p>
         {canManage && <button style={btnPrimary} onClick={() => setDialog({ kind: "quote" })}>New quotation</button>}
       </div>
+      {rows.length > 0 && (
+        <div style={{ marginBottom: 16 }}>
+          <KpiGrid>
+            <KpiTile label="Quotes waiting" tone="slate" value={rows.filter(o => o.status === "QUOTE").length} />
+            <KpiTile label="Orders to load" tone="blue" value={rows.filter(o => o.status === "CONFIRMED" || o.status === "PART_DELIVERED").length} hint={`${rows.filter(o => o.status === "CONFIRMED" || o.status === "PART_DELIVERED").reduce((n, o) => n + Number(o.litresRemaining ?? 0), 0).toLocaleString("en-ZA")}\u00a0L still to deliver`} />
+            <KpiTile label="Open order value" tone="violet" value={fmtR(rows.filter(o => o.status === "CONFIRMED" || o.status === "PART_DELIVERED").reduce((n, o) => n + Number(o.value ?? 0), 0))} />
+          </KpiGrid>
+        </div>
+      )}
       {list.isLoading ? <p style={{ color: "var(--hf-text-muted)" }}>Loading…</p> : rows.length === 0 ? <p style={{ color: "var(--hf-text-muted)" }}>No orders yet.</p> : (
         <div style={{ ...card, overflowX: "auto" }}>
           <table style={{ width: "100%", borderCollapse: "collapse" }}>
@@ -59,7 +65,7 @@ export default function OrdersTab() {
                     <td style={td}>{fmtL(o.litresOrdered)}</td>
                     <td style={td}>{fmtL(o.litresDelivered)}</td>
                     <td style={td}>{fmtR(o.value)}</td>
-                    <td style={td}><Chip bg={tone(o.status).bg} fg={tone(o.status).fg}>{statusLabel(o.status)}</Chip></td>
+                    <td style={td}><StatusPill tone={ORDER_TONE[o.status] ?? "slate"} label={statusLabel(o.status)} /></td>
                     <td style={td}>{canManage && <span style={{ display: "flex", gap: 6 }}>
                       {o.status === "QUOTE" && <><button style={btnGhost} onClick={() => setDialog({ kind: "quote", order: o })}>Edit</button>
                         <button style={btnPrimary} onClick={() => setDialog({ kind: "confirm", order: o })}>Confirm</button></>}

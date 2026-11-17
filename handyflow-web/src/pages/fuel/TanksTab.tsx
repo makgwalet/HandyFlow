@@ -1,5 +1,6 @@
 // src/pages/fuel/TanksTab.tsx
 // KEY FIX: res.data (not res.data.content) — tanks endpoint returns a List, not Page
+import { KpiGrid, KpiTile } from "./fuelUi"
 import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
@@ -201,6 +202,23 @@ export default function TanksTab() {
           </div>
         </div>
       )}
+
+      {(tanks as Tank[]).length > 0 && (() => {
+        const list = tanks as Tank[]
+        const stock = list.reduce((n, t) => n + Number(t.currentLitres ?? 0), 0)
+        const cap = list.reduce((n, t) => n + Number(t.capacityLitres ?? 0), 0)
+        const low = list.filter(t => t.low).length
+        return (
+          <div style={{ marginBottom: 18 }}>
+            <KpiGrid>
+              <KpiTile label="Total stock" tone="blue" icon={Droplets} value={`${stock.toLocaleString()} L`} hint={cap > 0 ? `${((stock / cap) * 100).toFixed(0)}% of ${cap.toLocaleString()} L` : undefined} />
+              <KpiTile label="Tanks" tone="violet" icon={Droplets} value={list.length} hint={`${new Set(list.map(t => t.fuelType)).size} fuel type(s)`} />
+              <KpiTile label="Free capacity" tone="green" icon={Droplets} value={`${Math.max(0, cap - stock).toLocaleString()} L`} />
+              <KpiTile label="Low tanks" tone={low > 0 ? "red" : "slate"} icon={AlertTriangle} value={low} hint={low > 0 ? "Receive stock" : "All above threshold"} />
+            </KpiGrid>
+          </div>
+        )
+      })()}
 
       {/* Toolbar */}
       <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 16 }}>
