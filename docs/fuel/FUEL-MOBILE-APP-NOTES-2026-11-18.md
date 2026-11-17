@@ -26,11 +26,11 @@
 | Access summary screen (B9), 401/402/403 explanations | Needs the access-summary endpoint. |
 | Eligibility check before loading, emergency contact, push, signature capture | Need endpoints or decisions in the mobile plan (section 11). |
 | Forecourt, Truck stop, Depot, Overview | Placeholders only. |
-| Component tests of the driver screens | Logic is tested in plain functions; only Home is rendered in tests. |
+| Component tests of Load detail and My loads | Home, Record delivery and Could not deliver are rendered in tests; the rest is covered through plain functions. |
 
 ## Checks run
 
-`npx tsc --noEmit` clean; `npx jest` 56 tests passing. Not run on a device or emulator. `package-lock.json` is not included: run `npm install` once.
+`npx tsc --noEmit` clean; `npx jest` 60 tests passing. Not run on a device or emulator. `package-lock.json` is not included: run `npm install` once.
 
 ## To apply
 
