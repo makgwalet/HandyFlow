@@ -57,6 +57,7 @@ public class FuelPosImportService {
     private final za.co.handyflow.platform.fuel.domain.repository.FuelImportPumpAliasRepository aliases;
     private final FuelForecourtService forecourt;
     private final FuelDivisionGuard divisions;
+    private final FuelPosTransactionService transactions;
     private final FeatureGuard featureGuard;
     private final ObjectMapper mapper;
 
@@ -240,6 +241,8 @@ public class FuelPosImportService {
                 + (in.notes() == null || in.notes().isBlank() ? "" : ". " + in.notes().trim()));
         if (notes.length() > 500) notes = notes.substring(0, 500);
         ShiftResponse opened = forecourt.openShift(tenantId, new OpenShiftRequest(in.attendantName().trim(), notes, open), null);
+        // Live refunds and voids sent for this shift become approved adjustments (by the person accepting) before the close compares takings.
+        transactions.applyToShift(tenantId, imp.getSource(), imp.getExternalId(), opened.id(), by);
         forecourt.closeShift(tenantId, opened.id(),
                 new CloseShiftRequest(in.cash(), in.card(), in.account(), in.other(), req == null ? null : req.varianceReason(), close, in.fleetCard()), by);
         if (in.openedAt() != null || in.closedAt() != null) forecourt.recordProviderTimes(tenantId, opened.id(), in.openedAt(), in.closedAt());
@@ -253,6 +256,7 @@ public class FuelPosImportService {
     public ImportView reject(TenantId tenantId, UUID id, String reason, UUID by) {
         FuelPosImport imp = find(tenantId, id);
         imp.reject(by, reason);
+        transactions.markNotApplied(tenantId, imp.getSource(), imp.getExternalId());
         return toView(imports.save(imp));
     }
 

@@ -201,6 +201,8 @@ public class SecurityConfig {
                                 // X-Fuel-Import-Key header inside the service (unknown, missing or revoked key gets 401); it only stages a
                                 // shift for review; rate limited in RateLimitFilter.
                                 "/api/v1/fuel/import/pos-shifts",
+                                // Fuel live transactions (sales, refunds, voids): same key and rules as pos-shifts; they are only stored against their shift for review.
+                                "/api/v1/fuel/import/pos-transactions",
                                 // Fuel tank-gauge feed: same key and same rules as the pos-shifts import; it only stages a reading for review.
                                 "/api/v1/fuel/import/tank-gauges",
                                 // CRM lead capture: called by a website form or another system with no login. Authenticated by the X-Crm-Key header

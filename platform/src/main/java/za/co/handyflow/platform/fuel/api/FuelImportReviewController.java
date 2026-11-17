@@ -28,6 +28,7 @@ public class FuelImportReviewController {
     private static final String KEYS = "hasAnyAuthority('FUEL_MANAGE','FUEL_FORECOURT_MANAGE')";
 
     private final FuelPosImportService imports;
+    private final za.co.handyflow.platform.fuel.application.internal.FuelPosTransactionService transactions;
     private final FeatureGuard featureGuard;
 
     @GetMapping
@@ -42,6 +43,14 @@ public class FuelImportReviewController {
     public ResponseEntity<ApiResponse<ImportView>> get(@PathVariable UUID id) {
         featureGuard.requireModule("fuel");
         return ResponseEntity.ok(ApiResponse.success(imports.get(TenantContext.getTenantIdAsObject(), id)));
+    }
+
+    @GetMapping("/{id}/transactions")
+    @PreAuthorize(REVIEW)
+    @Operation(summary = "The live sales, refunds and voids the sender sent for this staged shift, and what they add up to beside the shift's meters")
+    public ResponseEntity<ApiResponse<ShiftTransactions>> transactions(@PathVariable UUID id) {
+        featureGuard.requireModule("fuel");
+        return ResponseEntity.ok(ApiResponse.success(transactions.forImport(TenantContext.getTenantIdAsObject(), id)));
     }
 
     @PostMapping("/{id}/accept")

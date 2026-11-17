@@ -146,6 +146,9 @@ public class RateLimitFilter extends OncePerRequestFilter {
             // Fuel pump/POS shift import (public, key authenticated). A site sends a few shifts a day; this slows key guessing and runaway senders.
             new Limit("fuel:pos-import", "/api/v1/fuel/import/pos-shifts", 120, 60 * 1_000L),
 
+            // Fuel live pump transactions (public, key authenticated). Busier than shifts, since a site may send each sale; still slows key guessing.
+            new Limit("fuel:pos-transactions", "/api/v1/fuel/import/pos-transactions", 600, 60 * 1_000L),
+
             // Fuel tank-gauge feed (public, key authenticated). A gauge system reports each tank every few minutes; this is generous enough for a depot and still slows key guessing.
             new Limit("fuel:tank-gauge-import", "/api/v1/fuel/import/tank-gauges", 300, 60 * 1_000L),
 

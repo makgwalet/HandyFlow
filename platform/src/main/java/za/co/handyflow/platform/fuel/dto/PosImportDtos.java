@@ -6,6 +6,7 @@ import jakarta.validation.constraints.*;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 /**
@@ -52,4 +53,43 @@ public final class PosImportDtos {
     public record AliasRequest(@NotBlank @Size(max = 40) String source, @NotBlank @Size(max = 40) String alias, @jakarta.validation.constraints.NotNull UUID pumpId) {}
 
     public record AliasView(UUID id, String source, String alias, UUID pumpId, String pumpName, Instant createdAt) {}
+
+    // ── live transactions (sales, refunds, voids) ────────────────────────────
+
+    /**
+     * One live transaction. kind is SALE, REFUND or VOID. A SALE needs pumpLabel, litres and amount. A REFUND or VOID needs originalExternalId (the sale it
+     * reverses, sent under the same source) and a reason; a VOID reverses the whole sale, a REFUND part or all of it. amount is always more than 0.
+     */
+    public record IncomingTransaction(@NotBlank @Size(max = 100) String externalId,
+                                      @NotBlank @Pattern(regexp = "SALE|REFUND|VOID", message = "kind must be SALE, REFUND or VOID") String kind,
+                                      Instant occurredAt,
+                                      @Size(max = 40) String pumpLabel,
+                                      @Positive @DecimalMax("100000") BigDecimal litres,
+                                      @NotNull @Positive @DecimalMax("1000000") BigDecimal amount,
+                                      @Pattern(regexp = "CASH|CARD|ACCOUNT|FLEET|OTHER", message = "tender must be CASH, CARD, ACCOUNT, FLEET or OTHER") String tender,
+                                      @Size(max = 100) String originalExternalId,
+                                      @Size(max = 300) String reason) {}
+
+    /** The transactions of one shift. shiftExternalId is the externalId the finished shift is (or will be) sent under, with the same source. */
+    public record IncomingTransactions(@NotBlank @Size(max = 40) String source,
+                                       @NotBlank @Size(max = 100) String shiftExternalId,
+                                       @NotEmpty @Size(max = 200) @Valid List<IncomingTransaction> transactions) {}
+
+    /** outcome: STAGED, DUPLICATE (same content already received) or CONFLICT (same externalId, different content: not stored). problems are listed, not refused. */
+    public record TransactionOutcome(String externalId, String outcome, List<String> problems) {}
+
+    public record TransactionIngestResult(String shiftExternalId, List<TransactionOutcome> results) {}
+
+    public record TransactionView(UUID id, String externalId, String kind, String originalExternalId, String pumpLabel, BigDecimal litres, BigDecimal amount,
+                                  String tender, Instant occurredAt, String reason, String status, List<String> problems, UUID adjustmentId) {}
+
+    /**
+     * What the sender's transactions add up to for a shift, to compare with the shift itself. netByTender is sales less refunds and voids per tender
+     * (tender "UNSPECIFIED" when the sender gave none). meterLitres is what the staged shift's meters say (null until the shift is received).
+     * Nothing here changes the shift: its own takings stay the authority.
+     */
+    public record TransactionSummary(int sales, BigDecimal salesLitres, BigDecimal salesAmount, BigDecimal refundsAmount, BigDecimal voidsAmount, BigDecimal netAmount,
+                                     Map<String, BigDecimal> netByTender, BigDecimal meterLitres, BigDecimal litresDifference, int notApplied) {}
+
+    public record ShiftTransactions(List<TransactionView> transactions, TransactionSummary summary) {}
 }

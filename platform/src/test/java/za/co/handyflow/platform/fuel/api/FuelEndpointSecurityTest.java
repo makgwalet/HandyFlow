@@ -25,7 +25,7 @@ class FuelEndpointSecurityTest {
     private static final Path API = Path.of("src/main/java/za/co/handyflow/platform/fuel/api");
     private static final Path MIGRATIONS = Path.of("src/main/resources/db/migration");
     /** Public by design: login/accept-invite for portal users, and the key-authenticated pump/POS import (8e). */
-    private static final Set<String> PUBLIC_CONTROLLERS = Set.of("FuelPortalAuthController.java", "FuelImportIngestController.java", "FuelGaugeIngestController.java");
+    private static final Set<String> PUBLIC_CONTROLLERS = Set.of("FuelPortalAuthController.java", "FuelImportIngestController.java", "FuelGaugeIngestController.java", "FuelTransactionIngestController.java");
     /** Portal-token controllers: class-level guard, tenant derived from the grant, no staff module guard. */
     private static final Set<String> PORTAL_CONTROLLERS = Set.of("FuelPortalDataController.java");
     private static final Pattern MAPPING = Pattern.compile("^\\s*@(Get|Post|Put|Delete|Patch)Mapping");
@@ -106,6 +106,17 @@ class FuelEndpointSecurityTest {
         assertThat(src).doesNotContain("@PreAuthorize").doesNotContain("TenantContext").contains("X-Fuel-Import-Key");
         assertThat(Files.readString(Path.of("src/main/java/za/co/handyflow/platform/config/SecurityConfig.java"))).contains("\"/api/v1/fuel/import/pos-shifts\"");
         assertThat(Files.readString(Path.of("src/main/java/za/co/handyflow/platform/config/RateLimitFilter.java"))).contains("\"/api/v1/fuel/import/pos-shifts\"");
+    }
+
+    @Test
+    void transactionIngestIsOneKeyAuthenticatedStagingEndpoint() throws IOException {
+        // Live transactions: same rules as the shift import. One POST, key authenticated, never TenantContext, path permitted and rate limited.
+        Path p = API.resolve("FuelTransactionIngestController.java");
+        String src = Files.readString(p);
+        assertThat(endpoints(p)).hasSize(1);
+        assertThat(src).doesNotContain("@PreAuthorize").doesNotContain("TenantContext").contains("X-Fuel-Import-Key");
+        assertThat(Files.readString(Path.of("src/main/java/za/co/handyflow/platform/config/SecurityConfig.java"))).contains("\"/api/v1/fuel/import/pos-transactions\"");
+        assertThat(Files.readString(Path.of("src/main/java/za/co/handyflow/platform/config/RateLimitFilter.java"))).contains("\"/api/v1/fuel/import/pos-transactions\"");
     }
 
     @Test

@@ -51,13 +51,14 @@ class FuelPosImportServiceTest {
     @Mock FuelForecourtService forecourt;
     @Mock FuelDivisionGuard divisions;
     @Mock FeatureGuard featureGuard;
+    @Mock FuelPosTransactionService transactions;
     FuelPosImportService svc;
     FuelImportKey key;
     String raw;
     FuelPump pump1;
 
     @BeforeEach void setUp() {
-        svc = new FuelPosImportService(keys, imports, pumps, aliasRepo, forecourt, divisions, featureGuard, new ObjectMapper().findAndRegisterModules());
+        svc = new FuelPosImportService(keys, imports, pumps, aliasRepo, forecourt, divisions, transactions, featureGuard, new ObjectMapper().findAndRegisterModules());
         raw = "hf_fuel_testkey";
         key = FuelImportKey.create(T, "Site POS", FuelPosImportService.hashKey(raw), raw.substring(0, 12), USER);
         when(keys.findByKeyHash(FuelPosImportService.hashKey(raw))).thenReturn(Optional.of(key));
@@ -206,6 +207,36 @@ class FuelPosImportServiceTest {
         assertEquals("short by 5", close.getValue().varianceReason());
         assertEquals("ACCEPTED", v.status());
         assertEquals(shiftId, v.shiftId());
+    }
+
+    @Test @DisplayName("accept applies the live refunds and voids for the shift, as the accepting supervisor, after opening and before closing")
+    void acceptAppliesTransactions() {
+        FuelPosImport i = staged("A1", "Pump 1", "1100");
+        UUID shiftId = UUID.randomUUID();
+        when(forecourt.openShift(eq(T), any(OpenShiftRequest.class), any())).thenReturn(opened(shiftId));
+        svc.accept(T, i.getId(), null, USER);
+        var order = inOrder(forecourt, transactions);
+        order.verify(forecourt).openShift(eq(T), any(OpenShiftRequest.class), any());
+        order.verify(transactions).applyToShift(T, "ACME-POS", "A1", shiftId, USER);
+        order.verify(forecourt).closeShift(eq(T), eq(shiftId), any(CloseShiftRequest.class), eq(USER));
+    }
+
+    @Test @DisplayName("a refused transaction check refuses the accept and the shift is never closed")
+    void acceptRefusedByTransactions() {
+        FuelPosImport i = staged("A1", "Pump 1", "1100");
+        UUID shiftId = UUID.randomUUID();
+        when(forecourt.openShift(eq(T), any(OpenShiftRequest.class), any())).thenReturn(opened(shiftId));
+        when(transactions.applyToShift(any(), any(), any(), any(), any())).thenThrow(new IllegalArgumentException("Refunds and voids do not add up"));
+        assertThrows(IllegalArgumentException.class, () -> svc.accept(T, i.getId(), null, USER));
+        verify(forecourt, never()).closeShift(any(), any(), any(), any());
+        assertTrue(i.isPending());
+    }
+
+    @Test @DisplayName("rejecting the shift marks its live transactions not applied")
+    void rejectMarksTransactions() {
+        FuelPosImport i = staged("A1", "Pump 1", "1100");
+        svc.reject(T, i.getId(), "Duplicate of shift typed by hand", USER);
+        verify(transactions).markNotApplied(T, "ACME-POS", "A1");
     }
 
     @Test @DisplayName("accept notes the provider's own opened and closed times on the shift, beside the system times")
