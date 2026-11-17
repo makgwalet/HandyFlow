@@ -142,4 +142,8 @@ public interface FuelDeliveryRepository extends JpaRepository<FuelDelivery, UUID
 
     @Query("SELECT d FROM FuelDelivery d WHERE d.tenantId = :tenantId AND d.routeId IN :routeIds AND d.deletedAt IS NULL ORDER BY d.routeId, d.routeSequence")
     List<FuelDelivery> findByRoutes(TenantId tenantId, java.util.Collection<UUID> routeIds);
+
+    /** Deliveries not yet finished (scheduled or on the road), soonest first. Open work is a small set, so it is read whole. */
+    @Query("SELECT d FROM FuelDelivery d WHERE d.tenantId = :tenantId AND d.status IN ('SCHEDULED','IN_TRANSIT') AND d.deletedAt IS NULL ORDER BY d.scheduledAt ASC")
+    List<FuelDelivery> findOpen(TenantId tenantId);
 }

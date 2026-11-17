@@ -3,109 +3,86 @@ package za.co.handyflow.platform.fuel.application.internal;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import za.co.handyflow.platform.crm.CrmFacade;
-import za.co.handyflow.platform.crm.CustomerSummary;
-import za.co.handyflow.platform.fuel.domain.model.FuelComplianceItem;
 import za.co.handyflow.platform.fuel.domain.model.FuelDelivery;
-import za.co.handyflow.platform.fuel.domain.model.FuelSalesOrder;
-import za.co.handyflow.platform.fuel.domain.model.FuelTank;
-import za.co.handyflow.platform.fuel.domain.repository.*;
-import za.co.handyflow.platform.fuel.dto.DashboardResponse;
-import za.co.handyflow.platform.fuel.dto.MarginResponse;
+import za.co.handyflow.platform.fuel.domain.repository.DipReadingRepository;
+import za.co.handyflow.platform.fuel.domain.repository.FuelDeliveryRepository;
+import za.co.handyflow.platform.fuel.domain.repository.FuelDispatchRepository;
+import za.co.handyflow.platform.fuel.domain.repository.FuelReceiptRepository;
+import za.co.handyflow.platform.fuel.dto.FuelDashboardSummary;
+import za.co.handyflow.platform.fuel.dto.FuelDashboardSummary.NextDelivery;
 import za.co.handyflow.platform.shared.TenantId;
 
 import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.*;
 
-/** Stage 4D: the manager's overview and delivery margin by customer. */
+/**
+ * The Fuel dashboard's headline figures, computed over the whole month and every open delivery, so they no longer depend on the first 200 rows of a list.
+ * Everything is limited to the tanks the caller may see (the same scope as the lists): {@code null} means unrestricted, an empty set means nothing.
+ * Read only.
+ */
 @Service
 @RequiredArgsConstructor
 public class FuelDashboardService {
 
-    private static final ZoneId SAST = ZoneId.of("Africa/Johannesburg");
+    static final ZoneId SA = ZoneId.of("Africa/Johannesburg");
+    static final BigDecimal VARIANCE_ALERT = new BigDecimal("-5");
+    static final int NEXT_DELIVERIES = 8;
+    static final long OVERDUE_AFTER_HOURS = 24;
 
-    private final FuelTankRepository tanks;
-    private final FuelReservationRepository reservations;
-    private final FuelSalesOrderRepository orders;
+    private final FuelDispatchRepository dispatches;
+    private final FuelReceiptRepository receipts;
+    private final DipReadingRepository dips;
     private final FuelDeliveryRepository deliveries;
-    private final FuelCustomerAccountRepository accounts;
-    private final FuelComplianceItemRepository compliance;
-    private final FuelPurchaseOrderRepository purchaseOrders;
-    private final CrmFacade crm;
 
     @Transactional(readOnly = true)
-    public DashboardResponse overview(TenantId tenantId) {
-        LocalDate today = LocalDate.now(SAST);
-        Instant now = Instant.now();
-
-        Map<UUID, BigDecimal> reserved = new HashMap<>();
-        for (Object[] row : reservations.sumLiveByTank(tenantId, now)) reserved.put((UUID) row[0], (BigDecimal) row[1]);
-        Map<String, BigDecimal[]> byType = new TreeMap<>();
-        int low = 0;
-        for (FuelTank t : tanks.findAllActive(tenantId)) {
-            BigDecimal[] sums = byType.computeIfAbsent(t.getFuelType(), k -> new BigDecimal[]{BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO});
-            sums[0] = sums[0].add(t.getCurrentLitres());
-            sums[1] = sums[1].add(reserved.getOrDefault(t.getId(), BigDecimal.ZERO));
-            sums[2] = sums[2].add(t.getCapacityLitres());
-            if (t.isLow()) low++;
-        }
-        List<DashboardResponse.StockByType> stock = new ArrayList<>();
-        byType.forEach((type, s) -> stock.add(new DashboardResponse.StockByType(type, s[0], s[1], s[0].subtract(s[1]).max(BigDecimal.ZERO), s[2])));
-
-        List<FuelDelivery> notInvoiced = deliveries.findNotInvoiced(tenantId).stream().filter(d -> d.getReversedAt() == null).toList();
-        BigDecimal notInvoicedValue = notInvoiced.stream().map(d -> d.getTotalAmount() == null ? BigDecimal.ZERO : d.getTotalAmount()).reduce(BigDecimal.ZERO, BigDecimal::add);
-        long failures = notInvoiced.stream().filter(d -> "FAILED".equals(d.getInvoiceState())).count();
-
-        long onHold = accounts.findAllActive(tenantId).stream().filter(a -> a.isCreditHold()).count();
-
-        Instant from = today.atStartOfDay(SAST).toInstant(), to = today.plusDays(1).atStartOfDay(SAST).toInstant();
-        List<FuelDelivery> todays = deliveries.findScheduledBetween(tenantId, from, to);
-        long unallocated = todays.stream().filter(d -> "SCHEDULED".equals(d.getStatus()) && !d.isAllocated()).count();
-
-        return new DashboardResponse(today, stock, low,
-                orders.countByStatus(tenantId, FuelSalesOrder.QUOTE), orders.countByStatus(tenantId, FuelSalesOrder.CONFIRMED),
-                orders.countByStatus(tenantId, FuelSalesOrder.PART_DELIVERED),
-                notInvoiced.size(), notInvoicedValue, failures, onHold,
-                compliance.countExpired(tenantId, today), compliance.countExpiring(tenantId, today, today.plusDays(FuelComplianceItem.WARN_DAYS)),
-                todays.size(), unallocated, purchaseOrders.countAwaitingDelivery(tenantId));
+    public FuelDashboardSummary summary(TenantId tenantId, Set<UUID> allowedTankIds, Instant now) {
+        LocalDate today = now.atZone(SA).toLocalDate();
+        if (allowedTankIds != null && allowedTankIds.isEmpty()) return empty(today);
+        Instant from = today.withDayOfMonth(1).atStartOfDay(SA).toInstant();
+        Instant to = today.withDayOfMonth(1).plusMonths(1).atStartOfDay(SA).toInstant();
+        return build(today, now, allowedTankIds,
+                dispatches.dashboardRows(tenantId, from, to),
+                receipts.tankIdsReceivedBetween(tenantId, from, to),
+                dips.tankIdsWithVarianceBelow(tenantId, from, to, VARIANCE_ALERT),
+                deliveries.findOpen(tenantId));
     }
 
-    /** Margin by customer over the last {@code days} days. Reversed deliveries are left out; deliveries with no recorded cost are counted but not guessed at. */
-    @Transactional(readOnly = true)
-    public MarginResponse margin(TenantId tenantId, int days) {
-        int span = Math.max(1, Math.min(days, 366));
-        LocalDate to = LocalDate.now(SAST), from = to.minusDays(span - 1L);
-        List<FuelDelivery> rows = deliveries.findDeliveredBetween(tenantId, from.atStartOfDay(SAST).toInstant(), to.plusDays(1).atStartOfDay(SAST).toInstant());
-        Map<UUID, Acc> acc = new LinkedHashMap<>();
-        int noCost = 0;
-        for (FuelDelivery d : rows) {
-            if (d.getReversedAt() != null || d.getLitresDelivered() == null || d.getCustomerId() == null) continue;
-            Acc a = acc.computeIfAbsent(d.getCustomerId(), k -> new Acc());
-            BigDecimal revenue = d.getTotalAmount() != null ? d.getTotalAmount()
-                    : d.getPricePerLitre() == null ? BigDecimal.ZERO : d.getLitresDelivered().multiply(d.getPricePerLitre());
-            a.deliveries++; a.litres = a.litres.add(d.getLitresDelivered()); a.revenue = a.revenue.add(revenue);
-            if (d.getCostPerLitreAtSale() == null) { noCost++; continue; }
-            a.margin = a.margin.add(revenue.subtract(d.getLitresDelivered().multiply(d.getCostPerLitreAtSale())));
-            a.costedLitres = a.costedLitres.add(d.getLitresDelivered());
+    /** Pure, so it can be tested without a database. Dispatch rows are [tankId, dispatchedAt, litresDispensed]. */
+    static FuelDashboardSummary build(LocalDate today, Instant now, Set<UUID> allowed, List<Object[]> dispatchRows, List<UUID> receiptTanks,
+                                      List<UUID> varianceTanks, List<FuelDelivery> open) {
+        BigDecimal litres = BigDecimal.ZERO;
+        int count = 0;
+        List<BigDecimal> daily = new ArrayList<>();
+        for (int i = 0; i < today.getDayOfMonth(); i++) daily.add(BigDecimal.ZERO);
+        for (Object[] r : dispatchRows) {
+            if (!visible(allowed, (UUID) r[0])) continue;
+            BigDecimal l = r[2] == null ? BigDecimal.ZERO : (BigDecimal) r[2];
+            litres = litres.add(l); count++;
+            int day = ((Instant) r[1]).atZone(SA).getDayOfMonth();
+            if (day >= 1 && day <= daily.size()) daily.set(day - 1, daily.get(day - 1).add(l));
         }
-        List<MarginResponse.Row> out = new ArrayList<>();
-        BigDecimal revenue = BigDecimal.ZERO, margin = BigDecimal.ZERO;
-        for (Map.Entry<UUID, Acc> e : acc.entrySet()) {
-            Acc a = e.getValue();
-            String name = crm.findCustomerById(tenantId, e.getKey()).map(CustomerSummary::name).orElse("(customer removed)");
-            BigDecimal perLitre = a.costedLitres.signum() == 0 ? null : a.margin.divide(a.costedLitres, 4, RoundingMode.HALF_UP);
-            out.add(new MarginResponse.Row(e.getKey(), name, a.deliveries, a.litres, a.revenue.setScale(2, RoundingMode.HALF_UP), a.margin.setScale(2, RoundingMode.HALF_UP), perLitre));
-            revenue = revenue.add(a.revenue); margin = margin.add(a.margin);
-        }
-        out.sort(Comparator.comparing(MarginResponse.Row::margin).reversed());
-        return new MarginResponse(from, to, revenue.setScale(2, RoundingMode.HALF_UP), margin.setScale(2, RoundingMode.HALF_UP), noCost, out);
+        int rec = (int) receiptTanks.stream().filter(t -> visible(allowed, t)).count();
+        int neg = (int) varianceTanks.stream().filter(t -> visible(allowed, t)).count();
+
+        List<FuelDelivery> mine = open.stream().filter(d -> visible(allowed, d.getTankId())).toList();
+        int inTransit = (int) mine.stream().filter(d -> "IN_TRANSIT".equals(d.getStatus())).count();
+        Instant cutoff = now.minusSeconds(OVERDUE_AFTER_HOURS * 3600);
+        int overdue = (int) mine.stream().filter(d -> "SCHEDULED".equals(d.getStatus()) && d.getScheduledAt() != null && d.getScheduledAt().isBefore(cutoff)).count();
+        List<NextDelivery> next = mine.stream()
+                .sorted(Comparator.comparing(FuelDelivery::getScheduledAt, Comparator.nullsLast(Comparator.naturalOrder())))
+                .limit(NEXT_DELIVERIES)
+                .map(d -> new NextDelivery(d.getId(), d.getStatus(), d.getFuelType(), d.getLitresOrdered(), d.getScheduledAt())).toList();
+        return new FuelDashboardSummary(today, litres, count, rec, daily, neg, mine.size(), inTransit, overdue, next);
     }
 
-    private static final class Acc {
-        int deliveries; BigDecimal litres = BigDecimal.ZERO, revenue = BigDecimal.ZERO, margin = BigDecimal.ZERO, costedLitres = BigDecimal.ZERO;
+    private static boolean visible(Set<UUID> allowed, UUID tankId) { return allowed == null || (tankId != null && allowed.contains(tankId)); }
+
+    private static FuelDashboardSummary empty(LocalDate today) {
+        List<BigDecimal> daily = new ArrayList<>();
+        for (int i = 0; i < today.getDayOfMonth(); i++) daily.add(BigDecimal.ZERO);
+        return new FuelDashboardSummary(today, BigDecimal.ZERO, 0, 0, daily, 0, 0, 0, 0, List.of());
     }
 }

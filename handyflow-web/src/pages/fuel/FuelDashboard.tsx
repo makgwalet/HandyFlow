@@ -1,30 +1,21 @@
 // src/pages/fuel/FuelDashboard.tsx
 //
 // Fuel Operations Command Centre: headline numbers, tank levels, what needs attention, ongoing deliveries
-// and quick actions. Built from the tank, dispatch, delivery and receipt lists the module already loads.
+// and quick actions. Tank levels come from the tanks list; the month and open-delivery figures come from the server's dashboard summary,
+// which covers the whole month and every open delivery for the tanks the user may see.
 import { useQuery } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import { Droplets, AlertTriangle, Fuel, Truck, TrendingDown, PackagePlus, Gauge, CalendarPlus, Activity, ClipboardList } from "lucide-react"
 import { ActionTile, EmptyState, KpiGrid, KpiTile, Panel, PanelLink, ProgressBar, RingGauge, StatusPill, StepTracker, type Tone } from "./fuelUi"
-import { buildDashboard, DELIVERY_STEPS, deliveryStep, FUEL_TONE, fmtShortDate, fmtLitres } from "./dashboardOps"
-
-const unwrap = (r: any) => { const p = r.data?.data ?? r.data; return p?.content ?? p ?? [] }
+import { asSummary, buildDashboard, DELIVERY_STEPS, deliveryStep, FUEL_TONE, fmtShortDate, fmtLitres } from "./dashboardOps"
 
 export default function FuelDashboard({ onNavigate }: { onNavigate: (section: string) => void }) {
   const tanksQ = useQuery({ queryKey: ["tanks"], queryFn: async () => { const r = await apiClient.get("/api/v1/fuel/tanks"); return r.data?.data ?? r.data ?? [] } })
-  const dispatchesQ = useQuery({ queryKey: ["dispatches"], queryFn: async () => unwrap(await apiClient.get("/api/v1/fuel/dispatches?size=200")) })
-  const deliveriesQ = useQuery({ queryKey: ["deliveries"], queryFn: async () => unwrap(await apiClient.get("/api/v1/fuel/deliveries?size=200")) })
-  const receiptsQ = useQuery({ queryKey: ["receipts"], queryFn: async () => unwrap(await apiClient.get("/api/v1/fuel/receipts?size=200")) })
+  const summaryQ = useQuery({ queryKey: ["fuel-dashboard-summary"], queryFn: async () => { const r = await apiClient.get("/api/v1/fuel/dashboard-summary"); return asSummary(r.data?.data ?? r.data) } })
 
-  const d = buildDashboard({
-    tanks: Array.isArray(tanksQ.data) ? tanksQ.data : [],
-    dispatches: (dispatchesQ.data ?? []) as any[],
-    deliveries: (deliveriesQ.data ?? []) as any[],
-    receipts: (receiptsQ.data ?? []) as any[],
-    now: new Date(),
-  })
-  const loading = tanksQ.isLoading || dispatchesQ.isLoading || deliveriesQ.isLoading
-  const failed = tanksQ.isError || dispatchesQ.isError || deliveriesQ.isError
+  const d = buildDashboard({ tanks: Array.isArray(tanksQ.data) ? tanksQ.data : [], summary: summaryQ.data ?? null })
+  const loading = tanksQ.isLoading || summaryQ.isLoading
+  const failed = tanksQ.isError || summaryQ.isError || (summaryQ.isSuccess && summaryQ.data == null)
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
@@ -33,7 +24,7 @@ export default function FuelDashboard({ onNavigate }: { onNavigate: (section: st
       <KpiGrid>
         <KpiTile label="Total stock" icon={Droplets} tone="blue" value={loading ? "…" : fmtLitres(d.totalStock)} hint={d.capacity > 0 ? `${d.stockPercent.toFixed(0)}% of ${fmtLitres(d.capacity)} capacity` : "No tanks yet"} onClick={() => onNavigate("tanks")} />
         <KpiTile label="Dispatched this month" icon={Fuel} tone="green" value={loading ? "…" : fmtLitres(d.monthLitres)} hint={`${d.monthDispatchCount} dispatch${d.monthDispatchCount === 1 ? "" : "es"}`} trend={d.dailyLitres} onClick={() => onNavigate("dispatches")} />
-        <KpiTile label="Pending deliveries" icon={Truck} tone="violet" value={loading ? "…" : d.pendingDeliveries.length} hint={d.inTransit > 0 ? `${d.inTransit} in transit` : "None on the road"} onClick={() => onNavigate("deliveries")} />
+        <KpiTile label="Pending deliveries" icon={Truck} tone="violet" value={loading ? "…" : d.openDeliveries} hint={d.inTransit > 0 ? `${d.inTransit} in transit` : "None on the road"} onClick={() => onNavigate("deliveries")} />
         <KpiTile label="Low tanks" icon={AlertTriangle} tone={d.lowTanks.length > 0 ? "red" : "slate"} value={loading ? "…" : d.lowTanks.length} hint={d.lowTanks.length > 0 ? "Needs a stock receipt" : "All tanks above their threshold"} onClick={() => onNavigate("tanks")} />
       </KpiGrid>
 

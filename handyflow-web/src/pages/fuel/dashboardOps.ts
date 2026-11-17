@@ -27,12 +27,25 @@ export const fmtShortDate = (iso: string | null | undefined) => {
 export interface TankView { id: string; name: string; fuelType: string; location: string | null; litres: number; capacity: number; available: number; percent: number; low: boolean }
 export interface AlertItem { key: string; title: string; detail: string; section: string; severity: "high" | "medium" }
 
-export interface DashboardInput { tanks: any[]; dispatches: any[]; deliveries: any[]; receipts: any[]; now: Date }
+/** The server's figures for the month and the open deliveries (GET /api/v1/fuel/dashboard-summary), limited to the tanks the user may see. */
+export interface NextDelivery { id: string; status: string; fuelType: string; litresOrdered: number | null; scheduledAt: string | null }
+export interface DashboardSummary {
+  today: string; monthLitres: number; monthDispatches: number; monthReceipts: number; dailyLitres: number[]; negativeVarianceReadings: number
+  openDeliveries: number; inTransitDeliveries: number; overdueDeliveries: number; nextDeliveries: NextDelivery[]
+}
+
+export interface DashboardInput { tanks: any[]; summary: DashboardSummary | null }
 
 const num = (v: unknown) => { const n = Number(v ?? 0); return Number.isFinite(n) ? n : 0 }
-const monthKey = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`
 
-export function buildDashboard({ tanks, dispatches, deliveries, receipts, now }: DashboardInput) {
+/** The reply is an object with these numbers; anything else (an error body, an empty reply) is treated as not loaded. */
+export function asSummary(v: unknown): DashboardSummary | null {
+  const o = v as any
+  if (!o || Array.isArray(o) || typeof o.monthDispatches !== "number" || !Array.isArray(o.dailyLitres)) return null
+  return { ...o, nextDeliveries: Array.isArray(o.nextDeliveries) ? o.nextDeliveries : [] } as DashboardSummary
+}
+
+export function buildDashboard({ tanks, summary }: DashboardInput) {
   const tankViews: TankView[] = tanks.map(t => {
     const capacity = num(t.capacityLitres), litres = num(t.currentLitres)
     const percent = t.fillPercentage != null ? num(t.fillPercentage) : capacity > 0 ? (litres / capacity) * 100 : 0
@@ -43,35 +56,21 @@ export function buildDashboard({ tanks, dispatches, deliveries, receipts, now }:
   const capacity = tankViews.reduce((s, t) => s + t.capacity, 0)
   const lowTanks = tankViews.filter(t => t.low)
 
-  // The month is matched on the local calendar, not on the UTC date string, so a late-night dispatch lands in the right month.
-  const mk = monthKey(now)
-  const inMonth = (iso: unknown) => { if (!iso) return false; const d = new Date(String(iso)); return !Number.isNaN(d.getTime()) && monthKey(d) === mk }
-  const monthDispatches = dispatches.filter(d => inMonth(d.dispatchedAt))
-  const monthLitres = monthDispatches.reduce((s, d) => s + num(d.litresDispensed), 0)
-  const monthReceipts = receipts.filter(r => inMonth(r.receivedAt)).length
-
-  // Litres per day up to today, for the sparkline.
-  const dailyLitres = Array.from({ length: now.getDate() }, () => 0)
-  for (const d of monthDispatches) {
-    const day = new Date(String(d.dispatchedAt)).getDate()
-    if (day >= 1 && day <= dailyLitres.length) dailyLitres[day - 1] += num(d.litresDispensed)
-  }
-
-  const pendingDeliveries = deliveries
-    .filter(d => d.status === "SCHEDULED" || d.status === "IN_TRANSIT")
-    .sort((a, b) => String(a.scheduledAt ?? "").localeCompare(String(b.scheduledAt ?? "")))
-  const inTransit = pendingDeliveries.filter(d => d.status === "IN_TRANSIT").length
+  const s = summary
+  const monthLitres = num(s?.monthLitres), monthDispatchCount = s?.monthDispatches ?? 0, monthReceipts = s?.monthReceipts ?? 0
+  const dailyLitres = (s?.dailyLitres ?? []).map(num)
+  const pendingDeliveries = s?.nextDeliveries ?? []
+  const openDeliveries = s?.openDeliveries ?? 0, inTransit = s?.inTransitDeliveries ?? 0
+  const negative = s?.negativeVarianceReadings ?? 0, overdue = s?.overdueDeliveries ?? 0
 
   const alerts: AlertItem[] = []
   for (const t of lowTanks) alerts.push({ key: `low-${t.id}`, title: `${t.name} is low`, detail: `${fmtLitres(t.litres)} left (${t.percent.toFixed(0)}%)`, section: "tanks", severity: "high" })
-  const neg = dispatches.filter(d => num(d.varianceLitres) < -5)
-  if (neg.length > 0) alerts.push({ key: "variance", title: `${neg.length} negative variance reading${neg.length === 1 ? "" : "s"}`, detail: "Possible leak or theft. Review reconciliation.", section: "dispatches", severity: "high" })
-  const overdue = pendingDeliveries.filter(d => d.status === "SCHEDULED" && d.scheduledAt && new Date(d.scheduledAt).getTime() < now.getTime() - 24 * 3600_000)
-  if (overdue.length > 0) alerts.push({ key: "overdue", title: `${overdue.length} delivery${overdue.length === 1 ? " is" : "ies are"} overdue`, detail: "Scheduled more than a day ago and not yet on the road.", section: "deliveries", severity: "medium" })
+  if (negative > 0) alerts.push({ key: "variance", title: `${negative} negative variance reading${negative === 1 ? "" : "s"}`, detail: "Dip readings this month more than 5 L below the book figure. Review reconciliation.", section: "tanks", severity: "high" })
+  if (overdue > 0) alerts.push({ key: "overdue", title: overdue === 1 ? "1 delivery is overdue" : `${overdue} deliveries are overdue`, detail: "Scheduled more than a day ago and not yet on the road.", section: "deliveries", severity: "medium" })
 
   return {
     tanks: tankViews, totalStock, capacity, stockPercent: capacity > 0 ? (totalStock / capacity) * 100 : 0, lowTanks,
-    monthLitres, monthDispatchCount: monthDispatches.length, monthReceipts, dailyLitres,
-    pendingDeliveries, inTransit, alerts,
+    monthLitres, monthDispatchCount, monthReceipts, dailyLitres,
+    pendingDeliveries, openDeliveries, inTransit, alerts,
   }
 }

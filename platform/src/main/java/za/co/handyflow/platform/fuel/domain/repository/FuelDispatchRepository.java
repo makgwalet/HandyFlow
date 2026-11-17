@@ -75,4 +75,8 @@ public interface FuelDispatchRepository extends JpaRepository<FuelDispatch, UUID
     /** Supply runs to the given forecourts in a period (not deleted, not reversed). Backs the forecourt dispatch matching. */
     @Query("SELECT d FROM FuelDispatch d WHERE d.tenantId = :tenantId AND d.deletedAt IS NULL AND d.reversedAt IS NULL AND d.destinationDepotId IN :depotIds AND d.dispatchedAt >= :from AND d.dispatchedAt < :to ORDER BY d.dispatchedAt ASC")
     List<FuelDispatch> findToDepotsBetween(TenantId tenantId, java.util.Collection<UUID> depotIds, Instant from, Instant to);
+
+    /** The dashboard's month figures: rows of [tankId, dispatchedAt, litresDispensed] for dispatches not deleted and not reversed. */
+    @Query("SELECT d.tankId, d.dispatchedAt, d.litresDispensed FROM FuelDispatch d WHERE d.tenantId = :tenantId AND d.deletedAt IS NULL AND d.reversedAt IS NULL AND d.dispatchedAt >= :from AND d.dispatchedAt < :to")
+    List<Object[]> dashboardRows(TenantId tenantId, Instant from, Instant to);
 }
