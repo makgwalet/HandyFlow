@@ -45,6 +45,8 @@ class FuelAccountStatementServiceTest {
     @Mock FuelTruckStopStayRepository stays;
     @Mock FuelTruckStopTabRepository tabs;
     @Mock FuelTruckStopTabLineRepository tabLines;
+    @Mock za.co.handyflow.platform.fuel.domain.repository.FuelDeliveryRepository deliveries;
+    @Mock za.co.handyflow.platform.invoicing.application.InvoicingFacade invoicing;
     @InjectMocks FuelAccountStatementService service;
 
     FuelCustomerAccount account;
@@ -99,5 +101,74 @@ class FuelAccountStatementServiceTest {
         assertThrows(IllegalArgumentException.class, () -> service.statement(T, account.getId(), LocalDate.of(2025, 1, 1), LocalDate.of(2026, 11, 30)));
         assertThrows(ResourceNotFoundException.class, () -> service.statement(T, UUID.randomUUID(), from, to));
         verifyNoInteractions(stays, tabs);
+    }
+
+    private za.co.handyflow.platform.fuel.domain.model.FuelDelivery delivered(UUID customer, String litres, String price) {
+        var d = za.co.handyflow.platform.fuel.domain.model.FuelDelivery.create(T, UUID.randomUUID(), customer, java.util.Map.of(), "DIESEL", bd(litres), bd(price), java.time.Instant.now(), null, null);
+        d.dispatch("Driver", "GP 77 ZZ"); d.complete(bd(litres), "Receiver", null, null, null, false, null, null);
+        return d;
+    }
+
+    @Test @DisplayName("delivered fuel for this customer is a line of its own, dated in South African time, and another customer's delivery is left out")
+    void listsDeliveries() {
+        var mine = delivered(account.getCrmCustomerId(), "5000", "21.50");
+        var other = delivered(UUID.randomUUID(), "9000", "21.50");
+        when(deliveries.findDeliveredBetween(eq(T), any(), any())).thenReturn(List.of(mine, other));
+        Statement s = service.statement(T, account.getId(), from, to);
+        assertEquals(1, s.lines().size());
+        var l = s.lines().get(0);
+        assertEquals("DELIVERY", l.kind());
+        assertEquals(0, bd("107500.00").compareTo(l.amount()));
+        assertEquals("GP 77 ZZ", l.vehicleRegistration());
+        assertTrue(l.description().contains("5000 L DIESEL delivered"));
+        assertEquals(java.time.LocalDate.now(SAST), l.date());
+    }
+
+    @Test @DisplayName("the division filter narrows the statement: Distribution has no stays or tabs, Truck Stop has no deliveries, anything else is refused")
+    void divisionFilter() {
+        when(deliveries.findDeliveredBetween(eq(T), any(), any())).thenReturn(List.of(delivered(account.getCrmCustomerId(), "100", "20")));
+        FuelTruckStopStay stay = FuelTruckStopStay.book(T, "GP 1", "Sipho", null, LocalDate.of(2026, 11, 3), LocalDate.of(2026, 11, 6), bd("450"), null, null);
+        stay.chargeTo(account.getId()); stay.checkIn(); stay.checkOut(LocalDate.of(2026, 11, 6));
+        when(stays.findChargedToAccount(T, account.getId(), from, to)).thenReturn(List.of(stay));
+        assertEquals(List.of("DELIVERY"), service.statement(T, account.getId(), from, to, "distribution").lines().stream().map(x -> x.kind()).toList());
+        assertEquals(List.of("STAY"), service.statement(T, account.getId(), from, to, "TRUCK_STOP").lines().stream().map(x -> x.kind()).toList());
+        assertEquals(2, service.statement(T, account.getId(), from, to, null).lines().size());
+        assertThrows(IllegalArgumentException.class, () -> service.statement(T, account.getId(), from, to, "RETAIL_FORECOURT"));
+    }
+
+    @Test @DisplayName("each invoice Fuel raised shows what Invoicing says: total, paid, credited and what is still owed")
+    void invoiceStanding() {
+        var d = delivered(account.getCrmCustomerId(), "1000", "20");
+        UUID invoice = UUID.randomUUID();
+        d.markInvoiced(invoice, "INV-00042");
+        when(deliveries.findDeliveredBetween(eq(T), any(), any())).thenReturn(List.of(d));
+        when(invoicing.findInvoiceSummaries(eq(T), any())).thenReturn(List.of(new za.co.handyflow.platform.invoicing.application.InvoicingFacade.InvoiceSummary(
+                invoice, "INV-00042", "PARTIALLY_PAID", java.time.Instant.now(), bd("23000.00"), bd("10000.00"), bd("3000.00"))));
+        Statement s = service.statement(T, account.getId(), from, to);
+        assertTrue(s.settlementKnown());
+        assertEquals(1, s.invoices().size());
+        assertEquals(0, bd("10000.00").compareTo(s.paid()));
+        assertEquals(0, bd("3000.00").compareTo(s.credited()));
+        assertEquals(0, bd("10000.00").compareTo(s.outstanding()));
+        assertEquals(0, bd("20000.00").compareTo(s.invoiced()));
+        assertEquals(0, bd("0").compareTo(s.notInvoiced()));
+    }
+
+    @Test @DisplayName("if Invoicing cannot be read the lines are still returned and the statement says the settlement is not known")
+    void settlementUnavailable() {
+        var d = delivered(account.getCrmCustomerId(), "1000", "20");
+        d.markInvoiced(UUID.randomUUID(), "INV-1");
+        when(deliveries.findDeliveredBetween(eq(T), any(), any())).thenReturn(List.of(d));
+        when(invoicing.findInvoiceSummaries(eq(T), any())).thenThrow(new RuntimeException("down"));
+        Statement s = service.statement(T, account.getId(), from, to);
+        assertEquals(1, s.lines().size());
+        assertFalse(s.settlementKnown());
+        assertTrue(s.invoices().isEmpty());
+    }
+
+    @Test @DisplayName("no invoices means Invoicing is not asked at all")
+    void noInvoicesNoCall() {
+        service.statement(T, account.getId(), from, to);
+        verify(invoicing, never()).findInvoiceSummaries(any(), any());
     }
 }

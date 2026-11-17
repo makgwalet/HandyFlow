@@ -61,4 +61,30 @@ describe("StatementsTab", () => {
     fireEvent.click(screen.getByRole("button", { name: "Show statement" }))
     await waitFor(() => expect(screen.getByRole("alert").textContent).toMatch(/366 days/))
   })
+
+  it("asks for the chosen division and shows deliveries and where the invoices stand", async () => {
+    statement = { ...statement, division: "DISTRIBUTION", settlementKnown: true, invoicedWithVat: 23000, paid: 10000, credited: 3000, outstanding: 10000,
+      lines: [{ date: "2026-11-10", kind: "DELIVERY", sourceId: "d1", vehicleRegistration: "GP 77 ZZ", description: "5000 L DIESEL delivered", amount: 20000, invoiceState: "INVOICED", invoiceNumber: "INV-42", invoiceId: "i1" }],
+      invoices: [{ invoiceId: "i1", invoiceNumber: "INV-42", status: "PARTIALLY_PAID", issuedAt: null, total: 23000, paid: 10000, credited: 3000, outstanding: 10000 }] }
+    mount()
+    await screen.findByText("Acme Haulage")
+    fireEvent.change(screen.getByLabelText("Customer account"), { target: { value: "a1" } })
+    fireEvent.change(screen.getByLabelText("Show"), { target: { value: "DISTRIBUTION" } })
+    fireEvent.click(screen.getByRole("button", { name: "Show statement" }))
+    expect(await screen.findByText("Fuel delivery")).toBeTruthy()
+    expect(await screen.findByText("Where the invoices stand (including VAT)")).toBeTruthy()
+    expect(screen.getByText("Part paid")).toBeTruthy()
+    expect(screen.getByText(/Still owed/, { selector: "strong" })).toBeTruthy()
+    expect(get).toHaveBeenCalledWith(expect.stringContaining("division=DISTRIBUTION"))
+  })
+
+  it("says so when Invoicing could not be read, instead of showing zero paid", async () => {
+    statement = { ...statement, settlementKnown: false, invoices: [] }
+    mount()
+    await screen.findByText("Acme Haulage")
+    fireEvent.change(screen.getByLabelText("Customer account"), { target: { value: "a1" } })
+    fireEvent.click(screen.getByRole("button", { name: "Show statement" }))
+    expect(await screen.findByText(/Invoicing could not be read just now/)).toBeTruthy()
+    expect(screen.queryByText("Where the invoices stand (including VAT)")).toBeNull()
+  })
 })

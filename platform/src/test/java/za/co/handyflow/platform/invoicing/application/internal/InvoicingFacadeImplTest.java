@@ -237,4 +237,28 @@ class InvoicingFacadeImplTest {
                 new InvoicingFacade.DraftInvoice(customer, "t", null, null, java.util.List.of(draftLine("1", "10", "150")))));
         verify(invoiceRepo, org.mockito.Mockito.never()).save(org.mockito.ArgumentMatchers.any());
     }
+
+    @Test
+    void invoiceSummariesGiveTotalPaidAndCreditedAndSkipUnknownIds() {
+        UUID known = UUID.randomUUID(), unknown = UUID.randomUUID();
+        Invoice inv = invoice(known, "INV-00042", InvoiceStatus.PARTIALLY_PAID, UUID.randomUUID(), null, "100");
+        when(inv.getTotal()).thenReturn(new BigDecimal("115.00"));
+        when(inv.getAmountPaid()).thenReturn(new BigDecimal("50.00"));
+        when(inv.getCreditedAmount()).thenReturn(new BigDecimal("15.00"));
+        when(invoiceRepo.findActiveByIdWithLineItems(TENANT, known)).thenReturn(java.util.Optional.of(inv));
+        when(invoiceRepo.findActiveByIdWithLineItems(TENANT, unknown)).thenReturn(java.util.Optional.empty());
+        var out = facade().findInvoiceSummaries(TENANT, java.util.List.of(known, unknown, known));
+        org.junit.jupiter.api.Assertions.assertEquals(1, out.size());
+        org.junit.jupiter.api.Assertions.assertEquals("PARTIALLY_PAID", out.get(0).status());
+        assertNumber("115.00", out.get(0).total());
+        assertNumber("50.00", out.get(0).amountPaid());
+        assertNumber("15.00", out.get(0).creditedAmount());
+    }
+
+    @Test
+    void invoiceSummariesForNoIdsDoNotTouchTheDatabase() {
+        org.junit.jupiter.api.Assertions.assertTrue(facade().findInvoiceSummaries(TENANT, java.util.List.of()).isEmpty());
+        org.junit.jupiter.api.Assertions.assertTrue(facade().findInvoiceSummaries(TENANT, null).isEmpty());
+        verify(invoiceRepo, org.mockito.Mockito.never()).findActiveByIdWithLineItems(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
+    }
 }

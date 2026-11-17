@@ -15,11 +15,14 @@ import za.co.handyflow.platform.shared.TenantContext;
 import java.time.LocalDate;
 import java.util.UUID;
 
-/** What the truck stop charged to a customer account in a period. Under /truck-stop, so the Truck Stop division is required on the server. */
+/**
+ * What Fuel charged to a customer account in a period. Both paths serve the same statement. The first is not under /truck-stop, so a company without
+ * the Truck Stop division can read its delivery statement; the old path stays for existing callers and still requires the Truck Stop division.
+ */
 @RestController
-@RequestMapping("/api/v1/fuel/truck-stop/account-statements")
+@RequestMapping({"/api/v1/fuel/account-statements", "/api/v1/fuel/truck-stop/account-statements"})
 @RequiredArgsConstructor
-@Tag(name = "Fuel Truck Stop Account Statements", description = "Stays and tabs charged to a customer account")
+@Tag(name = "Fuel Account Statements", description = "What Fuel charged to a customer account: deliveries, stays and tabs, and where the invoices stand")
 public class FuelAccountStatementController {
 
     private final FuelAccountStatementService service;
@@ -29,8 +32,9 @@ public class FuelAccountStatementController {
     @PreAuthorize("hasAnyAuthority('FUEL_READ','FUEL_MANAGE','FUEL_TRUCKSTOP_MANAGE')")
     public ResponseEntity<ApiResponse<Statement>> statement(@PathVariable UUID accountId,
                                                             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
-                                                            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
+                                                            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+                                                            @RequestParam(required = false) String division) {
         featureGuard.requireModule("fuel");
-        return ResponseEntity.ok(ApiResponse.success(service.statement(TenantContext.getTenantIdAsObject(), accountId, from, to)));
+        return ResponseEntity.ok(ApiResponse.success(service.statement(TenantContext.getTenantIdAsObject(), accountId, from, to, division)));
     }
 }

@@ -179,4 +179,17 @@ class InvoicingFacadeImpl implements InvoicingFacade {
         var t = vatSettings.treatment(tenantId, on);
         return new VatTreatment(t.registered(), t.ratePercent(), t.configured(), t.effectiveFrom());
     }
+
+    @Override
+    @org.springframework.transaction.annotation.Transactional(readOnly = true)
+    public List<InvoiceSummary> findInvoiceSummaries(TenantId tenantId, java.util.Collection<UUID> invoiceIds) {
+        if (invoiceIds == null || invoiceIds.isEmpty()) return List.of();
+        List<InvoiceSummary> out = new java.util.ArrayList<>();
+        for (UUID id : new java.util.LinkedHashSet<>(invoiceIds)) {
+            if (out.size() >= MAX_INVOICES) break;
+            invoiceRepo.findActiveByIdWithLineItems(tenantId, id).ifPresent(i -> out.add(new InvoiceSummary(
+                    i.getId(), i.getInvoiceNumber(), i.getStatus().name(), i.getIssuedAt(), i.getTotal(), i.getAmountPaid(), i.getCreditedAmount())));
+        }
+        return out;
+    }
 }

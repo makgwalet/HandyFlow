@@ -37,3 +37,21 @@ describe("statementOps", () => {
     expect(csv).toContain("'@x")
   })
 })
+
+import { hasSettlement, toCsv as toCsv2, STATUS_LABEL } from "./statementOps"
+describe("settlement", () => {
+  const base = { accountId: "a", from: "2026-11-01", to: "2026-11-30", total: 100, invoiced: 100, notInvoiced: 0, lines: [] as any[] }
+  it("only claims settlement when Invoicing was read and there are invoices", () => {
+    expect(hasSettlement(base)).toBe(false)
+    expect(hasSettlement({ ...base, settlementKnown: false, invoices: [{ invoiceId: "i", invoiceNumber: "1", status: "PAID", issuedAt: null, total: 1, paid: 1, credited: 0, outstanding: 0 }] })).toBe(false)
+    expect(hasSettlement({ ...base, settlementKnown: true, invoices: [] })).toBe(false)
+    expect(hasSettlement({ ...base, settlementKnown: true, invoices: [{ invoiceId: "i", invoiceNumber: "1", status: "PAID", issuedAt: null, total: 1, paid: 1, credited: 0, outstanding: 0 }] })).toBe(true)
+  })
+  it("adds the invoice standing to the CSV only when it is known", () => {
+    expect(toCsv2(base)).not.toContain("Still owed")
+    const csv = toCsv2({ ...base, settlementKnown: true, invoicedWithVat: 115, paid: 50, credited: 15, outstanding: 50, invoices: [{ invoiceId: "i", invoiceNumber: "INV-1", status: "PARTIALLY_PAID", issuedAt: null, total: 115, paid: 50, credited: 15, outstanding: 50 }] })
+    expect(csv).toContain("Invoice,Status,Total (with VAT),Paid,Credited,Still owed")
+    expect(csv).toContain("INV-1,Part paid,115.00,50.00,15.00,50.00")
+    expect(STATUS_LABEL.PAID).toBe("Paid")
+  })
+})

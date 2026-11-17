@@ -245,6 +245,7 @@ export const FUEL_SECTIONS: ModuleSections = {
       label: 'Customers',
       sections: [
         { id: 'customers', label: 'Customer accounts', icon: Users, divisions: ['WHOLESALE_SUPPLY', 'DISTRIBUTION'] },
+        { id: 'account-statements', label: 'Account statements', icon: FileText, anyPermission: ['FUEL_READ', 'FUEL_TRUCKSTOP_MANAGE', 'FUEL_MANAGE'], divisions: ['WHOLESALE_SUPPLY', 'DISTRIBUTION', 'TRUCK_STOP'] },
         { id: 'enquiries', label: 'Enquiries', icon: MessageSquare, divisions: ['WHOLESALE_SUPPLY', 'DISTRIBUTION'] },
         { id: 'contracts', label: 'Contracts', icon: FileText, divisions: ['WHOLESALE_SUPPLY', 'DISTRIBUTION'] },
         { id: 'orders', label: 'Orders', icon: ClipboardList, divisions: ['WHOLESALE_SUPPLY', 'DISTRIBUTION'] },
@@ -279,7 +280,6 @@ export const FUEL_SECTIONS: ModuleSections = {
         { id: 'truck-stop', label: 'Truck stop', icon: Car, anyPermission: ['FUEL_READ', 'FUEL_TRUCKSTOP_MANAGE', 'FUEL_MANAGE'], divisions: ['TRUCK_STOP'] },
         { id: 'overnight-stays', label: 'Overnight stays', icon: Car, anyPermission: ['FUEL_READ', 'FUEL_TRUCKSTOP_MANAGE', 'FUEL_MANAGE'], divisions: ['TRUCK_STOP'] },
         { id: 'driver-tabs', label: 'Driver tabs', icon: Car, anyPermission: ['FUEL_READ', 'FUEL_TRUCKSTOP_MANAGE', 'FUEL_MANAGE'], divisions: ['TRUCK_STOP'] },
-        { id: 'account-statements', label: 'Account statements', icon: Car, anyPermission: ['FUEL_READ', 'FUEL_TRUCKSTOP_MANAGE', 'FUEL_MANAGE'], divisions: ['TRUCK_STOP'] },
       ],
     },
     {

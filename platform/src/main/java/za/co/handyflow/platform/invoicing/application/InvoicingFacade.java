@@ -162,4 +162,15 @@ public interface InvoicingFacade {
 
     /** The InvoiceStatus name (DRAFT, ISSUED, ... CANCELLED) of this tenant's invoice, or empty if it does not exist or was deleted. */
     Optional<String> findInvoiceStatus(TenantId tenantId, UUID invoiceId);
+
+    // ---- Settlement of invoices another module raised (Fuel account statements) ----
+
+    /**
+     * Where one invoice stands. Read only. {@code amountPaid} and {@code creditedAmount} may be null: treat as zero.
+     * What is still owed is total - amountPaid - creditedAmount.
+     */
+    record InvoiceSummary(UUID id, String invoiceNumber, String status, Instant issuedAt, BigDecimal total, BigDecimal amountPaid, BigDecimal creditedAmount) {}
+
+    /** The invoices with these ids (at most 500); ids that do not exist for this tenant are simply absent. */
+    List<InvoiceSummary> findInvoiceSummaries(TenantId tenantId, Collection<UUID> invoiceIds);
 }
