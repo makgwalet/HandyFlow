@@ -32,3 +32,18 @@ describe("contractOps", () => {
     expect(daysLeftText(contract({ daysLeft: 0 }))).toBe("Ends today"); expect(daysLeftText(contract({ daysLeft: null, status: "EXPIRED" }))).toBeNull()
   })
 })
+
+import { stepText, linkBody } from "./contractOps"
+describe("volume steps", () => {
+  it("describes a step and says nothing for the starting price", () => {
+    expect(stepText({ fromLitres: 0 })).toBe("")
+    expect(stepText({})).toBe("")
+    expect(stepText({ fromLitres: 5000 })).toContain("L delivered on this contract")
+  })
+  it("sends a volume only when a positive number is entered", () => {
+    expect(linkBody("")).toBeUndefined()
+    expect(linkBody("abc")).toBeUndefined()
+    expect(linkBody("0")).toBeUndefined()
+    expect(linkBody("5 000")).toEqual({ fromLitres: 5000 })
+  })
+})

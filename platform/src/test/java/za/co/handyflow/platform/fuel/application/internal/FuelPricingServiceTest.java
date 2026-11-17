@@ -36,6 +36,7 @@ class FuelPricingServiceTest {
     @Mock FuelPriceRepository prices;
     @Mock FuelCustomerAccountRepository accounts;
     @Mock CrmFacade crm;
+    @Mock FuelContractTierPricing contractTiers;
     @InjectMocks FuelPricingService service;
 
     static final TenantId T = TenantId.of(UUID.randomUUID());
@@ -117,5 +118,16 @@ class FuelPricingServiceTest {
         Optional<ResolvedPriceResponse> r = service.resolve(T, null, "DIESEL", bd("100"), D);
         assertTrue(r.isPresent());
         verify(prices, never()).liveForAccount(any(), any(), any(), any());
+    }
+
+    @Test @DisplayName("a contract volume step, when there is one, is the price; otherwise ordinary resolution runs")
+    void contractTierWins() {
+        UUID account = UUID.randomUUID(), priceId = UUID.randomUUID();
+        when(contractTiers.resolve(T, account, "DIESEL", D)).thenReturn(Optional.of(new ResolvedPriceResponse(bd("19.50"), "CONTRACT", priceId, BigDecimal.ZERO)));
+        assertEquals(priceId, service.resolve(T, account, "DIESEL", bd("100"), D).orElseThrow().priceId());
+        verify(prices, never()).liveForAccount(any(), any(), any(), any());
+        when(contractTiers.resolve(T, account, "DIESEL", D)).thenReturn(Optional.empty());
+        service.resolve(T, account, "DIESEL", bd("100"), D);
+        verify(prices).liveForAccount(T, "DIESEL", account, D);
     }
 }

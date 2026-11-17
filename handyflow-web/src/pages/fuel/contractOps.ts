@@ -1,5 +1,5 @@
 // Phase 7c helpers: supply contracts that group and report. A contract holds no prices; it links to the account's price entries.
-export interface LinkedPrice { priceId: string; fuelType: string; pricePerLitre: number; minLitres: number; validFrom: string; validTo: string | null; approvalStatus: string; live: boolean }
+export interface LinkedPrice { priceId: string; fuelType: string; pricePerLitre: number; minLitres: number; validFrom: string; validTo: string | null; approvalStatus: string; live: boolean; fromLitres?: number; inEffect?: boolean }
 export interface Contract {
   id: string; accountId: string; customerName: string | null; contractNumber: string; title: string; startDate: string; endDate: string
   fuelType: string | null; committedLitres: number | null; terms: string | null; status: "ACTIVE" | "UPCOMING" | "EXPIRED" | "CANCELLED"; cancelledReason: string | null
@@ -38,4 +38,15 @@ export function progressText(c: Contract): string {
 export function daysLeftText(c: Contract): string | null {
   if (c.daysLeft == null) return null
   return c.daysLeft === 0 ? "Ends today" : `${c.daysLeft} ${c.daysLeft === 1 ? "day" : "days"} left`
+}
+
+/** D2: text for a volume step, or nothing for the starting price. */
+export function stepText(p: { fromLitres?: number }): string {
+  return p.fromLitres && p.fromLitres > 0 ? `from ${p.fromLitres.toLocaleString("en-ZA")} L delivered on this contract` : ""
+}
+
+/** The body for linking: only carries a volume when one is entered. */
+export function linkBody(fromLitres: string): { fromLitres: number } | undefined {
+  const n = Number(fromLitres.replace(/\s/g, "").replace(",", "."))
+  return fromLitres.trim() !== "" && Number.isFinite(n) && n > 0 ? { fromLitres: n } : undefined
 }

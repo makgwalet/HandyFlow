@@ -177,4 +177,70 @@ class FuelContractServiceTest {
         assertEquals("Renamed", v.title()); assertEquals(END.plusMonths(6), v.endDate()); assertEquals("C-001", v.contractNumber()); assertEquals(account.getId(), v.accountId());
         assertEquals(0, bd("2000").compareTo(v.committedLitres()));
     }
+
+    // ── volume ladder ────────────────────────────────────────────────────────
+
+    private FuelPrice stepPrice(String fuel, String price) {
+        FuelPrice p = FuelPrice.create(T, fuel, account.getId(), bd(price), BigDecimal.ZERO, START, null, null, BY);
+        when(prices.findOwned(eq(T), eq(p.getId()))).thenReturn(Optional.of(p));
+        return p;
+    }
+
+    @Test @DisplayName("linking with a volume sets the step; linking again changes it; without a volume it is 0 as before")
+    void linkWithVolume() {
+        ContractView c = service.create(T, create("C-V1", "DIESEL", null), BY, TODAY);
+        FuelPrice base = stepPrice("DIESEL", "21.50"), step = stepPrice("DIESEL", "20.50");
+        service.linkPrice(T, c.id(), base.getId(), BY, TODAY);
+        service.linkPrice(T, c.id(), step.getId(), bd("5000"), BY, TODAY);
+        assertEquals(0, bd("0").compareTo(linked.get(0).getFromLitres()));
+        assertEquals(0, bd("5000").compareTo(linked.get(1).getFromLitres()));
+        service.linkPrice(T, c.id(), step.getId(), bd("7500"), BY, TODAY);
+        assertEquals(2, linked.size());
+        assertEquals(0, bd("7500").compareTo(linked.get(1).getFromLitres()));
+    }
+
+    @Test @DisplayName("two prices of one fuel cannot start at the same volume, and a negative volume is refused")
+    void sameVolumeRefused() {
+        ContractView c = service.create(T, create("C-V2", "DIESEL", null), BY, TODAY);
+        FuelPrice a = stepPrice("DIESEL", "20.50"), b = stepPrice("DIESEL", "20.00");
+        service.linkPrice(T, c.id(), a.getId(), bd("5000"), BY, TODAY);
+        assertThrows(IllegalArgumentException.class, () -> service.linkPrice(T, c.id(), b.getId(), bd("5000"), BY, TODAY));
+        assertThrows(IllegalArgumentException.class, () -> service.linkPrice(T, c.id(), b.getId(), bd("-1"), BY, TODAY));
+    }
+
+    @Test @DisplayName("the step in effect follows the volume delivered so far, and is shown on the contract")
+    void stepFollowsVolume() {
+        ContractView c = service.create(T, create("C-V3", "DIESEL", null), BY, TODAY);
+        FuelPrice base = stepPrice("DIESEL", "21.50"), s1 = stepPrice("DIESEL", "20.50"), s2 = stepPrice("DIESEL", "19.50");
+        service.linkPrice(T, c.id(), base.getId(), BY, TODAY);
+        service.linkPrice(T, c.id(), s1.getId(), bd("5000"), BY, TODAY);
+        service.linkPrice(T, c.id(), s2.getId(), bd("20000"), BY, TODAY);
+        assertEquals(base.getId(), inEffect(service.get(T, c.id(), TODAY)));
+        done(crmCustomer, "DIESEL", "6000");
+        assertEquals(s1.getId(), inEffect(service.get(T, c.id(), TODAY)));
+        done(crmCustomer, "DIESEL", "14000");
+        assertEquals(s2.getId(), inEffect(service.get(T, c.id(), TODAY)));
+    }
+
+    @Test @DisplayName("a step waiting for approval does not apply, so the next lower step does")
+    void pendingStepSkipped() {
+        ContractView c = service.create(T, create("C-V4", "DIESEL", null), BY, TODAY);
+        FuelPrice base = stepPrice("DIESEL", "21.50"), s1 = stepPrice("DIESEL", "20.50");
+        s1.submitForApproval(UUID.randomUUID(), "volume discount");
+        service.linkPrice(T, c.id(), base.getId(), BY, TODAY);
+        service.linkPrice(T, c.id(), s1.getId(), bd("5000"), BY, TODAY);
+        done(crmCustomer, "DIESEL", "9000");
+        assertEquals(base.getId(), inEffect(service.get(T, c.id(), TODAY)));
+    }
+
+    @Test @DisplayName("a contract with no step above 0 litres has no ladder, so nothing is marked in effect")
+    void noLadderNothingInEffect() {
+        ContractView c = service.create(T, create("C-V5", "DIESEL", null), BY, TODAY);
+        service.linkPrice(T, c.id(), stepPrice("DIESEL", "21.50").getId(), BY, TODAY);
+        assertNull(inEffect(service.get(T, c.id(), TODAY)));
+    }
+
+    private UUID inEffect(ContractView v) {
+        return v.prices().stream().filter(p -> p.inEffect()).map(p -> p.priceId()).findFirst().orElse(null);
+    }
 }

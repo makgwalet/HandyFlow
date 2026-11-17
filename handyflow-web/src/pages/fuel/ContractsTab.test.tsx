@@ -59,7 +59,17 @@ describe("ContractsTab", () => {
     await waitFor(() => expect(sel.querySelectorAll("option").length).toBe(2))   // the prompt and p1, not the other account's p2
     fireEvent.change(sel, { target: { value: "p1" } })
     fireEvent.click(screen.getByText("Link"))
-    await waitFor(() => expect(put).toHaveBeenCalledWith("/api/v1/fuel/contracts/c1/prices/p1"))
+    await waitFor(() => expect(put).toHaveBeenCalledWith("/api/v1/fuel/contracts/c1/prices/p1", {}))
+  })
+  it("sends the volume when one is entered, and marks the step in effect", async () => {
+    mount()
+    fireEvent.click(await screen.findByText("C-001"))
+    const sel = await screen.findByLabelText("Link a price")
+    await waitFor(() => expect(sel.querySelectorAll("option").length).toBe(2))
+    fireEvent.change(sel, { target: { value: "p1" } })
+    fireEvent.change(screen.getByLabelText("From litres"), { target: { value: "5000" } })
+    fireEvent.click(screen.getByText("Link"))
+    await waitFor(() => expect(put).toHaveBeenCalledWith("/api/v1/fuel/contracts/c1/prices/p1", { fromLitres: 5000 }))
   })
   it("cancelling needs a reason", async () => {
     mount()

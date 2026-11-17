@@ -25,6 +25,8 @@ public class FuelContractPrice {
     @AttributeOverride(name = "value", column = @Column(name = "tenant_id", nullable = false))
     private TenantId tenantId;
 
+    /** Contract litres delivered before an order from which this price applies. 0 means no threshold. */
+    @Column(name = "from_litres", nullable = false, precision = 14, scale = 2) private java.math.BigDecimal fromLitres = java.math.BigDecimal.ZERO;
     @Column(name = "linked_by") private UUID linkedBy;
     @Column(name = "linked_at", nullable = false) private Instant linkedAt = Instant.now();
 
@@ -32,6 +34,12 @@ public class FuelContractPrice {
         FuelContractPrice l = new FuelContractPrice();
         l.tenantId = tenantId; l.contractId = contractId; l.priceId = priceId; l.linkedBy = by;
         return l;
+    }
+
+    public void setFromLitres(java.math.BigDecimal v) {
+        if (v == null) { fromLitres = java.math.BigDecimal.ZERO; return; }
+        if (v.signum() < 0) throw new IllegalArgumentException("The volume cannot be negative.");
+        fromLitres = v.setScale(2, java.math.RoundingMode.HALF_UP);
     }
 
     public static class Key implements Serializable {

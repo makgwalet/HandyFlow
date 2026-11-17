@@ -64,9 +64,11 @@ public class FuelContractController {
 
     @PutMapping("/{id}/prices/{priceId}")
     @PreAuthorize("hasAnyAuthority('FUEL_MANAGE','FUEL_CUSTOMERS_MANAGE','FUEL_PRICING_MANAGE')")
-    public ResponseEntity<ApiResponse<ContractView>> linkPrice(@PathVariable UUID id, @PathVariable UUID priceId) {
+    public ResponseEntity<ApiResponse<ContractView>> linkPrice(@PathVariable UUID id, @PathVariable UUID priceId,
+                                                                @jakarta.validation.Valid @RequestBody(required = false) za.co.handyflow.platform.fuel.dto.ContractDtos.LinkRequest req) {
         featureGuard.requireModule("fuel");
-        return ResponseEntity.ok(ApiResponse.success("Price linked", service.linkPrice(TenantContext.getTenantIdAsObject(), id, priceId, TenantContext.getCurrentUserId(), today())));
+        return ResponseEntity.ok(ApiResponse.success("Price linked", service.linkPrice(TenantContext.getTenantIdAsObject(), id, priceId,
+                req == null ? null : req.fromLitres(), TenantContext.getCurrentUserId(), today())));
     }
 
     @DeleteMapping("/{id}/prices/{priceId}")

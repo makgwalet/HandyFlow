@@ -41,6 +41,7 @@ public class FuelPricingService {
     private final FuelSettingsRepository settings;
     private final FuelReceiptRepository receipts;
     private final ApprovalFacade approvalFacade;
+    private final FuelContractTierPricing contractTiers;
 
     @Transactional(readOnly = true)
     public List<PriceResponse> list(TenantId tenantId) {
@@ -135,6 +136,11 @@ public class FuelPricingService {
     /** The price for this customer, product, quantity and day, or empty if none is set. */
     @Transactional(readOnly = true)
     public Optional<ResolvedPriceResponse> resolve(TenantId tenantId, UUID accountId, String fuelType, BigDecimal litres, LocalDate on) {
+        // A contract with a volume ladder chooses among its own approved prices by the volume delivered so far. Without one, nothing changes.
+        if (accountId != null) {
+            Optional<ResolvedPriceResponse> tier = contractTiers.resolve(tenantId, accountId, fuelType, on);
+            if (tier != null && tier.isPresent()) return tier;
+        }
         List<FuelPrice> live = accountId == null ? prices.liveStandard(tenantId, fuelType, on) : prices.liveForAccount(tenantId, fuelType, accountId, on);
         return pick(live, accountId, litres == null ? BigDecimal.ZERO : litres);
     }

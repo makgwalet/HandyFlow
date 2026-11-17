@@ -5,7 +5,7 @@ import { apiClient } from "../../api/client"
 import { usePermissions } from "../../hooks/usePermission"
 import { Modal, btnPrimary, btnGhost, card, inputStyle, labelStyle, Chip } from "../warehousing/whseUi"
 import { fmtR } from "./orderOps"
-import { emptyContract, fromContract, validateContract, toContractRequest, progressText, daysLeftText, STATUS_LABEL, type Contract, type ContractForm } from "./contractOps"
+import { emptyContract, fromContract, validateContract, toContractRequest, progressText, daysLeftText, stepText, linkBody, STATUS_LABEL, type Contract, type ContractForm } from "./contractOps"
 
 const unwrap = (r: any) => r.data?.data ?? r.data
 const msg = (e: any, fb: string) => e?.response?.data?.message ?? fb
@@ -79,14 +79,15 @@ function PricePanel({ c, canManage, onChanged, onError }: { c: Contract; canMana
   const all = useQuery<any[]>({ queryKey: ["fuel-contract-prices"], enabled: canManage && c.status !== "CANCELLED", queryFn: async () => unwrap(await apiClient.get("/api/v1/fuel/prices")) })
   const linkedIds = new Set(c.prices.map(p => p.priceId))
   const options = (Array.isArray(all.data) ? all.data : []).filter(p => p.accountId === c.accountId && !linkedIds.has(p.id) && (!c.fuelType || p.fuelType?.toUpperCase() === c.fuelType.toUpperCase()))
-  const link = useMutation({ mutationFn: (id: string) => apiClient.put(`/api/v1/fuel/contracts/${c.id}/prices/${id}`), onSuccess: () => { onError(""); setPick(""); onChanged() }, onError: (e: any) => onError(msg(e, "Could not link the price")) })
+  const [from, setFrom] = useState("")
+  const link = useMutation({ mutationFn: (id: string) => apiClient.put(`/api/v1/fuel/contracts/${c.id}/prices/${id}`, linkBody(from) ?? {}), onSuccess: () => { onError(""); setPick(""); setFrom(""); onChanged() }, onError: (e: any) => onError(msg(e, "Could not link the price")) })
   const unlink = useMutation({ mutationFn: (id: string) => apiClient.delete(`/api/v1/fuel/contracts/${c.id}/prices/${id}`), onSuccess: () => { onError(""); onChanged() }, onError: (e: any) => onError(msg(e, "Could not unlink the price")) })
   return (
     <div>
       <p style={{ margin: "0 0 6px", fontSize: 12.5, fontWeight: 700 }}>Prices this contract refers to</p>
       {c.prices.length === 0 ? <p style={{ margin: "0 0 6px", fontSize: 12.5, color: "var(--hf-text-muted)" }}>None linked.</p> : c.prices.map(p => (
         <div key={p.priceId} style={{ fontSize: 12.5, padding: "3px 0" }}>
-          {p.fuelType} {fmtR(p.pricePerLitre)}/L{p.minLitres > 0 ? ` from ${p.minLitres.toLocaleString("en-ZA")} L` : ""} · {p.validFrom} to {p.validTo ?? "open"} · {p.approvalStatus === "APPROVED" ? (p.live ? "live" : "not live") : p.approvalStatus.toLowerCase().replace("_", " ")}
+          {p.fuelType} {fmtR(p.pricePerLitre)}/L{p.minLitres > 0 ? ` from ${p.minLitres.toLocaleString("en-ZA")} L` : ""}{stepText(p) ? ` · ${stepText(p)}` : ""} · {p.validFrom} to {p.validTo ?? "open"} · {p.approvalStatus === "APPROVED" ? (p.live ? "live" : "not live") : p.approvalStatus.toLowerCase().replace("_", " ")}{p.inEffect ? <strong> · in effect now</strong> : null}
           {canManage && c.status !== "CANCELLED" && <> <button style={btnGhost} onClick={() => unlink.mutate(p.priceId)}>Unlink</button></>}
         </div>
       ))}
@@ -96,10 +97,11 @@ function PricePanel({ c, canManage, onChanged, onError }: { c: Contract; canMana
             <option value="">Link one of this customer's prices…</option>
             {options.map(p => <option key={p.id} value={p.id}>{p.fuelType} {fmtR(p.pricePerLitre)}/L · {p.validFrom}</option>)}
           </select>
+          <input aria-label="From litres" inputMode="decimal" placeholder="From litres (optional)" value={from} onChange={e => setFrom(e.target.value)} style={{ ...inputStyle, width: 170 }} />
           <button style={btnGhost} disabled={!pick || link.isPending} onClick={() => link.mutate(pick)}>Link</button>
         </div>
       )}
-      <p style={{ margin: "8px 0 0", fontSize: 11, color: "var(--hf-text-muted)" }}>Prices are added and approved under Price lists. Linking only records which prices belong to this contract.</p>
+      <p style={{ margin: "8px 0 0", fontSize: 11, color: "var(--hf-text-muted)" }}>Prices are added and approved under Price lists. Linking records which prices belong to this contract. For volume discounts, link several prices of one fuel and set "From litres" on each: the step for the litres delivered on this contract so far applies to new orders, and only approved, live prices count. Existing orders keep their price.</p>
     </div>
   )
 }

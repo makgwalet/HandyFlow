@@ -24,8 +24,21 @@ public final class ContractDtos {
     public record CancelRequest(@NotBlank @Size(max = 300) String reason) {}
 
     /** A linked price entry, echoed read-only from the price list. */
+    /**
+     * fromLitres is the contract volume from which this price applies (0 = no threshold). inEffect is true for the one price the volume delivered so far
+     * selects, when the contract has a volume ladder and that price is live and approved.
+     */
     public record LinkedPrice(UUID priceId, String fuelType, BigDecimal pricePerLitre, BigDecimal minLitres, LocalDate validFrom, LocalDate validTo,
-                              String approvalStatus, boolean live) {}
+                              String approvalStatus, boolean live, BigDecimal fromLitres, boolean inEffect) {
+        /** Before volume pricing existed. */
+        public LinkedPrice(UUID priceId, String fuelType, BigDecimal pricePerLitre, BigDecimal minLitres, LocalDate validFrom, LocalDate validTo,
+                           String approvalStatus, boolean live) {
+            this(priceId, fuelType, pricePerLitre, minLitres, validFrom, validTo, approvalStatus, live, BigDecimal.ZERO, false);
+        }
+    }
+
+    /** fromLitres may be left out: no threshold. */
+    public record LinkRequest(@jakarta.validation.constraints.PositiveOrZero BigDecimal fromLitres) {}
 
     /**
      * status is CANCELLED, UPCOMING, ACTIVE or EXPIRED. deliveredLitres counts the account's delivered loads (of the contract's fuel type, when it
