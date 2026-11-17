@@ -44,6 +44,7 @@ class FuelOperatingProfileServiceTest {
     @Mock FuelReservationRepository reservations;
     @Mock FuelPurchaseOrderRepository purchaseOrders;
     @Mock FuelTruckStopStayRepository truckStopStays;
+    @Mock za.co.handyflow.platform.fuel.domain.repository.FuelTruckStopTabRepository truckStopTabs;
     @Mock FuelTruckStopService truckStop;
     @InjectMocks FuelOperatingProfileService service;
 
@@ -217,5 +218,13 @@ class FuelOperatingProfileServiceTest {
         when(truckStopStays.countOpen(T)).thenReturn(0L);
         when(truckStop.openReservationCount(T)).thenReturn(0);
         assertFalse(service.deactivateDivision(T, TRUCK_STOP, "closing the yard", BY).activeDivisions().contains(TRUCK_STOP));
+    }
+
+    @Test @DisplayName("Truck Stop cannot be switched off while a driver tab is still open")
+    void truckStopBlockedByOpenTab() {
+        service.activate(T, List.of(WHOLESALE_SUPPLY, TRUCK_STOP), BY);
+        when(truckStopTabs.countOpen(T)).thenReturn(3L);
+        IllegalStateException e = assertThrows(IllegalStateException.class, () -> service.deactivateDivision(T, TRUCK_STOP, "closing the yard", BY));
+        assertTrue(e.getMessage().contains("3 truck stop tab(s)"));
     }
 }

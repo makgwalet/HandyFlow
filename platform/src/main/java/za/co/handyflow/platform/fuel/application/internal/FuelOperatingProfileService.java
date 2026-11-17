@@ -35,6 +35,7 @@ public class FuelOperatingProfileService {
     private final FuelPurchaseOrderRepository purchaseOrders;
     private final FuelTruckStopStayRepository truckStopStays;
     private final FuelTruckStopService truckStop;
+    private final za.co.handyflow.platform.fuel.domain.repository.FuelTruckStopTabRepository truckStopTabs;
 
     @Transactional(readOnly = true)
     public ProfileView view(TenantId tenantId) {
@@ -155,6 +156,8 @@ public class FuelOperatingProfileService {
             if (stays > 0) out.add(stays + " overnight stay(s) are booked or in the yard");
             int reserved = truckStop.openReservationCount(tenantId);
             if (reserved > 0) out.add(reserved + " truck stop reservation(s) are still open");
+            long openTabs = truckStopTabs.countOpen(tenantId);
+            if (openTabs > 0) out.add(openTabs + " truck stop tab(s) are still open");
         }
         if (leaving.contains(FuelDivision.WHOLESALE_SUPPLY) && !procurementStays) {
             long po = purchaseOrders.countAwaitingDelivery(tenantId);

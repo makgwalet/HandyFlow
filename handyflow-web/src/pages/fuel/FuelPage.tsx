@@ -36,6 +36,7 @@ import SettingsTab from "./SettingsTab"
 import VariancesTab from "./VariancesTab"
 import SetupTab from "./SetupTab"
 import AccessLimitsTab from "./AccessLimitsTab"
+import TabsTab from "./TabsTab"
 import ImportsTab from "./ImportsTab"
 import GaugeImportsTab from "./GaugeImportsTab"
 import LegalEntitiesTab from "./LegalEntitiesTab"
@@ -96,6 +97,7 @@ export function FuelPage() {
         case "margin":     return <MarginTab />
         case "cost-to-serve": return <CostToServeTab onNavigate={goTo} />
         case "overnight-stays": return <StaysTab />
+        case "driver-tabs": return <TabsTab />
         case "contracts": return <ContractsTab />
         case "returned-fuel": return <ReturnedFuelTab />
         case "landed-cost": return <LandedCostTab />
