@@ -32,6 +32,7 @@ public class FuelTransportController {
     private final FuelTransportService transport;
     private final FuelDeliveryExceptionService exceptionService;
     private final FeatureGuard featureGuard;
+    private final za.co.handyflow.platform.fuel.application.internal.FuelArrivalCheckService arrivalChecks;
 
     @GetMapping("/tankers")
     @PreAuthorize("hasAuthority('FUEL_READ')")
@@ -122,6 +123,22 @@ public class FuelTransportController {
     public ResponseEntity<ApiResponse<DeliveryResponse>> myComplete(@PathVariable UUID id, @Valid @RequestBody CompleteDeliveryRequest req) {
         featureGuard.requireModule("fuel");
         return ResponseEntity.ok(ApiResponse.success("Delivery recorded", transport.myComplete(TenantContext.getTenantIdAsObject(), TenantContext.getCurrentUserId(), id, req)));
+    }
+
+    // ── N3: the driver's arrival eligibility check ───────────────────────────
+
+    @PostMapping("/driver/loads/{id}/arrival-check")
+    @PreAuthorize("hasAnyAuthority('FUEL_DRIVER','FUEL_MANAGE','FUEL_TRANSPORT_MANAGE')")
+    public ResponseEntity<ApiResponse<za.co.handyflow.platform.fuel.dto.ArrivalCheckDtos.ArrivalCheckView>> myArrivalCheck(@PathVariable UUID id) {
+        featureGuard.requireModule("fuel");
+        return ResponseEntity.ok(ApiResponse.success("Checked", arrivalChecks.check(TenantContext.getTenantIdAsObject(), TenantContext.getCurrentUserId(), id)));
+    }
+
+    @GetMapping("/driver/loads/{id}/arrival-check")
+    @PreAuthorize("hasAnyAuthority('FUEL_DRIVER','FUEL_MANAGE','FUEL_TRANSPORT_MANAGE')")
+    public ResponseEntity<ApiResponse<za.co.handyflow.platform.fuel.dto.ArrivalCheckDtos.ArrivalCheckView>> myLatestArrivalCheck(@PathVariable UUID id) {
+        featureGuard.requireModule("fuel");
+        return ResponseEntity.ok(ApiResponse.success(arrivalChecks.latest(TenantContext.getTenantIdAsObject(), TenantContext.getCurrentUserId(), id).orElse(null)));
     }
 
     // ── C04: delivery windows and failed attempts ────────────────────────────
