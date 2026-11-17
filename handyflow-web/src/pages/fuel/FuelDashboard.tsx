@@ -1,199 +1,136 @@
 // src/pages/fuel/FuelDashboard.tsx
+//
+// Fuel Operations Command Centre: headline numbers, tank levels, what needs attention, ongoing deliveries
+// and quick actions. Built from the tank, dispatch, delivery and receipt lists the module already loads.
 import { useQuery } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
-import { Droplets, AlertTriangle, Fuel, Truck, ArrowRight, TrendingDown } from "lucide-react"
+import { Droplets, AlertTriangle, Fuel, Truck, TrendingDown, PackagePlus, Gauge, CalendarPlus, Activity, ClipboardList } from "lucide-react"
+import { ActionTile, EmptyState, KpiGrid, KpiTile, Panel, PanelLink, ProgressBar, RingGauge, StatusPill, StepTracker, type Tone } from "./fuelUi"
+import { buildDashboard, DELIVERY_STEPS, deliveryStep, FUEL_TONE, fmtShortDate, fmtLitres } from "./dashboardOps"
 
 const unwrap = (r: any) => { const p = r.data?.data ?? r.data; return p?.content ?? p ?? [] }
-const fmtDate = (iso: string) => new Date(iso).toLocaleDateString("en-ZA", { day: "numeric", month: "short" })
-
-const FUEL_COLORS: Record<string, string> = {
-  DIESEL: "var(--hf-info-text)", PETROL: "var(--hf-danger-text)", PARAFFIN: "var(--hf-warning-text)", GAS: "var(--hf-violet-text)", OTHER: "var(--hf-text-muted)",
-}
 
 export default function FuelDashboard({ onNavigate }: { onNavigate: (section: string) => void }) {
-  const { data: tanksRaw } = useQuery({
-    queryKey: ["tanks"],
-    queryFn: async () => { const r = await apiClient.get("/api/v1/fuel/tanks"); return r.data?.data ?? r.data ?? [] },
-  })
-  const { data: dispatches = [] } = useQuery({
-    queryKey: ["dispatches"],
-    queryFn: async () => unwrap(await apiClient.get("/api/v1/fuel/dispatches?size=200")),
-  })
-  const { data: deliveries = [] } = useQuery({
-    queryKey: ["deliveries"],
-    queryFn: async () => unwrap(await apiClient.get("/api/v1/fuel/deliveries?size=200")),
-  })
-  const { data: receipts = [] } = useQuery({
-    queryKey: ["receipts"],
-    queryFn: async () => unwrap(await apiClient.get("/api/v1/fuel/receipts?size=200")),
-  })
+  const tanksQ = useQuery({ queryKey: ["tanks"], queryFn: async () => { const r = await apiClient.get("/api/v1/fuel/tanks"); return r.data?.data ?? r.data ?? [] } })
+  const dispatchesQ = useQuery({ queryKey: ["dispatches"], queryFn: async () => unwrap(await apiClient.get("/api/v1/fuel/dispatches?size=200")) })
+  const deliveriesQ = useQuery({ queryKey: ["deliveries"], queryFn: async () => unwrap(await apiClient.get("/api/v1/fuel/deliveries?size=200")) })
+  const receiptsQ = useQuery({ queryKey: ["receipts"], queryFn: async () => unwrap(await apiClient.get("/api/v1/fuel/receipts?size=200")) })
 
-  const tanks     = Array.isArray(tanksRaw) ? tanksRaw : []
-  const ds        = dispatches as any[]
-  const dvs       = deliveries as any[]
-  const rcs       = receipts as any[]
-  const lowTanks  = tanks.filter((t: any) => t.low)
-  const totalStock = tanks.reduce((s: number, t: any) => s + Number(t.currentLitres ?? 0), 0)
-
-  const today = new Date().toISOString().slice(0, 7) // YYYY-MM
-  const thisMonthDispatches = ds.filter(d => d.dispatchedAt?.startsWith(today))
-  const thisMonthLitres = thisMonthDispatches.reduce((s, d) => s + Number(d.litresDispensed ?? 0), 0)
-
-  const pendingDeliveries = dvs.filter(d => d.status === "SCHEDULED" || d.status === "IN_TRANSIT")
-
-  const kpis = [
-    { label: "Total stock",       value: `${totalStock.toLocaleString()} L`,            color: "var(--hf-primary-text)", bg: "var(--hf-info-soft)",  icon: Droplets,        tab: "tanks"      },
-    { label: "Low tanks",         value: lowTanks.length,                                color: lowTanks.length > 0 ? "var(--hf-danger-text)" : "var(--hf-success-text-strong)", bg: lowTanks.length > 0 ? "var(--hf-danger-soft)" : "var(--hf-success-soft-strong)", icon: AlertTriangle, tab: "tanks" },
-    { label: "Dispatched this mo",value: `${thisMonthLitres.toLocaleString()} L`,        color: "var(--hf-accent-text)", bg: "var(--hf-success-soft)",  icon: Fuel,            tab: "dispatches" },
-    { label: "Pending deliveries",value: pendingDeliveries.length,                       color: "var(--hf-warning-text)", bg: "var(--hf-warning-soft)",  icon: Truck,           tab: "deliveries" },
-  ]
+  const d = buildDashboard({
+    tanks: Array.isArray(tanksQ.data) ? tanksQ.data : [],
+    dispatches: (dispatchesQ.data ?? []) as any[],
+    deliveries: (deliveriesQ.data ?? []) as any[],
+    receipts: (receiptsQ.data ?? []) as any[],
+    now: new Date(),
+  })
+  const loading = tanksQ.isLoading || dispatchesQ.isLoading || deliveriesQ.isLoading
+  const failed = tanksQ.isError || dispatchesQ.isError || deliveriesQ.isError
 
   return (
-    <div>
-      {/* KPIs */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 14, marginBottom: 28 }}>
-        {kpis.map(k => (
-          <div key={k.label} onClick={() => onNavigate(k.tab)}
-            style={{ background: k.bg, borderRadius: 12, padding: "18px 20px", cursor: "pointer" }}
-            onMouseEnter={e => (e.currentTarget.style.boxShadow = "0 4px 16px rgba(0,0,0,0.08)")}
-            onMouseLeave={e => (e.currentTarget.style.boxShadow = "none")}>
-            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 10 }}>
-              <div style={{ fontSize: 11, fontWeight: 700, color: k.color, textTransform: "uppercase" as const }}>{k.label}</div>
-              <k.icon size={16} style={{ color: k.color }} />
-            </div>
-            <div style={{ fontSize: 26, fontWeight: 800, color: k.color }}>{k.value}</div>
-          </div>
-        ))}
+    <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+      {failed && <p role="alert" style={{ margin: 0, padding: "10px 14px", borderRadius: 10, background: "var(--hf-warning-soft)", color: "var(--hf-warning-text-strong)", fontSize: 13 }}>Some figures could not be loaded, so the numbers below may be incomplete.</p>}
+
+      <KpiGrid>
+        <KpiTile label="Total stock" icon={Droplets} tone="blue" value={loading ? "…" : fmtLitres(d.totalStock)} hint={d.capacity > 0 ? `${d.stockPercent.toFixed(0)}% of ${fmtLitres(d.capacity)} capacity` : "No tanks yet"} onClick={() => onNavigate("tanks")} />
+        <KpiTile label="Dispatched this month" icon={Fuel} tone="green" value={loading ? "…" : fmtLitres(d.monthLitres)} hint={`${d.monthDispatchCount} dispatch${d.monthDispatchCount === 1 ? "" : "es"}`} trend={d.dailyLitres} onClick={() => onNavigate("dispatches")} />
+        <KpiTile label="Pending deliveries" icon={Truck} tone="violet" value={loading ? "…" : d.pendingDeliveries.length} hint={d.inTransit > 0 ? `${d.inTransit} in transit` : "None on the road"} onClick={() => onNavigate("deliveries")} />
+        <KpiTile label="Low tanks" icon={AlertTriangle} tone={d.lowTanks.length > 0 ? "red" : "slate"} value={loading ? "…" : d.lowTanks.length} hint={d.lowTanks.length > 0 ? "Needs a stock receipt" : "All tanks above their threshold"} onClick={() => onNavigate("tanks")} />
+      </KpiGrid>
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(340px, 1fr))", gap: 18, alignItems: "start" }}>
+        <div style={{ gridColumn: "span 2", minWidth: 0 }} className="hf-fuel-span">
+          <Panel title="Tank levels" icon={Gauge} action={<PanelLink onClick={() => onNavigate("tanks")}>Manage tanks →</PanelLink>}>
+            {d.tanks.length === 0 ? (
+              <EmptyState icon={Droplets} title="No tanks registered" hint="Add a tank to start tracking stock." action={<button onClick={() => onNavigate("tanks")} style={{ padding: "8px 16px", background: "var(--hf-primary)", color: "var(--hf-text-on-solid)", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>Add tank</button>} />
+            ) : (
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(230px, 1fr))", gap: 14 }}>
+                {d.tanks.map(t => {
+                  const tone: Tone = t.low ? "red" : t.percent < 40 ? "amber" : FUEL_TONE[t.fuelType] ?? "blue"
+                  return (
+                    <div key={t.id} style={{ display: "flex", gap: 14, alignItems: "center", padding: 14, border: `1px solid ${t.low ? "var(--hf-danger-border)" : "var(--hf-border)"}`, borderRadius: 12, background: t.low ? "var(--hf-danger-soft)" : "var(--hf-surface)" }}>
+                      <RingGauge percent={t.percent} size={84} stroke={9} tone={tone} />
+                      <div style={{ minWidth: 0, flex: 1 }}>
+                        <div style={{ fontWeight: 700, color: "var(--hf-text)", fontSize: 14, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{t.name}</div>
+                        <div style={{ fontSize: 12, color: "var(--hf-text-muted)", marginBottom: 6 }}>{t.fuelType}{t.location ? ` · ${t.location}` : ""}</div>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: t.low ? "var(--hf-danger-text)" : "var(--hf-text)" }}>{fmtLitres(t.litres)}</div>
+                        <div style={{ fontSize: 11.5, color: "var(--hf-text-faint)" }}>of {fmtLitres(t.capacity)} · {fmtLitres(t.available)} free</div>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </Panel>
+        </div>
+
+        <Panel title="Alerts & exceptions" icon={AlertTriangle} pad={false}>
+          {d.alerts.length === 0 ? <EmptyState icon={Activity} title="All clear" hint="No low tanks, variances or overdue deliveries." /> : (
+            <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>
+              {d.alerts.map(a => (
+                <li key={a.key} style={{ borderTop: "1px solid var(--hf-border)" }}>
+                  <button type="button" onClick={() => onNavigate(a.section)} style={{ display: "flex", gap: 12, width: "100%", padding: "12px 16px", background: "none", border: "none", textAlign: "left", cursor: "pointer", font: "inherit", alignItems: "flex-start" }}>
+                    <span aria-hidden="true" style={{ width: 4, alignSelf: "stretch", borderRadius: 4, background: a.severity === "high" ? "var(--hf-danger)" : "var(--hf-warning)" }} />
+                    <span style={{ flex: 1, minWidth: 0 }}>
+                      <span style={{ display: "flex", alignItems: "center", gap: 6, fontWeight: 700, fontSize: 13, color: "var(--hf-text)" }}>
+                        {a.key.startsWith("variance") && <TrendingDown size={14} aria-hidden="true" />}{a.title}
+                      </span>
+                      <span style={{ display: "block", fontSize: 12, color: "var(--hf-text-muted)", marginTop: 2 }}>{a.detail}</span>
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Panel>
       </div>
 
-      {/* Low stock alert */}
-      {lowTanks.length > 0 && (
-        <div style={{ marginBottom: 22, padding: "14px 18px", background: "var(--hf-danger-soft)", border: "1px solid var(--hf-danger-border)", borderRadius: 10, display: "flex", alignItems: "center", gap: 12 }}>
-          <AlertTriangle size={18} style={{ color: 'var(--hf-danger-text)', flexShrink: 0 }} />
-          <div>
-            <div style={{ fontWeight: 700, fontSize: 14, color: "var(--hf-danger-text)" }}>Low Stock Alert</div>
-            <div style={{ fontSize: 13, color: "var(--hf-danger-text-strong)" }}>
-              {lowTanks.map((t: any) => `${t.name} (${Number(t.currentLitres).toLocaleString()} L — ${Number(t.fillPercentage).toFixed(0)}%)`).join(" · ")}
-            </div>
-          </div>
-          <button onClick={() => onNavigate("tanks")} style={{ marginLeft: "auto", padding: "6px 14px", background: "var(--hf-danger)", color: "var(--hf-text-on-solid)", border: "none", borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: "pointer", flexShrink: 0 }}>
-            Receive stock
-          </button>
-        </div>
-      )}
-
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 280px", gap: 18 }}>
-        {/* Tank levels */}
-        <div>
-          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 14 }}>
-            <span style={{ fontSize: 14, fontWeight: 700, color: "var(--hf-text)" }}>Tank Levels</span>
-            <button onClick={() => onNavigate("tanks")} style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 12, color: "var(--hf-accent-text)", background: "none", border: "none", cursor: "pointer", fontWeight: 600 }}>
-              Manage tanks <ArrowRight size={13} />
-            </button>
-          </div>
-          {tanks.length === 0 ? (
-            <div style={{ textAlign: "center", padding: "40px 20px", border: "1px dashed var(--hf-border)", borderRadius: 12, color: "var(--hf-text-faint)" }}>
-              <Droplets size={32} style={{ color: 'var(--hf-text-disabled)', marginBottom: 10 }} />
-              <div style={{ fontWeight: 600, color: "var(--hf-text-tertiary)" }}>No tanks registered</div>
-              <button onClick={() => onNavigate("tanks")} style={{ marginTop: 12, padding: "7px 16px", background: "var(--hf-accent)", color: "var(--hf-text-on-solid)", border: "none", borderRadius: 7, fontSize: 13, cursor: "pointer", fontWeight: 600 }}>Add tank</button>
-            </div>
-          ) : (
-            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-              {tanks.map((tank: any) => {
-                const color = FUEL_COLORS[tank.fuelType] ?? "var(--hf-text-muted)"
-                const pct   = Math.min(100, Math.max(0, Number(tank.fillPercentage ?? 0)))
-                return (
-                  <div key={tank.id} style={{ background: "var(--hf-surface)", border: `1px solid ${tank.low ? "var(--hf-danger-border)" : "var(--hf-border)"}`, borderRadius: 10, padding: "14px 18px" }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                        <Droplets size={16} style={{ color: color }} />
-                        <span style={{ fontWeight: 700, color: "var(--hf-text)" }}>{tank.name}</span>
-                        <span style={{ fontSize: 11, fontWeight: 700, background: `color-mix(in srgb, ${color} 9%, transparent)`, color, padding: "1px 8px", borderRadius: 20 }}>{tank.fuelType}</span>
-                        {tank.low && <span style={{ fontSize: 10, fontWeight: 700, background: "var(--hf-danger-soft)", color: "var(--hf-danger-text)", padding: "1px 7px", borderRadius: 20, display: "flex", alignItems: "center", gap: 3 }}><AlertTriangle size={9} />LOW</span>}
-                      </div>
-                      <div style={{ textAlign: "right" as const }}>
-                        <span style={{ fontWeight: 700, fontSize: 15, color: tank.low ? "var(--hf-danger-text)" : "var(--hf-text)" }}>{Number(tank.currentLitres).toLocaleString()} L</span>
-                        <span style={{ fontSize: 12, color: "var(--hf-text-faint)" }}> / {Number(tank.capacityLitres).toLocaleString()} L</span>
-                        <span style={{ fontSize: 13, fontWeight: 700, color: tank.low ? "var(--hf-danger-text)" : color, marginLeft: 10 }}>{pct.toFixed(1)}%</span>
-                      </div>
-                    </div>
-                    <div style={{ height: 8, background: "var(--hf-surface-sunken)", borderRadius: 99, overflow: "hidden" }}>
-                      <div style={{ height: "100%", width: `${pct}%`, borderRadius: 99,
-                        background: tank.low ? "linear-gradient(90deg, var(--hf-danger), color-mix(in srgb, var(--hf-danger) 60%, var(--hf-surface)))" : `linear-gradient(90deg,${color},color-mix(in srgb, ${color} 53%, transparent))`,
-                        transition: "width 0.5s" }} />
-                    </div>
-                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: "var(--hf-text-faint)", marginTop: 4 }}>
-                      <span>{tank.location || "No location"}</span>
-                      <span>Available: {(Number(tank.capacityLitres) - Number(tank.currentLitres)).toLocaleString()} L</span>
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          )}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(340px, 1fr))", gap: 18, alignItems: "start" }}>
+        <div style={{ gridColumn: "span 2", minWidth: 0 }} className="hf-fuel-span">
+          <Panel title="Ongoing deliveries" icon={Truck} pad={false} action={<PanelLink onClick={() => onNavigate("deliveries")}>View all →</PanelLink>}>
+            {d.pendingDeliveries.length === 0 ? <EmptyState icon={Truck} title="No deliveries on the way" hint="Scheduled and in-transit deliveries show here." /> : (
+              <div style={{ overflowX: "auto" }}>
+                <table>
+                  <thead><tr><th style={{ textAlign: "left", padding: "9px 16px" }}>Fuel</th><th style={{ textAlign: "right", padding: "9px 12px" }}>Ordered</th><th style={{ textAlign: "left", padding: "9px 12px" }}>Scheduled</th><th style={{ textAlign: "left", padding: "9px 16px" }}>Status</th></tr></thead>
+                  <tbody>{d.pendingDeliveries.slice(0, 6).map((v: any) => (
+                    <tr key={v.id} style={{ borderTop: "1px solid var(--hf-border)" }}>
+                      <td style={{ padding: "10px 16px", fontSize: 13, color: "var(--hf-text)", fontWeight: 600 }}>{v.fuelType}</td>
+                      <td style={{ padding: "10px 12px", fontSize: 13, textAlign: "right", color: "var(--hf-text)" }}>{fmtLitres(Number(v.litresOrdered ?? 0))}</td>
+                      <td style={{ padding: "10px 12px", fontSize: 13, color: "var(--hf-text-muted)" }}>{fmtShortDate(v.scheduledAt)}</td>
+                      <td style={{ padding: "10px 16px" }}><StatusPill status={v.status} /></td>
+                    </tr>))}</tbody>
+                </table>
+              </div>
+            )}
+            {d.pendingDeliveries.length > 0 && (
+              <div style={{ padding: "16px 20px", borderTop: "1px solid var(--hf-border)" }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: "var(--hf-text-muted)", marginBottom: 10, textTransform: "uppercase", letterSpacing: "0.04em" }}>Next delivery · {d.pendingDeliveries[0].fuelType}</div>
+                <StepTracker steps={DELIVERY_STEPS} current={deliveryStep(d.pendingDeliveries[0].status)} />
+              </div>
+            )}
+          </Panel>
         </div>
 
-        {/* Sidebar */}
-        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-          {/* This month summary */}
-          <div style={{ background: "var(--hf-accent)", borderRadius: 12, padding: 20 }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.6)", marginBottom: 14, textTransform: "uppercase" as const, letterSpacing: "0.06em" }}>This month</div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 18, minWidth: 0 }}>
+          <Panel title="This month" icon={ClipboardList}>
             {[
-              { label: "Dispatches",   value: thisMonthDispatches.length },
-              { label: "Litres out",   value: `${thisMonthLitres.toLocaleString()} L` },
-              { label: "Stock-ins",    value: rcs.filter(r => r.receivedAt?.startsWith(today)).length },
-            ].map(s => (
-              <div key={s.label} style={{ display: "flex", justifyContent: "space-between", padding: "7px 0", borderBottom: "1px solid rgba(255,255,255,0.15)" }}>
-                <span style={{ fontSize: 13, color: "rgba(255,255,255,0.8)" }}>{s.label}</span>
-                <span style={{ fontSize: 14, fontWeight: 700, color: "var(--hf-text-on-solid)" }}>{s.value}</span>
+              { label: "Dispatches", value: String(d.monthDispatchCount) },
+              { label: "Litres out", value: fmtLitres(d.monthLitres) },
+              { label: "Stock receipts", value: String(d.monthReceipts) },
+            ].map((s, i) => (
+              <div key={s.label} style={{ display: "flex", justifyContent: "space-between", padding: "9px 0", borderTop: i ? "1px solid var(--hf-border)" : "none", fontSize: 13 }}>
+                <span style={{ color: "var(--hf-text-muted)" }}>{s.label}</span><b style={{ color: "var(--hf-text)" }}>{s.value}</b>
               </div>
             ))}
-          </div>
-
-          {/* Negative variance warning */}
-          {(() => {
-            const negVariance = ds.filter((d: any) => Number(d.varianceLitres ?? 0) < -5)
-            return negVariance.length > 0 ? (
-              <div style={{ background: "var(--hf-danger-soft)", border: "1px solid var(--hf-danger-border)", borderRadius: 10, padding: 14 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 6, fontWeight: 700, fontSize: 13, color: "var(--hf-danger-text)", marginBottom: 6 }}>
-                  <TrendingDown size={14} /> Variance Alerts
-                </div>
-                <div style={{ fontSize: 12, color: "var(--hf-danger-text-strong)" }}>{negVariance.length} dip reading(s) show negative variance — possible leak or theft. Review reconciliation.</div>
-              </div>
-            ) : null
-          })()}
-
-          {/* Pending deliveries */}
-          {pendingDeliveries.length > 0 && (
-            <div style={{ background: "var(--hf-warning-soft)", border: "1px solid var(--hf-warning-border)", borderRadius: 10, padding: 14 }}>
-              <div style={{ fontWeight: 700, fontSize: 13, color: "var(--hf-warning-text)", marginBottom: 8 }}>Pending Deliveries</div>
-              {pendingDeliveries.slice(0, 3).map((d: any) => (
-                <div key={d.id} style={{ display: "flex", justifyContent: "space-between", fontSize: 12, padding: "5px 0", borderBottom: "1px solid var(--hf-warning-border)" }}>
-                  <span style={{ color: "var(--hf-warning-text-deep)" }}>{d.fuelType} · {Number(d.litresOrdered).toLocaleString()} L</span>
-                  <span style={{ color: "var(--hf-warning-text)", fontWeight: 600 }}>{fmtDate(d.scheduledAt)}</span>
-                </div>
-              ))}
-              <button onClick={() => onNavigate("deliveries")} style={{ marginTop: 8, width: "100%", padding: "6px", background: "var(--hf-warning-soft-strong)", border: "1px solid var(--hf-warning-border-strong)", borderRadius: 6, fontSize: 12, fontWeight: 600, color: "var(--hf-warning-text)", cursor: "pointer" }}>
-                View all →
-              </button>
+            {d.capacity > 0 && <div style={{ marginTop: 10 }}><div style={{ fontSize: 11.5, color: "var(--hf-text-muted)", marginBottom: 6 }}>Stock vs capacity</div><ProgressBar percent={d.stockPercent} tone={d.stockPercent < 25 ? "red" : "blue"} /></div>}
+          </Panel>
+          <Panel title="Quick actions" icon={Activity}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 10 }}>
+              <ActionTile label="Receive stock" icon={PackagePlus} tone="green" onClick={() => onNavigate("tanks")} />
+              <ActionTile label="Dispatch fuel" icon={Fuel} tone="blue" onClick={() => onNavigate("dispatches")} />
+              <ActionTile label="Record dip" icon={Gauge} tone="amber" onClick={() => onNavigate("tanks")} />
+              <ActionTile label="Schedule delivery" icon={CalendarPlus} tone="violet" onClick={() => onNavigate("deliveries")} />
             </div>
-          )}
-
-          {/* Quick actions */}
-          <div>
-            <div style={{ fontSize: 13, fontWeight: 700, color: "var(--hf-text)", marginBottom: 10 }}>Quick actions</div>
-            {[
-              { label: "Receive stock",    tab: "tanks",      color: "var(--hf-accent-text)" },
-              { label: "Dispatch fuel",    tab: "dispatches", color: "var(--hf-primary-text)" },
-              { label: "Record dip",       tab: "tanks",      color: "var(--hf-warning-text)" },
-              { label: "Schedule delivery",tab: "deliveries", color: "var(--hf-violet-text)" },
-            ].map(a => (
-              <button key={a.label} onClick={() => onNavigate(a.tab)}
-                style={{ width: "100%", marginBottom: 8, padding: "9px 14px", background: "var(--hf-surface)", border: "1px solid var(--hf-border)", borderRadius: 8, fontSize: 13, fontWeight: 600, color: a.color, cursor: "pointer", textAlign: "left" as const, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                {a.label} <ArrowRight size={13} />
-              </button>
-            ))}
-          </div>
+          </Panel>
         </div>
       </div>
     </div>

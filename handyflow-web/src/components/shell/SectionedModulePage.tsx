@@ -69,7 +69,7 @@ export function SectionedModulePage({ config, render, action, subtitle, detail, 
         action={action}
       />
       {banner}
-      <div key={section.id} style={{ background: 'var(--hf-surface)', border: '1px solid var(--hf-border)', borderRadius: 14, padding: 24 }}>
+      <div key={section.id} className={config.moduleKey === 'fuel' ? 'hf-fuel' : undefined} style={{ background: 'var(--hf-surface)', border: '1px solid var(--hf-border)', borderRadius: 14, padding: 24, boxShadow: config.moduleKey === 'fuel' ? 'var(--hf-shadow-sm)' : undefined }}>
         {render(section.id, goTo)}
       </div>
       {children}

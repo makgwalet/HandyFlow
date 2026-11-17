@@ -3,23 +3,15 @@ import { useState } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import { usePermissions } from "../../hooks/usePermission"
-import { btnGhost, card } from "../warehousing/whseUi"
+import { btnGhost } from "../warehousing/whseUi"
+import { CheckCircle2, ClipboardCheck, Layers, TrendingUp } from "lucide-react"
+import { EmptyState, KpiGrid, KpiTile, Panel, ProgressBar } from "./fuelUi"
 import { fmtL, fmtR } from "./orderOps"
 import { attention, pct, type Overview, type Margin } from "./overviewOps"
 
 const unwrap = (r: any) => r.data?.data ?? r.data
 const th: React.CSSProperties = { textAlign: "left", padding: "8px 12px", fontSize: 11, fontWeight: 700, color: "var(--hf-text-muted)" }
 const td: React.CSSProperties = { padding: "8px 12px", fontSize: 13, color: "var(--hf-text)" }
-
-function Tile({ label, value, sub, onClick }: { label: string; value: React.ReactNode; sub?: string; onClick?: () => void }) {
-  return (
-    <button onClick={onClick} style={{ ...card, padding: "14px 16px", textAlign: "left", cursor: onClick ? "pointer" : "default", background: "var(--hf-surface)" }}>
-      <div style={{ fontSize: 11.5, color: "var(--hf-text-muted)", fontWeight: 600 }}>{label}</div>
-      <div style={{ fontSize: 22, fontWeight: 800, color: "var(--hf-text)", marginTop: 4 }}>{value}</div>
-      {sub && <div style={{ fontSize: 11.5, color: "var(--hf-text-muted)", marginTop: 2 }}>{sub}</div>}
-    </button>
-  )
-}
 
 export default function OverviewTab({ onNavigate }: { onNavigate: (section: string) => void }) {
   const canMargin = usePermissions(["FUEL_MARGIN_READ"])
@@ -33,40 +25,48 @@ export default function OverviewTab({ onNavigate }: { onNavigate: (section: stri
   const todo = attention(o)
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-      <div style={{ ...card, padding: 14 }}>
-        <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 6 }}>Needs attention</div>
-        {todo.length === 0 ? <p style={{ margin: 0, fontSize: 13, color: "var(--hf-success-text-strong)" }}>Nothing needs attention right now.</p> : (
-          <ul style={{ margin: 0, paddingLeft: 18 }}>{todo.map(a => <li key={a.key} style={{ fontSize: 13, marginBottom: 3 }}>{a.text} <button style={{ ...btnGhost, padding: "2px 8px", fontSize: 11.5 }} onClick={() => onNavigate(a.section)}>Open</button></li>)}</ul>
+      <Panel title="Needs attention" icon={ClipboardCheck}>
+        {todo.length === 0 ? (
+          <p style={{ margin: 0, fontSize: 13, color: "var(--hf-success-text-strong)", display: "flex", alignItems: "center", gap: 8 }}><CheckCircle2 size={16} aria-hidden="true" />Nothing needs attention right now.</p>
+        ) : (
+          <ul style={{ margin: 0, padding: 0, listStyle: "none", display: "flex", flexDirection: "column", gap: 8 }}>{todo.map(a => (
+            <li key={a.key} style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 13, padding: "8px 12px", borderRadius: 10, background: "var(--hf-warning-soft)", border: "1px solid var(--hf-warning-border)", color: "var(--hf-warning-text-deep)" }}>
+              <span style={{ flex: 1 }}>{a.text}</span>
+              <button style={{ ...btnGhost, padding: "3px 10px", fontSize: 11.5, background: "var(--hf-surface)" }} onClick={() => onNavigate(a.section)}>Open</button>
+            </li>))}
+          </ul>
         )}
-      </div>
+      </Panel>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))", gap: 12 }}>
-        <Tile label="Open orders" value={o.confirmedOrders + o.partDeliveredOrders} sub={`${o.quotes} quotation${o.quotes === 1 ? "" : "s"} waiting`} onClick={() => onNavigate("orders")} />
-        <Tile label="Delivered, not invoiced" value={fmtR(o.deliveredNotInvoicedValue)} sub={`${o.deliveredNotInvoicedCount} deliver${o.deliveredNotInvoicedCount === 1 ? "y" : "ies"}`} onClick={() => onNavigate("invoicing")} />
-        <Tile label="Loads today" value={o.loadsToday} sub={`${o.loadsTodayUnallocated} without tanker or driver`} onClick={() => onNavigate("planning")} />
-        <Tile label="On credit hold" value={o.customersOnCreditHold} sub="customers" onClick={() => onNavigate("customers")} />
-        <Tile label="Compliance" value={o.complianceExpired + o.complianceExpiring} sub={`${o.complianceExpired} expired, ${o.complianceExpiring} expiring`} onClick={() => onNavigate("compliance")} />
-        <Tile label="Supplier orders" value={o.purchaseOrdersAwaitingDelivery} sub="awaiting delivery" onClick={() => onNavigate("purchase-orders")} />
-      </div>
+      <KpiGrid min={200}>
+        <KpiTile label="Open orders" tone="blue" value={o.confirmedOrders + o.partDeliveredOrders} hint={`${o.quotes} quotation${o.quotes === 1 ? "" : "s"} waiting`} onClick={() => onNavigate("orders")} />
+        <KpiTile label="Delivered, not invoiced" tone="amber" value={fmtR(o.deliveredNotInvoicedValue)} hint={`${o.deliveredNotInvoicedCount} deliver${o.deliveredNotInvoicedCount === 1 ? "y" : "ies"}`} onClick={() => onNavigate("invoicing")} />
+        <KpiTile label="Loads today" tone="violet" value={o.loadsToday} hint={`${o.loadsTodayUnallocated} without tanker or driver`} onClick={() => onNavigate("planning")} />
+        <KpiTile label="On credit hold" tone={o.customersOnCreditHold > 0 ? "red" : "slate"} value={o.customersOnCreditHold} hint="customers" onClick={() => onNavigate("customers")} />
+        <KpiTile label="Compliance" tone={o.complianceExpired > 0 ? "red" : o.complianceExpiring > 0 ? "amber" : "green"} value={o.complianceExpired + o.complianceExpiring} hint={`${o.complianceExpired} expired, ${o.complianceExpiring} expiring`} onClick={() => onNavigate("compliance")} />
+        <KpiTile label="Supplier orders" tone="green" value={o.purchaseOrdersAwaitingDelivery} hint="awaiting delivery" onClick={() => onNavigate("purchase-orders")} />
+      </KpiGrid>
 
-      <div style={{ ...card, overflowX: "auto" }}>
-        <div style={{ padding: "12px 14px 0", fontWeight: 700, fontSize: 13 }}>Stock by fuel</div>
-        {o.stock.length === 0 ? <p style={{ padding: "0 14px 12px", color: "var(--hf-text-muted)", fontSize: 13 }}>No tanks yet.</p> : (
-          <table style={{ width: "100%", borderCollapse: "collapse" }}>
-            <thead><tr><th style={th}>Fuel</th><th style={th}>On hand</th><th style={th}>Reserved</th><th style={th}>Available</th><th style={th}>Capacity</th></tr></thead>
-            <tbody>{o.stock.map(s => <tr key={s.fuelType} style={{ borderTop: "1px solid var(--hf-border)" }}><td style={td}>{s.fuelType}</td><td style={td}>{fmtL(s.litresOnHand)}</td><td style={td}>{fmtL(s.litresReserved)}</td><td style={td}>{fmtL(s.litresAvailable)}</td><td style={td}>{fmtL(s.capacityLitres)}</td></tr>)}</tbody>
-          </table>
+      <Panel title="Stock by fuel" icon={Layers} pad={false}>
+        {o.stock.length === 0 ? <EmptyState title="No tanks yet" /> : (
+          <div style={{ overflowX: "auto" }}>
+            <table>
+              <thead><tr><th style={th}>Fuel</th><th style={th}>On hand</th><th style={th}>Reserved</th><th style={th}>Available</th><th style={th}>Capacity</th><th style={{ ...th, minWidth: 120 }}>Filled</th></tr></thead>
+              <tbody>{o.stock.map(s => (
+                <tr key={s.fuelType} style={{ borderTop: "1px solid var(--hf-border)" }}>
+                  <td style={{ ...td, fontWeight: 700 }}>{s.fuelType}</td><td style={td}>{fmtL(s.litresOnHand)}</td><td style={td}>{fmtL(s.litresReserved)}</td><td style={td}>{fmtL(s.litresAvailable)}</td><td style={td}>{fmtL(s.capacityLitres)}</td>
+                  <td style={td}><ProgressBar percent={s.capacityLitres > 0 ? (s.litresOnHand / s.capacityLitres) * 100 : 0} tone={s.capacityLitres > 0 && s.litresOnHand / s.capacityLitres < 0.25 ? "red" : "blue"} /></td>
+                </tr>))}</tbody>
+            </table>
+          </div>
         )}
-      </div>
+      </Panel>
 
       {canMargin && (
-        <div style={{ ...card, overflowX: "auto" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 14px 0" }}>
-            <div style={{ fontWeight: 700, fontSize: 13, flex: 1 }}>Delivery margin by customer</div>
-            <select aria-label="Period" value={days} onChange={e => setDays(Number(e.target.value))} style={{ padding: "4px 8px", borderRadius: 6, border: "1px solid var(--hf-border)", background: "var(--hf-surface)", color: "var(--hf-text)" }}>
-              <option value={30}>Last 30 days</option><option value={90}>Last 90 days</option><option value={365}>Last 12 months</option>
-            </select>
-          </div>
+        <Panel title="Delivery margin by customer" icon={TrendingUp} pad={false} action={
+          <select aria-label="Period" value={days} onChange={e => setDays(Number(e.target.value))} style={{ padding: "3px 8px", borderRadius: 6, border: "1px solid var(--hf-border)", background: "var(--hf-surface)", color: "var(--hf-text)", fontSize: 12 }}>
+            <option value={30}>Last 30 days</option><option value={90}>Last 90 days</option><option value={365}>Last 12 months</option>
+          </select>}>
           <p style={{ fontSize: 12, color: "var(--hf-text-muted)", margin: "6px 14px" }}>Revenue less the fuel's cost at the time of sale. This is margin, not full cost-to-serve: driver time, vehicle running costs and overheads are not included, so real profit is lower.</p>
           {mg.isLoading ? <p style={{ padding: "0 14px 12px", color: "var(--hf-text-muted)" }}>Loading…</p> : !mg.data || mg.data.customers.length === 0 ? <p style={{ padding: "0 14px 12px", color: "var(--hf-text-muted)", fontSize: 13 }}>No deliveries in this period.</p> : (
             <>
@@ -84,7 +84,7 @@ export default function OverviewTab({ onNavigate }: { onNavigate: (section: stri
               </p>
             </>
           )}
-        </div>
+        </Panel>
       )}
     </div>
   )

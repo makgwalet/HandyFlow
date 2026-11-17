@@ -1,0 +1,59 @@
+/*
+ * Fuel module polish. Scoped to .hf-fuel (the section panel in SectionedModulePage) so nothing else changes.
+ * Fuel screens style tables and fields inline, so the few rules that must win use !important; everything
+ * reads theme tokens and therefore follows light/dark mode.
+ */
+
+.hf-fuel { font-feature-settings: "tnum" 1, "cv11" 1; }
+
+/* Tables: quiet header band, comfortable rows, hover highlight, numbers line up. */
+.hf-fuel table { border-collapse: separate !important; border-spacing: 0; width: 100%; font-variant-numeric: tabular-nums; }
+.hf-fuel table thead th {
+  background: var(--hf-surface-muted) !important;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  color: var(--hf-text-muted) !important;
+  border-bottom: 1px solid var(--hf-border) !important;
+  white-space: nowrap;
+}
+.hf-fuel table thead th:first-child { border-top-left-radius: 10px; }
+.hf-fuel table thead th:last-child  { border-top-right-radius: 10px; }
+.hf-fuel table tbody td { padding-top: 10px; padding-bottom: 10px; vertical-align: middle; }
+.hf-fuel table tbody tr { transition: background-color .12s ease; }
+.hf-fuel table tbody tr:hover { background: var(--hf-surface-muted); }
+
+/* Fields and buttons: consistent focus ring, smoother feedback. */
+.hf-fuel input:not([type="checkbox"]):not([type="radio"]),
+.hf-fuel select,
+.hf-fuel textarea { transition: border-color .12s ease, box-shadow .12s ease; }
+.hf-fuel input:focus-visible,
+.hf-fuel select:focus-visible,
+.hf-fuel textarea:focus-visible { outline: none; border-color: var(--hf-primary) !important; box-shadow: 0 0 0 3px color-mix(in srgb, var(--hf-primary) 22%, transparent); }
+.hf-fuel button:focus-visible,
+.hf-fuel a:focus-visible { outline: 2px solid var(--hf-primary); outline-offset: 2px; }
+.hf-fuel button:not(:disabled) { transition: background-color .12s ease, box-shadow .12s ease, transform .12s ease, opacity .12s ease; }
+.hf-fuel button:disabled { cursor: not-allowed; }
+
+/* Cards that are buttons or tiles lift a little on hover. */
+.hf-fuel-lift { transition: transform .15s ease, box-shadow .15s ease, border-color .15s ease; }
+.hf-fuel-lift:hover { transform: translateY(-2px); box-shadow: var(--hf-shadow-md); }
+.hf-fuel-lift:active { transform: translateY(0); }
+
+/* Section content fades in once, so switching sections feels deliberate rather than abrupt. */
+@keyframes hf-fuel-in { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+.hf-fuel > * { animation: hf-fuel-in .22s ease both; }
+
+@media (max-width: 760px) {
+  .hf-fuel { padding: 14px !important; }
+  .hf-fuel table tbody td, .hf-fuel table thead th { padding-left: 8px; padding-right: 8px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hf-fuel > *, .hf-fuel-lift, .hf-fuel table tbody tr, .hf-fuel button { animation: none !important; transition: none !important; }
+  .hf-fuel-lift:hover { transform: none; }
+}
+
+/* Two-column spans collapse to one column on narrow screens. */
+@media (max-width: 760px) { .hf-fuel .hf-fuel-span { grid-column: auto !important; } }

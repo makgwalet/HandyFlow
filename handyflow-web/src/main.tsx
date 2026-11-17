@@ -2,6 +2,7 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './styles/tokens.css'
 import './index.css'
+import './styles/fuel.css'
 import App from './App.tsx'
 
 // Lets the app open with no signal (see public/sw.js). Production only, so development never serves a stale copy.
