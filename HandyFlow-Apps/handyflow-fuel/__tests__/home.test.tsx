@@ -6,7 +6,8 @@ const mockNavigate = jest.fn();
 let mockPermissions: string[] = [];
 
 jest.mock("@react-navigation/native", () => ({ useNavigation: () => ({ navigate: mockNavigate }) }));
-jest.mock("@/auth/AuthContext", () => ({ useAuth: () => ({ session: { firstName: "Sipho", lastName: "D", email: "s@x", permissions: mockPermissions }, signOut: jest.fn() }) }));
+jest.mock("@/access/useAccess", () => ({ useAccess: () => ({ access: null, isLoading: false, error: null }) }));
+jest.mock("@/auth/AuthContext", () => ({ useAuth: () => ({ session: { firstName: "Sipho", lastName: "D", email: "s@x", permissions: mockPermissions }, signOut: jest.fn(), subscriptionInactive: false }) }));
 jest.mock("@/ui/Screen", () => {
   const { View, Text } = require("react-native");
   return { Screen: ({ title, children }: any) => <View><Text>{title}</Text>{children}</View>, Card: ({ children }: any) => <View>{children}</View> };

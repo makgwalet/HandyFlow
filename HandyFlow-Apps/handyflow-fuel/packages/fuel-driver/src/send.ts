@@ -1,4 +1,5 @@
 import { api } from "@/api/client";
+import { removeFile } from "@/files";
 import type { OutboxItem } from "@/offline/outbox";
 
 const base = (loadId: unknown) => `/api/v1/fuel/driver/loads/${String(loadId)}`;
@@ -34,4 +35,6 @@ async function sendEvidence(item: OutboxItem): Promise<void> {
   if (p.note) form.append("note", String(p.note));
   form.append("clientRequestId", item.id);
   await api(`${base(p.loadId)}/evidence/file`, { method: "POST", form });
+  // The server has it. Only now is the phone's copy no longer needed.
+  await removeFile(String(p.uri));
 }

@@ -5,13 +5,14 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { DarkTheme, NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
-import { CompleteScreen, FailedAttemptScreen, LoadDetailScreen, MyLoadsScreen } from "@driver/index";
+import { ArrivalCheckScreen, SignatureScreen, CompleteScreen, FailedAttemptScreen, LoadDetailScreen, MyLoadsScreen } from "@driver/index";
 import { TankDetailScreen, TanksScreen } from "@depot/index";
 import { AuthProvider, useAuth } from "@/auth/AuthContext";
 import { OutboxProvider } from "@/offline/OutboxProvider";
 import { HomeScreen } from "@/screens/HomeScreen";
 import { LoginScreen } from "@/screens/LoginScreen";
 import { ModePlannedScreen } from "@/screens/ModePlannedScreen";
+import { AccessScreen } from "@/screens/AccessScreen";
 import { SyncCentreScreen } from "@/screens/SyncCentreScreen";
 import type { RootStackParamList } from "@/navigation/types";
 import { colors } from "@/ui/theme";
@@ -27,10 +28,13 @@ function SignedIn() {
         <Stack.Navigator>
           <Stack.Screen name="Home" component={HomeScreen} options={{ title: "HandyFlow Fuel", headerBackVisible: false }} />
           <Stack.Screen name="ModePlanned" component={ModePlannedScreen} options={{ title: "Coming soon" }} />
+          <Stack.Screen name="Access" component={AccessScreen} options={{ title: "My access" }} />
           <Stack.Screen name="SyncCentre" component={SyncCentreScreen} options={{ title: "Sync centre" }} />
           <Stack.Screen name="DriverLoads" component={MyLoadsScreen} options={{ title: "My loads" }} />
           <Stack.Screen name="LoadDetail" component={LoadDetailScreen} options={{ title: "Load" }} />
           <Stack.Screen name="CompleteLoad" component={CompleteScreen} options={{ title: "Record delivery" }} />
+          <Stack.Screen name="ArrivalCheck" component={ArrivalCheckScreen} options={{ title: "Arrival check" }} />
+          <Stack.Screen name="Signature" component={SignatureScreen} options={{ title: "Signature" }} />
           <Stack.Screen name="FailedAttempt" component={FailedAttemptScreen} options={{ title: "Could not deliver" }} />
           <Stack.Screen name="DepotTanks" component={TanksScreen} options={{ title: "Tanks" }} />
           <Stack.Screen name="TankDetail" component={TankDetailScreen} options={{ title: "Tank" }} />

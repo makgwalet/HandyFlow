@@ -5,3 +5,5 @@ export { MyLoadsScreen } from "./MyLoadsScreen";
 export { LoadDetailScreen } from "./LoadDetailScreen";
 export { CompleteScreen } from "./CompleteScreen";
 export { FailedAttemptScreen } from "./FailedAttemptScreen";
+export { ArrivalCheckScreen } from "./ArrivalCheckScreen";
+export { SignatureScreen } from "./SignatureScreen";

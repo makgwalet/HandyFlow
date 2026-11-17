@@ -1,8 +1,11 @@
 import React from "react";
-import { Pressable, RefreshControl, ScrollView, Text, View } from "react-native";
+import { Linking, Pressable, RefreshControl, ScrollView, Text, View } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useAccess } from "@/access/useAccess";
+import { emergencyContactOf, telUrl } from "@/api/access";
+import { Button } from "@/ui/Button";
 import type { RootStackParamList } from "@/navigation/types";
 import { useOutbox } from "@/offline/OutboxProvider";
 import { Card, styles as ui } from "@/ui/Screen";
@@ -15,6 +18,8 @@ export function MyLoadsScreen() {
   const nav = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { loads, isLoading, error, savedAt, refetch } = useLoads();
   const { pending } = useOutbox();
+  const { access } = useAccess();
+  const contact = emergencyContactOf(access);
   const [refreshing, setRefreshing] = React.useState(false);
 
   return (
@@ -25,6 +30,7 @@ export function MyLoadsScreen() {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={async () => { setRefreshing(true); await refetch(); setRefreshing(false); }} tintColor={colors.text} />}
       >
         <Text accessibilityRole="header" style={ui.title}>My loads</Text>
+        {contact ? <Button label={`Emergency: call ${contact.name}`} tone="danger" onPress={() => void Linking.openURL(telUrl(contact.phone))} /> : null}
         {savedAt ? <Text style={{ color: "#FCD34D" }}>No signal. Showing the list saved at {new Date(savedAt).toLocaleTimeString()}.</Text> : null}
         {error && !savedAt && loads.length === 0 ? <Card><Text accessibilityRole="alert" style={{ color: "#FCA5A5", fontSize: 16 }}>{error}</Text></Card> : null}
         {isLoading ? <Text style={{ color: colors.muted }}>Loading your loads…</Text> : null}

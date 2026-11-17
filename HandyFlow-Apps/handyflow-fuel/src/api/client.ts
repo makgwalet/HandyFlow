@@ -27,12 +27,27 @@ export class ApiError extends Error {
 
 type TokenProvider = () => string | null;
 
+/** What a try at renewing the sign-in came to. "offline" is not a refusal: the phone keeps the session and its queue. */
+export type RefreshOutcome = "refreshed" | "expired" | "offline";
+
 let tokenProvider: TokenProvider = () => null;
 let onUnauthorized: () => void = () => undefined;
+let onPaymentRequired: () => void = () => undefined;
+let refresher: () => Promise<RefreshOutcome> = async () => "expired";
 
-export function configureApi(opts: { token: TokenProvider; onUnauthorized: () => void }): void {
+export function configureApi(opts: {
+  token: TokenProvider;
+  /** Called when the sign-in is over for good (refresh refused). */
+  onUnauthorized: () => void;
+  /** Called when the company's Fuel subscription is not active (402). */
+  onPaymentRequired?: () => void;
+  /** Renews the access token. Called once for a 401, and the request is sent again if it says "refreshed". */
+  refresh?: () => Promise<RefreshOutcome>;
+}): void {
   tokenProvider = opts.token;
   onUnauthorized = opts.onUnauthorized;
+  onPaymentRequired = opts.onPaymentRequired ?? (() => undefined);
+  refresher = opts.refresh ?? (async () => "expired");
 }
 
 interface RequestOptions {
@@ -43,6 +58,8 @@ interface RequestOptions {
   /** Skip the bearer header and the sign-out-on-401 behaviour (login). */
   anonymous?: boolean;
   signal?: AbortSignal;
+  /** Set on the one automatic second try after a refresh. Callers never set it. */
+  retried?: boolean;
 }
 
 const REQUEST_TIMEOUT_MS = 20_000;
@@ -82,6 +99,14 @@ export async function api<T>(path: string, opts: RequestOptions = {}): Promise<T
     envelope = undefined;
   }
 
+  if (response.status === 401 && !opts.anonymous && !opts.retried) {
+    const outcome = await refresher();
+    if (outcome === "refreshed") return api<T>(path, { ...opts, retried: true });
+    if (outcome === "offline") throw new ApiError("Cannot reach the server. Check your signal and try again.", 0);
+    onUnauthorized();
+    throw new ApiError(envelope?.message ?? "Your sign-in has expired.", 401);
+  }
+  if (response.status === 402) onPaymentRequired();
   if (!response.ok || envelope?.success === false) {
     if (response.status === 401 && !opts.anonymous) onUnauthorized();
     throw new ApiError(envelope?.message ?? `Request failed (${response.status})`, response.status);

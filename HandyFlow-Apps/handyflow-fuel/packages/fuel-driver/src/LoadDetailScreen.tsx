@@ -3,11 +3,14 @@ import { Text } from "react-native";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import * as ImagePicker from "expo-image-picker";
 import * as Location from "expo-location";
+import { keepFile } from "@/files";
 import type { RootStackParamList } from "@/navigation/types";
 import { useOutbox } from "@/offline/OutboxProvider";
 import { Button } from "@/ui/Button";
 import { Card, Screen } from "@/ui/Screen";
 import { colors } from "@/ui/theme";
+import { offloadGate } from "./arrival";
+import { useArrival } from "./useArrival";
 import { actionsFor, addressText, loadSummary, queuedKinds, windowText } from "./loads";
 import { useLoads } from "./useLoads";
 
@@ -31,6 +34,7 @@ export function LoadDetailScreen({ route, navigation }: Props) {
   const { pending, enqueue } = useOutbox();
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState<string | null>(null);
+  const { check } = useArrival(loadId);
   const load = loads.find((l) => l.id === loadId);
 
   if (!load) {
@@ -40,6 +44,7 @@ export function LoadDetailScreen({ route, navigation }: Props) {
   const queued = queuedKinds(pending, load.id);
   const can = actionsFor(load, queued);
   const w = windowText(load.windowStart, load.windowEnd);
+  const gate = offloadGate(check);
 
   async function start() {
     setBusy(true);
@@ -59,8 +64,9 @@ export function LoadDetailScreen({ route, navigation }: Props) {
       if (shot.canceled || !shot.assets[0]) return;
       const a = shot.assets[0];
       const pos = await tryPosition();
+      const kept = await keepFile(a.uri, a.fileName ?? `delivery-${Date.now()}.jpg`); // the camera's cache can be emptied before the upload runs
       await enqueue("EVIDENCE", {
-        loadId, kind: "PHOTO", uri: a.uri, name: a.fileName ?? `delivery-${Date.now()}.jpg`, mimeType: a.mimeType ?? "image/jpeg",
+        loadId, kind: "PHOTO", uri: kept, name: a.fileName ?? `delivery-${Date.now()}.jpg`, mimeType: a.mimeType ?? "image/jpeg",
         latitude: pos?.latitude ?? null, longitude: pos?.longitude ?? null, accuracyM: pos?.accuracyM ?? null,
       });
       setNote("Photo saved. It will upload when there is signal.");
@@ -79,7 +85,14 @@ export function LoadDetailScreen({ route, navigation }: Props) {
       </Card>
       {note ? <Text accessibilityRole="alert" style={{ color: "#86EFAC" }}>{note}</Text> : null}
       {can.start ? <Button label="Start trip" onPress={start} loading={busy} /> : null}
-      {can.complete ? <Button label="Record delivery" onPress={() => navigation.navigate("CompleteLoad", { loadId })} /> : null}
+      {can.complete && !gate.ok ? (
+        <>
+          <Text style={{ color: "#FCD34D", fontSize: 15 }}>{gate.reason}</Text>
+          <Button label="Arrival check" onPress={() => navigation.navigate("ArrivalCheck", { loadId })} />
+        </>
+      ) : null}
+      {can.complete && gate.ok ? <Button label="Record delivery" onPress={() => navigation.navigate("CompleteLoad", { loadId })} /> : null}
+      {can.complete && gate.ok ? <Button label="Receiver's signature" tone="plain" onPress={() => navigation.navigate("Signature", { loadId })} /> : null}
       {can.evidence ? <Button label="Take a photo" tone="plain" onPress={photo} loading={busy} /> : null}
       {can.failed ? <Button label="Could not deliver" tone="danger" onPress={() => navigation.navigate("FailedAttempt", { loadId })} /> : null}
     </Screen>

@@ -4,6 +4,7 @@ import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { displayName } from "@/api/auth";
 import { hasFuelAccess, modesFor, type Mode } from "@/access/modes";
+import { useAccess } from "@/access/useAccess";
 import { useAuth } from "@/auth/AuthContext";
 import type { RootStackParamList } from "@/navigation/types";
 import { Button } from "@/ui/Button";
@@ -13,10 +14,11 @@ import { colors } from "@/ui/theme";
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
 export function HomeScreen() {
-  const { session, signOut } = useAuth();
+  const { session, signOut, subscriptionInactive } = useAuth();
+  const { access } = useAccess();
   const nav = useNavigation<Nav>();
   const perms = session?.permissions ?? [];
-  const modes = modesFor(perms);
+  const modes = modesFor(perms, access);
 
   function open(m: Mode) {
     if (m.id === "driver") nav.navigate("DriverLoads");
@@ -26,6 +28,11 @@ export function HomeScreen() {
 
   return (
     <Screen title={session ? displayName(session) : "HandyFlow Fuel"}>
+      {subscriptionInactive ? (
+        <Card>
+          <Text accessibilityRole="alert" style={{ color: "#FCD34D", fontSize: 16 }}>Your company's Fuel subscription is not active. Anything you save is kept on this phone and sent when it is active again. Ask your administrator.</Text>
+        </Card>
+      ) : null}
       {!hasFuelAccess(perms) || modes.length === 0 ? (
         <Card>
           <Text style={{ color: colors.text, fontSize: 17 }}>This sign-in has no Fuel access. Ask your administrator to give you a Fuel role.</Text>
@@ -40,6 +47,7 @@ export function HomeScreen() {
           </Pressable>
         ))
       )}
+      <Button label="My access" tone="plain" onPress={() => nav.navigate("Access")} />
       <Button label="Sync centre" tone="plain" onPress={() => nav.navigate("SyncCentre")} />
       <Button label="Sign out" tone="plain" onPress={() => void signOut()} />
     </Screen>
