@@ -37,6 +37,7 @@ import VariancesTab from "./VariancesTab"
 import SetupTab from "./SetupTab"
 import AccessLimitsTab from "./AccessLimitsTab"
 import ImportsTab from "./ImportsTab"
+import GaugeImportsTab from "./GaugeImportsTab"
 import LegalEntitiesTab from "./LegalEntitiesTab"
 import EligibilityTab from "./EligibilityTab"
 import { useEffect } from "react"
@@ -105,6 +106,7 @@ export function FuelPage() {
         case "setup":      return <SetupTab />
         case "access-limits": return <AccessLimitsTab />
         case "imports": return <ImportsTab />
+        case "gauge-readings": return <GaugeImportsTab />
         case "legal-entities": return <LegalEntitiesTab />
         default:           return null
       }

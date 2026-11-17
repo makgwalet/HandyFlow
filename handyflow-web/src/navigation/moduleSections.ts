@@ -238,6 +238,7 @@ export const FUEL_SECTIONS: ModuleSections = {
         { id: 'stock', label: 'Stock & Ledger', icon: Layers },
         { id: 'receipts', label: 'Stock In', icon: ArrowDownToLine },
         { id: 'dispatches', label: 'Dispatches', icon: Fuel },
+        { id: 'gauge-readings', label: 'Gauge readings', icon: Gauge, anyPermission: ['FUEL_MANAGE', 'FUEL_OPERATIONS_MANAGE'] },
       ],
     },
     {
