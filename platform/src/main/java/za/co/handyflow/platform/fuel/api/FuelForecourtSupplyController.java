@@ -24,6 +24,7 @@ public class FuelForecourtSupplyController {
     private final FeatureGuard featureGuard;
     private final za.co.handyflow.platform.fuel.application.internal.FuelScopeService scopes;
     private final za.co.handyflow.platform.fuel.application.internal.FuelForecourtSupplyReconciliationService reconciliation;
+    private final za.co.handyflow.platform.fuel.application.internal.FuelDispatchMatchService dispatchMatching;
 
     @GetMapping
     @PreAuthorize("hasAuthority('FUEL_READ')")
@@ -42,6 +43,35 @@ public class FuelForecourtSupplyController {
         var tenant = TenantContext.getTenantIdAsObject();
         var allowed = scopes.allowedDepotIds(tenant, za.co.handyflow.platform.fuel.application.internal.FuelScopeService.currentUserOrNull());
         return ResponseEntity.ok(ApiResponse.success(reconciliation.report(tenant, days, allowed)));
+    }
+
+    /** Dispatches to each forecourt against the receipts linked to them. Litres only. */
+    @GetMapping("/dispatch-matching")
+    @PreAuthorize("hasAuthority('FUEL_READ')")
+    public ResponseEntity<ApiResponse<za.co.handyflow.platform.fuel.dto.ForecourtSupplyDtos.MatchingReport>> matching(@RequestParam(defaultValue = "30") int days) {
+        featureGuard.requireModule("fuel");
+        var tenant = TenantContext.getTenantIdAsObject();
+        var allowed = scopes.allowedDepotIds(tenant, za.co.handyflow.platform.fuel.application.internal.FuelScopeService.currentUserOrNull());
+        return ResponseEntity.ok(ApiResponse.success(dispatchMatching.report(tenant, days, allowed)));
+    }
+
+    @PostMapping("/dispatch-matching")
+    @PreAuthorize("hasAnyAuthority('FUEL_MANAGE','FUEL_STOCK_MANAGE')")
+    public ResponseEntity<ApiResponse<Void>> match(@RequestBody za.co.handyflow.platform.fuel.dto.ForecourtSupplyDtos.MatchRequest req) {
+        featureGuard.requireModule("fuel");
+        var tenant = TenantContext.getTenantIdAsObject();
+        var user = za.co.handyflow.platform.fuel.application.internal.FuelScopeService.currentUserOrNull();
+        dispatchMatching.match(tenant, req.dispatchId(), req.receiptId(), user, scopes.allowedDepotIds(tenant, user));
+        return ResponseEntity.ok(ApiResponse.success("Receipt linked to the dispatch", null));
+    }
+
+    @DeleteMapping("/dispatch-matching/{matchId}")
+    @PreAuthorize("hasAnyAuthority('FUEL_MANAGE','FUEL_STOCK_MANAGE')")
+    public ResponseEntity<ApiResponse<Void>> unmatch(@PathVariable java.util.UUID matchId) {
+        featureGuard.requireModule("fuel");
+        var tenant = TenantContext.getTenantIdAsObject();
+        dispatchMatching.unmatch(tenant, matchId, scopes.allowedDepotIds(tenant, za.co.handyflow.platform.fuel.application.internal.FuelScopeService.currentUserOrNull()));
+        return ResponseEntity.ok(ApiResponse.success("Link removed", null));
     }
 
     private static boolean canSeeMoney() {

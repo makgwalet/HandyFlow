@@ -46,3 +46,25 @@ export function splitProblem(lines: SplitLine[]): string | null {
   const t = splitTotal(lines)
   return t === 100 ? null : `The percentages must total 100. They total ${t}.`
 }
+
+// Matching a forecourt's receipts to the dispatches that supplied it.
+export type FcLinkedReceipt = { matchId: string; receiptId: string; receivedAt: string; litres: number; deliveryNote: string | null }
+export type FcMatched = { dispatchId: string; dispatchedAt: string; fromTank: string; fuelType: string; litresDispatched: number; litresReceived: number; difference: number; receipts: FcLinkedReceipt[] }
+export type FcOpenDispatch = { dispatchId: string; dispatchedAt: string; fromTank: string; fuelType: string; litres: number }
+export type FcOpenReceipt = { receiptId: string; receivedAt: string; tank: string; fuelType: string; litres: number; deliveryNote: string | null }
+export type FcMatching = { depotId: string; name: string; matched: FcMatched[]; openDispatches: FcOpenDispatch[]; openReceipts: FcOpenReceipt[]; dispatchedLitres: number; receivedLitres: number }
+export type FcMatchingReport = { from: string; to: string; forecourts: FcMatching[] }
+
+export function isFcMatching(x: any): x is FcMatchingReport { return !!x && Array.isArray(x.forecourts) && x.forecourts.every((f: any) => Array.isArray(f.matched) && Array.isArray(f.openDispatches) && Array.isArray(f.openReceipts)) }
+
+/** Open receipts that could be linked to this dispatch: same fuel type. The server checks the forecourt and the rest. */
+export function receiptChoices(f: FcMatching, d: FcOpenDispatch): FcOpenReceipt[] {
+  return f.openReceipts.filter(r => r.fuelType === d.fuelType)
+}
+
+/** Plain wording for a linked dispatch: nothing is judged, the gap is just stated. */
+export function differenceText(m: FcMatched): string {
+  const d = Math.round(m.difference * 100) / 100
+  if (d === 0) return "Received in full"
+  return d > 0 ? `${d.toLocaleString("en-ZA")} L less received than dispatched` : `${(-d).toLocaleString("en-ZA")} L more received than dispatched`
+}

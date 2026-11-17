@@ -6,6 +6,7 @@ import { card, inputStyle, Chip } from "../warehousing/whseUi"
 import { fmtL, fmtR } from "./orderOps"
 import ForecourtSupplySection from "./ForecourtSupplySection"
 import ForecourtReconciliationSection from "./ForecourtReconciliationSection"
+import ForecourtMatchingSection from "./ForecourtMatchingSection"
 import { changeText, caveats, type GroupReport, type GroupRow } from "./groupReportOps"
 
 const unwrap = (r: any) => r.data?.data ?? r.data
@@ -65,6 +66,7 @@ export default function GroupReportTab() {
           </div>
           <ForecourtSupplySection days={days} />
           <ForecourtReconciliationSection days={days} />
+          <ForecourtMatchingSection days={days} />
         </>
       )}
     </div>

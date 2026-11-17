@@ -56,6 +56,7 @@ public class FuelService {
     private final FuelPurchasingService purchasing;
     private final FuelReceiptRepository  receiptRepository;
     private final FuelDispatchRepository dispatchRepository;
+    private final za.co.handyflow.platform.fuel.domain.repository.FuelDepotRepository depotRepository;
     private final DipReadingRepository   dipRepository;
     private final FuelDeliveryRepository deliveryRepository;
     private final ReceiptNumberGenerator receiptNumberGenerator;
@@ -470,6 +471,12 @@ public class FuelService {
         FuelTank tank = findActiveTankForUpdate(tenantId, tankId);
         var levelBefore = tank.getCurrentLitres();
         boolean wasLow = tank.isLow();
+        if (req.destinationDepotId() != null) {
+            // A supply run to a forecourt: the destination must be an active depot of this company, and not the depot the fuel leaves.
+            depotRepository.findActiveById(tenantId, req.destinationDepotId())
+                    .orElseThrow(() -> new za.co.handyflow.platform.shared.ResourceNotFoundException("Depot", req.destinationDepotId().toString()));
+            if (req.destinationDepotId().equals(tank.getDepotId())) throw new IllegalArgumentException("The destination is the depot the fuel leaves. Choose the forecourt it is delivered to.");
+        }
 
         // Never silently take fuel reserved for someone else.
         ledger.requireUnreserved(tank, req.litresDispensed(), java.math.BigDecimal.ZERO);
@@ -486,6 +493,7 @@ public class FuelService {
         // just customer-billed ones, per the agreed design. See
         // FuelDispatch.recordCostSnapshot()'s own comment.
         dispatch.recordCostSnapshot(tank.getCostPerLitreWac());
+        dispatch.setDestinationDepot(req.destinationDepotId());
         dispatchRepository.save(dispatch);
         ledger.post(tank, FuelStockMovement.Type.DISPATCH, req.litresDispensed().negate(), "DISPATCH", dispatch.getId(),
                 req.recipientName());
@@ -842,7 +850,7 @@ public class FuelService {
                 d.getLitresDispensed(), d.getPricePerLitre(), d.getDispatchedAt(),
                 d.getOdometerReading(), d.getHoursReading(), d.getAuthorisedBy(),
                 d.getLevelBefore(), d.getLevelAfter(), d.getCreatedAt(),
-                d.getReversedAt(), d.getReversalReason());
+                d.getReversedAt(), d.getReversalReason(), d.getDestinationDepotId());
     }
 
     private DipReadingResponse toDipResponse(DipReading d) {

@@ -32,4 +32,22 @@ public final class ForecourtSupplyDtos {
 
     /** One line of a forecourt's supply split, as read back. */
     public record Share(UUID supplyingDepotId, String name, BigDecimal percentage) {}
+
+    /** A dispatch to a forecourt with the receipts linked to it. difference = litres dispatched minus litres received (positive: less arrived than left). */
+    public record Matched(UUID dispatchId, java.time.Instant dispatchedAt, String fromTank, String fuelType, BigDecimal litresDispatched, BigDecimal litresReceived, BigDecimal difference, List<LinkedReceipt> receipts) {}
+
+    public record LinkedReceipt(UUID matchId, UUID receiptId, java.time.Instant receivedAt, BigDecimal litres, String deliveryNote) {}
+
+    /** A dispatch to the forecourt that no receipt is linked to yet. */
+    public record OpenDispatch(UUID dispatchId, java.time.Instant dispatchedAt, String fromTank, String fuelType, BigDecimal litres) {}
+
+    /** A receipt into a forecourt tank that is not linked to a dispatch. */
+    public record OpenReceipt(UUID receiptId, java.time.Instant receivedAt, String tank, String fuelType, BigDecimal litres, String deliveryNote) {}
+
+    public record ForecourtMatching(UUID depotId, String name, List<Matched> matched, List<OpenDispatch> openDispatches, List<OpenReceipt> openReceipts,
+                                    BigDecimal dispatchedLitres, BigDecimal receivedLitres) {}
+
+    public record MatchingReport(LocalDate from, LocalDate to, List<ForecourtMatching> forecourts) {}
+
+    public record MatchRequest(UUID dispatchId, UUID receiptId) {}
 }

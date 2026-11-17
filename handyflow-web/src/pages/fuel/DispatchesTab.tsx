@@ -12,7 +12,7 @@ const fmtDate    = (iso: string) => new Date(iso).toLocaleDateString("en-ZA", { 
 const fmtTime    = (iso: string) => new Date(iso).toLocaleTimeString("en-ZA", { hour: "2-digit", minute: "2-digit" })
 const fmtRTotal  = (n: any)     => `R ${Number(n ?? 0).toLocaleString("en-ZA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
-const EMPTY_FORM = { tankId: "", litresDispensed: "", pricePerLitre: "", recipientName: "", authorisedBy: "", odometerReading: "", hoursReading: "", notes: "" }
+const EMPTY_FORM = { tankId: "", litresDispensed: "", pricePerLitre: "", recipientName: "", authorisedBy: "", odometerReading: "", hoursReading: "", notes: "", destinationDepotId: "" }
 
 export default function DispatchesTab() {
   const qc = useQueryClient()
@@ -59,6 +59,11 @@ export default function DispatchesTab() {
     queryFn: async () => unwrap(await apiClient.get("/api/v1/fuel/dispatches?size=200&sort=dispatchedAt,desc")),
   })
 
+  // Optional: the forecourt (a depot) a supply run is delivered to, so its receipts can be matched to this dispatch later.
+  const { data: depotList = [] } = useQuery<any[]>({
+    queryKey: ["fuel-depots"], retry: false,
+    queryFn: async () => { const d = (await apiClient.get("/api/v1/fuel/depots")).data; const l = d?.data ?? d; return Array.isArray(l) ? l : [] },
+  })
   const { data: tanks = [] } = useQuery<any[]>({
     queryKey: ["tanks"],
     queryFn: async () => unwrapList(await apiClient.get("/api/v1/fuel/tanks")),
@@ -340,6 +345,13 @@ export default function DispatchesTab() {
                   <label style={lbl}>Recipient / Vehicle *</label>
                   <input value={form.recipientName} onChange={e => setForm(f => ({ ...f, recipientName: e.target.value }))} placeholder="CAT D9-001 Dozer / GP 34 56 JHB" style={inp} />
                 </div>
+                {depotList.length > 1 && <div>
+                  <label style={lbl} htmlFor="dsp-dest">Delivering to forecourt</label>
+                  <select id="dsp-dest" value={form.destinationDepotId} onChange={e => setForm(f => ({ ...f, destinationDepotId: e.target.value }))} style={inp}>
+                    <option value="">Not a supply run</option>
+                    {depotList.map(x => <option key={x.id} value={x.id}>{x.code} - {x.name}</option>)}
+                  </select>
+                </div>}
                 <div>
                   <label style={lbl}>Authorised By</label>
                   <input value={form.authorisedBy} onChange={e => setForm(f => ({ ...f, authorisedBy: e.target.value }))} placeholder="Thabo Mokoena" style={inp} />
@@ -368,7 +380,7 @@ export default function DispatchesTab() {
             <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 20 }}>
               <button onClick={() => { setShowDispatch(false); setError("") }} style={{ padding: "9px 18px", border: "1px solid var(--hf-border)", borderRadius: 9, background: "var(--hf-surface)", fontSize: 14, cursor: "pointer", color: "var(--hf-text-secondary)" }}>Cancel</button>
               <button
-                onClick={() => dispatchFuel.mutate({ tankId: form.tankId, body: { litresDispensed: Number(form.litresDispensed), pricePerLitre: form.pricePerLitre ? Number(form.pricePerLitre) : null, dispatchedAt: new Date().toISOString(), recipientName: form.recipientName || null, authorisedBy: form.authorisedBy || null, odometerReading: form.odometerReading ? Number(form.odometerReading) : null, hoursReading: form.hoursReading ? Number(form.hoursReading) : null, notes: form.notes || null } })}
+                onClick={() => dispatchFuel.mutate({ tankId: form.tankId, body: { litresDispensed: Number(form.litresDispensed), pricePerLitre: form.pricePerLitre ? Number(form.pricePerLitre) : null, dispatchedAt: new Date().toISOString(), recipientName: form.recipientName || null, authorisedBy: form.authorisedBy || null, odometerReading: form.odometerReading ? Number(form.odometerReading) : null, hoursReading: form.hoursReading ? Number(form.hoursReading) : null, notes: form.notes || null, ...(form.destinationDepotId ? { destinationDepotId: form.destinationDepotId } : {}) } })}
                 disabled={!form.tankId || !form.litresDispensed || !form.recipientName || Number(form.litresDispensed) > Number(selectedTank?.currentLitres ?? 0) || dispatchFuel.isPending}
                 style={{ padding: "9px 22px", background: "var(--hf-primary)", color: "var(--hf-text-on-solid)", border: "none", borderRadius: 9, fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
                 {dispatchFuel.isPending ? "Dispatching..." : "Dispatch Fuel"}

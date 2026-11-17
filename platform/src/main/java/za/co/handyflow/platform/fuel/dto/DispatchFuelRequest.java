@@ -10,5 +10,11 @@ public record DispatchFuelRequest(
         @NotNull Instant dispatchedAt,
         UUID vehicleId, UUID assetId, UUID customerId,
         String recipientName, Integer odometerReading,
-        BigDecimal hoursReading, String authorisedBy, String notes
-) {}
+        BigDecimal hoursReading, String authorisedBy, String notes,
+        UUID destinationDepotId
+) {
+    public DispatchFuelRequest(BigDecimal litresDispensed, BigDecimal pricePerLitre, Instant dispatchedAt, UUID vehicleId, UUID assetId, UUID customerId,
+                               String recipientName, Integer odometerReading, BigDecimal hoursReading, String authorisedBy, String notes) {
+        this(litresDispensed, pricePerLitre, dispatchedAt, vehicleId, assetId, customerId, recipientName, odometerReading, hoursReading, authorisedBy, notes, null);
+    }
+}

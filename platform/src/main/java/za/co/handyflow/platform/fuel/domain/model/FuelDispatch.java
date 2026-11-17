@@ -37,6 +37,10 @@ public class FuelDispatch {
     @Column(name = "customer_id")
     private UUID customerId;
 
+    /** The forecourt (a depot) this dispatch is delivered to, when it is a supply run. Null for issues to vehicles, assets and customers. */
+    @Column(name = "destination_depot_id")
+    private UUID destinationDepotId;
+
     @Column(name = "recipient_name")
     private String recipientName;
 
@@ -123,6 +127,8 @@ public class FuelDispatch {
         d.updatedAt       = Instant.now();
         return d;
     }
+
+    public void setDestinationDepot(UUID depotId) { this.destinationDepotId = depotId; }
 
     public boolean isDeleted() { return deletedAt != null; }
 
