@@ -108,6 +108,12 @@ public class FuelReceipt {
         return r;
     }
 
+    @Column(name = "client_request_id")
+    private UUID clientRequestId;
+
+    /** Marks the record with the phone's request id so a replay can be recognised. Call before saving. */
+    public FuelReceipt withClientRequestId(UUID id) { this.clientRequestId = id; return this; }
+
     public void assignPurchaseOrder(UUID purchaseOrderId) { this.purchaseOrderId = purchaseOrderId; }
 
     /**

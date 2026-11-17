@@ -70,6 +70,10 @@ public class RateLimitFilter extends OncePerRequestFilter {
             // brute-forcing.
             new Limit("auth:login", "/api/v1/auth/login", 10, 10 * 60 * 1_000L),        // 10/10min
 
+            // Native app login and refresh (same brute-force exposure as the web login; a phone refreshes about hourly).
+            new Limit("auth:mobile-login", "/api/v1/auth/mobile/login", 10, 10 * 60 * 1_000L),
+            new Limit("auth:mobile-refresh", "/api/v1/auth/mobile/refresh", 60, 10 * 60 * 1_000L),
+
             // Accountant client portal — invite-based registration. Tighter
             // than main-app register() since this is invite-only (a
             // legitimate user only ever calls this once, when accepting

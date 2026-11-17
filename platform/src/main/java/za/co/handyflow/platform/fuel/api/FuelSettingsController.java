@@ -8,6 +8,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import za.co.handyflow.platform.billing.FeatureGuard;
 import za.co.handyflow.platform.fuel.application.internal.FuelSettingsService;
+import za.co.handyflow.platform.fuel.dto.FuelSettingsDtos;
 import za.co.handyflow.platform.fuel.dto.FuelWholesaleDtos;
 import za.co.handyflow.platform.fuel.dto.FuelSettingsDtos.SettingsRequest;
 import za.co.handyflow.platform.fuel.dto.FuelSettingsDtos.SettingsResponse;
@@ -42,6 +43,13 @@ public class FuelSettingsController {
     public ResponseEntity<ApiResponse<FuelWholesaleDtos.ControlsResponse>> updateControls(@RequestBody FuelWholesaleDtos.ControlsRequest req) {
         featureGuard.requireModule("fuel");
         return ResponseEntity.ok(ApiResponse.success("Saved", settings.updateControls(TenantContext.getTenantIdAsObject(), req)));
+    }
+
+    @PutMapping("/emergency-contact")
+    @PreAuthorize("hasAuthority('FUEL_CONFIGURATION_MANAGE')")
+    public ResponseEntity<ApiResponse<FuelSettingsDtos.EmergencyContact>> updateEmergencyContact(@Valid @RequestBody FuelSettingsDtos.EmergencyContact req) {
+        featureGuard.requireModule("fuel");
+        return ResponseEntity.ok(ApiResponse.success("Saved", settings.updateEmergencyContact(TenantContext.getTenantIdAsObject(), req)));
     }
 
     @PutMapping

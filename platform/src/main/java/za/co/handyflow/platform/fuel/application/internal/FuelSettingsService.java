@@ -66,6 +66,23 @@ public class FuelSettingsService {
     }
 
     @Transactional(readOnly = true)
+    public za.co.handyflow.platform.fuel.dto.FuelSettingsDtos.EmergencyContact emergencyContact(TenantId tenantId) {
+        FuelSettings s = current(tenantId);
+        return new za.co.handyflow.platform.fuel.dto.FuelSettingsDtos.EmergencyContact(s.getEmergencyContactName(), s.getEmergencyContactPhone());
+    }
+
+    @Transactional
+    public za.co.handyflow.platform.fuel.dto.FuelSettingsDtos.EmergencyContact updateEmergencyContact(TenantId tenantId, za.co.handyflow.platform.fuel.dto.FuelSettingsDtos.EmergencyContact req) {
+        FuelSettings s = settings.findByTenant(tenantId).orElseGet(() -> FuelSettings.forTenant(tenantId));
+        s.updateEmergencyContact(req.name(), req.phone());
+        return emergencyContact0(settings.save(s));
+    }
+
+    private static za.co.handyflow.platform.fuel.dto.FuelSettingsDtos.EmergencyContact emergencyContact0(FuelSettings s) {
+        return new za.co.handyflow.platform.fuel.dto.FuelSettingsDtos.EmergencyContact(s.getEmergencyContactName(), s.getEmergencyContactPhone());
+    }
+
+    @Transactional(readOnly = true)
     public ControlsResponse controls(TenantId tenantId) {
         FuelSettings s = current(tenantId);
         return toControls(s);

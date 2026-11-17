@@ -11,6 +11,9 @@ public final class FuelSettingsDtos {
     /** How shifts-by-date reports date a shift: the provider's closing time for imported shifts, or the system's; and the timezone that decides the day. */
     public record ReportBasis(boolean useProviderTimes, String timezone) {}
 
+    /** The control-room contact a driver rings in an emergency. Both fields empty means none is set. */
+    public record EmergencyContact(@jakarta.validation.constraints.Size(max = 100) String name, @jakarta.validation.constraints.Size(max = 30) String phone) {}
+
     public record SettingsRequest(
             @DecimalMin("0") BigDecimal driverCostPerHour,
             @DecimalMin("0") BigDecimal vehicleCostPerKm,

@@ -56,4 +56,20 @@ class FuelSettingsTest {
         site.setDistanceKm(null);
         assertNull(site.getDistanceKm());
     }
+
+    @Test @DisplayName("the emergency contact needs a name and a number together, and a number a driver can ring")
+    void emergencyContact() {
+        FuelSettings s = FuelSettings.forTenant(T);
+        assertNull(s.getEmergencyContactPhone());
+        s.updateEmergencyContact(" Control room ", " +27 11 555 0100 ");
+        assertEquals("Control room", s.getEmergencyContactName());
+        assertEquals("+27 11 555 0100", s.getEmergencyContactPhone());
+        assertThrows(IllegalArgumentException.class, () -> s.updateEmergencyContact("Control room", null));
+        assertThrows(IllegalArgumentException.class, () -> s.updateEmergencyContact(null, "0115550100"));
+        assertThrows(IllegalArgumentException.class, () -> s.updateEmergencyContact("Control room", "call me"));
+        assertEquals("Control room", s.getEmergencyContactName(), "a refused change leaves the saved contact alone");
+        s.updateEmergencyContact("", " ");
+        assertNull(s.getEmergencyContactName());
+        assertNull(s.getEmergencyContactPhone());
+    }
 }

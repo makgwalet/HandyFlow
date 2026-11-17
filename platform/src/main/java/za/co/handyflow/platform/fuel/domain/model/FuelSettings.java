@@ -100,6 +100,13 @@ public class FuelSettings {
     @Column(name = "report_timezone", length = 60)
     private String reportTimezone;
 
+    /** Who a driver rings in an emergency (the control room). Shown on the driver app's home screen. */
+    @Column(name = "emergency_contact_name", length = 100)
+    private String emergencyContactName;
+
+    @Column(name = "emergency_contact_phone", length = 30)
+    private String emergencyContactPhone;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt = Instant.now();
 
@@ -192,6 +199,16 @@ public class FuelSettings {
         String tz = timezone == null || timezone.isBlank() ? null : timezone.trim();
         if (tz != null) { try { java.time.ZoneId.of(tz); } catch (RuntimeException e) { throw new IllegalArgumentException("Unknown timezone: " + tz); } }
         this.shiftReportUseProviderTimes = useProviderTimes; this.reportTimezone = tz; this.updatedAt = Instant.now();
+    }
+    private static final java.util.regex.Pattern PHONE = java.util.regex.Pattern.compile("^\\+?[0-9 ()\\-]{5,30}$");
+
+    /** Both blank clears the contact. A number with no name, or a name with no number, is refused: a driver must be able to ring it. */
+    public void updateEmergencyContact(String name, String phone) {
+        String n = name == null || name.isBlank() ? null : name.trim();
+        String p = phone == null || phone.isBlank() ? null : phone.trim();
+        if ((n == null) != (p == null)) throw new IllegalArgumentException("Enter both a name and a phone number, or leave both empty.");
+        if (p != null && !PHONE.matcher(p).matches()) throw new IllegalArgumentException("The phone number must be digits, with an optional + at the start.");
+        this.emergencyContactName = n; this.emergencyContactPhone = p; this.updatedAt = Instant.now();
     }
     public void updateRequireVerifiedCleaning(boolean on) { this.requireVerifiedCleaning = on; this.updatedAt = Instant.now(); }
     public void updateRequireCompartmentRating(boolean on) { this.requireCompartmentRating = on; this.updatedAt = Instant.now(); }

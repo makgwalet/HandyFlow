@@ -15,6 +15,9 @@ import java.util.UUID;
 
 public interface DipReadingRepository extends JpaRepository<DipReading, UUID> {
 
+    @Query("SELECT d FROM DipReading d WHERE d.tenantId = :tenantId AND d.tankId = :tankId AND d.clientRequestId = :clientRequestId")
+    java.util.Optional<DipReading> findByClientRequest(TenantId tenantId, UUID tankId, UUID clientRequestId);
+
     @Query("SELECT d FROM DipReading d WHERE d.tenantId = :tenantId AND d.tankId = :tankId ORDER BY d.readAt DESC")
     Page<DipReading> findByTank(TenantId tenantId, UUID tankId, Pageable pageable);
 

@@ -10,6 +10,7 @@ za/co/handyflow/platform/contracting/api/PublicSigningController.java
 za/co/handyflow/platform/facilitiesmanagement/api/FmPortalAuthController.java
 za/co/handyflow/platform/fuel/api/FuelPortalAuthController.java
 za/co/handyflow/platform/identity/api/AuthController.java
+za/co/handyflow/platform/identity/api/MobileAuthController.java
 za/co/handyflow/platform/payrollbureau/api/PayrollBureauPortalAuthController.java
 za/co/handyflow/platform/projects/api/ClientPortalAuthController.java
 za/co/handyflow/platform/projects/api/ClientPortalController.java

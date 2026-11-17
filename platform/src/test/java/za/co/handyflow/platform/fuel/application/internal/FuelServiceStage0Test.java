@@ -4,6 +4,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -222,5 +223,43 @@ class FuelServiceStage0Test {
         var limited = service.generateMarginReport(TENANT, null, null, java.util.Set.of(mineId));
         assertEquals(1, limited.lines().size());
         assertEquals(mineId, limited.lines().get(0).tankId());
+    }
+
+    @Test @DisplayName("mobile: sending the same receipt request id again returns the first receipt and adds stock once")
+    void receiptReplayAddsStockOnce() {
+        UUID tankId = UUID.randomUUID(), key = UUID.randomUUID();
+        ReceiveFuelRequest req = new ReceiveFuelRequest(bd("100"), bd("20"), Instant.now(), null, null, null, null, null, null, key);
+        service.receiveFuel(TENANT, tankId, req);
+        assertEquals(0, bd("5100").compareTo(tank.getCurrentLitres()));
+        ArgumentCaptor<FuelReceipt> saved = ArgumentCaptor.forClass(FuelReceipt.class);
+        verify(receiptRepository).save(saved.capture());
+        when(receiptRepository.findByClientRequest(TENANT, tankId, key)).thenReturn(Optional.of(saved.getValue()));
+        assertDoesNotThrow(() -> service.receiveFuel(TENANT, tankId, req));
+        assertEquals(0, bd("5100").compareTo(tank.getCurrentLitres()), "a replay must not add stock again");
+        verify(receiptRepository, times(1)).save(any());
+    }
+
+    @Test @DisplayName("mobile: a receipt with no request id is not treated as a replay")
+    void receiptWithoutKeyIsNeverReplay() {
+        UUID tankId = UUID.randomUUID();
+        ReceiveFuelRequest req = new ReceiveFuelRequest(bd("100"), bd("20"), Instant.now(), null, null, null, null);
+        service.receiveFuel(TENANT, tankId, req);
+        service.receiveFuel(TENANT, tankId, req);
+        assertEquals(0, bd("5200").compareTo(tank.getCurrentLitres()));
+        verify(receiptRepository, never()).findByClientRequest(any(), any(), any());
+    }
+
+    @Test @DisplayName("mobile: sending the same dip request id again returns the first reading and saves one")
+    void dipReplaySavesOnce() {
+        UUID tankId = UUID.randomUUID(), key = UUID.randomUUID();
+        DipReadingRequest req = new DipReadingRequest(bd("4900"), Instant.now(), "Sipho", null, key);
+        service.recordDipReading(TENANT, tankId, req);
+        ArgumentCaptor<za.co.handyflow.platform.fuel.domain.model.DipReading> saved = ArgumentCaptor.forClass(za.co.handyflow.platform.fuel.domain.model.DipReading.class);
+        verify(dipRepository).save(saved.capture());
+        assertEquals(key, saved.getValue().getClientRequestId());
+        when(dipRepository.findByClientRequest(TENANT, tankId, key)).thenReturn(Optional.of(saved.getValue()));
+        DipReadingResponse again = service.recordDipReading(TENANT, tankId, req);
+        assertEquals(0, bd("4900").compareTo(again.actualLitres()));
+        verify(dipRepository, times(1)).save(any());
     }
 }

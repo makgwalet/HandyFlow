@@ -401,7 +401,15 @@ public class FuelService {
     public ReceiptResponse receiveFuel(TenantId tenantId, UUID tankId,
                                        ReceiveFuelRequest req) {
         requireSupplier(tenantId, req.supplierId());
-        FuelTank tank = findActiveTankForUpdate(tenantId, tankId);
+        FuelTank tank = findActiveTankForUpdate(tenantId, tankId); // the tank row lock also serialises two sends of the same request
+        // A replay of a request the server already saved returns that receipt. Stock is never added twice.
+        if (req.clientRequestId() != null) {
+            var existing = receiptRepository.findByClientRequest(tenantId, tankId, req.clientRequestId());
+            if (existing.isPresent()) {
+                log.info("Receipt request {} for tank {} already saved; returning the first receipt", req.clientRequestId(), tankId);
+                return toReceiptResponse(existing.get());
+            }
+        }
         if (req.purchaseOrderId() != null) {
             purchasing.checkReceivable(tenantId, req.purchaseOrderId(), req.supplierId(), tank.getFuelType(), req.litresReceived());
         }
@@ -418,6 +426,7 @@ public class FuelService {
                 req.supplierId(), req.litresReceived(), req.pricePerLitre(),
                 req.receivedAt(), req.deliveryNote(), req.invoiceRef(),
                 levelBefore, levelAfter);
+        receipt.withClientRequestId(req.clientRequestId());
         receipt.assignPurchaseOrder(req.purchaseOrderId());
         receipt.recordFreight(req.freightAmount(), req.freightNote());
         receiptRepository.save(receipt);
@@ -587,9 +596,19 @@ public class FuelService {
                                                DipReadingRequest req) {
         FuelTank tank = findActiveTank(tenantId, tankId);
 
+        // A replay of a request the server already saved (the phone never saw the reply) returns that reading, not a second one.
+        if (req.clientRequestId() != null) {
+            var existing = dipRepository.findByClientRequest(tenantId, tankId, req.clientRequestId());
+            if (existing.isPresent()) {
+                log.info("Dip request {} for tank {} already saved; returning the first reading", req.clientRequestId(), tankId);
+                return toDipResponse(existing.get());
+            }
+        }
+
         DipReading dip = DipReading.create(tenantId, tankId, req.readAt(),
                 req.actualLitres(), tank.getCurrentLitres(),
-                req.readBy(), req.notes());
+                req.readBy(), req.notes())
+                .withClientRequestId(req.clientRequestId());
         dipRepository.save(dip);
 
         if (dip.hasNegativeVariance()) {

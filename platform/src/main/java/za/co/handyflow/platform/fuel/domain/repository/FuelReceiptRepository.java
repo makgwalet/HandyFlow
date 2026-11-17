@@ -16,6 +16,9 @@ import java.util.UUID;
 
 public interface FuelReceiptRepository extends JpaRepository<FuelReceipt, UUID> {
 
+    @Query("SELECT r FROM FuelReceipt r WHERE r.tenantId = :tenantId AND r.tankId = :tankId AND r.clientRequestId = :clientRequestId")
+    Optional<FuelReceipt> findByClientRequest(TenantId tenantId, UUID tankId, UUID clientRequestId);
+
     /** Most recent receipts of a fuel type across the tenant's tanks, newest first. Used as the purchase-cost reference for pricing. */
     @Query("SELECT r FROM FuelReceipt r, FuelTank t WHERE r.tankId = t.id AND r.tenantId = :tenantId AND t.tenantId = :tenantId AND t.fuelType = :fuelType AND r.deletedAt IS NULL AND r.reversedAt IS NULL ORDER BY r.receivedAt DESC")
     List<FuelReceipt> latestForFuelType(TenantId tenantId, String fuelType, Pageable pageable);

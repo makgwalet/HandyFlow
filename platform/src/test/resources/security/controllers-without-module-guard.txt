@@ -142,6 +142,7 @@ za/co/handyflow/platform/hr/api/SavedReportController.java
 za/co/handyflow/platform/hr/api/TaxCertificateController.java
 za/co/handyflow/platform/hr/application/internal/HrEmployeePortalController.java
 za/co/handyflow/platform/identity/api/AuthController.java
+za/co/handyflow/platform/identity/api/MobileAuthController.java
 za/co/handyflow/platform/identity/api/TenantController.java
 za/co/handyflow/platform/identity/api/UiPreferencesController.java
 za/co/handyflow/platform/identity/api/UserController.java

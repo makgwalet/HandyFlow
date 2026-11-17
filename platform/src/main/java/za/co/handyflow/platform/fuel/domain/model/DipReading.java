@@ -48,6 +48,12 @@ public class DipReading {
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
+    @Column(name = "client_request_id")
+    private UUID clientRequestId;
+
+    /** Marks the record with the phone's request id so a replay can be recognised. Call before saving. */
+    public DipReading withClientRequestId(UUID id) { this.clientRequestId = id; return this; }
+
     public static DipReading create(TenantId tenantId, UUID tankId,
                                     Instant readAt, BigDecimal actualLitres,
                                     BigDecimal calculatedLitres, String readBy,
