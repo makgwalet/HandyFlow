@@ -5,7 +5,7 @@ import { apiClient } from "../../api/client"
 import { usePermissions } from "../../hooks/usePermission"
 import { Modal, btnPrimary, btnGhost, card, inputStyle, labelStyle, Chip } from "../warehousing/whseUi"
 import { fmtR } from "./orderOps"
-import { chargeableAccounts, type StayAccount } from "./stayOps"
+import { chargeableAccounts, onlyFleetOptions, type StayAccount } from "./stayOps"
 import { onlyTabs, sellable, validateQuantity, validateNewTab, tabActions, tabInvoiceText, canRaiseTabInvoice, paidText, TAB_STATUS_LABEL, TILL_METHODS, type Tab } from "./tabOps"
 
 const unwrap = (r: any) => r.data?.data ?? r.data
@@ -51,7 +51,7 @@ export default function TabsTab() {
               {list.map(t => (
                 <Fragment key={t.id}>
                   <tr style={{ borderTop: "1px solid var(--hf-border)" }}>
-                    <td style={td}><button style={{ ...btnGhost, padding: "2px 6px" }} onClick={() => setOpen(open === t.id ? null : t.id)}>{t.vehicleRegistration}</button></td>
+                    <td style={td}><button style={{ ...btnGhost, padding: "2px 6px" }} onClick={() => setOpen(open === t.id ? null : t.id)}>{t.vehicleRegistration}</button>{t.fleetVehicleId && <> <Chip bg="var(--hf-surface-2)" fg="var(--hf-text-muted)">Own truck</Chip></>}</td>
                     <td style={td}>{t.driverName ?? "–"}</td>
                     <td style={td}>{new Date(t.openedAt).toLocaleString("en-ZA", { dateStyle: "short", timeStyle: "short" })}</td>
                     <td style={td}>{fmtR(t.total)}</td>
@@ -140,13 +140,22 @@ function TabDetail({ tab, canManage, offerings, onChanged, onAct, busy }: { tab:
 
 function NewTabDialog({ accounts, onDone, onClose }: { accounts: StayAccount[]; onDone: () => void; onClose: () => void }) {
   const [reg, setReg] = useState(""); const [driver, setDriver] = useState(""); const [accountId, setAccountId] = useState(""); const [err, setErr] = useState("")
+  const [fleetId, setFleetId] = useState("")
+  const fleet = useQuery({ queryKey: ["fuel-ts-fleet-vehicles"], retry: false, queryFn: async () => onlyFleetOptions(unwrap(await apiClient.get(`${BASE}/fleet-vehicles`))) })
   const save = useMutation({
-    mutationFn: () => apiClient.post(`${BASE}/tabs`, { vehicleRegistration: reg.trim(), driverName: driver.trim() || null, accountId: accountId || null }),
+    mutationFn: () => apiClient.post(`${BASE}/tabs`, { vehicleRegistration: reg.trim(), driverName: driver.trim() || null, accountId: accountId || null, fleetVehicleId: fleetId || null }),
     onSuccess: () => { onDone(); onClose() }, onError: (e: any) => setErr(msg(e, "Could not open the tab")),
   })
   return (
     <Modal title="New driver tab" onClose={onClose}>
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        {(fleet.data ?? []).length > 0 && (
+          <div><label style={labelStyle} htmlFor="nt-fleet">Own truck (Fleet)</label>
+            <select id="nt-fleet" value={fleetId} onChange={e => { setFleetId(e.target.value); const v = (fleet.data ?? []).find(x => x.id === e.target.value); if (v) setReg(v.registration) }} style={inputStyle}>
+              <option value="">Not one of our trucks</option>
+              {(fleet.data ?? []).map(v => <option key={v.id} value={v.id}>{v.label}</option>)}
+            </select></div>
+        )}
         <div><label style={labelStyle} htmlFor="nt-reg">Vehicle registration *</label><input id="nt-reg" value={reg} maxLength={20} onChange={e => setReg(e.target.value)} style={inputStyle} /></div>
         <div><label style={labelStyle} htmlFor="nt-driver">Driver</label><input id="nt-driver" value={driver} maxLength={120} onChange={e => setDriver(e.target.value)} style={inputStyle} /></div>
         <div><label style={labelStyle} htmlFor="nt-acct">Charge to</label>

@@ -47,6 +47,23 @@ describe("StaysTab", () => {
     expect(post.mock.calls[0][0]).toBe("/api/v1/fuel/truck-stop/stays")
     expect(post.mock.calls[0][1]).toMatchObject({ vehicleRegistration: "ND 5 GP", arrivalDate: todayStr(), departureDate: plus(3) })
   })
+  it("links a booking to one of our own trucks when Fleet has vehicles", async () => {
+    const base = get.getMockImplementation()!
+    get.mockImplementation(async (u: string, ...r: unknown[]) => u.includes("fleet-vehicles") ? { data: { data: [{ id: "v1", registration: "CA 123 456", label: "CA 123 456 (Volvo FH)" }] } } : base(u, ...r))
+    mount()
+    fireEvent.click(await screen.findByText("Book a stay"))
+    fireEvent.change(await screen.findByLabelText("Own truck (Fleet)"), { target: { value: "v1" } })
+    fireEvent.change(screen.getByLabelText(/Leaves/), { target: { value: plus(3) } })
+    fireEvent.click(screen.getByText("Book stay"))
+    await waitFor(() => expect(post).toHaveBeenCalled())
+    expect(post.mock.calls[0][1]).toMatchObject({ vehicleRegistration: "CA 123 456", fleetVehicleId: "v1" })
+  })
+  it("does not offer the Fleet choice when the company has no Fleet vehicles", async () => {
+    mount()
+    fireEvent.click(await screen.findByText("Book a stay"))
+    await screen.findByLabelText(/Truck registration/)
+    expect(screen.queryByLabelText("Own truck (Fleet)")).toBeNull()
+  })
   it("will not book before a rate is set", async () => {
     settingsNow = { nightlyRate: null, bays: null }
     mount()

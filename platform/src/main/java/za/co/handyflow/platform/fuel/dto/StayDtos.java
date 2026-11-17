@@ -19,7 +19,12 @@ public final class StayDtos {
     public record SettingsView(BigDecimal nightlyRate, Integer bays) {}
 
     public record BookRequest(@NotBlank @Size(max = 20) String vehicleRegistration, @Size(max = 120) String driverName, @Size(max = 40) String driverPhone,
-                              @NotNull LocalDate arrivalDate, @NotNull LocalDate departureDate, @Size(max = 300) String note, UUID accountId) {}
+                              @NotNull LocalDate arrivalDate, @NotNull LocalDate departureDate, @Size(max = 300) String note, UUID accountId, UUID fleetVehicleId) {
+        /** Without a Fleet vehicle: a registration that matches one is still linked automatically. */
+        public BookRequest(String vehicleRegistration, String driverName, String driverPhone, LocalDate arrivalDate, LocalDate departureDate, String note, UUID accountId) {
+            this(vehicleRegistration, driverName, driverPhone, arrivalDate, departureDate, note, accountId, null);
+        }
+    }
 
     /** Charge the stay to this Fuel customer account; null means paid at the gate. */
     public record AccountRequest(UUID accountId) {}
@@ -35,13 +40,21 @@ public final class StayDtos {
     public record StayView(UUID id, String vehicleRegistration, String driverName, String driverPhone, LocalDate arrivalDate, LocalDate departureDate,
                            LocalDate actualDepartureDate, String status, BigDecimal ratePerNight, int nights, BigDecimal amount, String note,
                            String cancelledReason, boolean overstaying, Instant checkedInAt, Instant checkedOutAt,
-                           UUID accountId, String invoiceState, String invoiceNumber, String invoiceError, UUID bayId) {
+                           UUID accountId, String invoiceState, String invoiceNumber, String invoiceError, UUID bayId, UUID fleetVehicleId) {
+        /** Before Fleet links existed. */
+        public StayView(UUID id, String vehicleRegistration, String driverName, String driverPhone, LocalDate arrivalDate, LocalDate departureDate,
+                        LocalDate actualDepartureDate, String status, BigDecimal ratePerNight, int nights, BigDecimal amount, String note,
+                        String cancelledReason, boolean overstaying, Instant checkedInAt, Instant checkedOutAt,
+                        UUID accountId, String invoiceState, String invoiceNumber, String invoiceError, UUID bayId) {
+            this(id, vehicleRegistration, driverName, driverPhone, arrivalDate, departureDate, actualDepartureDate, status, ratePerNight, nights, amount, note,
+                    cancelledReason, overstaying, checkedInAt, checkedOutAt, accountId, invoiceState, invoiceNumber, invoiceError, bayId, null);
+        }
         public StayView(UUID id, String vehicleRegistration, String driverName, String driverPhone, LocalDate arrivalDate, LocalDate departureDate,
                         LocalDate actualDepartureDate, String status, BigDecimal ratePerNight, int nights, BigDecimal amount, String note,
                         String cancelledReason, boolean overstaying, Instant checkedInAt, Instant checkedOutAt,
                         UUID accountId, String invoiceState, String invoiceNumber, String invoiceError) {
             this(id, vehicleRegistration, driverName, driverPhone, arrivalDate, departureDate, actualDepartureDate, status, ratePerNight, nights, amount, note,
-                    cancelledReason, overstaying, checkedInAt, checkedOutAt, accountId, invoiceState, invoiceNumber, invoiceError, null);
+                    cancelledReason, overstaying, checkedInAt, checkedOutAt, accountId, invoiceState, invoiceNumber, invoiceError, null, null);
         }
     }
 

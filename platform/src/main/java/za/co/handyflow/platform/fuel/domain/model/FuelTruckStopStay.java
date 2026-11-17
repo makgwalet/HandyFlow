@@ -69,6 +69,10 @@ public class FuelTruckStopStay {
     @Column(name = "account_id")
     private UUID accountId;
 
+    /** One of the company's own Fleet vehicles, when this truck is one. Fleet owns the registration. */
+    @Column(name = "fleet_vehicle_id")
+    private UUID fleetVehicleId;
+
     /** The named bay the truck is in or booked into. Optional. */
     @Column(name = "bay_id")
     private UUID bayId;
@@ -121,6 +125,13 @@ public class FuelTruckStopStay {
     }
 
     /** Charges the stay to a customer account; only while it has not ended. */
+    /** Links to a Fleet vehicle; the registration becomes Fleet's. */
+    public void linkFleetVehicle(UUID vehicleId, String registration) {
+        this.fleetVehicleId = vehicleId;
+        if (vehicleId != null && registration != null && !registration.isBlank()) this.vehicleRegistration = registration.trim().toUpperCase();
+        this.updatedAt = Instant.now();
+    }
+
     public void chargeTo(UUID accountId) {
         requireStatus("change the account of", BOOKED, CHECKED_IN);
         this.accountId = accountId; this.updatedAt = Instant.now();

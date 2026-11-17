@@ -20,6 +20,7 @@ describe("TabsTab", () => {
     get.mockImplementation((u: string) => {
       if (u.includes("/tabs")) return ok(tabsNow)
       if (u.includes("/offerings")) return ok([{ id: "o1", serviceName: "Shower", active: true, price: 45 }, { id: "o2", serviceName: "Wash", active: true, price: null }])
+      if (u.includes("fleet-vehicles")) return ok([{ id: "v1", registration: "CA 123 456", label: "CA 123 456 (Volvo FH)" }])
       if (u.includes("customer-accounts")) return ok([{ id: "a1", customerName: "Acme Haulage", creditHold: false }, { id: "a2", customerName: "Held Co", creditHold: true }])
       return ok([])
     })
@@ -95,7 +96,7 @@ describe("TabsTab", () => {
     fireEvent.change(screen.getByLabelText(/Vehicle registration/), { target: { value: "CA 5" } })
     fireEvent.change(acct, { target: { value: "a1" } })
     fireEvent.click(screen.getByRole("button", { name: "Open tab" }))
-    await waitFor(() => expect(post).toHaveBeenCalledWith("/api/v1/fuel/truck-stop/tabs", { vehicleRegistration: "CA 5", driverName: null, accountId: "a1" }))
+    await waitFor(() => expect(post).toHaveBeenCalledWith("/api/v1/fuel/truck-stop/tabs", { vehicleRegistration: "CA 5", driverName: null, accountId: "a1", fleetVehicleId: null }))
   })
 
   it("hides the actions from someone who cannot manage", async () => {
@@ -105,5 +106,20 @@ describe("TabsTab", () => {
     await screen.findByText("Shower")
     expect(screen.queryByRole("button", { name: "New tab" })).toBeNull()
     expect(screen.queryByRole("button", { name: "Settle at the till" })).toBeNull()
+  })
+
+  it("links a new tab to one of our own trucks and fills in its registration", async () => {
+    mount()
+    fireEvent.click(await screen.findByRole("button", { name: "New tab" }))
+    fireEvent.change(await screen.findByLabelText("Own truck (Fleet)"), { target: { value: "v1" } })
+    expect((screen.getByLabelText(/Vehicle registration/) as HTMLInputElement).value).toBe("CA 123 456")
+    fireEvent.click(screen.getByRole("button", { name: "Open tab" }))
+    await waitFor(() => expect(post).toHaveBeenCalledWith("/api/v1/fuel/truck-stop/tabs", { vehicleRegistration: "CA 123 456", driverName: null, accountId: null, fleetVehicleId: "v1" }))
+  })
+
+  it("marks a linked tab as an own truck", async () => {
+    tabsNow = [tab({ fleetVehicleId: "v1" })]
+    mount()
+    expect(await screen.findByText("Own truck")).toBeTruthy()
   })
 })

@@ -36,6 +36,7 @@ public class FuelTabService {
     private final FuelTruckStopOfferingRepository offerings;
     private final FuelCustomerAccountRepository accounts;
     private final BookingsFacade bookings;
+    private final FuelTruckStopFleetLinks fleetLinks;
 
     @Transactional(readOnly = true)
     public List<TabView> list(TenantId tenant, String status, int limit) {
@@ -50,8 +51,9 @@ public class FuelTabService {
     @Transactional
     public TabView open(TenantId tenant, OpenRequest req, UUID by) {
         if (req.accountId() != null) requireChargeable(tenant, req.accountId());
-        FuelTruckStopTab t = tabs.save(FuelTruckStopTab.open(tenant, req.vehicleRegistration(), req.driverName(), req.accountId(), by));
-        return view(t, List.of());
+        FuelTruckStopTab t = FuelTruckStopTab.open(tenant, req.vehicleRegistration(), req.driverName(), req.accountId(), by);
+        fleetLinks.resolve(tenant, req.fleetVehicleId(), t.getVehicleRegistration()).ifPresent(l -> t.linkFleetVehicle(l.vehicleId(), l.registration()));
+        return view(tabs.save(t), List.of());
     }
 
     /** Sets or clears the account while the tab is open. */
@@ -135,6 +137,6 @@ public class FuelTabService {
         List<LineView> lv = ls.stream().map(l -> new LineView(l.getId(), l.getOfferingId(), l.getDescription(), l.getQuantity(), l.getUnitPrice(), l.amount())).toList();
         BigDecimal total = lv.stream().map(LineView::amount).reduce(BigDecimal.ZERO, BigDecimal::add);
         return new TabView(t.getId(), t.getVehicleRegistration(), t.getDriverName(), t.getAccountId(), t.getStatus(), t.getPaymentMethod(), t.getOpenedAt(), t.getSettledAt(),
-                t.getVoidReason(), t.getInvoiceState(), t.getInvoiceNumber(), t.getInvoiceError(), lv, total);
+                t.getVoidReason(), t.getInvoiceState(), t.getInvoiceNumber(), t.getInvoiceError(), lv, total, t.getFleetVehicleId());
     }
 }

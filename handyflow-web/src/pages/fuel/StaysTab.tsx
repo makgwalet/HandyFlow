@@ -5,7 +5,7 @@ import { apiClient } from "../../api/client"
 import { usePermissions } from "../../hooks/usePermission"
 import { Modal, btnPrimary, btnGhost, card, inputStyle, labelStyle, Chip } from "../warehousing/whseUi"
 import { fmtR } from "./orderOps"
-import { emptyStay, validateStay, validateSettings, nightsText, stayActions, nightState, firstFullNight, chargeText, invoiceText, canRaiseInvoice, chargeableAccounts, onlyBays, bayName, canChangeBay, STATUS_LABEL, type Bay, type StayAccount, type Stay, type StayForm, type ParkingSettings, type Occupancy, type Capacity } from "./stayOps"
+import { emptyStay, validateStay, validateSettings, nightsText, stayActions, nightState, firstFullNight, chargeText, invoiceText, canRaiseInvoice, chargeableAccounts, onlyFleetOptions, onlyBays, bayName, canChangeBay, STATUS_LABEL, type Bay, type StayAccount, type Stay, type StayForm, type ParkingSettings, type Occupancy, type Capacity } from "./stayOps"
 
 const unwrap = (r: any) => r.data?.data ?? r.data
 const msg = (e: any, fb: string) => e?.response?.data?.message ?? fb
@@ -65,7 +65,7 @@ export default function StaysTab() {
             <thead><tr><th style={th}>Truck</th><th style={th}>Arrives</th><th style={th}>Leaves</th><th style={th}>Nights</th><th style={th}>Amount</th><th style={th}>Bay</th><th style={th}>Charged to</th><th style={th}>Status</th><th style={th} /></tr></thead>
             <tbody>{rows.map(s => (
               <tr key={s.id} style={{ borderTop: "1px solid var(--hf-border)" }}>
-                <td style={td}><strong>{s.vehicleRegistration}</strong><div style={{ fontSize: 11, color: "var(--hf-text-muted)" }}>{[s.driverName, s.driverPhone].filter(Boolean).join(" · ")}</div></td>
+                <td style={td}><strong>{s.vehicleRegistration}</strong>{s.fleetVehicleId && <> <Chip bg="var(--hf-surface-2)" fg="var(--hf-text-muted)">Own truck</Chip></>}<div style={{ fontSize: 11, color: "var(--hf-text-muted)" }}>{[s.driverName, s.driverPhone].filter(Boolean).join(" · ")}</div></td>
                 <td style={td}>{s.arrivalDate}</td>
                 <td style={td}>{s.actualDepartureDate ?? s.departureDate}{s.actualDepartureDate && s.actualDepartureDate !== s.departureDate && <div style={{ fontSize: 11, color: "var(--hf-text-muted)" }}>planned {s.departureDate}</div>}</td>
                 <td style={td}>{nightsText(s)}</td>
@@ -153,14 +153,24 @@ function SettingsBox({ settings, canManage, onSaved }: { settings?: ParkingSetti
 
 function BookDialog({ today, rateSet, accounts, onDone, onClose }: { today: string; rateSet: boolean; accounts: StayAccount[]; onDone: () => void; onClose: () => void }) {
   const [f, setF] = useState<StayForm>(emptyStay(today)); const [err, setErr] = useState("")
+  const [fleetId, setFleetId] = useState("")
+  const fleet = useQuery({ queryKey: ["fuel-ts-fleet-vehicles"], retry: false, queryFn: async () => onlyFleetOptions(unwrap(await apiClient.get("/api/v1/fuel/truck-stop/fleet-vehicles"))) })
   const set = (k: keyof StayForm) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setF(s => ({ ...s, [k]: e.target.value }))
   const save = useMutation({
-    mutationFn: () => apiClient.post("/api/v1/fuel/truck-stop/stays", { vehicleRegistration: f.vehicleRegistration.trim(), driverName: f.driverName.trim() || null, driverPhone: f.driverPhone.trim() || null, arrivalDate: f.arrivalDate, departureDate: f.departureDate, note: f.note.trim() || null, accountId: f.accountId || null }),
+    mutationFn: () => apiClient.post("/api/v1/fuel/truck-stop/stays", { vehicleRegistration: f.vehicleRegistration.trim(), driverName: f.driverName.trim() || null, driverPhone: f.driverPhone.trim() || null, arrivalDate: f.arrivalDate, departureDate: f.departureDate, note: f.note.trim() || null, accountId: f.accountId || null, fleetVehicleId: fleetId || null }),
     onSuccess: () => { onDone(); onClose() }, onError: (e: any) => setErr(msg(e, "Could not book the stay")),
   })
   return (
     <Modal title="Book an overnight stay" onClose={onClose}>
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        {(fleet.data ?? []).length > 0 && (
+          <div><label style={labelStyle} htmlFor="bs-fleet">Own truck (Fleet)</label>
+            <select id="bs-fleet" value={fleetId} onChange={e => { setFleetId(e.target.value); const v = (fleet.data ?? []).find(x => x.id === e.target.value); if (v) setF(s => ({ ...s, vehicleRegistration: v.registration })) }} style={inputStyle}>
+              <option value="">Not one of our trucks</option>
+              {(fleet.data ?? []).map(v => <option key={v.id} value={v.id}>{v.label}</option>)}
+            </select>
+            <div style={{ fontSize: 11, color: "var(--hf-text-muted)", marginTop: 3 }}>A registration that matches a Fleet truck is linked automatically.</div></div>
+        )}
         <div><label style={labelStyle} htmlFor="bs-reg">Truck registration *</label><input id="bs-reg" value={f.vehicleRegistration} maxLength={20} onChange={set("vehicleRegistration")} style={inputStyle} /></div>
         <div style={{ display: "flex", gap: 10 }}>
           <div style={{ flex: 1 }}><label style={labelStyle} htmlFor="bs-dn">Driver</label><input id="bs-dn" value={f.driverName} maxLength={120} onChange={set("driverName")} style={inputStyle} /></div>

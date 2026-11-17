@@ -6,7 +6,7 @@ export interface TabLine { id: string; offeringId: string; description: string; 
 export interface Tab {
   id: string; vehicleRegistration: string; driverName: string | null; accountId: string | null; status: TabStatus; paymentMethod: string | null
   openedAt: string; settledAt: string | null; voidReason: string | null; invoiceState: InvoiceState | null; invoiceNumber: string | null; invoiceError: string | null
-  lines: TabLine[]; total: number
+  lines: TabLine[]; total: number; fleetVehicleId?: string | null
 }
 export interface TabOffering { id: string; serviceName: string; active: boolean; price: number | null }
 

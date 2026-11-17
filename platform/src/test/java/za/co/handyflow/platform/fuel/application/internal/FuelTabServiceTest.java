@@ -44,6 +44,7 @@ class FuelTabServiceTest {
     @Mock FuelTruckStopOfferingRepository offerings;
     @Mock FuelCustomerAccountRepository accounts;
     @Mock BookingsFacade bookings;
+    @Mock FuelTruckStopFleetLinks fleetLinks;
     @InjectMocks FuelTabService service;
 
     final UUID serviceId = UUID.randomUUID();
@@ -156,5 +157,14 @@ class FuelTabServiceTest {
     void registration() {
         assertThrows(IllegalArgumentException.class, () -> FuelTruckStopTab.open(T, "  ", null, null, null));
         assertEquals("CA 123 GP", FuelTruckStopTab.open(T, " ca 123 gp ", null, null, null).getVehicleRegistration());
+    }
+
+    @Test @DisplayName("a tab opened for a registration that matches a Fleet vehicle is linked to it")
+    void tabLinksToFleet() {
+        UUID vehicle = UUID.randomUUID();
+        when(tabs.save(any())).thenAnswer(i -> i.getArgument(0));
+        when(fleetLinks.resolve(eq(T), isNull(), eq("GP 1"))).thenReturn(Optional.of(new FuelTruckStopFleetLinks.Link(vehicle, "GP 1")));
+        assertEquals(vehicle, service.open(T, new OpenRequest("gp 1", null, null, null), USER).fleetVehicleId());
+        assertNull(service.open(T, new OpenRequest("zz 9", null, null, null), USER).fleetVehicleId());
     }
 }

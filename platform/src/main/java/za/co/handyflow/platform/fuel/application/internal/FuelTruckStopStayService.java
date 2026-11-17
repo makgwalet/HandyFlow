@@ -32,6 +32,7 @@ public class FuelTruckStopStayService {
     private final FuelTruckStopStayRepository stays;
     private final FuelTruckStopParkingRepository parking;
     private final FuelCustomerAccountRepository accounts;
+    private final FuelTruckStopFleetLinks fleetLinks;
     private final za.co.handyflow.platform.fuel.domain.repository.FuelTruckStopBayRepository bays;
 
     @Transactional(readOnly = true)
@@ -66,6 +67,7 @@ public class FuelTruckStopStayService {
                 p.getNightlyRate(), req.note(), by);
         requireRoom(tenantId, p.getBays(), s.getArrivalDate(), s.getDepartureDate(), null, today);
         if (req.accountId() != null) s.chargeTo(requireChargeable(tenantId, req.accountId()).getId());
+        fleetLinks.resolve(tenantId, req.fleetVehicleId(), s.getVehicleRegistration()).ifPresent(l -> s.linkFleetVehicle(l.vehicleId(), l.registration()));
         stays.save(s);
         log.info("Overnight stay booked for {} from {} to {}", s.getVehicleRegistration(), s.getArrivalDate(), s.getDepartureDate());
         return view(s, today);
@@ -238,6 +240,6 @@ public class FuelTruckStopStayService {
     static StayView view(FuelTruckStopStay s, LocalDate today) {
         return new StayView(s.getId(), s.getVehicleRegistration(), s.getDriverName(), s.getDriverPhone(), s.getArrivalDate(), s.getDepartureDate(), s.getActualDepartureDate(),
                 s.getStatus(), s.getRatePerNight(), s.nights(), s.amount(), s.getNote(), s.getCancelledReason(), s.isOverstaying(today), s.getCheckedInAt(), s.getCheckedOutAt(),
-                s.getAccountId(), s.getInvoiceState(), s.getInvoiceNumber(), s.getInvoiceError(), s.getBayId());
+                s.getAccountId(), s.getInvoiceState(), s.getInvoiceNumber(), s.getInvoiceError(), s.getBayId(), s.getFleetVehicleId());
     }
 }

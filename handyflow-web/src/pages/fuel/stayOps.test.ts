@@ -83,3 +83,11 @@ describe("named bays", () => {
     expect(canChangeBay({ status: "CHECKED_OUT" } as any)).toBe(false)
   })
 })
+
+import { onlyFleetOptions } from "./stayOps"
+describe("onlyFleetOptions", () => {
+  it("keeps only rows that look like Fleet vehicle options", () => {
+    expect(onlyFleetOptions([{ id: "v1", registration: "GP 1", label: "GP 1 (Volvo)" }, { id: "x" }])).toHaveLength(1)
+    expect(onlyFleetOptions({})).toEqual([])
+  })
+})

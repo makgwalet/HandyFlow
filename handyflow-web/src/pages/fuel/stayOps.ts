@@ -3,7 +3,7 @@ export type StayStatus = "BOOKED" | "CHECKED_IN" | "CHECKED_OUT" | "CANCELLED" |
 export interface Stay {
   id: string; vehicleRegistration: string; driverName: string | null; driverPhone: string | null; arrivalDate: string; departureDate: string; actualDepartureDate: string | null
   status: StayStatus; ratePerNight: number; nights: number; amount: number; note: string | null; cancelledReason: string | null; overstaying: boolean; checkedInAt: string | null; checkedOutAt: string | null
-  accountId?: string | null; invoiceState?: InvoiceState | null; invoiceNumber?: string | null; invoiceError?: string | null; bayId?: string | null
+  accountId?: string | null; invoiceState?: InvoiceState | null; invoiceNumber?: string | null; invoiceError?: string | null; bayId?: string | null; fleetVehicleId?: string | null
 }
 export type InvoiceState = "PENDING" | "CLAIMED" | "INVOICED" | "FAILED" | "LINK_FAILED"
 export interface StayAccount { id: string; customerName: string; creditHold: boolean }
@@ -89,3 +89,12 @@ export function bayName(s: Stay, bays: Bay[]): string { return s.bayId ? (bays.f
 
 /** A stay can change bay only while it is booked or in the yard. */
 export function canChangeBay(s: Stay): boolean { return s.status === "BOOKED" || s.status === "CHECKED_IN" }
+
+// Own trucks: a stay or tab may be linked to one of the company's Fleet vehicles. Optional.
+export interface FleetOption { id: string; registration: string; label: string }
+
+/** Other tests answer every URL with generic data; keep only rows that look like Fleet vehicle options. */
+export function onlyFleetOptions(raw: unknown): FleetOption[] {
+  if (!Array.isArray(raw)) return []
+  return (raw as any[]).filter(o => o && typeof o.id === "string" && typeof o.registration === "string" && typeof o.label === "string")
+}

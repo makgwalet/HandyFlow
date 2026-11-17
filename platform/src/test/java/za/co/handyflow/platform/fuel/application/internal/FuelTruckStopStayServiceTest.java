@@ -40,6 +40,7 @@ class FuelTruckStopStayServiceTest {
     @Mock FuelTruckStopParkingRepository parking;
     @Mock za.co.handyflow.platform.fuel.domain.repository.FuelCustomerAccountRepository accounts;
     @Mock za.co.handyflow.platform.fuel.domain.repository.FuelTruckStopBayRepository bayRepo;
+    @Mock FuelTruckStopFleetLinks fleetLinks;
     @InjectMocks FuelTruckStopStayService service;
 
     final List<FuelTruckStopStay> saved = new ArrayList<>();
@@ -344,5 +345,19 @@ class FuelTruckStopStayServiceTest {
         StayView s = book("GP 1", 0, 2);
         service.cancel(T, s.id(), new za.co.handyflow.platform.fuel.dto.StayDtos.CancelRequest("changed plans"), TODAY);
         assertThrows(IllegalStateException.class, () -> assign(s, b1));
+    }
+
+    @Test @DisplayName("a stay is linked to the Fleet vehicle the lookup finds, and takes Fleet's registration")
+    void linksToFleetVehicle() {
+        UUID vehicle = UUID.randomUUID();
+        when(fleetLinks.resolve(eq(T), isNull(), eq("GP 5"))).thenReturn(java.util.Optional.of(new FuelTruckStopFleetLinks.Link(vehicle, "GP5 X")));
+        var v = service.book(T, req("gp 5", 0, 1), BY, TODAY);
+        assertEquals(vehicle, v.fleetVehicleId());
+        assertEquals("GP5 X", v.vehicleRegistration());
+    }
+
+    @Test @DisplayName("a stay with no Fleet match is simply not linked")
+    void noFleetMatch() {
+        assertNull(service.book(T, req("ZZ 9", 0, 1), BY, TODAY).fleetVehicleId());
     }
 }

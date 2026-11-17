@@ -14,7 +14,7 @@ import java.util.UUID;
 public final class TabDtos {
     private TabDtos() {}
 
-    public record OpenRequest(@NotBlank @Size(max = 20) String vehicleRegistration, @Size(max = 120) String driverName, UUID accountId) {}
+    public record OpenRequest(@NotBlank @Size(max = 20) String vehicleRegistration, @Size(max = 120) String driverName, UUID accountId, UUID fleetVehicleId) {}
 
     public record AccountRequest(UUID accountId) {}
 
@@ -28,5 +28,5 @@ public final class TabDtos {
     public record LineView(UUID id, UUID offeringId, String description, BigDecimal quantity, BigDecimal unitPrice, BigDecimal amount) {}
 
     public record TabView(UUID id, String vehicleRegistration, String driverName, UUID accountId, String status, String paymentMethod, Instant openedAt, Instant settledAt,
-                          String voidReason, String invoiceState, String invoiceNumber, String invoiceError, List<LineView> lines, BigDecimal total) {}
+                          String voidReason, String invoiceState, String invoiceNumber, String invoiceError, List<LineView> lines, BigDecimal total, UUID fleetVehicleId) {}
 }

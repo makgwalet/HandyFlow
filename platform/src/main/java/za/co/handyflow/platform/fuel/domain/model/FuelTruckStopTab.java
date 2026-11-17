@@ -31,6 +31,7 @@ public class FuelTruckStopTab {
     @Column(name = "vehicle_registration", nullable = false, length = 20) private String vehicleRegistration;
     @Column(name = "driver_name", length = 120) private String driverName;
     @Column(name = "account_id") private UUID accountId;
+    @Column(name = "fleet_vehicle_id") private UUID fleetVehicleId;
     @Column(nullable = false, length = 10) private String status = OPEN;
     @Column(name = "payment_method", length = 10) private String paymentMethod;
     @Column(name = "opened_by", updatable = false) private UUID openedBy;
@@ -55,6 +56,13 @@ public class FuelTruckStopTab {
         t.tenantId = tenantId; t.vehicleRegistration = reg; t.accountId = accountId; t.openedBy = by;
         t.driverName = driverName == null || driverName.isBlank() ? null : driverName.trim();
         return t;
+    }
+
+    /** Links to a Fleet vehicle; the registration becomes Fleet's. Only while open. */
+    public void linkFleetVehicle(UUID vehicleId, String registration) {
+        requireOpen();
+        this.fleetVehicleId = vehicleId;
+        if (vehicleId != null && registration != null && !registration.isBlank()) this.vehicleRegistration = registration.trim().toUpperCase();
     }
 
     public boolean isOpen() { return OPEN.equals(status); }

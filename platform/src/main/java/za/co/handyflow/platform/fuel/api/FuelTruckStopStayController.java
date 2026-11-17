@@ -24,6 +24,7 @@ public class FuelTruckStopStayController {
 
     private final FuelTruckStopStayService service;
     private final za.co.handyflow.platform.fuel.application.internal.FuelStayInvoicingService invoicing;
+    private final za.co.handyflow.platform.fuel.application.internal.FuelTruckStopFleetLinks fleetLinks;
     private final FeatureGuard featureGuard;
 
     private static LocalDate today() { return LocalDate.now(ZoneId.of("Africa/Johannesburg")); }
@@ -47,6 +48,14 @@ public class FuelTruckStopStayController {
     public ResponseEntity<ApiResponse<List<StayView>>> list(@RequestParam(defaultValue = "100") int limit) {
         featureGuard.requireModule("fuel");
         return ResponseEntity.ok(ApiResponse.success(service.list(TenantContext.getTenantIdAsObject(), limit, today())));
+    }
+
+    /** The company's own Fleet vehicles a stay or tab can be linked to. Empty when Fleet is not available. */
+    @GetMapping("/fleet-vehicles")
+    @PreAuthorize("hasAnyAuthority('FUEL_READ','FUEL_MANAGE','FUEL_TRUCKSTOP_MANAGE')")
+    public ResponseEntity<ApiResponse<List<za.co.handyflow.platform.fuel.dto.FleetVehicleOption>>> fleetVehicles() {
+        featureGuard.requireModule("fuel");
+        return ResponseEntity.ok(ApiResponse.success(fleetLinks.options(TenantContext.getTenantIdAsObject())));
     }
 
     @GetMapping("/stays/occupancy")
