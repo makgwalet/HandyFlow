@@ -10,19 +10,20 @@ vi.mock("../../hooks/usePermission", () => ({ usePermissions: () => can }))
 
 const rule = (o: any = {}) => ({ siteId: "s1", hasRule: false, maxCapacityLitres: null, maxGvmKg: null, maxLengthM: null, maxWidthM: null, maxHeightM: null, approvedTypes: [], accessNotes: null, approvedTankers: [], requireApprovedDrivers: false, requiredTraining: null, ...o })
 let overrideRows: any[] = []
+let cleaningRows: any[] = []
 let ruleNow: any, approvals: any[], ratings: any[], changeovers: any[], reqRating: boolean
 function mount() { render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><EligibilityTab /></QueryClientProvider>) }
 
 describe("EligibilityTab", () => {
   beforeEach(() => {
     get.mockReset(); post.mockReset(); put.mockReset(); del.mockReset(); can = true
-    ruleNow = rule(); approvals = []; changeovers = []; reqRating = false
+    ruleNow = rule(); approvals = []; changeovers = []; reqRating = false; cleaningRows = []
     ratings = [{ compartmentId: "k1", number: 1, capacityLitres: 10000, fuelTypes: ["DIESEL"], lastCargo: "DIESEL", lastCargoAt: "2026-11-10T08:00:00Z", lastCleanedAt: null }]
     get.mockImplementation(async (u: string) => ({ data: { data:
       u.endsWith("/customer-accounts") ? [{ id: "a1", customerName: "Gold Mine Ltd" }] : u.endsWith("/customer-accounts/a1") ? { id: "a1", sites: [{ id: "s1", name: "Mine Gate 2" }] }
       : u.endsWith("/access-rule") ? ruleNow : u.endsWith("/driver-approvals") ? approvals : u.endsWith("/tankers") ? [{ id: "t1", registration: "GP 12 AB", active: true, compartments: [] }]
       : u.endsWith("/drivers") ? [{ id: "e1", name: "Moses Sithole" }] : u.endsWith("/specs") ? { tankerType: null, gvmKg: null, lengthM: null, widthM: null, heightM: null }
-      : u.endsWith("/compartment-ratings") ? ratings : u.endsWith("/cleanings") ? [] : u.endsWith("/changeover-rules") ? changeovers : u.endsWith("/eligibility/settings") ? { requireCompartmentRating: reqRating } : u.endsWith("/eligibility/overrides") ? overrideRows : null } }))
+      : u.endsWith("/compartment-ratings") ? ratings : u.endsWith("/cleanings") ? cleaningRows : u.endsWith("/changeover-rules") ? changeovers : u.endsWith("/eligibility/settings") ? { requireCompartmentRating: reqRating, requireVerifiedCleaning: false } : u.endsWith("/eligibility/overrides") ? overrideRows : null } }))
     put.mockResolvedValue({ data: { data: {} } }); post.mockResolvedValue({ data: { data: {} } }); del.mockResolvedValue({ data: { data: null } })
   })
   afterEach(cleanup)
@@ -123,5 +124,49 @@ describe("EligibilityTab", () => {
     mount()
     await screen.findByRole("tab", { name: "Customer sites" })
     expect(screen.queryByRole("tab", { name: "Review decisions" })).toBeNull()
+  })
+
+  async function openCleanings() {
+    mount()
+    fireEvent.click(screen.getByText("Tankers and compartments"))
+    await waitFor(() => screen.getByText("GP 12 AB"))
+    fireEvent.change(screen.getByLabelText("Tanker to set up"), { target: { value: "t1" } })
+    await screen.findByText("Compartment 1")
+    fireEvent.click(screen.getByText("Cleanings"))
+  }
+  const cleaningRow = (o: any = {}) => ({ id: "cl1", compartmentId: "k1", cleanedAt: "2026-11-14T09:00:00Z", method: "Steam", certificateRef: "CERT-77", evidenceNote: null, fileStored: false, verifiedAt: null, ...o })
+
+  it("a cleaning with no file offers an upload and shows that no certificate file is held", async () => {
+    cleaningRows = [cleaningRow()]
+    await openCleanings()
+    expect(await screen.findByText("No certificate file")).toBeTruthy()
+    const input = await screen.findByLabelText("Certificate file for 2026-11-14")
+    const file = new File([new Uint8Array([37, 80, 68, 70])], "cert.pdf", { type: "application/pdf" })
+    fireEvent.change(input, { target: { files: [file] } })
+    await waitFor(() => expect(post).toHaveBeenCalled())
+    expect(post.mock.calls[0][0]).toBe("/api/v1/fuel/tankers/t1/compartments/k1/cleanings/cl1/certificate")
+  })
+
+  it("an uploaded certificate can be verified by someone with the verify permission, and viewed", async () => {
+    cleaningRows = [cleaningRow({ fileStored: true })]
+    can = true
+    await openCleanings()
+    expect(await screen.findByText("Certificate not yet verified")).toBeTruthy()
+    fireEvent.click(screen.getByText("Verify certificate for 2026-11-14"))
+    await waitFor(() => expect(post).toHaveBeenCalledWith("/api/v1/fuel/tankers/t1/compartments/k1/cleanings/cl1/verify"))
+    expect(screen.getByText("View certificate for 2026-11-14")).toBeTruthy()
+  })
+
+  it("a verified certificate has no verify button", async () => {
+    cleaningRows = [cleaningRow({ fileStored: true, verifiedAt: "2026-11-15T08:00:00Z" })]
+    await openCleanings()
+    expect(await screen.findByText("Certificate verified")).toBeTruthy()
+    expect(screen.queryByText(/^Verify certificate/)).toBeNull()
+  })
+
+  it("the verified-certificate setting is saved without disturbing the rating setting", async () => {
+    mount(); fireEvent.click(screen.getByText("Changeover rules"))
+    fireEvent.click(await screen.findByLabelText("Require verified certificates"))
+    await waitFor(() => expect(put).toHaveBeenCalledWith("/api/v1/fuel/eligibility/settings", { requireCompartmentRating: false, requireVerifiedCleaning: true }))
   })
 })

@@ -8,7 +8,7 @@ export interface DriverApproval { employeeId: string; driverName: string; status
 export interface DriverForm { employeeId: string; status: string; inductionDate: string; inductionExpiry: string; trainingRef: string; trainingExpiry: string; conditions: string }
 export interface CompartmentRating { compartmentId: string; number: number; capacityLitres: number; fuelTypes: string[]; lastCargo: string | null; lastCargoAt: string | null; lastCleanedAt: string | null }
 export interface ChangeoverRule { id: string; fromFuel: string; toFuel: string; note: string | null }
-export interface Cleaning { id: string; compartmentId: string; cleanedAt: string; method: string | null; certificateRef: string | null; evidenceNote: string | null }
+export interface Cleaning { id: string; compartmentId: string; cleanedAt: string; method: string | null; certificateRef: string | null; evidenceNote: string | null; fileStored?: boolean; fileName?: string | null; verifiedAt?: string | null }
 
 export const APPROVAL_STATUSES: [string, string][] = [["APPROVED", "Approved"], ["RESTRICTED", "Restricted (needs conditions)"], ["SUSPENDED", "Suspended (blocks)"]]
 export const STATE_LABEL: Record<string, string> = {
@@ -104,4 +104,10 @@ export function overrideLine(o: OverrideRow): string {
   const who = o.approvedByName ?? `User ${o.approvedBy.slice(0, 8)}`
   const when = (o.createdAt ?? "").slice(0, 16).replace("T", " ")
   return `${o.tankerRegistration ?? "Tanker"} · ${who} · ${when}`
+}
+
+/** Where a cleaning's certificate stands, in words. */
+export function certificateText(c: Pick<Cleaning, "fileStored" | "verifiedAt">): string {
+  if (!c.fileStored) return "No certificate file"
+  return c.verifiedAt ? "Certificate verified" : "Certificate not yet verified"
 }

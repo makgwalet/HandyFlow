@@ -43,6 +43,38 @@ public class FuelCompartmentCleaning {
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt = Instant.now();
 
+    @Column(name = "file_ref", length = 500) private String fileRef;
+    @Column(name = "content_type", length = 100) private String contentType;
+    @Column(name = "file_size_bytes") private Long fileSizeBytes;
+    @Column(name = "file_name", length = 255) private String fileName;
+    @Column(name = "file_uploaded_by") private UUID fileUploadedBy;
+    @Column(name = "file_uploaded_at") private Instant fileUploadedAt;
+    @Column(name = "verified_by") private UUID verifiedBy;
+    @Column(name = "verified_at") private Instant verifiedAt;
+
+    public boolean hasFile() { return fileRef != null; }
+    public boolean isVerified() { return verifiedAt != null; }
+    /** Counts towards clearing a changeover when the company asks for verified evidence: the certificate is uploaded and someone else confirmed it. */
+    public boolean isVerifiedEvidence() { return hasFile() && isVerified(); }
+
+    /** One file per cleaning, kept as uploaded. A wrong file is corrected by recording another cleaning, never by replacing it. */
+    public void attachFile(String key, String type, long size, String name, UUID by) {
+        if (hasFile()) throw new IllegalStateException("This cleaning already has a certificate. Record a new cleaning to correct it.");
+        if (key == null || key.isBlank() || type == null || size <= 0) throw new IllegalArgumentException("The file was not stored.");
+        this.fileRef = key; this.contentType = type; this.fileSizeBytes = size;
+        this.fileName = name == null ? null : (name.length() > 120 ? name.substring(0, 120) : name);
+        this.fileUploadedBy = by; this.fileUploadedAt = Instant.now();
+    }
+
+    /** A second person confirms the certificate. Not the person who recorded the cleaning or uploaded the file. */
+    public void verify(UUID by) {
+        if (by == null) throw new IllegalStateException("You are not signed in as a user.");
+        if (!hasFile()) throw new IllegalStateException("Upload the certificate before it can be verified.");
+        if (isVerified()) throw new IllegalStateException("This certificate is already verified.");
+        if (by.equals(recordedBy) || by.equals(fileUploadedBy)) throw new IllegalStateException("You recorded this cleaning or uploaded its certificate, so someone else must verify it.");
+        this.verifiedBy = by; this.verifiedAt = Instant.now();
+    }
+
     /** A cleaning needs its evidence: a certificate reference, a note, or both. It cannot be dated in the future. */
     public static FuelCompartmentCleaning record(TenantId tenantId, UUID compartmentId, Instant cleanedAt, String method, String certificateRef, String evidenceNote, UUID by, Instant now) {
         if (cleanedAt == null) throw new IllegalArgumentException("Give when the compartment was cleaned.");

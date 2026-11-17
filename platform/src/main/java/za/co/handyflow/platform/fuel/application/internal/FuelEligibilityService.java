@@ -94,13 +94,17 @@ public class FuelEligibilityService {
         Map<UUID, FuelDeliveryCompartmentRepository.PreviousCargo> previous = new HashMap<>();
         loadSplits.findPreviousCargo(tenantId, used, d.getId()).forEach(c -> previous.merge(c.compartmentId(), c, (a, b) -> a.at().isAfter(b.at()) ? a : b));
         Set<String> rules = changeovers.findAllForTenant(tenantId).stream().map(r -> r.getFromFuel() + ">" + r.getToFuel()).collect(Collectors.toSet());
-        boolean requireRating = settings.findByTenant(tenantId).map(FuelSettings::isRequireCompartmentRating).orElse(false);
+        var tenantSettings = settings.findByTenant(tenantId);
+        boolean requireRating = tenantSettings.map(FuelSettings::isRequireCompartmentRating).orElse(false);
+        boolean verifiedOnly = tenantSettings.map(FuelSettings::isRequireVerifiedCleaning).orElse(false);
         String fuel = d.getFuelType().trim().toUpperCase();
         List<Finding> out = new ArrayList<>();
         for (UUID id : used) {
             FuelTankerCompartment c = byId.get(id);
-            Instant lastCleaned = cleanings.findForCompartment(tenantId, id, org.springframework.data.domain.PageRequest.of(0, 1)).stream().map(FuelCompartmentCleaning::getCleanedAt).findFirst().orElse(null);
-            out.addAll(compartmentFindings(tanker.getRegistration(), c.getNumber(), fuel, rated.getOrDefault(id, Set.of()), requireRating, previous.get(id), rules, lastCleaned));
+            var latest = verifiedOnly ? cleanings.findVerifiedForCompartment(tenantId, id, org.springframework.data.domain.PageRequest.of(0, 1))
+                    : cleanings.findForCompartment(tenantId, id, org.springframework.data.domain.PageRequest.of(0, 1));
+            Instant lastCleaned = latest.stream().map(FuelCompartmentCleaning::getCleanedAt).findFirst().orElse(null);
+            out.addAll(compartmentFindings(tanker.getRegistration(), c.getNumber(), fuel, rated.getOrDefault(id, Set.of()), requireRating, previous.get(id), rules, lastCleaned, verifiedOnly));
         }
         return out;
     }
@@ -113,6 +117,12 @@ public class FuelEligibilityService {
      */
     static List<Finding> compartmentFindings(String reg, int number, String fuel, Set<String> rated, boolean requireRating,
                                              FuelDeliveryCompartmentRepository.PreviousCargo previous, Set<String> changeoverRules, Instant lastCleaned) {
+        return compartmentFindings(reg, number, fuel, rated, requireRating, previous, changeoverRules, lastCleaned, false);
+    }
+
+    /** {@code verifiedOnly}: the company asks for cleaning certificates to be uploaded and verified, and {@code lastCleaned} is the latest such cleaning. */
+    static List<Finding> compartmentFindings(String reg, int number, String fuel, Set<String> rated, boolean requireRating,
+                                             FuelDeliveryCompartmentRepository.PreviousCargo previous, Set<String> changeoverRules, Instant lastCleaned, boolean verifiedOnly) {
         List<Finding> out = new ArrayList<>();
         String where = "Compartment " + number + " of " + reg;
         if (!rated.isEmpty() && !rated.contains(fuel)) {
@@ -124,7 +134,8 @@ public class FuelEligibilityService {
             if (!previous.fuelType().equalsIgnoreCase(fuel) && changeoverRules.contains(previous.fuelType().toUpperCase() + ">" + fuel)
                     && (lastCleaned == null || !lastCleaned.isAfter(previous.at()))) {
                 out.add(block("COMPARTMENT_CLEANING_REQUIRED", where + " last carried " + previous.fuelType() + "; going to " + fuel
-                        + " needs a cleaning recorded after that load, with its certificate or evidence."));
+                        + (verifiedOnly ? " needs a cleaning recorded after that load, with its certificate uploaded and verified by a second person."
+                        : " needs a cleaning recorded after that load, with its certificate or evidence.")));
             }
         } else if (lastCleaned == null && changeoverRules.stream().anyMatch(r -> r.endsWith(">" + fuel))) {
             out.add(review("COMPARTMENT_PREVIOUS_CARGO_UNKNOWN", where + " has no recorded previous load or cleaning, and " + fuel + " has a changeover rule."));
@@ -407,8 +418,9 @@ public class FuelEligibilityService {
         return cleaningView(cleanings.save(c));
     }
 
-    private static CleaningView cleaningView(FuelCompartmentCleaning c) {
-        return new CleaningView(c.getId(), c.getCompartmentId(), c.getCleanedAt(), c.getMethod(), c.getCertificateRef(), c.getEvidenceNote(), c.getRecordedBy());
+    static CleaningView cleaningView(FuelCompartmentCleaning c) {
+        return new CleaningView(c.getId(), c.getCompartmentId(), c.getCleanedAt(), c.getMethod(), c.getCertificateRef(), c.getEvidenceNote(), c.getRecordedBy(),
+                c.hasFile(), c.getFileName(), c.getContentType(), c.getFileSizeBytes(), c.getVerifiedBy(), c.getVerifiedAt());
     }
 
     private void requireCompartment(TenantId tenantId, UUID tankerId, UUID compartmentId) {
@@ -420,14 +432,17 @@ public class FuelEligibilityService {
 
     @Transactional(readOnly = true)
     public EligibilitySettings eligibilitySettings(TenantId tenantId) {
-        return new EligibilitySettings(settings.findByTenant(tenantId).map(FuelSettings::isRequireCompartmentRating).orElse(false));
+        var s = settings.findByTenant(tenantId);
+        return new EligibilitySettings(s.map(FuelSettings::isRequireCompartmentRating).orElse(false), s.map(FuelSettings::isRequireVerifiedCleaning).orElse(false));
     }
 
     @Transactional
     public EligibilitySettings saveEligibilitySettings(TenantId tenantId, EligibilitySettings req) {
         FuelSettings s = settings.findByTenant(tenantId).orElseGet(() -> FuelSettings.forTenant(tenantId));
         s.updateRequireCompartmentRating(req.requireCompartmentRating());
-        return new EligibilitySettings(settings.save(s).isRequireCompartmentRating());
+        if (req.requireVerifiedCleaning() != null) s.updateRequireVerifiedCleaning(req.requireVerifiedCleaning());
+        FuelSettings saved = settings.save(s);
+        return new EligibilitySettings(saved.isRequireCompartmentRating(), saved.isRequireVerifiedCleaning());
     }
 
     /** The decisions to allocate a load with open review points, newest first. Read only. A name that cannot be found is left empty. */

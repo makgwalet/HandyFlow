@@ -88,6 +88,10 @@ public class FuelSettings {
     @Column(name = "require_compartment_rating", nullable = false)
     private boolean requireCompartmentRating = false;
 
+    /** When on, a cleaning clears a changeover only once its certificate is uploaded and verified by someone else. */
+    @Column(name = "require_verified_cleaning", nullable = false)
+    private boolean requireVerifiedCleaning = false;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt = Instant.now();
 
@@ -176,6 +180,7 @@ public class FuelSettings {
         this.varianceReviewDays = days; this.updatedAt = Instant.now();
     }
 
+    public void updateRequireVerifiedCleaning(boolean on) { this.requireVerifiedCleaning = on; this.updatedAt = Instant.now(); }
     public void updateRequireCompartmentRating(boolean on) { this.requireCompartmentRating = on; this.updatedAt = Instant.now(); }
 
     public java.util.Set<String> blockingActivities() {

@@ -377,6 +377,18 @@ class FuelEligibilityServiceTest {
         assertTrue(FuelEligibilityService.compartmentFindings("GP 1", 1, "PARAFFIN", Set.of(), false, last, rules, NOW.plusSeconds(3600)).isEmpty());
     }
 
+    @Test @DisplayName("when the company asks for verified certificates the block explains it, and the same rule clears only with a verified cleaning after the load")
+    void verifiedOnlyMessage() {
+        var rules = Set.of("DIESEL>PARAFFIN");
+        var last = prev("DIESEL", NOW);
+        var blocked = FuelEligibilityService.compartmentFindings("GP 1", 1, "PARAFFIN", Set.of(), false, last, rules, null, true);
+        assertEquals(Set.of("COMPARTMENT_CLEANING_REQUIRED"), codes(blocked));
+        assertTrue(blocked.get(0).message().contains("uploaded and verified"));
+        assertTrue(FuelEligibilityService.compartmentFindings("GP 1", 1, "PARAFFIN", Set.of(), false, last, rules, NOW.plusSeconds(3600), true).isEmpty());
+        // The ordinary rule's wording is unchanged for companies that have not asked for it.
+        assertFalse(FuelEligibilityService.compartmentFindings("GP 1", 1, "PARAFFIN", Set.of(), false, last, rules, null).get(0).message().contains("uploaded and verified"));
+    }
+
     @Test @DisplayName("no rule for the pair, or the same product again, needs no cleaning; the company decides which pairs matter")
     void changeoverNeedsARule() {
         assertTrue(FuelEligibilityService.compartmentFindings("GP 1", 1, "PARAFFIN", Set.of(), false, prev("DIESEL", NOW), Set.of(), null).isEmpty());
@@ -416,6 +428,40 @@ class FuelEligibilityServiceTest {
         when(cleanings.findForCompartment(eq(T), any(), any())).thenReturn(List.of());
         var onC1 = List.of(new za.co.handyflow.platform.fuel.dto.AllocationRequest.CompartmentLoad(c1.getId(), bd("10000")));
         assertEquals(Set.of("COMPARTMENT_CLEANING_REQUIRED"), codes(service.evaluate(T, load, tanker, driverId, "Moses", List.of(c1, c2), onC1).blocks()));
+    }
+
+    @Test @DisplayName("with verified certificates required, an unverified cleaning does not clear the changeover; without the setting it still does")
+    void evaluateVerifiedCleaningSetting() {
+        when(compartmentProducts.findForCompartments(eq(T), any())).thenReturn(List.of());
+        when(loadSplits.findPreviousCargo(eq(T), any(), any())).thenReturn(List.of(new FuelDeliveryCompartmentRepository.PreviousCargo(c1.getId(), "PARAFFIN", NOW)));
+        when(changeovers.findAllForTenant(T)).thenReturn(List.of(FuelChangeoverRule.of(T, "PARAFFIN", "DIESEL", null)));
+        var unverified = FuelCompartmentCleaning.record(T, c1.getId(), NOW.plusSeconds(3600), "Steam", "CERT-9", null, USER, NOW.plusSeconds(7200));
+        when(cleanings.findForCompartment(eq(T), any(), any())).thenReturn(List.of(unverified));
+        when(cleanings.findVerifiedForCompartment(eq(T), any(), any())).thenReturn(List.of());
+        var onC1 = List.of(new za.co.handyflow.platform.fuel.dto.AllocationRequest.CompartmentLoad(c1.getId(), bd("10000")));
+
+        when(settings.findByTenant(T)).thenReturn(Optional.empty());
+        assertTrue(service.evaluate(T, load, tanker, driverId, "Moses", List.of(c1, c2), onC1).blocks().isEmpty(), "today's rule: the certificate reference is enough");
+
+        FuelSettings on = FuelSettings.forTenant(T); on.updateRequireVerifiedCleaning(true);
+        when(settings.findByTenant(T)).thenReturn(Optional.of(on));
+        var blocks = service.evaluate(T, load, tanker, driverId, "Moses", List.of(c1, c2), onC1).blocks();
+        assertEquals(Set.of("COMPARTMENT_CLEANING_REQUIRED"), codes(blocks));
+        assertTrue(blocks.get(0).message().contains("uploaded and verified"));
+
+        when(cleanings.findVerifiedForCompartment(eq(T), any(), any())).thenReturn(List.of(unverified));
+        assertTrue(service.evaluate(T, load, tanker, driverId, "Moses", List.of(c1, c2), onC1).blocks().isEmpty(), "a verified cleaning after the load clears it");
+    }
+
+    @Test @DisplayName("saving only the rating setting leaves the verified-cleaning setting as it was; sending it changes it")
+    void settingsSaveKeepsTheOther() {
+        FuelSettings s = FuelSettings.forTenant(T); s.updateRequireVerifiedCleaning(true);
+        when(settings.findByTenant(T)).thenReturn(Optional.of(s));
+        when(settings.save(any())).thenAnswer(i -> i.getArgument(0));
+        var kept = service.saveEligibilitySettings(T, new EligibilitySettings(true));
+        assertTrue(kept.requireCompartmentRating()); assertTrue(kept.requireVerifiedCleaning());
+        var off = service.saveEligibilitySettings(T, new EligibilitySettings(true, false));
+        assertFalse(off.requireVerifiedCleaning());
     }
 
     @Test @DisplayName("a cleaning needs evidence and cannot be dated in the future; a rule needs two different products")

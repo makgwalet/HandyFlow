@@ -59,8 +59,16 @@ public final class EligibilityDtos {
     public record ChangeoverRuleRequest(@Size(max = 30) String fromFuel, @Size(max = 30) String toFuel, @Size(max = 300) String note) {}
     public record ChangeoverRuleView(UUID id, String fromFuel, String toFuel, String note) {}
     public record CleaningRequest(java.time.Instant cleanedAt, @Size(max = 120) String method, @Size(max = 120) String certificateRef, @Size(max = 300) String evidenceNote) {}
-    public record CleaningView(UUID id, UUID compartmentId, java.time.Instant cleanedAt, String method, String certificateRef, String evidenceNote, UUID recordedBy) {}
-    public record EligibilitySettings(boolean requireCompartmentRating) {}
+    public record CleaningView(UUID id, UUID compartmentId, java.time.Instant cleanedAt, String method, String certificateRef, String evidenceNote, UUID recordedBy,
+                               boolean fileStored, String fileName, String contentType, Long fileSizeBytes, UUID verifiedBy, java.time.Instant verifiedAt) {
+        public CleaningView(UUID id, UUID compartmentId, java.time.Instant cleanedAt, String method, String certificateRef, String evidenceNote, UUID recordedBy) {
+            this(id, compartmentId, cleanedAt, method, certificateRef, evidenceNote, recordedBy, false, null, null, null, null, null);
+        }
+    }
+    /** {@code requireVerifiedCleaning} null on a save means leave it as it is (older clients send only the rating setting). */
+    public record EligibilitySettings(boolean requireCompartmentRating, Boolean requireVerifiedCleaning) {
+        public EligibilitySettings(boolean requireCompartmentRating) { this(requireCompartmentRating, null); }
+    }
 
     /** One decision to allocate a load although something the check needs was not recorded. */
     public record OverrideView(UUID id, UUID deliveryId, UUID tankerId, String tankerRegistration, UUID driverEmployeeId, String findings, String reason,

@@ -8,6 +8,10 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import za.co.handyflow.platform.billing.FeatureGuard;
 import za.co.handyflow.platform.fuel.application.internal.FuelEligibilityService;
+import za.co.handyflow.platform.fuel.application.internal.FuelCleaningCertificateService;
+import org.springframework.http.*;
+import org.springframework.web.multipart.MultipartFile;
+import java.io.IOException;
 import za.co.handyflow.platform.fuel.dto.EligibilityDtos.*;
 import za.co.handyflow.platform.shared.ApiResponse;
 import za.co.handyflow.platform.shared.TenantContext;
@@ -23,6 +27,7 @@ import java.util.UUID;
 public class FuelEligibilityController {
 
     private final FuelEligibilityService eligibility;
+    private final FuelCleaningCertificateService certificates;
     private final FeatureGuard featureGuard;
 
     @GetMapping("/customer-sites/{siteId}/access-rule")
@@ -104,6 +109,38 @@ public class FuelEligibilityController {
     public ResponseEntity<ApiResponse<CleaningView>> recordCleaning(@PathVariable UUID id, @PathVariable UUID compartmentId, @Valid @RequestBody CleaningRequest req) {
         featureGuard.requireModule("fuel");
         return ResponseEntity.ok(ApiResponse.success("Cleaning recorded", eligibility.recordCleaning(TenantContext.getTenantIdAsObject(), id, compartmentId, req, TenantContext.getCurrentUserId())));
+    }
+
+    private static final String CERT_VIEW = "hasAnyAuthority('FUEL_MANAGE','FUEL_TRANSPORT_MANAGE','FUEL_COMPLIANCE_MANAGE','FUEL_COMPLIANCE_VERIFY')";
+
+    @PostMapping(value = "/tankers/{id}/compartments/{compartmentId}/cleanings/{cleaningId}/certificate", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize(MANAGE)
+    public ResponseEntity<ApiResponse<CleaningView>> uploadCertificate(@PathVariable UUID id, @PathVariable UUID compartmentId, @PathVariable UUID cleaningId, @RequestParam("file") MultipartFile file) {
+        featureGuard.requireModule("fuel");
+        byte[] bytes;
+        try { bytes = file.getBytes(); } catch (IOException e) { throw new IllegalArgumentException("The file could not be read."); }
+        return ResponseEntity.ok(ApiResponse.success("Certificate added", certificates.attach(TenantContext.getTenantIdAsObject(), id, compartmentId, cleaningId, file.getOriginalFilename(), bytes, TenantContext.getCurrentUserId())));
+    }
+
+    /** Documents are for the people who manage or verify, like other compliance evidence. */
+    @GetMapping("/tankers/{id}/compartments/{compartmentId}/cleanings/{cleaningId}/certificate")
+    @PreAuthorize(CERT_VIEW)
+    public ResponseEntity<byte[]> certificate(@PathVariable UUID id, @PathVariable UUID compartmentId, @PathVariable UUID cleaningId) {
+        featureGuard.requireModule("fuel");
+        var f = certificates.download(TenantContext.getTenantIdAsObject(), id, compartmentId, cleaningId);
+        return ResponseEntity.ok()
+                .contentType(MediaType.parseMediaType(f.contentType()))
+                .header("X-Content-Type-Options", "nosniff")
+                .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.inline().filename(f.filename()).build().toString())
+                .cacheControl(CacheControl.noStore().cachePrivate())
+                .body(f.bytes());
+    }
+
+    @PostMapping("/tankers/{id}/compartments/{compartmentId}/cleanings/{cleaningId}/verify")
+    @PreAuthorize("hasAuthority('FUEL_COMPLIANCE_VERIFY')")
+    public ResponseEntity<ApiResponse<CleaningView>> verifyCertificate(@PathVariable UUID id, @PathVariable UUID compartmentId, @PathVariable UUID cleaningId) {
+        featureGuard.requireModule("fuel");
+        return ResponseEntity.ok(ApiResponse.success("Verified", certificates.verify(TenantContext.getTenantIdAsObject(), id, compartmentId, cleaningId, TenantContext.getCurrentUserId())));
     }
 
     @GetMapping("/changeover-rules")

@@ -6,11 +6,12 @@ import { apiClient } from "../../api/client"
 import { usePermissions } from "../../hooks/usePermission"
 import { btnPrimary, btnGhost, card, inputStyle, labelStyle, Chip } from "../warehousing/whseUi"
 import OverrideLog from "./OverrideLog"
+import { validateComplianceFile } from "./complianceOps"
 import type { CustomerAccount, CustomerSite } from "./customerOps"
 import type { Tanker, Driver } from "./transportOps"
 import {
   APPROVAL_STATUSES, STATE_LABEL, stateBlocks, emptySiteForm, validateSiteForm, toSiteRequest, describeSiteRule, emptyDriverForm, fromApproval, validateDriverForm, toDriverRequest,
-  validateSpecs, toSpecsRequest, parseProducts, ratingText, validateChangeover, validateCleaning,
+  validateSpecs, toSpecsRequest, parseProducts, ratingText, validateChangeover, validateCleaning, certificateText,
   type SiteRule, type SiteRuleForm, type DriverApproval, type DriverForm, type SpecsForm, type CompartmentRating, type ChangeoverRule, type Cleaning,
 } from "./eligibilityOps"
 
@@ -233,6 +234,21 @@ function Compartments({ tankerId, canManage }: { tankerId: string; canManage: bo
 
 function CleaningPanel({ tankerId, compartmentId, canManage }: { tankerId: string; compartmentId: string; canManage: boolean }) {
   const qc = useQueryClient(); const [err, setErr] = useState("")
+  const canVerify = usePermissions(["FUEL_COMPLIANCE_VERIFY"])
+  const canSeeFile = usePermissions(["FUEL_MANAGE", "FUEL_TRANSPORT_MANAGE", "FUEL_COMPLIANCE_MANAGE", "FUEL_COMPLIANCE_VERIFY"])
+  const base = `/api/v1/fuel/tankers/${tankerId}/compartments/${compartmentId}/cleanings`
+  const refreshList = () => { qc.invalidateQueries({ queryKey: ["fuel-cleanings", compartmentId] }); qc.invalidateQueries({ queryKey: ["fuel-compartment-ratings", tankerId] }) }
+  const upload = useMutation({
+    mutationFn: (a: { id: string; file: File }) => { const f = new FormData(); f.append("file", a.file); return apiClient.post(`${base}/${a.id}/certificate`, f) },
+    onSuccess: () => { setErr(""); refreshList() }, onError: (e: any) => setErr(msg(e, "Could not upload the certificate")),
+  })
+  const verify = useMutation({ mutationFn: (id: string) => apiClient.post(`${base}/${id}/verify`), onSuccess: () => { setErr(""); refreshList() }, onError: (e: any) => setErr(msg(e, "Could not verify it")) })
+  const view = async (id: string) => {
+    try {
+      const r = await apiClient.get(`${base}/${id}/certificate`, { responseType: "blob" })
+      const url = URL.createObjectURL(r.data as Blob); window.open(url, "_blank", "noopener"); setTimeout(() => URL.revokeObjectURL(url), 60_000)
+    } catch (e: any) { setErr(msg(e, "Could not open the file")) }
+  }
   const [at, setAt] = useState(""); const [method, setMethod] = useState(""); const [cert, setCert] = useState(""); const [evid, setEvid] = useState("")
   const q = useQuery<Cleaning[]>({ queryKey: ["fuel-cleanings", compartmentId], queryFn: async () => unwrap(await apiClient.get(`/api/v1/fuel/tankers/${tankerId}/compartments/${compartmentId}/cleanings`)) ?? [] })
   const add = useMutation({
@@ -243,7 +259,12 @@ function CleaningPanel({ tankerId, compartmentId, canManage }: { tankerId: strin
   return (
     <div style={{ background: "var(--hf-surface-alt, transparent)", padding: "8px 0 0 12px" }}>
       {(q.data ?? []).length === 0 ? <p style={{ fontSize: 12.5, color: "var(--hf-text-muted)" }}>No cleanings recorded.</p>
-        : <ul style={{ fontSize: 12.5, margin: "0 0 8px", paddingLeft: 18 }}>{(q.data ?? []).map(c => <li key={c.id}>{c.cleanedAt.slice(0, 16).replace("T", " ")}{c.method ? ` · ${c.method}` : ""}{c.certificateRef ? ` · certificate ${c.certificateRef}` : ""}{c.evidenceNote ? ` · ${c.evidenceNote}` : ""}</li>)}</ul>}
+        : <ul style={{ fontSize: 12.5, margin: "0 0 8px", paddingLeft: 18 }}>{(q.data ?? []).map(c => <li key={c.id} style={{ marginBottom: 4 }}>{c.cleanedAt.slice(0, 16).replace("T", " ")}{c.method ? ` · ${c.method}` : ""}{c.certificateRef ? ` · certificate ${c.certificateRef}` : ""}{c.evidenceNote ? ` · ${c.evidenceNote}` : ""}
+          {" "}<Chip bg={c.fileStored ? (c.verifiedAt ? "var(--hf-success-soft-strong)" : "var(--hf-warning-soft)") : "var(--hf-border)"} fg={c.fileStored ? (c.verifiedAt ? "var(--hf-success-text-strong)" : "var(--hf-warning-text)") : "var(--hf-text-muted)"}>{certificateText(c)}</Chip>
+          {c.fileStored && canSeeFile && <button style={{ ...btnGhost, marginLeft: 6 }} onClick={() => view(c.id)}>{`View certificate for ${c.cleanedAt.slice(0, 10)}`}</button>}
+          {c.fileStored && !c.verifiedAt && canVerify && <button style={{ ...btnGhost, marginLeft: 6 }} disabled={verify.isPending} onClick={() => verify.mutate(c.id)}>{`Verify certificate for ${c.cleanedAt.slice(0, 10)}`}</button>}
+          {!c.fileStored && canManage && <label style={{ marginLeft: 6, fontSize: 12 }}>Upload certificate <input type="file" aria-label={`Certificate file for ${c.cleanedAt.slice(0, 10)}`} accept="image/jpeg,image/png,image/webp,application/pdf" onChange={e => { const file = e.target.files?.[0] ?? null; const v = validateComplianceFile(file); if (v) { setErr(v); return } setErr(""); upload.mutate({ id: c.id, file: file! }) }} /></label>}
+        </li>)}</ul>}
       {canManage && <>
         <div style={row}>
           <div style={field}><label style={labelStyle}>Cleaned at *</label><input aria-label="Cleaned at" type="datetime-local" value={at} onChange={e => setAt(e.target.value)} style={inputStyle} /></div>
@@ -265,7 +286,7 @@ function RulesPart({ canManage }: { canManage: boolean }) {
   const qc = useQueryClient(); const [err, setErr] = useState("")
   const [from, setFrom] = useState(""); const [to, setTo] = useState(""); const [note, setNote] = useState("")
   const rules = useQuery<ChangeoverRule[]>({ queryKey: ["fuel-changeover-rules"], queryFn: async () => unwrap(await apiClient.get("/api/v1/fuel/changeover-rules")) ?? [] })
-  const settings = useQuery<{ requireCompartmentRating: boolean }>({ queryKey: ["fuel-eligibility-settings"], queryFn: async () => unwrap(await apiClient.get("/api/v1/fuel/eligibility/settings")) })
+  const settings = useQuery<{ requireCompartmentRating: boolean; requireVerifiedCleaning?: boolean }>({ queryKey: ["fuel-eligibility-settings"], queryFn: async () => unwrap(await apiClient.get("/api/v1/fuel/eligibility/settings")) })
   const refresh = () => qc.invalidateQueries({ queryKey: ["fuel-changeover-rules"] })
   const add = useMutation({
     mutationFn: () => apiClient.post("/api/v1/fuel/changeover-rules", { fromFuel: from.trim(), toFuel: to.trim(), note: note.trim() || null }),
@@ -274,6 +295,10 @@ function RulesPart({ canManage }: { canManage: boolean }) {
   const remove = useMutation({ mutationFn: (id: string) => apiClient.delete(`/api/v1/fuel/changeover-rules/${id}`), onSuccess: refresh, onError: (e: any) => setErr(msg(e, "Could not remove the rule")) })
   const toggle = useMutation({
     mutationFn: (on: boolean) => apiClient.put("/api/v1/fuel/eligibility/settings", { requireCompartmentRating: on }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["fuel-eligibility-settings"] }), onError: (e: any) => setErr(msg(e, "Could not save the setting")),
+  })
+  const toggleVerified = useMutation({
+    mutationFn: (on: boolean) => apiClient.put("/api/v1/fuel/eligibility/settings", { requireCompartmentRating: settings.data?.requireCompartmentRating ?? false, requireVerifiedCleaning: on }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["fuel-eligibility-settings"] }), onError: (e: any) => setErr(msg(e, "Could not save the setting")),
   })
   return (
@@ -297,6 +322,11 @@ function RulesPart({ canManage }: { canManage: boolean }) {
         <label style={{ fontSize: 13 }}>
           <input type="checkbox" aria-label="Require ratings" disabled={!canManage || settings.isLoading} checked={settings.data?.requireCompartmentRating ?? false} onChange={e => toggle.mutate(e.target.checked)} /> Require every compartment to have a product rating</label>
         <p style={{ fontSize: 12, color: "var(--hf-text-muted)", margin: "4px 0 0" }}>When on, a load that uses a compartment with no rating needs a review by someone with the review permission. Off by default.</p>
+      </div>
+      <div style={{ ...card, padding: 14, marginTop: 14 }}>
+        <label style={{ fontSize: 13 }}>
+          <input type="checkbox" aria-label="Require verified certificates" disabled={!canManage || settings.isLoading} checked={settings.data?.requireVerifiedCleaning ?? false} onChange={e => toggleVerified.mutate(e.target.checked)} /> Require cleaning certificates to be uploaded and verified</label>
+        <p style={{ fontSize: 12, color: "var(--hf-text-muted)", margin: "4px 0 0" }}>When on, a cleaning clears a product changeover only once its certificate file is uploaded and a second person has verified it. A certificate reference or note alone is no longer enough. Off by default, so cleanings recorded today keep working.</p>
       </div>
     </div>
   )

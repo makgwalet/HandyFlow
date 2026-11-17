@@ -17,3 +17,19 @@ The 11 open decisions are closed with the recommended defaults (attachment recei
 | 11 | Forecourt replenishment | Internal depot-to-forecourt = one stock transfer linked to the dispatch; external = receipt; inter-entity = inter-entity transfer | Dispatch matching report (0850s) | Link dispatch to transfer; never double-count |
 
 Order I will build in: 2 (D3), 1 (D1), 7, 5, 4, 6, 3 check, 11, 9, 8. Each is a separate patch; Java stays "written, not compiled or run".
+
+## Build status (updated 2026-11-17, evening)
+
+| # | Decision | Status | Patch |
+|---|---|---|---|
+| 1 | D1 shift variance | Built | 0869 |
+| 2 | D3 alert exclusions (and D2 contract volume pricing, separately) | Built | 0865, 0866 |
+| 5 | Statements | Built, with the limits in its notes (no payment ledger, no legal-entity filter) | 0870 |
+| 7 | Eligibility review roles | Built (review decisions log) | 0868 |
+| 8 | Cleaning certificates | Built | 0873 |
+| 9 | Depot compliance visibility | Built | 0871 |
+| 11 | Forecourt replenishment | Built (inter-entity transfers not built) | 0872 |
+| 4 | Till-paid tabs feed takings | Not built | |
+| 6 | Provider times in reports | Not built | |
+| 3 | Bookings VAT check | Not built | |
+| 10 | Supply split | No change needed | |
