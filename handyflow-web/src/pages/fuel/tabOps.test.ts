@@ -59,3 +59,17 @@ describe("VAT breakdown", () => {
   it("says nothing until the rate is known", () => { expect(vb(170, undefined)).toBeNull(); expect(vb(170, { x: 1 })).toBeNull() })
   it("words the breakdown", () => { expect(vt(vb(100, { registered: true, ratePercent: 15 }), n => `R${n}`)).toBe("R100 ex VAT + R15 VAT (15%) = R115") })
 })
+
+import { asTakings, takingsRangeError } from "./tabOps"
+describe("takings helpers", () => {
+  it("accepts only a report-shaped answer", () => {
+    expect(asTakings([])).toBeNull(); expect(asTakings({})).toBeNull()
+    expect(asTakings({ days: [], totals: [], takingsExVat: 0 })).not.toBeNull()
+  })
+  it("checks the date range", () => {
+    expect(takingsRangeError("", "2026-11-01")).not.toBeNull()
+    expect(takingsRangeError("2026-11-02", "2026-11-01")).toMatch(/before/)
+    expect(takingsRangeError("2026-01-01", "2026-11-01")).toMatch(/93/)
+    expect(takingsRangeError("2026-11-01", "2026-11-07")).toBeNull()
+  })
+})

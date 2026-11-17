@@ -11,13 +11,16 @@ vi.mock("../../hooks/usePermission", () => ({ usePermissions: () => can }))
 const tab = (o: any = {}) => ({ id: "t1", vehicleRegistration: "GP 1", driverName: "Sipho", accountId: null, status: "OPEN", paymentMethod: null, openedAt: "2026-11-17T08:00:00Z", settledAt: null,
   voidReason: null, invoiceState: null, invoiceNumber: null, invoiceError: null, lines: [{ id: "l1", offeringId: "o1", description: "Shower", quantity: 2, unitPrice: 45, amount: 90 }], total: 90, ...o })
 let tabsNow: any[]
+let takingsNow: any
 function mount() { render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><TabsTab /></QueryClientProvider>) }
 const ok = (d: unknown) => Promise.resolve({ data: { data: d } })
 
 describe("TabsTab", () => {
   beforeEach(() => {
-    get.mockReset(); post.mockReset(); del.mockReset(); can = true; tabsNow = [tab()]
+    get.mockReset(); post.mockReset(); del.mockReset(); can = true; tabsNow = [tab()]; takingsNow = { from: "2026-11-11", to: "2026-11-17", timezone: "Africa/Johannesburg", days: [], totals: [], takingsExVat: 0, chargedTabs: 0, chargedExVat: 0 }
     get.mockImplementation((u: string) => {
+      if (u.includes("/tabs/vat")) return ok({ registered: true, ratePercent: 15 })
+      if (u.includes("/tabs/takings")) return ok(takingsNow)
       if (u.includes("/tabs")) return ok(tabsNow)
       if (u.includes("/offerings")) return ok([{ id: "o1", serviceName: "Shower", active: true, price: 45 }, { id: "o2", serviceName: "Wash", active: true, price: null }])
       if (u.includes("fleet-vehicles")) return ok([{ id: "v1", registration: "CA 123 456", label: "CA 123 456 (Volvo FH)" }])
@@ -121,5 +124,34 @@ describe("TabsTab", () => {
     tabsNow = [tab({ fleetVehicleId: "v1" })]
     mount()
     expect(await screen.findByText("Own truck")).toBeTruthy()
+  })
+
+  it("shows takings by day and method, with account charges apart and VAT on top of ex-VAT", async () => {
+    takingsNow = { from: "2026-11-11", to: "2026-11-17", timezone: "Africa/Johannesburg",
+      days: [{ date: "2026-11-16", takings: [{ method: "CASH", tabs: 1, exVat: 100 }, { method: "EFT", tabs: 1, exVat: 200 }], takingsExVat: 300, chargedTabs: 1, chargedExVat: 500 }],
+      totals: [{ method: "CASH", tabs: 1, exVat: 100 }, { method: "EFT", tabs: 1, exVat: 200 }], takingsExVat: 300, chargedTabs: 1, chargedExVat: 500 }
+    mount()
+    expect(await screen.findByText("2026-11-16")).toBeTruthy()
+    expect(screen.getAllByText(/Cash R\s?100/).length).toBeGreaterThan(0)
+    expect(screen.getAllByText(/EFT R\s?200/).length).toBeGreaterThan(0)
+    expect(await screen.findByText(/with VAT/)).toBeTruthy()
+    expect(screen.getAllByText(/1 tab, R\s?500/).length).toBe(2)
+    expect(screen.getByText(/Tabs charged to an account are not takings/)).toBeTruthy()
+  })
+
+  it("offers EFT when settling at the till", async () => {
+    mount()
+    fireEvent.click(await screen.findByText("GP 1"))
+    const select = await screen.findByLabelText("Paid by") as HTMLSelectElement
+    expect(Array.from(select.options).map(o => o.value)).toEqual(["CASH", "CARD", "EFT", "OTHER"])
+  })
+
+  it("refuses an end date before the start without asking the server", async () => {
+    mount()
+    await screen.findByText("GP 1")
+    get.mockClear()
+    fireEvent.change(screen.getByLabelText("To"), { target: { value: "2020-01-01" } })
+    expect(await screen.findByText("The end date is before the start date.")).toBeTruthy()
+    expect(get.mock.calls.some(c => String(c[0]).includes("/tabs/takings"))).toBe(false)
   })
 })

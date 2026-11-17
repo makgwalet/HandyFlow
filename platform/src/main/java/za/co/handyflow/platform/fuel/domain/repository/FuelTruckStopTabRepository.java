@@ -47,4 +47,8 @@ public interface FuelTruckStopTabRepository extends JpaRepository<FuelTruckStopT
     /** Tabs charged to an account that were settled in [from, to), oldest first. */
     @Query("SELECT t FROM FuelTruckStopTab t WHERE t.tenantId = :tenantId AND t.accountId = :accountId AND t.status = 'SETTLED' AND t.paymentMethod = 'ACCOUNT' AND t.settledAt >= :from AND t.settledAt < :to ORDER BY t.settledAt")
     List<FuelTruckStopTab> findChargedToAccount(TenantId tenantId, UUID accountId, Instant from, Instant to);
+
+    /** Every tab settled in [from, to), whether paid at the till or charged to an account. Voided tabs are not settled and so are not here. */
+    @Query("SELECT t FROM FuelTruckStopTab t WHERE t.tenantId = :tenantId AND t.status = 'SETTLED' AND t.settledAt >= :from AND t.settledAt < :to ORDER BY t.settledAt")
+    List<FuelTruckStopTab> findSettledBetween(TenantId tenantId, Instant from, Instant to);
 }

@@ -11,7 +11,7 @@ export interface Tab {
 export interface TabOffering { id: string; serviceName: string; active: boolean; price: number | null }
 
 export const TAB_STATUS_LABEL: Record<TabStatus, string> = { OPEN: "Open", SETTLED: "Settled", VOID: "Void" }
-export const TILL_METHODS: { id: string; label: string }[] = [{ id: "CASH", label: "Cash" }, { id: "CARD", label: "Card" }, { id: "OTHER", label: "Other" }]
+export const TILL_METHODS: { id: string; label: string }[] = [{ id: "CASH", label: "Cash" }, { id: "CARD", label: "Card" }, { id: "EFT", label: "EFT" }, { id: "OTHER", label: "Other" }]
 
 /** Other tests answer every URL with generic data; keep only rows that look like tabs. */
 export function onlyTabs(raw: unknown): Tab[] {
@@ -80,4 +80,23 @@ export function vatBreakdown(exVat: number | null | undefined, info: unknown): V
 export function vatText(b: VatBreakdown | null, fmt: (n: number) => string): string | null {
   if (!b) return null
   return b.ratePercent > 0 ? `${fmt(b.exVat)} ex VAT + ${fmt(b.vat)} VAT (${b.ratePercent}%) = ${fmt(b.total)}` : `${fmt(b.exVat)}, no VAT charged`
+}
+
+export interface MethodTakings { method: string; tabs: number; exVat: number }
+export interface TakingsDay { date: string; takings: MethodTakings[]; takingsExVat: number; chargedTabs: number; chargedExVat: number }
+export interface TakingsReport { from: string; to: string; timezone: string; days: TakingsDay[]; totals: MethodTakings[]; takingsExVat: number; chargedTabs: number; chargedExVat: number }
+
+export const METHOD_LABEL: Record<string, string> = { CASH: "Cash", CARD: "Card", EFT: "EFT", OTHER: "Other" }
+
+/** Other tests answer every URL with generic data; accept only something shaped like the report. */
+export function asTakings(raw: unknown): TakingsReport | null {
+  const r = raw as any
+  return r && Array.isArray(r.days) && Array.isArray(r.totals) && typeof r.takingsExVat === "number" ? r as TakingsReport : null
+}
+
+export function takingsRangeError(from: string, to: string): string | null {
+  if (!from || !to) return "Choose a start and an end date."
+  if (to < from) return "The end date is before the start date."
+  if ((Date.parse(to) - Date.parse(from)) / 86400000 > 93) return "Choose at most 93 days."
+  return null
 }

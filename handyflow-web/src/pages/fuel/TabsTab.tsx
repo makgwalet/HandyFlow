@@ -6,7 +6,7 @@ import { usePermissions } from "../../hooks/usePermission"
 import { Modal, btnPrimary, btnGhost, card, inputStyle, labelStyle, Chip } from "../warehousing/whseUi"
 import { fmtR } from "./orderOps"
 import { chargeableAccounts, onlyFleetOptions, type StayAccount } from "./stayOps"
-import { onlyTabs, sellable, validateQuantity, validateNewTab, tabActions, tabInvoiceText, canRaiseTabInvoice, paidText, vatBreakdown, vatText, TAB_STATUS_LABEL, TILL_METHODS, type Tab } from "./tabOps"
+import { onlyTabs, sellable, validateQuantity, validateNewTab, tabActions, tabInvoiceText, canRaiseTabInvoice, paidText, vatBreakdown, vatText, asTakings, takingsRangeError, METHOD_LABEL, TAB_STATUS_LABEL, TILL_METHODS, type Tab } from "./tabOps"
 
 const unwrap = (r: any) => r.data?.data ?? r.data
 const msg = (e: any, fb: string) => e?.response?.data?.message ?? fb
@@ -27,7 +27,7 @@ export default function TabsTab() {
   const [dialog, setDialog] = useState(false)
   const [note, setNote] = useState("")
   const [err, setErr] = useState("")
-  const refresh = () => qc.invalidateQueries({ queryKey: ["fuel-ts-tabs"] })
+  const refresh = () => { qc.invalidateQueries({ queryKey: ["fuel-ts-tabs"] }); qc.invalidateQueries({ queryKey: ["fuel-ts-takings"] }) }
   const list = tabs.data ?? []
 
   const act = useMutation({
@@ -71,8 +71,56 @@ export default function TabsTab() {
           </table>
         </div>
       )}
+      <TakingsSection vat={vat.data} />
       {dialog && <NewTabDialog accounts={chargeableAccounts(accountList)} onDone={refresh} onClose={() => setDialog(false)} />}
     </div>
+  )
+}
+
+const dayStr = (offset: number) => new Date(Date.now() + offset * 86400000).toLocaleDateString("en-CA", { timeZone: "Africa/Johannesburg" })
+
+/** Takings of tabs paid at the till, on the day they were paid, by method. Account charges are shown apart: they are invoiced, not taken. */
+function TakingsSection({ vat }: { vat?: unknown }) {
+  const [from, setFrom] = useState(dayStr(-6))
+  const [to, setTo] = useState(dayStr(0))
+  const bad = takingsRangeError(from, to)
+  const q = useQuery({ queryKey: ["fuel-ts-takings", from, to], enabled: !bad, retry: false, queryFn: async () => asTakings(unwrap(await apiClient.get(`${BASE}/tabs/takings?from=${from}&to=${to}`))) })
+  const r = q.data
+  const withVat = (n: number) => { const b = vatBreakdown(n, vat); return b ? fmtR(b.total) : null }
+  return (
+    <section aria-label="Truck stop takings" style={{ ...card, padding: 14, marginTop: 14 }}>
+      <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 6 }}>Takings paid at the till</div>
+      <p style={{ margin: "0 0 8px", fontSize: 12, color: "var(--hf-text-muted)" }}>Counted on the day the tab was paid, by how it was paid. Tabs charged to an account are not takings: they are collected on their invoice. Amounts are ex VAT{vatText(vatBreakdown(100, vat), fmtR) ? "; the VAT-inclusive figure uses today's rate." : "."}</p>
+      <div style={{ display: "flex", gap: 8, alignItems: "flex-end", flexWrap: "wrap" }}>
+        <div><label style={labelStyle} htmlFor="tk-from">From</label><input id="tk-from" type="date" value={from} onChange={e => setFrom(e.target.value)} style={inputStyle} /></div>
+        <div><label style={labelStyle} htmlFor="tk-to">To</label><input id="tk-to" type="date" value={to} onChange={e => setTo(e.target.value)} style={inputStyle} /></div>
+      </div>
+      {bad && <p role="alert" style={{ color: "var(--hf-danger-text)", fontSize: 12, margin: "8px 0 0" }}>{bad}</p>}
+      {!bad && r && r.days.length === 0 && <p style={{ fontSize: 12.5, margin: "10px 0 0" }}>No tabs were paid or charged in this period.</p>}
+      {!bad && r && r.days.length > 0 && (
+        <div style={{ overflowX: "auto", marginTop: 10 }}>
+          <table style={{ width: "100%", borderCollapse: "collapse" }}>
+            <thead><tr><th style={th}>Day</th><th style={th}>Paid at the till</th><th style={th}>Ex VAT</th><th style={th}>Charged to accounts</th></tr></thead>
+            <tbody>
+              {r.days.map(d => (
+                <tr key={d.date} style={{ borderTop: "1px solid var(--hf-border)" }}>
+                  <td style={td}>{d.date}</td>
+                  <td style={td}>{d.takings.length === 0 ? "None" : d.takings.map(m => `${METHOD_LABEL[m.method] ?? m.method} ${fmtR(m.exVat)}`).join(" · ")}</td>
+                  <td style={td}>{fmtR(d.takingsExVat)}{withVat(d.takingsExVat) && <div style={{ fontSize: 11, color: "var(--hf-text-muted)" }}>{withVat(d.takingsExVat)} with VAT</div>}</td>
+                  <td style={td}>{d.chargedTabs === 0 ? "None" : `${d.chargedTabs} ${d.chargedTabs === 1 ? "tab" : "tabs"}, ${fmtR(d.chargedExVat)}`}</td>
+                </tr>
+              ))}
+              <tr style={{ borderTop: "2px solid var(--hf-border)", fontWeight: 700 }}>
+                <td style={td}>Total</td>
+                <td style={td}>{r.totals.map(m => `${METHOD_LABEL[m.method] ?? m.method} ${fmtR(m.exVat)}`).join(" · ") || "None"}</td>
+                <td style={td}>{fmtR(r.takingsExVat)}</td>
+                <td style={td}>{r.chargedTabs} {r.chargedTabs === 1 ? "tab" : "tabs"}, {fmtR(r.chargedExVat)}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      )}
+    </section>
   )
 }
 

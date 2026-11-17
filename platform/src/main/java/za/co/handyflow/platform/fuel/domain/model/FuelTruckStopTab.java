@@ -20,7 +20,7 @@ import java.util.UUID;
 public class FuelTruckStopTab {
 
     public static final String OPEN = "OPEN", SETTLED = "SETTLED", VOID = "VOID";
-    public static final Set<String> TILL_METHODS = Set.of("CASH", "CARD", "OTHER");
+    public static final Set<String> TILL_METHODS = Set.of("CASH", "CARD", "EFT", "OTHER");
 
     @Id private UUID id = UUID.randomUUID();
 
@@ -76,7 +76,7 @@ public class FuelTruckStopTab {
         requireOpen();
         if (accountId != null) throw new IllegalStateException("This tab is charged to a customer account. Charge it to the account instead.");
         String m = method == null ? "" : method.trim().toUpperCase();
-        if (!TILL_METHODS.contains(m)) throw new IllegalArgumentException("Choose how it was paid: cash, card or other.");
+        if (!TILL_METHODS.contains(m)) throw new IllegalArgumentException("Choose how it was paid: cash, card, EFT or other.");
         status = SETTLED; paymentMethod = m; settledBy = by; settledAt = Instant.now();
     }
 

@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.*;
 import za.co.handyflow.platform.billing.FeatureGuard;
 import za.co.handyflow.platform.fuel.application.internal.FuelTabInvoicingService;
 import za.co.handyflow.platform.fuel.application.internal.FuelTabService;
+import za.co.handyflow.platform.fuel.application.internal.FuelTabTakingsService;
 import za.co.handyflow.platform.fuel.dto.TabDtos.*;
 import za.co.handyflow.platform.shared.ApiResponse;
 import za.co.handyflow.platform.shared.TenantContext;
@@ -31,6 +32,7 @@ public class FuelTabController {
 
     private final FuelTabService service;
     private final FuelTabInvoicingService invoicing;
+    private final FuelTabTakingsService takings;
     private final FeatureGuard featureGuard;
 
     @GetMapping
@@ -38,6 +40,14 @@ public class FuelTabController {
     public ResponseEntity<ApiResponse<List<TabView>>> list(@RequestParam(required = false) String status, @RequestParam(defaultValue = "100") int limit) {
         featureGuard.requireModule("fuel");
         return ResponseEntity.ok(ApiResponse.success(service.list(TenantContext.getTenantIdAsObject(), status, limit)));
+    }
+
+    @GetMapping("/takings")
+    @PreAuthorize(READ)
+    public ResponseEntity<ApiResponse<TakingsReport>> takings(@RequestParam @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) java.time.LocalDate from,
+                                                              @RequestParam @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) java.time.LocalDate to) {
+        featureGuard.requireModule("fuel");
+        return ResponseEntity.ok(ApiResponse.success(takings.report(TenantContext.getTenantIdAsObject(), from, to)));
     }
 
     @GetMapping("/vat")

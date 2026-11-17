@@ -32,4 +32,13 @@ public final class TabDtos {
 
     /** The company's VAT treatment today: prices are ex-VAT and Invoicing adds this rate once. Zero when not registered. */
     public record VatInfo(boolean registered, BigDecimal ratePercent) {}
+
+    /** Takings of one method on one day. {@code exVat} is the sum of tab lines, which are VAT-exclusive. */
+    public record MethodTakings(String method, int tabs, BigDecimal exVat) {}
+
+    /** One day (in the company's report timezone). {@code takings} is money taken at the till on this day; {@code chargedToAccounts} was billed, not paid, and is collected on its invoice. */
+    public record TakingsDay(java.time.LocalDate date, List<MethodTakings> takings, BigDecimal takingsExVat, int chargedTabs, BigDecimal chargedExVat) {}
+
+    public record TakingsReport(java.time.LocalDate from, java.time.LocalDate to, String timezone, List<TakingsDay> days, List<MethodTakings> totals,
+                                BigDecimal takingsExVat, int chargedTabs, BigDecimal chargedExVat) {}
 }
