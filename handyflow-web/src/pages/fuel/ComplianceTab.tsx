@@ -16,6 +16,7 @@ type Dialog = { kind: "edit"; item?: ComplianceItem } | { kind: "evidence"; item
 
 export default function ComplianceTab() {
   const canManage = usePermissions(["FUEL_MANAGE", "FUEL_COMPLIANCE_MANAGE"])
+  const canSeeDetail = usePermissions(["FUEL_MANAGE", "FUEL_COMPLIANCE_MANAGE", "FUEL_COMPLIANCE_VERIFY"])
   const qc = useQueryClient()
   const [dialog, setDialog] = useState<Dialog>(null)
   const [err, setErr] = useState("")
@@ -26,8 +27,10 @@ export default function ComplianceTab() {
   const remove = useMutation({ mutationFn: (id: string) => apiClient.delete(`/api/v1/fuel/compliance/${id}`), onSuccess: () => { setErr(""); refresh() }, onError: (e: any) => setErr(msg(e, "Could not remove it")) })
   const rows = [...(list.data ?? [])].sort(byUrgency)
   const expired = rows.filter(r => r.status === "EXPIRED").length
+  const statusOnly = !canSeeDetail || rows.some(r => r.detailsHidden)
   return (
     <div>
+      {statusOnly && <p role="note" style={{ fontSize: 12.5, color: "var(--hf-text-muted)", margin: "0 0 10px" }}>You can see what is held, who or where it is for, and when it expires. Reference numbers, notes and documents are kept for the people who manage compliance.</p>}
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
         <p style={{ fontSize: 12.5, color: "var(--hf-text-muted)", margin: 0, flex: 1 }}>
           Anything that expires: licences, calibrations, roadworthy and inspection certificates, insurance. A tanker or driver with an expired item cannot be allocated to a load, and neither can anyone while the company's licence has expired. Account admins are emailed a reminder 30 days and 7 days before an item expires, and once when it has expired.
@@ -59,18 +62,18 @@ export default function ComplianceTab() {
       {list.isLoading ? <p style={{ color: "var(--hf-text-muted)" }}>Loading…</p> : rows.length === 0 ? <p style={{ color: "var(--hf-text-muted)" }}>Nothing recorded yet.</p> : (
         <div style={{ ...card, overflowX: "auto" }}>
           <table style={{ width: "100%", borderCollapse: "collapse" }}>
-            <thead><tr><th style={th}>Item</th><th style={th}>For</th><th style={th}>Reference</th><th style={th}>Expires</th><th style={th}>Status</th><th style={th}></th></tr></thead>
+            <thead><tr><th style={th}>Item</th><th style={th}>For</th>{!statusOnly && <th style={th}>Reference</th>}<th style={th}>Expires</th><th style={th}>Status</th><th style={th}></th></tr></thead>
             <tbody>
               {rows.map(i => (
                 <tr key={i.id} style={{ borderTop: "1px solid var(--hf-border)" }}>
                   <td style={td}>{i.title}<div style={{ fontSize: 11, color: "var(--hf-text-muted)" }}>{i.itemType.toLowerCase()}</div></td>
                   <td style={td}>{i.subjectType === "COMPANY" ? "Company" : `${i.subjectType.toLowerCase()}: ${i.subjectLabel ?? ""}`}
                     {(i.legalEntityName || i.depotName || i.licensedActivity) && <div style={{ fontSize: 11, color: "var(--hf-text-muted)" }}>{[i.legalEntityName, i.depotName ? `Site: ${i.depotName}` : null, i.licensedActivity ? activityLabel(i.licensedActivity) : null, i.issuingAuthority].filter(Boolean).join(" · ")}</div>}</td>
-                  <td style={td}>{i.referenceNo ?? "–"}</td>
+                  {!statusOnly && <td style={td}>{i.referenceNo ?? "–"}</td>}
                   <td style={td}>{i.expiresOn}<div style={{ fontSize: 11, color: "var(--hf-text-muted)" }}>{whenLabel(i)}</div></td>
                   <td style={td}><Chip bg={tone(i.status).bg} fg={tone(i.status).fg}>{i.status === "VALID" ? "Valid" : i.status === "EXPIRING" ? "Expiring" : "Expired"}</Chip></td>
                   <td style={td}><span style={{ display: "flex", gap: 6 }}>
-                    <button style={btnGhost} onClick={() => setDialog({ kind: "evidence", item: i })}>{`Evidence (${i.evidenceCount ?? 0})`}</button>
+                    {!statusOnly && <button style={btnGhost} onClick={() => setDialog({ kind: "evidence", item: i })}>{`Evidence (${i.evidenceCount ?? 0})`}</button>}
                     {canManage && <>
                     <button style={btnPrimary} onClick={() => setDialog({ kind: "renew", item: i })}>Renew</button>
                     <button style={btnGhost} onClick={() => setDialog({ kind: "edit", item: i })}>Edit</button>

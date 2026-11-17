@@ -2,7 +2,7 @@
 export interface ComplianceItem {
   id: string; itemType: string; title: string; referenceNo: string | null; subjectType: string; subjectId: string | null; subjectLabel: string | null
   issuedOn: string | null; expiresOn: string; notes: string | null; status: "VALID" | "EXPIRING" | "EXPIRED"; daysToExpiry: number
-  legalEntityId?: string | null; legalEntityName?: string | null; licensedActivity?: string | null; issuingAuthority?: string | null; evidenceCount?: number; depotId?: string | null; depotName?: string | null
+  legalEntityId?: string | null; legalEntityName?: string | null; licensedActivity?: string | null; issuingAuthority?: string | null; evidenceCount?: number; depotId?: string | null; depotName?: string | null; detailsHidden?: boolean
 }
 export interface ComplianceEvidence {
   id: string; itemId: string; fileRef: string | null; note: string | null; capturedAt: string; status: "ACTIVE" | "SUPERSEDED"; supersededReason: string | null

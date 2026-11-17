@@ -38,7 +38,7 @@ public class FuelComplianceController {
     @PreAuthorize("hasAuthority('FUEL_READ')")
     public ResponseEntity<ApiResponse<List<ComplianceResponse>>> list() {
         featureGuard.requireModule("fuel");
-        return ResponseEntity.ok(ApiResponse.success(compliance.list(TenantContext.getTenantIdAsObject())));
+        return ResponseEntity.ok(ApiResponse.success(compliance.list(TenantContext.getTenantIdAsObject(), FuelComplianceAuthority.canSeeDetail())));
     }
 
     @GetMapping("/coverage")
@@ -49,7 +49,7 @@ public class FuelComplianceController {
     }
 
     @GetMapping("/{id}/evidence")
-    @PreAuthorize("hasAuthority('FUEL_READ')")
+    @PreAuthorize("hasAnyAuthority('FUEL_MANAGE','FUEL_COMPLIANCE_MANAGE','FUEL_COMPLIANCE_VERIFY')")
     public ResponseEntity<ApiResponse<List<EvidenceView>>> evidence(@PathVariable UUID id) {
         featureGuard.requireModule("fuel");
         return ResponseEntity.ok(ApiResponse.success(compliance.listEvidence(TenantContext.getTenantIdAsObject(), id)));
@@ -74,7 +74,7 @@ public class FuelComplianceController {
     }
 
     @GetMapping("/evidence/{evidenceId}/file")
-    @PreAuthorize("hasAuthority('FUEL_READ')")
+    @PreAuthorize("hasAnyAuthority('FUEL_MANAGE','FUEL_COMPLIANCE_MANAGE','FUEL_COMPLIANCE_VERIFY')")
     public ResponseEntity<byte[]> evidenceFile(@PathVariable UUID evidenceId) {
         featureGuard.requireModule("fuel");
         StoredFile f = evidenceFiles.download(TenantContext.getTenantIdAsObject(), evidenceId);

@@ -92,4 +92,38 @@ class FuelComplianceServiceTest {
     void allows() {
         assertDoesNotThrow(() -> service.requireCompliantForAllocation(T, UUID.randomUUID(), "GP 1", UUID.randomUUID(), "Sipho"));
     }
+
+    private FuelComplianceItem detailed() {
+        FuelComplianceItem i = FuelComplianceItem.create(T, "LICENCE", "Site licence", "SL-2026-009821", "COMPANY", null, "Company", TODAY.minusDays(100), TODAY.plusDays(10), "Renewal lodged with the Controller");
+        i.applyScope(null, "STORAGE", "Controller of Petroleum Products");
+        return i;
+    }
+
+    @Test @DisplayName("the status-only list keeps status and expiry but leaves out reference, notes, authority, issue date and document count")
+    void statusOnlyList() {
+        FuelComplianceItem i = detailed();
+        when(items.findAllActive(T)).thenReturn(List.of(i));
+        when(evidence.countActiveByItem(T)).thenReturn(List.<Object[]>of(new Object[]{i.getId(), 3L}));
+        var r = service.list(T, false).get(0);
+        assertEquals("Site licence", r.title());
+        assertEquals("EXPIRING", r.status());
+        assertEquals(TODAY.plusDays(10), r.expiresOn());
+        assertEquals("STORAGE", r.licensedActivity());
+        assertNull(r.referenceNo()); assertNull(r.notes()); assertNull(r.issuingAuthority()); assertNull(r.issuedOn());
+        assertEquals(0L, r.evidenceCount());
+        assertTrue(r.detailsHidden());
+    }
+
+    @Test @DisplayName("the full list still carries everything for people who manage compliance")
+    void fullList() {
+        FuelComplianceItem i = detailed();
+        when(items.findAllActive(T)).thenReturn(List.of(i));
+        when(evidence.countActiveByItem(T)).thenReturn(List.<Object[]>of(new Object[]{i.getId(), 3L}));
+        var r = service.list(T).get(0);
+        assertEquals("SL-2026-009821", r.referenceNo());
+        assertEquals("Renewal lodged with the Controller", r.notes());
+        assertEquals("Controller of Petroleum Products", r.issuingAuthority());
+        assertEquals(3L, r.evidenceCount());
+        assertFalse(r.detailsHidden());
+    }
 }

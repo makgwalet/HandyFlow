@@ -171,12 +171,22 @@ describe("ComplianceTab", () => {
     fireEvent.change(await screen.findByLabelText(/Reason/), { target: { value: "Wrong scan uploaded" } })
     fireEvent.click(screen.getAllByText("Replace").pop()!)
     await waitFor(() => expect(post).toHaveBeenCalledWith("/api/v1/fuel/compliance/evidence/v1/supersede", { reason: "Wrong scan uploaded" }))
-    cleanup(); perms = ["FUEL_READ"]
+    cleanup(); perms = ["FUEL_READ", "FUEL_COMPLIANCE_VERIFY"]
     mount()
     await screen.findByText("Roadworthy")
     fireEvent.click(screen.getAllByText(/^Evidence \(/)[0])
     await screen.findByText("scans/rw1.pdf")
     expect(screen.queryByText("Add evidence")).toBeNull()
     expect(screen.queryByText("Replace")).toBeNull()
+  })
+
+  it("someone with only read access sees status and expiry, with no reference column and no evidence button", async () => {
+    perms = ["FUEL_READ"]
+    mount()
+    await screen.findByText("Roadworthy")
+    expect(screen.getByRole("note").textContent).toMatch(/kept for the people who manage compliance/)
+    expect(screen.queryByText("Reference")).toBeNull()
+    expect(screen.queryAllByText(/^Evidence \(/).length).toBe(0)
+    expect(screen.queryByText("Add item")).toBeNull()
   })
 })

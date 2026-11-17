@@ -39,14 +39,18 @@ public class FuelComplianceService {
     private final FuelComplianceEvidenceRepository evidence;
     private final FuelSettingsService settings;
 
+    public List<ComplianceResponse> list(TenantId tenantId) { return list(tenantId, true); }
+
+    /** {@code detail} false is the status-only view: reference, notes, authority, issue date and documents are left out. */
     @Transactional(readOnly = true)
-    public List<ComplianceResponse> list(TenantId tenantId) {
+    public List<ComplianceResponse> list(TenantId tenantId, boolean detail) {
         LocalDate today = LocalDate.now(SAST);
         Map<UUID, String> names = entityNames(tenantId);
         Map<UUID, String> depotNames = depotNames(tenantId);
         Map<UUID, Long> counts = new HashMap<>();
         for (Object[] row : evidence.countActiveByItem(tenantId)) counts.put((UUID) row[0], ((Number) row[1]).longValue());
-        return items.findAllActive(tenantId).stream().map(i -> toResponse(i, today, names.get(i.getLegalEntityId()), counts.getOrDefault(i.getId(), 0L), depotNames.get(i.getDepotId()))).toList();
+        return items.findAllActive(tenantId).stream().map(i -> toResponse(i, today, names.get(i.getLegalEntityId()), counts.getOrDefault(i.getId(), 0L), depotNames.get(i.getDepotId())))
+                .map(r -> detail ? r : r.statusOnly()).toList();
     }
 
     /** Licences by legal entity and status today. Information only: the system does not know which licences a business must hold. */
