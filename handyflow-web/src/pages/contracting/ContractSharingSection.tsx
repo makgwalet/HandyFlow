@@ -14,7 +14,7 @@ interface SharingView {
 
 export function ContractSharingSection({ contractId }: { contractId: string }) {
   const qc = useQueryClient()
-  const canChange = usePermissions(['USER_UPDATE', 'CONTRACTS_MANAGE', 'CONTRACTS_ADMIN'], 'any')
+  const canChange = usePermissions(['CONTRACTS_MANAGE', 'CONTRACTS_ADMIN'], 'any')
   const base = `/api/v1/contracts/${contractId}/sharing`
   const { data, isLoading, isError } = useQuery<SharingView>({ queryKey: ['contract-sharing', contractId], queryFn: async () => (await apiClient.get(base)).data })
   if (isLoading) return <div style={{ fontSize: 12, color: 'var(--hf-text-faint)', marginBottom: 14 }}>Loading sharing…</div>
