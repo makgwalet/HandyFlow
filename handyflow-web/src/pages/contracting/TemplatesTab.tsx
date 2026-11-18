@@ -13,6 +13,7 @@
 import { sanitizeHtml } from './sanitizeHtml'
 import { RichTextEditor } from './RichTextEditor'
 import { hasContent } from './richText'
+import { usePermissions } from '../../hooks/usePermission'
 import { useState, type CSSProperties, type ChangeEvent } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { apiClient } from '../../api/client'
@@ -157,7 +158,8 @@ function LegalReviewModal({ template, onClose, onSubmit, error, busy }: {
   )
 }
 
-function LegalHistory({ templateId, onWithdraw, onAttach, onDownload }: {
+function LegalHistory({ templateId, onWithdraw, onAttach, onDownload, canAuthor }: {
+  canAuthor: boolean
   templateId: string; onWithdraw: (reviewId: string) => void
   onAttach: (reviewId: string, file: File) => void; onDownload: (reviewId: string, fileName: string) => void
 }) {
@@ -184,7 +186,7 @@ function LegalHistory({ templateId, onWithdraw, onAttach, onDownload }: {
               ? <button style={{ ...smallBtn, padding: '2px 8px' }} onClick={() => onDownload(r.id, r.evidenceFileName ?? 'legal-review-evidence')}>Download {r.evidenceFileName ?? 'file'}</button>
               : <span style={{ color: 'var(--hf-warning-text)' }}>none attached</span>}
           </div>
-          {!r.withdrawnAt && (
+          {canAuthor && !r.withdrawnAt && (
             <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 6, flexWrap: 'wrap' }}>
               <label style={{ ...smallBtn, display: 'inline-block' }}>
                 {r.evidenceDocumentId ? 'Upload replacement' : 'Attach evidence'}
@@ -236,7 +238,7 @@ function HtmlPreview({ html, maxHeight = 280 }: { html: string; maxHeight?: numb
 
 // ─── TemplateCard ─────────────────────────────────────────────────────────────
 
-function TemplateCard({ template, onCopyVar, copied, onAction, onEdit, onRecordReview, onWithdraw, onAttach, onDownload, busy }: {
+function TemplateCard({ template, onCopyVar, copied, onAction, onEdit, onRecordReview, onWithdraw, onAttach, onDownload, busy, canAuthor }: {
   template: Template
   onCopyVar: (v: string) => void
   copied: string | null
@@ -247,6 +249,7 @@ function TemplateCard({ template, onCopyVar, copied, onAction, onEdit, onRecordR
   onAttach: (templateId: string, reviewId: string, file: File) => void
   onDownload: (templateId: string, reviewId: string, fileName: string) => void
   busy: boolean
+  canAuthor: boolean
 }) {
   const [expanded, setExpanded] = useState(false)
   const [showLegal, setShowLegal] = useState(false)
@@ -325,16 +328,16 @@ function TemplateCard({ template, onCopyVar, copied, onAction, onEdit, onRecordR
 
         {/* Lifecycle actions */}
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 10 }}>
-          {(status === 'DRAFT' || status === 'INTERNAL_REVIEW') && <button style={smallBtn} disabled={busy} onClick={() => onEdit(template)}>Edit</button>}
-          {status === 'DRAFT' && <button style={smallBtn} disabled={busy} onClick={() => onAction(template.id, 'submit-internal-review')}>Submit for internal review</button>}
-          {status === 'INTERNAL_REVIEW' && <button style={smallBtn} disabled={busy} onClick={() => onAction(template.id, 'submit-legal-review')}>Submit for legal review</button>}
-          {status === 'LEGAL_REVIEW' && <button style={smallBtn} disabled={busy} onClick={() => onRecordReview(template)}>Record legal review</button>}
-          {status === 'APPROVED' && <button style={smallBtn} disabled={busy} onClick={() => onAction(template.id, 'publish')}>Publish</button>}
-          {status === 'PUBLISHED' && <button style={smallBtn} disabled={busy} onClick={() => onAction(template.id, 'new-version')}>New version</button>}
-          {status === 'PUBLISHED' && !template.isSystem && <button style={smallBtn} disabled={busy} onClick={() => onAction(template.id, 'archive')}>Archive</button>}
+          {canAuthor && (status === 'DRAFT' || status === 'INTERNAL_REVIEW') && <button style={smallBtn} disabled={busy} onClick={() => onEdit(template)}>Edit</button>}
+          {canAuthor && status === 'DRAFT' && <button style={smallBtn} disabled={busy} onClick={() => onAction(template.id, 'submit-internal-review')}>Submit for internal review</button>}
+          {canAuthor && status === 'INTERNAL_REVIEW' && <button style={smallBtn} disabled={busy} onClick={() => onAction(template.id, 'submit-legal-review')}>Submit for legal review</button>}
+          {canAuthor && status === 'LEGAL_REVIEW' && <button style={smallBtn} disabled={busy} onClick={() => onRecordReview(template)}>Record legal review</button>}
+          {canAuthor && status === 'APPROVED' && <button style={smallBtn} disabled={busy} onClick={() => onAction(template.id, 'publish')}>Publish</button>}
+          {canAuthor && status === 'PUBLISHED' && <button style={smallBtn} disabled={busy} onClick={() => onAction(template.id, 'new-version')}>New version</button>}
+          {canAuthor && status === 'PUBLISHED' && !template.isSystem && <button style={smallBtn} disabled={busy} onClick={() => onAction(template.id, 'archive')}>Archive</button>}
           <button style={smallBtn} onClick={() => setShowLegal(!showLegal)}>{showLegal ? 'Hide legal reviews' : 'Legal reviews'}</button>
         </div>
-        {showLegal && <div style={{ marginBottom: 10 }}><LegalHistory templateId={template.id} onWithdraw={rid => onWithdraw(template.id, rid)}
+        {showLegal && <div style={{ marginBottom: 10 }}><LegalHistory canAuthor={canAuthor} templateId={template.id} onWithdraw={rid => onWithdraw(template.id, rid)}
           onAttach={(rid, fl) => onAttach(template.id, rid, fl)} onDownload={(rid, nm) => onDownload(template.id, rid, nm)} /></div>}
 
         {/* Preview toggle */}
@@ -387,6 +390,7 @@ function TemplateCard({ template, onCopyVar, copied, onAction, onEdit, onRecordR
 
 export default function TemplatesTab() {
   const qc = useQueryClient()
+  const canAuthor = usePermissions(['CONTRACTS_TEMPLATES', 'CONTRACTS_MANAGE'], 'any')
 
   const [showCreate, setShowCreate] = useState(false)
   const [copied,     setCopied]     = useState<string | null>(null)
@@ -499,6 +503,7 @@ export default function TemplatesTab() {
   }
 
   const cardProps = {
+    canAuthor,
     onCopyVar: copyVariable, copied,
     onAction: (id: string, action: string) => act.mutate({ id, action }),
     onEdit: startEdit, onRecordReview: (t: Template) => { setReviewFor(t); setReviewError('') },
@@ -526,10 +531,10 @@ export default function TemplatesTab() {
           <span style={{ fontWeight: 700, color: 'var(--hf-text)' }}>{systemTemplates.length}</span> system templates ·{' '}
           <span style={{ fontWeight: 700, color: 'var(--hf-text)' }}>{customTemplates.length}</span> custom templates
         </div>
-        <button onClick={() => { setEditingId(null); setForm(EMPTY_FORM); setShowCreate(true); setError('') }}
+        {canAuthor && <button onClick={() => { setEditingId(null); setForm(EMPTY_FORM); setShowCreate(true); setError('') }}
           style={{ display: 'flex', alignItems: 'center', gap: 7, background: 'var(--hf-primary)', color: 'var(--hf-text-on-solid)', border: 'none', borderRadius: 8, padding: '9px 18px', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
           <Plus size={15} /> New Template
-        </button>
+        </button>}
       </div>
 
       {error && !showCreate && (

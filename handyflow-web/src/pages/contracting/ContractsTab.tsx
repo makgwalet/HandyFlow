@@ -30,6 +30,7 @@ import { ContractSharingSection } from './ContractSharingSection'
 import { ContractRedlineSection } from './ContractRedlineSection'
 import { ContractRiskSection } from './ContractRiskSection'
 import { linkStatus, LINK_TONE_COLOR } from './signingLink'
+import { usePermissions } from '../../hooks/usePermission'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -216,6 +217,10 @@ function Sect({ title, children }: { title: string; children: React.ReactNode })
 
 export default function ContractsTab() {
   const qc = useQueryClient()
+  // Mirrors the server's @PreAuthorize so buttons that would be refused are not shown (the server still enforces).
+  const canManage    = usePermissions(['CONTRACTS_MANAGE'], 'any')
+  const canTerminate = usePermissions(['CONTRACTS_ADMIN'], 'any')
+  const canSign       = usePermissions(['CONTRACTS_SIGN', 'CONTRACTS_MANAGE'], 'any')
 
   // ── UI state ─────────────────────────────────────────────────────────────────
   const [statusFilter, setStatus]       = useState('')
@@ -447,9 +452,9 @@ export default function ContractsTab() {
           <button onClick={() => qc.invalidateQueries({ queryKey: ['contracts'] })} style={{ ...btnS, padding: '9px 11px' }} title="Refresh">
             <RefreshCw size={13} />
           </button>
-          <button onClick={() => { setShowCreate(true); setError(''); setForm(INIT_FORM()); setSelectedTemplate(null) }} style={btnP()}>
+          {canManage && <button onClick={() => { setShowCreate(true); setError(''); setForm(INIT_FORM()); setSelectedTemplate(null) }} style={btnP()}>
             <Plus size={14} /> New Contract
-          </button>
+          </button>}
         </div>
       </div>
 
@@ -559,7 +564,7 @@ export default function ContractsTab() {
                         <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--hf-text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
                           Parties & Signing
                         </div>
-                        {(c.status === 'DRAFT' || c.status === 'UNDER_REVIEW') && (
+                        {canManage && (c.status === 'DRAFT' || c.status === 'UNDER_REVIEW') && (
                           <button onClick={() => { setShowParty(c.id); setError('') }}
                             style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '4px 10px', background: 'var(--hf-surface-muted)', border: '1px solid var(--hf-border)', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer', color: 'var(--hf-text-secondary)' }}>
                             <Plus size={11} /> Add Party
@@ -635,7 +640,7 @@ export default function ContractsTab() {
                                   )}
 
                                   {/* Action buttons based on party state */}
-                                  {c.status === 'SENT' && party.signingStatus === 'PENDING' && (
+                                  {canSign && c.status === 'SENT' && party.signingStatus === 'PENDING' && (
                                     <button
                                       onClick={() => { setShowOtp({ contractId: c.id, partyId: party.id, name: party.fullName, isResend: false }); setError('') }}
                                       style={{ ...btnP(), padding: '5px 10px', fontSize: 11 }}>
@@ -643,7 +648,7 @@ export default function ContractsTab() {
                                     </button>
                                   )}
 
-                                  {c.status === 'SENT' && party.signingStatus === 'SENT' && (
+                                  {canSign && c.status === 'SENT' && party.signingStatus === 'SENT' && (
                                     <button
                                       onClick={() => { setShowOtp({ contractId: c.id, partyId: party.id, name: party.fullName, isResend: true }); setError('') }}
                                       style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '5px 10px', background: otpExpired ? 'var(--hf-danger-soft)' : 'var(--hf-warning-soft)', color: otpExpired ? 'var(--hf-danger-text)' : 'var(--hf-warning-text)', border: `1px solid ${otpExpired ? 'var(--hf-danger-border)' : 'var(--hf-warning-border)'}`, borderRadius: 6, fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>
@@ -653,7 +658,7 @@ export default function ContractsTab() {
                                   )}
 
                                   {/* Resend signing link */}
-                                  {c.status === 'SENT' && (party.signingStatus === 'PENDING' || party.signingStatus === 'SENT') && (
+                                  {canManage && c.status === 'SENT' && (party.signingStatus === 'PENDING' || party.signingStatus === 'SENT') && (
                                     <button
                                       onClick={() => resendLink.mutate({ contractId: c.id, partyId: party.id })}
                                       disabled={resendLink.isPending}
@@ -715,7 +720,7 @@ export default function ContractsTab() {
                           )}
 
                           {/* Post new comment (internal — admin/owner) */}
-                          <div style={{ background: 'var(--hf-surface)', border: '1px solid var(--hf-border)', borderRadius: 8, padding: '12px 14px' }}>
+                          {canManage && <div style={{ background: 'var(--hf-surface)', border: '1px solid var(--hf-border)', borderRadius: 8, padding: '12px 14px' }}>
                             <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--hf-text-secondary)', marginBottom: 8 }}>Post internal comment</div>
                             <textarea
                               value={commentText}
@@ -744,7 +749,7 @@ export default function ContractsTab() {
                                 {postComment.isPending ? 'Posting…' : 'Post Comment'}
                               </button>
                             </div>
-                          </div>
+                          </div>}
                         </div>
                       )}
                     </div>
@@ -755,7 +760,7 @@ export default function ContractsTab() {
                           {{variables}} or edit anything after creation —
                           only visible for DRAFT/UNDER_REVIEW, matching
                           Contract.assertEditable()'s backend guard exactly. */}
-                      {(c.status === 'DRAFT' || c.status === 'UNDER_REVIEW') && (
+                      {canManage && (c.status === 'DRAFT' || c.status === 'UNDER_REVIEW') && (
                         <button
                           onClick={() => {
                             setEditForm({
@@ -774,7 +779,7 @@ export default function ContractsTab() {
                           Edit
                         </button>
                       )}
-                      {getNextActions(c.status).map(({ label, action, color, bg }) => (
+                      {getNextActions(c.status).filter(a => a.action === 'terminate' ? canTerminate : canManage).map(({ label, action, color, bg }) => (
                         <button key={action}
                           onClick={() => {
                             if (action === 'terminate') { setShowTerminate(c.id); setTerminateReason(''); setError(''); return }
