@@ -621,6 +621,7 @@ export const SUPPLY_CHAIN_SECTIONS: ModuleSections = {
       ],
     },
     { label: 'Stock', sections: [{ id: 'inventory', label: 'Inventory', icon: Package }] },
+    { label: 'Insight', sections: [{ id: 'analytics', label: 'Analytics', icon: BarChart3, anyPermission: ['SCM_READ', 'SCM_ADMIN'] }] },
   ],
 }
 

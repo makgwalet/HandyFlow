@@ -183,3 +183,27 @@ export function rfqActions(status: string, hasPo: boolean): RfqAction[] {
     default: return []
   }
 }
+
+// ── Analytics ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+export const FLAG_TEXT: Record<string, string> = {
+  HIGH_SPEND_LOW_SCORE: "Large share of spend, low score — act first",
+  LOW_SCORE: "Low score",
+}
+
+/** "12.5%" or an em dash when there is nothing to compare against. */
+export const pctText = (v: number | null | undefined) => (v == null ? "—" : `${v.toFixed(1)}%`)
+
+/** Width of a bar for a share, kept visible but within the cell. */
+export const barWidth = (v: number | null | undefined) => `${Math.max(2, Math.min(100, v ?? 0))}%`
+
+export function defaultRange(today: Date = new Date()): { from: string; to: string } {
+  const iso = (d: Date) => d.toISOString().slice(0, 10)
+  const from = new Date(today); from.setFullYear(from.getFullYear() - 1)
+  return { from: iso(from), to: iso(today) }
+}
+
+export function rangeProblem(from: string, to: string): string | null {
+  if (!from || !to) return "Choose both dates"
+  if (to < from) return "The period cannot end before it starts"
+  return null
+}

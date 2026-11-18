@@ -109,3 +109,16 @@ describe("RFQs", () => {
     expect(rfqActions("CANCELLED", false)).toEqual([])
   })
 })
+
+import { pctText, barWidth, defaultRange, rangeProblem, FLAG_TEXT } from "./scmOps"
+describe("analytics helpers", () => {
+  it("formats shares and bars", () => {
+    expect(pctText(12.5)).toBe("12.5%"); expect(pctText(null)).toBe("—")
+    expect(barWidth(0)).toBe("2%"); expect(barWidth(250)).toBe("100%"); expect(barWidth(null)).toBe("2%"); expect(barWidth(40)).toBe("40%")
+  })
+  it("defaults to the last twelve months and validates the range", () => {
+    expect(defaultRange(new Date("2026-11-18T10:00:00Z"))).toEqual({ from: "2025-11-18", to: "2026-11-18" })
+    expect(rangeProblem("2026-01-01", "2025-01-01")).toContain("before"); expect(rangeProblem("", "2025-01-01")).toContain("both"); expect(rangeProblem("2025-01-01", "2026-01-01")).toBeNull()
+  })
+  it("explains the flags", () => { expect(FLAG_TEXT.HIGH_SPEND_LOW_SCORE).toContain("act first") })
+})
