@@ -90,6 +90,7 @@ za/co/handyflow/platform/collectionsagency/api/CollAgencyPortalAuthController.ja
 za/co/handyflow/platform/collectionsagency/api/CollAgencyPortalDataController.java
 za/co/handyflow/platform/contracting/api/ContractObligationController.java
 za/co/handyflow/platform/contracting/api/ContractReportController.java
+za/co/handyflow/platform/contracting/api/ContractRedlineController.java
 za/co/handyflow/platform/contracting/api/ContractSharingController.java
 za/co/handyflow/platform/contracting/api/ContractingController.java
 za/co/handyflow/platform/contracting/api/OtpDevController.java

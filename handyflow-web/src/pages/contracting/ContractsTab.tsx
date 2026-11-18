@@ -27,6 +27,7 @@ import {
 } from 'lucide-react'
 import { unwrap, fmtR } from './ContractingPage'
 import { ContractSharingSection } from './ContractSharingSection'
+import { ContractRedlineSection } from './ContractRedlineSection'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -543,6 +544,8 @@ export default function ContractsTab() {
                         />
                       )}
                     </div>
+
+                    <ContractRedlineSection contractId={c.id} status={c.status} />
 
                     {/* Secure sharing of the signed contract (executed copy) */}
                     {['SIGNED', 'EXPIRED', 'TERMINATED', 'ARCHIVED'].includes(c.status) && <ContractSharingSection contractId={c.id} />}

@@ -50,6 +50,7 @@ public class ContractingService {
     private final PublicSigningRateLimiter        publicRateLimiter;
     private final ContractTemplateLegalReviewRepository templateReviewRepo;
     private final SigningPolicy                   signingPolicy;
+    private final ContractRedlineService         redline;      // body version history
     private final DocumentsFacade                documents;   // legal review evidence
     private final ContractRecordsService         records;   // executed copy + records retention (V581)
 
@@ -470,6 +471,7 @@ public class ContractingService {
 
         if (requiredSigningMethod != null) contract.setRequiredSigningMethod(requiredSigningMethod);
         contractRepo.save(contract);
+        redline.snapshot(tenantId, contract, "CREATED", null, createdByUserId);
         log.info("Created contract={} tenant={}", number, tenantId);
         return toContractResponse(contract);
     }
@@ -500,6 +502,7 @@ public class ContractingService {
     @Transactional
     public ContractResponse updateContract(TenantId tenantId, UUID id, UpdateContractRequest req) {
         Contract c = findActive(tenantId, id);
+        String bodyBefore = c.getBody();
 
         if (req.variables() != null && !req.variables().isEmpty()) {
             Map<String, String> safeVars = new HashMap<>();
@@ -527,6 +530,7 @@ public class ContractingService {
         }
 
         contractRepo.save(c);
+        if (!Objects.equals(bodyBefore, c.getBody())) redline.snapshot(tenantId, c, "EDITED", "Variables filled in", currentUserOrNull());
         c.setParties(partyRepo.findByContract(id));
         log.info("Updated contract={} tenant={}", c.getContractNumber(), tenantId);
         return toContractResponse(c);
