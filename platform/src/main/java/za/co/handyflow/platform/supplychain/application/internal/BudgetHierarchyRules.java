@@ -54,6 +54,11 @@ public final class BudgetHierarchyRules {
         return null;
     }
 
+    /** What a parent may still spend directly: its amount less what it has handed to active children, never below zero. */
+    public static BigDecimal directCap(BigDecimal parentAmount, BigDecimal allocatedToChildren) {
+        return parentAmount.subtract(allocatedToChildren).max(BigDecimal.ZERO);
+    }
+
     /** A parent cannot be reduced below what it has already handed to its active children. */
     public static String reduceProblem(BigDecimal newParentAmount, BigDecimal activeChildrenTotal) {
         if (newParentAmount.compareTo(activeChildrenTotal) < 0)

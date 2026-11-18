@@ -40,6 +40,7 @@ public class ScmService {
     private final ScmSeparationOfDuties sod;
     private final PriceOverrideGate priceOverrideGate;
     private final ApprovalLimitService approvalLimits;
+    private final ProcurementPolicy procurementPolicy;
     private final ContractService contractService;
     private final ScSupplierRepository        supplierRepo;
     private final ScStockLocationRepository   locationRepo;
@@ -636,6 +637,8 @@ public class ScmService {
         requireCodingForBudgets(tenantId, inv);
         enforceSegregation(tenantId, "SCM_INVOICE", "ScSupplierInvoice", inv.getId(), inv.getCapturedBy(), approverId, "supplier invoice");
         approvalLimits.enforce(tenantId, approverId, ApprovalLimitRules.SUPPLIER_INVOICE, inv.getTotalAmount());
+        // Budget actuals are measured in the base currency, so a foreign invoice needs a rate before it counts.
+        procurementPolicy.requireRate(tenantId.getValue(), inv.getCurrency(), inv.getInvoiceDate(), "Invoice " + inv.getInvoiceNumber());
 
         inv.approve(approverId, approverName);
         log.info("[SCM] Supplier invoice {} approved by {}", inv.getInvoiceNumber(), approverName);

@@ -57,6 +57,7 @@ class ScmInvoicePaymentGuardTest {
     @Mock ScSupplierRepository supplierRepo;
     @Mock ScmSeparationOfDuties sod;
     @Mock ApprovalLimitService approvalLimits;
+    @Mock ProcurementPolicy procurementPolicy;
     @InjectMocks ScmService service;
 
     private ScSupplierInvoice invoice;

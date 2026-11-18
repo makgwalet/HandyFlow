@@ -123,6 +123,15 @@ public class ProcurementPolicy {
                 java.sql.Date.valueOf(date != null ? date : LocalDate.now()));
     }
 
+    /** Throws 409 NO_EXCHANGE_RATE when a foreign-currency document has no rate to the base currency on its date. */
+    public void requireRate(UUID tenantId, String currency, LocalDate date, String what) {
+        String base = forTenant(tenantId).baseCurrency();
+        if (ScmPolicyRules.isBase(currency, base) || rateOrNull(tenantId, currency, date) != null) return;
+        throw new HandyFlowException(what + " is in " + currency.toUpperCase(Locale.ROOT) + " and there is no " + currency.toUpperCase(Locale.ROOT)
+                + " to " + base + " exchange rate on or before " + (date != null ? date : LocalDate.now())
+                + ". Add one under Procurement policy > Exchange rates, then approve again.", HttpStatus.CONFLICT, "NO_EXCHANGE_RATE");
+    }
+
     /**
      * The amount a purchase order counts against a budget: net + VAT x the supplier's factor, in the base currency.
      * Throws 409 NO_EXCHANGE_RATE when the PO is in a foreign currency with no rate, rather than guess.

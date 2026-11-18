@@ -38,6 +38,7 @@ class ScmNoPoCodingTest {
     @Mock InvoiceMatchingService matchingService;
     @Mock BudgetService budgetService;
     @Mock ApprovalLimitService approvalLimits;
+    @Mock ProcurementPolicy procurementPolicy;
     @InjectMocks ScmService service;
 
     private ScSupplierInvoice noPo;

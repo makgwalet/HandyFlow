@@ -79,8 +79,14 @@ public class BudgetService {
             throw new HandyFlowException("An active budget for this " + scope + " already covers part of that period — close or shorten it first",
                     HttpStatus.CONFLICT, "BUDGET_OVERLAP");
 
+        // Budgets are measured in the company's base currency (foreign documents are converted into it).
+        String base = policy.forTenant(tid).baseCurrency();
+        String currency = req.currency() == null || req.currency().isBlank() ? base : req.currency().trim().toUpperCase(java.util.Locale.ROOT);
+        if (!currency.equals(base))
+            throw new HandyFlowException("Budgets are kept in the base currency (" + base + "); " + currency
+                    + " documents are converted into it using the exchange rates", HttpStatus.BAD_REQUEST, "BUDGET_CURRENCY");
         ScBudget b = ScBudget.create(tid, req.name().trim(), scope, req.scopeValue().trim(),
-                req.periodStart(), req.periodEnd(), req.amount(), mode, req.currency(), userId);
+                req.periodStart(), req.periodEnd(), req.amount(), mode, currency, userId);
         if (req.parentBudgetId() != null) {
             ScBudget parent = budgetRepo.lockByTenantAndId(tid, req.parentBudgetId())
                     .orElseThrow(() -> new HandyFlowException("Parent budget not found", HttpStatus.NOT_FOUND, "NOT_FOUND"));
@@ -397,6 +403,24 @@ public class BudgetService {
         for (ScBudget b : applicable.values())
             views.add(new View(b.getId(), b.getName(), b.getScopeType(), b.getScopeValue(), b.getAmount(),
                     b.getControlMode(), usage(tid, b, excludePoId, all).used()));
+        // Spend coded to a parent but to none of its sub-budgets is "direct" spend: it may only use what the parent has not
+        // allocated to its children. Checked as an extra cap (parent amount less allocations) against direct usage.
+        for (ScBudget p : new ArrayList<>(applicable.values())) {
+            List<ScBudget> kids = new ArrayList<>();
+            for (ScBudget k : all) if (p.getId().equals(k.getParentBudgetId()) && k.isActive()) kids.add(k);
+            if (kids.isEmpty()) continue;
+            boolean inChild = false;
+            for (ScBudget k : kids) if (applicable.containsKey(k.getId())) { inChild = true; break; }
+            if (inChild) continue;
+            BigDecimal allocated = BigDecimal.ZERO;
+            Map<UUID, ScBudget> kidScopes = new LinkedHashMap<>();
+            for (ScBudget k : kids) { allocated = allocated.add(k.getAmount()); for (ScBudget s : subtree(all, k)) kidScopes.put(s.getId(), s); }
+            BigDecimal direct = usageOf(tid, subtree(all, p), excludePoId).used()
+                    .subtract(usageOf(tid, new ArrayList<>(kidScopes.values()), excludePoId).used()).max(BigDecimal.ZERO);
+            views.add(new View(UUID.nameUUIDFromBytes(("unallocated:" + p.getId()).getBytes(java.nio.charset.StandardCharsets.UTF_8)),
+                    p.getName() + " (unallocated part)", p.getScopeType(), p.getScopeValue(),
+                    BudgetHierarchyRules.directCap(p.getAmount(), allocated), p.getControlMode(), direct));
+        }
         return BudgetRules.evaluate(views, requested, nearLimitPct);
     }
 
@@ -480,7 +504,12 @@ public class BudgetService {
      * a department and one of its projects is not counted twice.
      */
     private Usage usage(UUID tid, ScBudget b, UUID excludePoId, List<ScBudget> all) {
-        List<ScBudget> scopes = subtree(all, b);
+        return usageOf(tid, subtree(all, b), excludePoId);
+    }
+
+    /** Committed / actual / used across the union of these budgets' scopes (a row matching several counts once). */
+    private Usage usageOf(UUID tid, List<ScBudget> scopes, UUID excludePoId) {
+        if (scopes.isEmpty()) return new Usage(BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO);
         List<Object> args = new ArrayList<>(List.of(tid, tid));
         String scope = poScopeClause(scopes, args);
         args.add(excludePoId != null ? excludePoId : UUID.randomUUID());

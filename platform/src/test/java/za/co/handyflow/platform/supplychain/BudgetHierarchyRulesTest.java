@@ -98,4 +98,11 @@ class BudgetHierarchyRulesTest {
         assertThat(BudgetHierarchyRules.heightOf(a, childrenOf)).isEqualTo(3);
         assertThat(BudgetHierarchyRules.heightOf(c, childrenOf)).isEqualTo(1);
     }
+
+    @Test
+    void directSpendMayOnlyUseWhatIsNotAllocatedToChildren() {
+        assertThat(BudgetHierarchyRules.directCap(new java.math.BigDecimal("1000000"), new java.math.BigDecimal("600000"))).isEqualByComparingTo("400000");
+        assertThat(BudgetHierarchyRules.directCap(new java.math.BigDecimal("500"), new java.math.BigDecimal("500"))).isEqualByComparingTo("0");
+        assertThat(BudgetHierarchyRules.directCap(new java.math.BigDecimal("500"), new java.math.BigDecimal("700"))).isEqualByComparingTo("0");
+    }
 }
