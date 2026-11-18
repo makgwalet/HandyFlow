@@ -47,6 +47,8 @@ public class ContractingService {
     private final SmsService                     smsService;    // FIX: SMS now wired
     private final OtpRateLimitRepository          otpRateLimitRepo;
     private final PublicSigningRateLimiter        publicRateLimiter;
+    private final ContractTemplateLegalReviewRepository templateReviewRepo;
+    private final SigningPolicy                   signingPolicy;
     private final ContractRecordsService         records;   // executed copy + records retention (V581)
 
     @Value("${contracting.signing.base-url:http://localhost:5173}")
@@ -165,30 +167,149 @@ public class ContractingService {
         ContractTemplate t = ContractTemplate.create(tenantId, req.name(),
                 req.contractType(), req.description(), req.bodyTemplate(),
                 req.variables(), false);
+        t.edit(req.name(), req.contractType(), req.description(), req.bodyTemplate(), req.variables(),
+                req.legalArea(), normaliseSigningMethod(req.requiredSigningMethod()));
         templateRepo.save(t);
         return toTemplateResponse(t);
     }
 
-    // ═══════════════════════════════════════════════════════════════════════════
-    // Contracts
-    // ═══════════════════════════════════════════════════════════════════════════
-
+    /** Edits a template that is still DRAFT or INTERNAL_REVIEW. Published wording is never edited in place: use a new version. */
     @Transactional
     public TemplateResponse updateTemplate(TenantId tenantId, UUID id, CreateTemplateRequest req) {
-        ContractTemplate t = templateRepo.findActiveById(tenantId, id)
-                .orElseThrow(() -> new ResourceNotFoundException("Template", id.toString()));
-        t.edit(req.name(), req.contractType(), req.description(), req.bodyTemplate(), req.variables());
+        ContractTemplate t = template(tenantId, id);
+        t.edit(req.name(), req.contractType(), req.description(), req.bodyTemplate(), req.variables(),
+                req.legalArea(), normaliseSigningMethod(req.requiredSigningMethod()));
         templateRepo.save(t);
         return toTemplateResponse(t);
     }
 
     @Transactional
     public void archiveTemplate(TenantId tenantId, UUID id) {
-        ContractTemplate t = templateRepo.findActiveById(tenantId, id)
-                .orElseThrow(() -> new ResourceNotFoundException("Template", id.toString()));
+        ContractTemplate t = template(tenantId, id);
         t.archive();
         templateRepo.save(t);
     }
+
+    @Transactional
+    public TemplateResponse submitTemplateForInternalReview(TenantId tenantId, UUID id) {
+        ContractTemplate t = template(tenantId, id);
+        t.submitForInternalReview();
+        return toTemplateResponse(templateRepo.save(t));
+    }
+
+    @Transactional
+    public TemplateResponse submitTemplateForLegalReview(TenantId tenantId, UUID id) {
+        ContractTemplate t = template(tenantId, id);
+        t.submitForLegalReview();
+        return toTemplateResponse(templateRepo.save(t));
+    }
+
+    /**
+     * Records a legal reviewer's outcome for this version. APPROVED or CONDITIONAL moves the template to APPROVED, ready to
+     * publish; REJECTED sends it back to DRAFT. The review is evidence at a point in time, not a guarantee of compliance.
+     */
+    @Transactional
+    public LegalReviewResponse recordTemplateLegalReview(TenantId tenantId, UUID id, RecordLegalReviewRequest req) {
+        ContractTemplate t = template(tenantId, id);
+        if (t.statusEnum() != TemplateStatus.LEGAL_REVIEW)
+            throw new IllegalStateException("A legal review can only be recorded while the template is in LEGAL_REVIEW (it is " + t.getStatus() + ")");
+        ContractTemplateLegalReview r = ContractTemplateLegalReview.record(tenantId.getValue(), t.getId(), t.getTemplateVersion(),
+                req.reviewerName(), req.reviewerProfessionalDetails(), req.reviewerOrganisation(), req.reviewDate(),
+                req.legalArea(), req.jurisdiction(), req.scopeAssumptions(), req.outstandingIssues(), req.outcome(),
+                req.nextReviewDate(), req.evidenceDocumentId(), currentUserOrNull());
+        templateReviewRepo.save(r);
+        if (ContractTemplateLegalReview.REJECTED.equals(r.getOutcome())) t.returnToDraft(); else t.markApproved();
+        templateRepo.save(t);
+        log.info("Legal review recorded for template={} v{} outcome={} reviewer={}", t.getId(), t.getTemplateVersion(), r.getOutcome(), r.getReviewerName());
+        return toLegalReviewResponse(r);
+    }
+
+    /** Withdraws a recorded review (for example the reviewer changed their view). A published template then stops being offered for new contracts. */
+    @Transactional
+    public LegalReviewResponse withdrawTemplateLegalReview(TenantId tenantId, UUID templateId, UUID reviewId, String reason) {
+        ContractTemplate t = template(tenantId, templateId);
+        ContractTemplateLegalReview r = templateReviewRepo.findByTenantIdAndIdAndTemplateId(tenantId.getValue(), reviewId, templateId)
+                .orElseThrow(() -> new ResourceNotFoundException("Legal review", reviewId.toString()));
+        if (r.isWithdrawn()) throw new IllegalStateException("This review was already withdrawn");
+        r.withdraw(reason, currentUserOrNull());
+        templateReviewRepo.save(r);
+        if (t.statusEnum() == TemplateStatus.APPROVED) { t.returnToDraft(); templateRepo.save(t); }
+        return toLegalReviewResponse(r);
+    }
+
+    @Transactional(readOnly = true)
+    public List<LegalReviewResponse> getTemplateLegalReviews(TenantId tenantId, UUID templateId) {
+        template(tenantId, templateId);
+        return templateReviewRepo.findByTenantIdAndTemplateIdOrderByCreatedAtDesc(tenantId.getValue(), templateId)
+                .stream().map(this::toLegalReviewResponse).toList();
+    }
+
+    /** Publishes an APPROVED template. The previous published version of the same template is superseded. */
+    @Transactional
+    public TemplateResponse publishTemplate(TenantId tenantId, UUID id) {
+        ContractTemplate t = template(tenantId, id);
+        String legal = legalStatus(t);
+        if (!"APPROVED".equals(legal) && !"CONDITIONAL".equals(legal))
+            throw new IllegalStateException("A template cannot be published without a current legal approval (status: " + legal + ")");
+        t.publish();
+        for (ContractTemplate other : templateRepo.findByFamily(tenantId, t.getFamilyId() != null ? t.getFamilyId() : t.getId())) {
+            if (!other.getId().equals(t.getId()) && other.statusEnum() == TemplateStatus.PUBLISHED) {
+                other.supersede();
+                templateRepo.save(other);
+            }
+        }
+        return toTemplateResponse(templateRepo.save(t));
+    }
+
+    /** Starts a new DRAFT version of a published template. Only one open draft per template at a time. */
+    @Transactional
+    public TemplateResponse newTemplateVersion(TenantId tenantId, UUID id) {
+        ContractTemplate t = template(tenantId, id);
+        UUID family = t.getFamilyId() != null ? t.getFamilyId() : t.getId();
+        boolean openDraft = templateRepo.findByFamily(tenantId, family).stream().anyMatch(o ->
+                o.statusEnum() != TemplateStatus.PUBLISHED && o.statusEnum() != TemplateStatus.SUPERSEDED);
+        if (openDraft) throw new IllegalStateException("This template already has a version in progress");
+        return toTemplateResponse(templateRepo.save(t.newVersion()));
+    }
+
+    private ContractTemplate template(TenantId tenantId, UUID id) {
+        return templateRepo.findActiveById(tenantId, id)
+                .orElseThrow(() -> new ResourceNotFoundException("Template", id.toString()));
+    }
+
+    private static String normaliseSigningMethod(String m) {
+        if (m == null || m.isBlank()) return null;
+        try { return SigningMethod.valueOf(m.trim().toUpperCase()).name(); }
+        catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException("requiredSigningMethod must be one of SIMPLE_ELECTRONIC, ADVANCED_ELECTRONIC, WET_INK, IN_PERSON");
+        }
+    }
+
+    /**
+     * Legal status of this exact template version: NOT_REVIEWED, APPROVED, CONDITIONAL, REJECTED, EXPIRED (next review date
+     * passed) or WITHDRAWN. A template whose approval has expired or been withdrawn is no longer shown as approved.
+     */
+    private String legalStatus(ContractTemplate t) {
+        return templateReviewRepo.findFirstByTenantIdAndTemplateIdAndTemplateVersionOrderByCreatedAtDesc(
+                        t.getTenantId(), t.getId(), t.getTemplateVersion())
+                .map(r -> {
+                    if (r.isWithdrawn()) return "WITHDRAWN";
+                    if (ContractTemplateLegalReview.REJECTED.equals(r.getOutcome())) return "REJECTED";
+                    if (r.isExpired(LocalDate.now())) return "EXPIRED";
+                    return r.getOutcome();
+                }).orElse("NOT_REVIEWED");
+    }
+
+    private LegalReviewResponse toLegalReviewResponse(ContractTemplateLegalReview r) {
+        return new LegalReviewResponse(r.getId(), r.getTemplateId(), r.getTemplateVersion(), r.getReviewerName(),
+                r.getReviewerProfessionalDetails(), r.getReviewerOrganisation(), r.getReviewDate(), r.getLegalArea(),
+                r.getJurisdiction(), r.getScopeAssumptions(), r.getOutstandingIssues(), r.getOutcome(), r.getNextReviewDate(),
+                r.getEvidenceDocumentId(), r.isExpired(LocalDate.now()), r.getWithdrawnAt(), r.getWithdrawnReason(), r.getCreatedAt());
+    }
+
+    // ═════════════════════════════════════════════════════
+    // Contracts
+    // ═════════════════════════════════════════════════════
 
     @Transactional(readOnly = true)
     public Page<ContractSummaryResponse> getContracts(TenantId tenantId, String status,
@@ -229,11 +350,18 @@ public class ContractingService {
         templateSeeder.seedForTenant(tenantId);
 
         String body = req.body();
+        String requiredSigningMethod = null;
         if (body == null && req.templateId() != null) {
             ContractTemplate tmpl = templateRepo.findActiveById(tenantId, req.templateId())
                     .orElseThrow(() -> new ResourceNotFoundException("Template",
                             req.templateId().toString()));
+            if (tmpl.statusEnum() != TemplateStatus.PUBLISHED)
+                throw new IllegalStateException("Only published templates can be used to create a contract (this one is " + tmpl.getStatus() + ")");
+            String legal = legalStatus(tmpl);
+            if ("EXPIRED".equals(legal) || "WITHDRAWN".equals(legal) || "REJECTED".equals(legal))
+                throw new IllegalStateException("This template's legal approval is " + legal.toLowerCase() + ". It needs a new legal review before it can be used.");
             body = tmpl.getBodyTemplate();
+            requiredSigningMethod = tmpl.getRequiredSigningMethod();
         }
         if (body == null) body = "<p>Contract body — edit to add content.</p>";
 
@@ -257,6 +385,7 @@ public class ContractingService {
         if (req.renewalNoticeDays() != null)
             contract.setAutoRenew(req.autoRenew(), req.renewalNoticeDays());
 
+        if (requiredSigningMethod != null) contract.setRequiredSigningMethod(requiredSigningMethod);
         contractRepo.save(contract);
         log.info("Created contract={} tenant={}", number, tenantId);
         return toContractResponse(contract);
@@ -332,6 +461,7 @@ public class ContractingService {
     @Transactional
     public ContractResponse sendForSigning(TenantId tenantId, UUID id) {
         Contract c = findActive(tenantId, id);
+        signingPolicy.assertCanSign(c);
         List<ContractParty> parties = partyRepo.findByContract(id);
         c.setParties(parties);
 
@@ -523,6 +653,7 @@ public class ContractingService {
                                          String ipAddress, String userAgent,
                                          UUID witnessedByUserId) {
         Contract c = findActive(tenantId, contractId);
+        signingPolicy.assertCanSign(c);
         List<ContractParty> parties = partyRepo.findByContract(contractId);
         c.setParties(parties);
 
@@ -655,6 +786,7 @@ public class ContractingService {
                                          UUID partyId, SignContractRequest req,
                                          String ipAddress, String userAgent, String token) {
         Contract c = findActive(tenantId, contractId);
+        signingPolicy.assertCanSign(c);
         List<ContractParty> parties = partyRepo.findByContract(contractId);
         c.setParties(parties);
 
@@ -1138,7 +1270,9 @@ public class ContractingService {
     private TemplateResponse toTemplateResponse(ContractTemplate t) {
         return new TemplateResponse(t.getId(), t.getName(), t.getContractType(),
                 t.getDescription(), t.getBodyTemplate(), t.getVariables(),
-                t.isSystem(), t.getCreatedAt(), t.getTemplateVersion());
+                t.isSystem(), t.getCreatedAt(), t.getTemplateVersion(),
+                t.getFamilyId(), t.getStatus(), legalStatus(t), t.getLegalArea(), t.getJurisdiction(),
+                t.getRequiredSigningMethod(), t.getPublishedAt());
     }
 
     private CommentView toCommentViewWithParties(ContractComment comm, List<ContractParty> parties) {

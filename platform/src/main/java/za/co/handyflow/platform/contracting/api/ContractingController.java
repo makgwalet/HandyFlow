@@ -30,7 +30,7 @@ public class ContractingController {
 
     @PutMapping("/templates/{id}")
     @PreAuthorize("hasAnyAuthority('CONTRACTS_TEMPLATES','CONTRACTS_MANAGE','USER_UPDATE')")
-    @Operation(summary = "Edit a custom template. Raises its version; existing contracts keep their text")
+    @Operation(summary = "Edit a template that is still DRAFT or INTERNAL_REVIEW. Published wording is changed through a new version")
     public ResponseEntity<ApiResponse<TemplateResponse>> updateTemplate(
             @PathVariable UUID id, @Valid @RequestBody CreateTemplateRequest req) {
         return ResponseEntity.ok(ApiResponse.success("Template updated",
@@ -43,6 +43,64 @@ public class ContractingController {
     public ResponseEntity<ApiResponse<Void>> archiveTemplate(@PathVariable UUID id) {
         contractingService.archiveTemplate(TenantContext.getTenantIdAsObject(), id);
         return ResponseEntity.ok(ApiResponse.success("Template archived", null));
+    }
+
+    @PostMapping("/templates/{id}/submit-internal-review")
+    @PreAuthorize("hasAnyAuthority('CONTRACTS_TEMPLATES','CONTRACTS_MANAGE','USER_UPDATE')")
+    @Operation(summary = "Template lifecycle: DRAFT to INTERNAL_REVIEW")
+    public ResponseEntity<ApiResponse<TemplateResponse>> submitTemplateInternalReview(@PathVariable UUID id) {
+        return ResponseEntity.ok(ApiResponse.success("Template submitted for internal review",
+                contractingService.submitTemplateForInternalReview(TenantContext.getTenantIdAsObject(), id)));
+    }
+
+    @PostMapping("/templates/{id}/submit-legal-review")
+    @PreAuthorize("hasAnyAuthority('CONTRACTS_TEMPLATES','CONTRACTS_MANAGE','USER_UPDATE')")
+    @Operation(summary = "Template lifecycle: INTERNAL_REVIEW to LEGAL_REVIEW")
+    public ResponseEntity<ApiResponse<TemplateResponse>> submitTemplateLegalReview(@PathVariable UUID id) {
+        return ResponseEntity.ok(ApiResponse.success("Template submitted for legal review",
+                contractingService.submitTemplateForLegalReview(TenantContext.getTenantIdAsObject(), id)));
+    }
+
+    @PostMapping("/templates/{id}/legal-reviews")
+    @PreAuthorize("hasAnyAuthority('CONTRACTS_TEMPLATES','CONTRACTS_MANAGE','USER_UPDATE')")
+    @Operation(summary = "Record a South African legal practitioner's review of this template version (APPROVED, CONDITIONAL or REJECTED)")
+    public ResponseEntity<ApiResponse<LegalReviewResponse>> recordTemplateLegalReview(
+            @PathVariable UUID id, @Valid @RequestBody RecordLegalReviewRequest req) {
+        return ResponseEntity.status(201).body(ApiResponse.success("Legal review recorded",
+                contractingService.recordTemplateLegalReview(TenantContext.getTenantIdAsObject(), id, req)));
+    }
+
+    @GetMapping("/templates/{id}/legal-reviews")
+    @PreAuthorize("hasAnyAuthority('CONTRACTS_READ','CONTRACTS_TEMPLATES','CONTRACTS_MANAGE','CONTRACTS_ADMIN','USER_READ','USER_UPDATE')")
+    @Operation(summary = "Legal review history of a template, newest first")
+    public ResponseEntity<ApiResponse<List<LegalReviewResponse>>> getTemplateLegalReviews(@PathVariable UUID id) {
+        return ResponseEntity.ok(ApiResponse.success("Legal reviews",
+                contractingService.getTemplateLegalReviews(TenantContext.getTenantIdAsObject(), id)));
+    }
+
+    @PostMapping("/templates/{id}/legal-reviews/{reviewId}/withdraw")
+    @PreAuthorize("hasAnyAuthority('CONTRACTS_TEMPLATES','CONTRACTS_MANAGE','USER_UPDATE')")
+    @Operation(summary = "Withdraw a recorded legal review. A published template then stops being offered for new contracts")
+    public ResponseEntity<ApiResponse<LegalReviewResponse>> withdrawTemplateLegalReview(
+            @PathVariable UUID id, @PathVariable UUID reviewId, @Valid @RequestBody WithdrawLegalReviewRequest req) {
+        return ResponseEntity.ok(ApiResponse.success("Legal review withdrawn",
+                contractingService.withdrawTemplateLegalReview(TenantContext.getTenantIdAsObject(), id, reviewId, req.reason())));
+    }
+
+    @PostMapping("/templates/{id}/publish")
+    @PreAuthorize("hasAnyAuthority('CONTRACTS_TEMPLATES','CONTRACTS_MANAGE','USER_UPDATE')")
+    @Operation(summary = "Publish an APPROVED template. Requires a current legal approval; supersedes the previous version")
+    public ResponseEntity<ApiResponse<TemplateResponse>> publishTemplate(@PathVariable UUID id) {
+        return ResponseEntity.ok(ApiResponse.success("Template published",
+                contractingService.publishTemplate(TenantContext.getTenantIdAsObject(), id)));
+    }
+
+    @PostMapping("/templates/{id}/new-version")
+    @PreAuthorize("hasAnyAuthority('CONTRACTS_TEMPLATES','CONTRACTS_MANAGE','USER_UPDATE')")
+    @Operation(summary = "Start a new DRAFT version of a published template")
+    public ResponseEntity<ApiResponse<TemplateResponse>> newTemplateVersion(@PathVariable UUID id) {
+        return ResponseEntity.status(201).body(ApiResponse.success("New template version created",
+                contractingService.newTemplateVersion(TenantContext.getTenantIdAsObject(), id)));
     }
 
     @GetMapping("/templates")

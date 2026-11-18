@@ -13,5 +13,12 @@ public record TemplateResponse(
         Map<String, String> variables,
         boolean isSystem,
         Instant createdAt,
-        int templateVersion
+        int templateVersion,
+        UUID familyId,
+        String status,              // DRAFT, INTERNAL_REVIEW, LEGAL_REVIEW, APPROVED, PUBLISHED, SUPERSEDED
+        String legalStatus,         // NOT_REVIEWED, APPROVED, CONDITIONAL, REJECTED, EXPIRED, WITHDRAWN (for this version)
+        String legalArea,
+        String jurisdiction,
+        String requiredSigningMethod,
+        Instant publishedAt
 ) {}

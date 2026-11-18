@@ -244,6 +244,15 @@ public class Contract {
      * contract may be edited lives here on the entity, not scattered into
      * the service.
      */
+    /** The signature standard this contract needs (from its template, or set by staff). Null = not classified. */
+    @jakarta.persistence.Column(name = "required_signing_method")
+    private String requiredSigningMethod;
+
+    public void setRequiredSigningMethod(String method) {
+        this.requiredSigningMethod = method;
+        this.updatedAt = Instant.now();
+    }
+
     public void updateBody(String body) {
         assertEditable();
         this.body      = HtmlSanitizer.clean(body);
