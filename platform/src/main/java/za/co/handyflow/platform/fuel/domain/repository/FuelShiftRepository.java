@@ -28,4 +28,10 @@ public interface FuelShiftRepository extends JpaRepository<FuelShift, UUID> {
     @Query("SELECT COUNT(s) FROM FuelShift s WHERE s.tenantId = :tenantId AND s.status = 'CLOSED' AND LOWER(s.attendantName) = LOWER(:attendant) "
             + "AND s.closedAt >= :since AND s.varianceAmount IS NOT NULL AND s.toleranceApplied IS NOT NULL AND ABS(s.varianceAmount) > s.toleranceApplied")
     long countOutsideToleranceSince(TenantId tenantId, String attendant, Instant since);
+
+    @Query("SELECT s FROM FuelShift s WHERE s.tenantId = :tenantId AND s.openRequestId = :requestId")
+    Optional<FuelShift> findByOpenRequest(TenantId tenantId, UUID requestId);
+
+    @Query("SELECT s FROM FuelShift s WHERE s.tenantId = :tenantId AND s.closeRequestId = :requestId")
+    Optional<FuelShift> findByCloseRequest(TenantId tenantId, UUID requestId);
 }

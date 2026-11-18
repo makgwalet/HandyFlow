@@ -2,14 +2,15 @@ import React, { useEffect, useMemo, useState } from "react";
 import { Text } from "react-native";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { useNavigation } from "@react-navigation/native";
-import { api } from "@/api/client";
+import { useOutbox } from "@/offline/OutboxProvider";
 import { useAuth } from "@/auth/AuthContext";
 import type { RootStackParamList } from "@/navigation/types";
 import { Button } from "@/ui/Button";
 import { Field } from "@/ui/Field";
 import { Card, Screen } from "@/ui/Screen";
 import { colors } from "@/ui/theme";
-import { failText, usePumps, useRefreshShifts, useShift } from "./hooks";
+import { usePumps, useShift } from "./hooks";
+import { closeWaiting } from "./send";
 import { canRunShifts, closeBody, closeRows, emptyTakings, expectedPreview, lit, rand, validateClose, type CloseRow, type Takings } from "./shifts";
 
 type Props = NativeStackScreenProps<RootStackParamList, "CloseShift">;
@@ -20,7 +21,7 @@ export function CloseShiftScreen({ route }: Props) {
   const { session } = useAuth();
   const { shift, isLoading, error: loadError } = useShift(shiftId);
   const { pumps } = usePumps();
-  const refresh = useRefreshShifts();
+  const { enqueue, pending } = useOutbox();
   const [rows, setRows] = useState<CloseRow[] | null>(null);
   const [t, setT] = useState<Takings>(emptyTakings);
   const [reason, setReason] = useState("");
@@ -31,6 +32,7 @@ export function CloseShiftScreen({ route }: Props) {
 
   if (!canRunShifts(session?.permissions ?? [])) return <Screen title="Close shift"><Text style={{ color: colors.muted }}>You do not have permission to close a shift.</Text></Screen>;
   if (isLoading || !shift) return <Screen title="Close shift"><Text style={{ color: loadError ? "#FCA5A5" : colors.muted }}>{loadError ?? "Loading…"}</Text></Screen>;
+  if (closeWaiting(pending, shiftId)) return <Screen title="Close shift"><Card><Text style={{ color: colors.text, fontSize: 17 }}>The close for this shift is saved on this phone and waiting to send.</Text><Text style={{ color: colors.muted }}>It is not final, and the takings are not booked, until the server accepts it.</Text></Card></Screen>;
   if (shift.status !== "OPEN") return <Screen title="Close shift"><Text style={{ color: colors.muted }}>This shift is already {shift.status.toLowerCase()}.</Text></Screen>;
   const cur = rows ?? [];
   const preview = expectedPreview(shift, cur, prices);
@@ -42,10 +44,9 @@ export function CloseShiftScreen({ route }: Props) {
     if (problem) { setError(problem); return; }
     setError(null); setBusy(true);
     try {
-      await api(`/api/v1/fuel/forecourt/shifts/${shiftId}/close`, { method: "POST", body: closeBody(cur, t, reason) });
-      await refresh(shiftId);
+      await enqueue("SHIFT_CLOSE", { shiftId, body: closeBody(cur, t, reason) });
       nav.goBack();
-    } catch (e) { setError(failText(e)); } finally { setBusy(false); }
+    } catch (e) { setError(e instanceof Error ? e.message : "Could not save on this phone"); } finally { setBusy(false); }
   }
 
   return (
@@ -64,7 +65,7 @@ export function CloseShiftScreen({ route }: Props) {
       <Field label="Other (rand)" value={t.other} keyboardType="decimal-pad" onChangeText={setTake("other")} />
       <Field label="Reason for any difference (optional)" value={reason} onChangeText={setReason} />
       {error ? <Text accessibilityRole="alert" style={{ color: "#FCA5A5", fontSize: 15 }}>{error}</Text> : null}
-      <Text style={{ color: colors.muted }}>Closing needs signal. The server works out the expected takings and the variance.</Text>
+      <Text style={{ color: colors.muted }}>Saved on this phone first and sent when there is signal. The takings are not final until the server accepts them: it works out the expected takings and the variance, and may send the shift for review.</Text>
       <Button label="Close shift" onPress={save} loading={busy} />
     </Screen>
   );

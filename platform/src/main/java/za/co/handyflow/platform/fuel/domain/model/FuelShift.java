@@ -53,6 +53,10 @@ public class FuelShift {
     @Column(name = "reverse_reason", length = 500) private String reverseReason;
     @Column(name = "provider_opened_at") private Instant providerOpenedAt;
     @Column(name = "provider_closed_at") private Instant providerClosedAt;
+    @Column(name = "open_request_id") private UUID openRequestId;
+    @Column(name = "close_request_id") private UUID closeRequestId;
+    @Column(name = "captured_opened_at") private Instant capturedOpenedAt;
+    @Column(name = "captured_closed_at") private Instant capturedClosedAt;
     @Version private Long version;
 
     public static FuelShift open(TenantId tenantId, String shiftNumber, String attendantName, UUID openedBy, String notes) {
@@ -72,6 +76,10 @@ public class FuelShift {
         if (opened != null && closed != null && closed.isBefore(opened)) throw new IllegalArgumentException("The provider's closing time is before its opening time.");
         this.providerOpenedAt = opened; this.providerClosedAt = closed;
     }
+
+    /** Remembers the phone's id for the open, so a resend returns this shift instead of making another. */
+    public void stampOpen(UUID requestId, Instant capturedAt) { this.openRequestId = requestId; this.capturedOpenedAt = capturedAt; }
+    public void stampClose(UUID requestId, Instant capturedAt) { this.closeRequestId = requestId; this.capturedClosedAt = capturedAt; }
 
     public boolean isOpen() { return "OPEN".equals(status); }
     public boolean isClosed() { return "CLOSED".equals(status); }

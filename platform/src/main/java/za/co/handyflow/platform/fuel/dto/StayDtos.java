@@ -19,7 +19,11 @@ public final class StayDtos {
     public record SettingsView(BigDecimal nightlyRate, Integer bays) {}
 
     public record BookRequest(@NotBlank @Size(max = 20) String vehicleRegistration, @Size(max = 120) String driverName, @Size(max = 40) String driverPhone,
-                              @NotNull LocalDate arrivalDate, @NotNull LocalDate departureDate, @Size(max = 300) String note, UUID accountId, UUID fleetVehicleId) {
+                              @NotNull LocalDate arrivalDate, @NotNull LocalDate departureDate, @Size(max = 300) String note, UUID accountId, UUID fleetVehicleId,
+                              UUID clientRequestId, java.time.Instant capturedAt) {
+        public BookRequest(String vehicleRegistration, String driverName, String driverPhone, LocalDate arrivalDate, LocalDate departureDate, String note, UUID accountId, UUID fleetVehicleId) {
+            this(vehicleRegistration, driverName, driverPhone, arrivalDate, departureDate, note, accountId, fleetVehicleId, null, null);
+        }
         /** Without a Fleet vehicle: a registration that matches one is still linked automatically. */
         public BookRequest(String vehicleRegistration, String driverName, String driverPhone, LocalDate arrivalDate, LocalDate departureDate, String note, UUID accountId) {
             this(vehicleRegistration, driverName, driverPhone, arrivalDate, departureDate, note, accountId, null);
@@ -32,7 +36,12 @@ public final class StayDtos {
     public record DepartureRequest(@NotNull LocalDate departureDate) {}
 
     /** {@code date} is the day the truck left; empty means today. */
-    public record CheckOutRequest(LocalDate date) {}
+    public record CheckOutRequest(LocalDate date, UUID clientRequestId, java.time.Instant capturedAt) {
+        public CheckOutRequest(LocalDate date) { this(date, null, null); }
+    }
+
+    /** A check-in from a phone that may have been offline. The body is optional: an online check-in has none. */
+    public record CheckInRequest(UUID clientRequestId, java.time.Instant capturedAt) {}
 
     public record CancelRequest(@NotBlank @Size(max = 300) String reason) {}
 

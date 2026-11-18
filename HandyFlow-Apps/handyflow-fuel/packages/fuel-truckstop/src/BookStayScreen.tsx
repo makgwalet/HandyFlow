@@ -1,26 +1,26 @@
 import React, { useState } from "react";
 import { Text } from "react-native";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
-import { api } from "@/api/client";
+import { useOutbox } from "@/offline/OutboxProvider";
 import { useAuth } from "@/auth/AuthContext";
 import type { RootStackParamList } from "@/navigation/types";
 import { Button } from "@/ui/Button";
 import { Field } from "@/ui/Field";
 import { Screen } from "@/ui/Screen";
 import { colors } from "@/ui/theme";
-import { failText, useRefreshYard } from "./hooks";
+
 import { canRunTruckStop, todayZA } from "./stays";
 import { bookBody, validateBook, type BookForm } from "./tabs";
 
 type Props = NativeStackScreenProps<RootStackParamList, "BookStay">;
 
 /**
- * Book a stay at the desk. Needs signal: availability, bays and the rate are the server's to judge, and the phone does not
+ * Book a stay at the desk. Saved on the phone and sent when there is signal. Availability, bays and the rate are the server's to judge, and the phone does not
  * claim a space is free. The server refuses a booking it cannot place.
  */
 export function BookStayScreen({ navigation }: Props) {
   const { session } = useAuth();
-  const refresh = useRefreshYard();
+  const { enqueue } = useOutbox();
   const today = todayZA();
   const [f, setF] = useState<BookForm>({ vehicleRegistration: "", driverName: "", driverPhone: "", arrivalDate: today, departureDate: "", note: "" });
   const [busy, setBusy] = useState(false);
@@ -33,10 +33,9 @@ export function BookStayScreen({ navigation }: Props) {
     if (problem) { setError(problem); return; }
     setError(null); setBusy(true);
     try {
-      await api("/api/v1/fuel/truck-stop/stays", { method: "POST", body: bookBody(f) });
-      await refresh();
+      await enqueue("STAY_BOOK", { body: bookBody(f) });
       navigation.goBack();
-    } catch (e) { setError(failText(e)); } finally { setBusy(false); }
+    } catch (e) { setError(e instanceof Error ? e.message : "Could not save on this phone"); } finally { setBusy(false); }
   }
 
   return (
@@ -49,7 +48,7 @@ export function BookStayScreen({ navigation }: Props) {
       <Field label="Note (optional)" value={f.note} onChangeText={(v) => set("note", v)} maxLength={300} />
       {error ? <Text accessibilityRole="alert" style={{ color: "#FCA5A5", fontSize: 15 }}>{error}</Text> : null}
       <Button label="Book the stay" onPress={() => void save()} loading={busy} />
-      <Text style={{ color: colors.muted, fontSize: 14 }}>Needs signal. The server checks the bays and the rate.</Text>
+      <Text style={{ color: colors.muted, fontSize: 14 }}>Saved on this phone and sent when there is signal. The phone cannot see which bays are free: the booking is only confirmed when the server has checked the bays and the rate, and it is refused if the yard is full.</Text>
     </Screen>
   );
 }

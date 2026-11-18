@@ -29,18 +29,24 @@ public final class ForecourtDtos {
 
     public record OpenReading(@NotNull UUID pumpId, @NotNull @PositiveOrZero BigDecimal openingMeter) {}
 
+    /** clientRequestId and capturedAt are set by a phone that may have been offline; without them this is an ordinary online open. */
     public record OpenShiftRequest(@NotBlank @Size(max = 120) String attendantName, @Size(max = 500) String notes,
-                                   @NotEmpty @Valid List<OpenReading> readings) {}
+                                   @NotEmpty @Valid List<OpenReading> readings, UUID clientRequestId, java.time.Instant capturedAt) {
+        public OpenShiftRequest(String attendantName, String notes, List<OpenReading> readings) { this(attendantName, notes, readings, null, null); }
+    }
 
     public record CloseReading(@NotNull UUID pumpId, @NotNull @PositiveOrZero BigDecimal closingMeter, @PositiveOrZero BigDecimal testLitres) {}
 
     public record CloseShiftRequest(@NotNull @PositiveOrZero BigDecimal cash, @NotNull @PositiveOrZero BigDecimal card,
                                     @NotNull @PositiveOrZero BigDecimal account, @NotNull @PositiveOrZero BigDecimal other,
                                     @Size(max = 500) String varianceReason, @NotEmpty @Valid List<CloseReading> readings,
-                                    @PositiveOrZero BigDecimal fleetCard) {
+                                    @PositiveOrZero BigDecimal fleetCard, UUID clientRequestId, java.time.Instant capturedAt) {
         /** Without a fleet-card amount (older clients): treated as 0. */
         public CloseShiftRequest(BigDecimal cash, BigDecimal card, BigDecimal account, BigDecimal other, String varianceReason, List<CloseReading> readings) {
-            this(cash, card, account, other, varianceReason, readings, null);
+            this(cash, card, account, other, varianceReason, readings, null, null, null);
+        }
+        public CloseShiftRequest(BigDecimal cash, BigDecimal card, BigDecimal account, BigDecimal other, String varianceReason, List<CloseReading> readings, BigDecimal fleetCard) {
+            this(cash, card, account, other, varianceReason, readings, fleetCard, null, null);
         }
     }
 

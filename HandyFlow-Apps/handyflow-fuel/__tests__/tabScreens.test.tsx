@@ -8,11 +8,14 @@ import { staySchema } from "@truckstop/stays";
 const mockApi = jest.fn();
 const mockRefresh = jest.fn(async () => undefined);
 let mockTab: any = null;
+const mockEnqueue = jest.fn(async () => ({}));
+let mockPending: any[] = [];
 let mockStays: any[] = [];
 let mockPermissions = ["FUEL_TRUCKSTOP_MANAGE"];
 class MockApiError extends Error { constructor(m: string, readonly status: number) { super(m); } get isNetwork() { return this.status === 0; } }
 
 jest.mock("@/api/client", () => ({ api: (...a: unknown[]) => mockApi(...a), get ApiError() { return MockApiError; } }));
+jest.mock("@/offline/OutboxProvider", () => ({ useOutbox: () => ({ enqueue: mockEnqueue, pending: mockPending }) }));
 jest.mock("@/auth/AuthContext", () => ({ useAuth: () => ({ session: { permissions: mockPermissions } }) }));
 jest.mock("react-native-safe-area-context", () => ({ SafeAreaView: ({ children }: any) => children }));
 jest.mock("@/ui/SyncBanner", () => ({ SyncBanner: () => null }));
@@ -41,7 +44,7 @@ const line = { id: "L1", description: "Shower", quantity: 1, unitPrice: 35, amou
 const mk = (o: any = {}) => tabSchema.parse({ id: "T1", vehicleRegistration: "ABC 123 GP", status: "OPEN", lines: [line], total: 35, ...o });
 const props = { route: { params: { tabId: "T1" } } } as any;
 
-beforeEach(() => { mockApi.mockReset(); mockRefresh.mockClear(); mockPermissions = ["FUEL_TRUCKSTOP_MANAGE"]; mockTab = mk(); mockStays = []; });
+beforeEach(() => { mockEnqueue.mockReset(); mockEnqueue.mockResolvedValue({}); mockPending = []; mockApi.mockReset(); mockRefresh.mockClear(); mockPermissions = ["FUEL_TRUCKSTOP_MANAGE"]; mockTab = mk(); mockStays = []; });
 
 describe("TabDetailScreen", () => {
   it("settles at the till with the chosen method and shows the server's answer", async () => {

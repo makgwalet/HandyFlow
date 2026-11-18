@@ -7,7 +7,9 @@ import type { RootStackParamList } from "@/navigation/types";
 import { Button } from "@/ui/Button";
 import { Card, Screen } from "@/ui/Screen";
 import { colors } from "@/ui/theme";
+import { useOutbox } from "@/offline/OutboxProvider";
 import { failText, useBays, useRefreshYard, useYard } from "./hooks";
+import { stayWaiting } from "./send";
 import { ACTION_LABEL, ACTION_PATH, actionsFor, activeBays, canRunTruckStop, dayText, todayZA, type Stay, type StayAction } from "./stays";
 import { Field } from "@/ui/Field";
 import { canCancelStay, validateCancel } from "./tabs";
@@ -21,6 +23,7 @@ export function StayDetailScreen({ route }: Props) {
   const { stays } = useYard();
   const { bays } = useBays();
   const refresh = useRefreshYard();
+  const { enqueue, pending } = useOutbox();
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
@@ -29,8 +32,9 @@ export function StayDetailScreen({ route }: Props) {
   const [cancelReason, setCancelReason] = useState("");
   const s = override && override.id === stayId ? override : stays.find((x) => x.id === stayId);
   if (!s) return <Screen title="Stay"><Text style={{ color: colors.muted }}>This stay is not on the list.</Text></Screen>;
+  const waiting = stayWaiting(pending, stayId);
   const may = canRunTruckStop(session?.permissions ?? []);
-  const actions = may ? actionsFor(s, todayZA()) : [];
+  const actions = may && !waiting ? actionsFor(s, todayZA()) : [];
   const bayName = bays.find((b) => b.id === s.bayId)?.name;
 
   async function run(key: string, call: () => Promise<Stay>) {
@@ -38,7 +42,15 @@ export function StayDetailScreen({ route }: Props) {
     try { const out = await call(); setOverride(out); await refresh(); setMessage(key === "bay" ? "Bay saved." : "Saved."); }
     catch (e) { setError(failText(e)); } finally { setBusy(null); }
   }
-  const act = (a: StayAction) => run(a, () => api<Stay>(`${base}/${stayId}/${ACTION_PATH[a]}`, { method: "POST" }));
+  /** Check-in and check-out are saved on the phone first, so a gate with no signal can still let a truck in or out. The rest need signal. */
+  async function queue(a: "checkIn" | "checkOut") {
+    setError(null); setMessage(null); setBusy(a);
+    try {
+      await enqueue(a === "checkIn" ? "STAY_CHECK_IN" : "STAY_CHECK_OUT", a === "checkIn" ? { stayId } : { stayId, date: todayZA() });
+      setMessage("Saved on this phone. It is not confirmed until the server accepts it.");
+    } catch (e) { setError(e instanceof Error ? e.message : "Could not save on this phone"); } finally { setBusy(null); }
+  }
+  const act = (a: StayAction) => (a === "checkIn" || a === "checkOut" ? queue(a) : run(a, () => api<Stay>(`${base}/${stayId}/${ACTION_PATH[a]}`, { method: "POST" })));
   const setBay = (bayId: string | null) => run("bay", () => api<Stay>(`${base}/${stayId}/bay`, { method: "PUT", body: { bayId } }));
 
   function confirmCancel() {
@@ -61,6 +73,7 @@ export function StayDetailScreen({ route }: Props) {
       {s.driverPhone ? <Button label={`Call ${s.driverName ?? "driver"}`} tone="plain" onPress={() => void Linking.openURL(`tel:${s.driverPhone!.replace(/[^\d+]/g, "")}`)} /> : null}
       {error ? <Text accessibilityRole="alert" style={{ color: "#FCA5A5", fontSize: 15 }}>{error}</Text> : null}
       {message ? <Text accessibilityRole="alert" style={{ color: "#86EFAC", fontSize: 15 }}>{message}</Text> : null}
+      {waiting ? <Card><Text style={{ color: colors.text }}>{waiting.kind === "STAY_CHECK_IN" ? "Check-in" : "Check-out"} saved on this phone and waiting to send.</Text><Text style={{ color: colors.muted }}>The status above is the last one the server told us. The price is worked out by the server.</Text></Card> : null}
       {actions.map((a) => <Button key={a} label={ACTION_LABEL[a]} tone={a === "noShow" ? "plain" : "primary"} loading={busy === a} disabled={!!busy} onPress={() => void act(a)} />)}
       {may && canCancelStay(s.status) && !cancelling ? <Button label="Cancel this stay" tone="danger" disabled={!!busy} onPress={() => { setCancelling(true); setError(null); }} /> : null}
       {cancelling ? (

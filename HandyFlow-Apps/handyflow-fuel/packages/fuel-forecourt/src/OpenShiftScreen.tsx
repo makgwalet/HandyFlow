@@ -1,21 +1,21 @@
 import React, { useEffect, useState } from "react";
 import { Text } from "react-native";
 import { useNavigation } from "@react-navigation/native";
-import { api } from "@/api/client";
+import { useOutbox } from "@/offline/OutboxProvider";
 import { displayName } from "@/api/auth";
 import { useAuth } from "@/auth/AuthContext";
 import { Button } from "@/ui/Button";
 import { Field } from "@/ui/Field";
 import { Card, Screen } from "@/ui/Screen";
 import { colors } from "@/ui/theme";
-import { failText, usePumps, useRefreshShifts } from "./hooks";
+import { usePumps } from "./hooks";
 import { canRunShifts, openBody, openRows, validateOpen, type OpenRow } from "./shifts";
 
 export function OpenShiftScreen() {
   const nav = useNavigation();
   const { session } = useAuth();
   const { pumps, isLoading, error: loadError } = usePumps();
-  const refresh = useRefreshShifts();
+  const { enqueue } = useOutbox();
   const [attendant, setAttendant] = useState(session ? displayName(session) : "");
   const [notes, setNotes] = useState("");
   const [rows, setRows] = useState<OpenRow[] | null>(null);
@@ -31,10 +31,9 @@ export function OpenShiftScreen() {
     if (problem) { setError(problem); return; }
     setError(null); setBusy(true);
     try {
-      await api("/api/v1/fuel/forecourt/shifts", { method: "POST", body: openBody(attendant, free, notes) });
-      await refresh();
+      await enqueue("SHIFT_OPEN", { body: openBody(attendant, free, notes) });
       nav.goBack();
-    } catch (e) { setError(failText(e)); } finally { setBusy(false); }
+    } catch (e) { setError(e instanceof Error ? e.message : "Could not save on this phone"); } finally { setBusy(false); }
   }
 
   return (
@@ -50,6 +49,7 @@ export function OpenShiftScreen() {
       })}
       <Field label="Notes (optional)" value={notes} onChangeText={setNotes} />
       {error ? <Text accessibilityRole="alert" style={{ color: "#FCA5A5", fontSize: 15 }}>{error}</Text> : null}
+      <Text style={{ color: colors.muted }}>Saved on this phone first and sent when there is signal. The shift is not open on the server until it is accepted. If a pump is already on another shift, or a meter is below the last reading, the server will refuse it and say why.</Text>
       <Button label="Open shift" onPress={save} loading={busy} disabled={free.length === 0} />
     </Screen>
   );

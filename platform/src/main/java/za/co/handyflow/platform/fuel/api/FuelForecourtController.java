@@ -37,6 +37,7 @@ public class FuelForecourtController {
     private static final String SUPERVISE = "hasAuthority('FUEL_SHIFT_SUPERVISE')";
 
     private final FuelForecourtService forecourt;
+    private final za.co.handyflow.platform.fuel.application.internal.FuelOfflineService offline;
     private final FuelScopeService scopes;
     private final FuelCashControlService cash;
     private final FuelTankReconciliationService reconciliation;
@@ -103,14 +104,23 @@ public class FuelForecourtController {
     public ResponseEntity<ApiResponse<ShiftResponse>> open(@Valid @RequestBody OpenShiftRequest req) {
         featureGuard.requireModule("fuel");
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success("Shift opened",
-                forecourt.openShift(TenantContext.getTenantIdAsObject(), req, TenantContext.getCurrentUserId())));
+                offline.openShift(TenantContext.getTenantIdAsObject(), req, TenantContext.getCurrentUserId(), java.time.Instant.now())));
     }
 
     @PostMapping("/shifts/{id}/close")
     @PreAuthorize(RUN)
     public ResponseEntity<ApiResponse<ShiftResponse>> close(@PathVariable UUID id, @Valid @RequestBody CloseShiftRequest req) {
         featureGuard.requireModule("fuel");
-        return ResponseEntity.ok(ApiResponse.success("Shift closed", forecourt.closeShift(TenantContext.getTenantIdAsObject(), id, req, TenantContext.getCurrentUserId())));
+        return ResponseEntity.ok(ApiResponse.success("Shift closed", offline.closeShift(TenantContext.getTenantIdAsObject(), id, req, TenantContext.getCurrentUserId(), java.time.Instant.now())));
+    }
+
+    /** Closes a shift the phone opened offline and knows only by the id it made for the open. Same checks as closing by id. */
+    @PostMapping("/shifts/by-request/{openRequestId}/close")
+    @PreAuthorize(RUN)
+    public ResponseEntity<ApiResponse<ShiftResponse>> closeByRequest(@PathVariable UUID openRequestId, @Valid @RequestBody CloseShiftRequest req) {
+        featureGuard.requireModule("fuel");
+        return ResponseEntity.ok(ApiResponse.success("Shift closed", offline.closeByOpenRequest(TenantContext.getTenantIdAsObject(), openRequestId, req,
+                TenantContext.getCurrentUserId(), java.time.Instant.now())));
     }
 
     @PostMapping("/shifts/{id}/reverse")

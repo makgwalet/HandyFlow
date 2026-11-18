@@ -101,6 +101,12 @@ public class FuelTruckStopStay {
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt = Instant.now();
 
+    @Column(name = "book_request_id") private UUID bookRequestId;
+    @Column(name = "check_in_request_id") private UUID checkInRequestId;
+    @Column(name = "check_out_request_id") private UUID checkOutRequestId;
+    @Column(name = "captured_check_in_at") private Instant capturedCheckInAt;
+    @Column(name = "captured_check_out_at") private Instant capturedCheckOutAt;
+
     @Version
     private Long version;
 
@@ -138,6 +144,10 @@ public class FuelTruckStopStay {
     }
 
     private static String clean(String v, int max) { return v == null || v.isBlank() ? null : (v.trim().length() > max ? v.trim().substring(0, max) : v.trim()); }
+
+    public void stampBook(UUID requestId) { this.bookRequestId = requestId; }
+    public void stampCheckIn(UUID requestId, Instant capturedAt) { this.checkInRequestId = requestId; this.capturedCheckInAt = capturedAt; }
+    public void stampCheckOut(UUID requestId, Instant capturedAt) { this.checkOutRequestId = requestId; this.capturedCheckOutAt = capturedAt; }
 
     public void checkIn() {
         requireStatus("check in", BOOKED);

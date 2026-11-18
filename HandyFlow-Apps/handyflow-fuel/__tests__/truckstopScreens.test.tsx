@@ -6,12 +6,15 @@ import { staySchema } from "@truckstop/stays";
 
 const mockApi = jest.fn();
 const mockRefresh = jest.fn(async () => undefined);
+const mockEnqueue = jest.fn(async () => ({}));
+let mockPending: any[] = [];
 let mockStays: any[] = [];
 let mockRequests: any[] = [];
 let mockPermissions = ["FUEL_TRUCKSTOP_MANAGE"];
 class MockApiError extends Error { constructor(m: string, readonly status: number) { super(m); } get isNetwork() { return this.status === 0; } }
 
 jest.mock("@/api/client", () => ({ api: (...a: unknown[]) => mockApi(...a), get ApiError() { return MockApiError; } }));
+jest.mock("@/offline/OutboxProvider", () => ({ useOutbox: () => ({ enqueue: mockEnqueue, pending: mockPending }) }));
 jest.mock("@/auth/AuthContext", () => ({ useAuth: () => ({ session: { permissions: mockPermissions } }) }));
 jest.mock("react-native-safe-area-context", () => ({ SafeAreaView: ({ children }: any) => children }));
 jest.mock("@/ui/SyncBanner", () => ({ SyncBanner: () => null }));
@@ -30,23 +33,39 @@ jest.mock("@/ui/Screen", () => {
 const stay = (o: any = {}) => staySchema.parse({ id: "S1", vehicleRegistration: "ABC 123 GP", arrivalDate: "2020-01-01", departureDate: "2030-01-01", status: "BOOKED", nights: 1, ...o });
 const props = { route: { params: { stayId: "S1" } } } as any;
 
-beforeEach(() => { mockApi.mockReset(); mockRefresh.mockClear(); mockPermissions = ["FUEL_TRUCKSTOP_MANAGE"]; mockStays = [stay()]; mockRequests = []; });
+beforeEach(() => { mockEnqueue.mockReset(); mockEnqueue.mockResolvedValue({}); mockPending = []; mockApi.mockReset(); mockRefresh.mockClear(); mockPermissions = ["FUEL_TRUCKSTOP_MANAGE"]; mockStays = [stay()]; mockRequests = []; });
 
 describe("StayDetailScreen", () => {
-  it("checks a due truck in and shows the server's answer", async () => {
-    mockApi.mockResolvedValue({ ...mockStays[0], status: "CHECKED_IN" });
+  it("saves a check-in on the phone and does not claim the truck is in until the server says so", async () => {
     await render(<StayDetailScreen {...props} />);
     await fireEvent.press(screen.getByLabelText("Check in"));
-    await waitFor(() => expect(screen.getByText("Saved.")).toBeTruthy());
-    expect(mockApi).toHaveBeenCalledWith("/api/v1/fuel/truck-stop/stays/S1/check-in", { method: "POST" });
-    expect(screen.getByLabelText("Check out")).toBeTruthy();
-    expect(mockRefresh).toHaveBeenCalled();
+    await waitFor(() => expect(screen.getByText(/Saved on this phone\. It is not confirmed/)).toBeTruthy());
+    expect(mockEnqueue).toHaveBeenCalledWith("STAY_CHECK_IN", { stayId: "S1" });
+    expect(mockApi).not.toHaveBeenCalled();
   });
-  it("shows the server's refusal", async () => {
-    mockApi.mockRejectedValue(new MockApiError("This truck is not due until 2026-12-01.", 409));
+  it("saves a check-out with the date it was captured, so a late sync adds no nights", async () => {
+    mockStays = [stay({ status: "CHECKED_IN" })];
+    await render(<StayDetailScreen {...props} />);
+    await fireEvent.press(screen.getByLabelText("Check out"));
+    await waitFor(() => expect(mockEnqueue).toHaveBeenCalledWith("STAY_CHECK_OUT", { stayId: "S1", date: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/) }));
+  });
+  it("hides the actions while one is waiting to send, so it cannot be queued twice", async () => {
+    mockPending = [{ kind: "STAY_CHECK_IN", payload: { stayId: "S1" } }];
+    await render(<StayDetailScreen {...props} />);
+    expect(screen.getByText(/Check-in saved on this phone and waiting to send/)).toBeTruthy();
+    expect(screen.queryByLabelText("Check in")).toBeNull();
+  });
+  it("stays on the screen with the reason when the phone cannot save", async () => {
+    mockEnqueue.mockRejectedValue(new Error("The phone's queue is not ready yet."));
     await render(<StayDetailScreen {...props} />);
     await fireEvent.press(screen.getByLabelText("Check in"));
-    await waitFor(() => expect(screen.getByText(/not due until/)).toBeTruthy());
+    await waitFor(() => expect(screen.getByText(/queue is not ready/)).toBeTruthy());
+  });
+  it("still sends a no-show online", async () => {
+    mockApi.mockResolvedValue({ ...mockStays[0], status: "NO_SHOW" });
+    await render(<StayDetailScreen {...props} />);
+    await fireEvent.press(screen.getByLabelText("Did not arrive"));
+    await waitFor(() => expect(mockApi).toHaveBeenCalledWith("/api/v1/fuel/truck-stop/stays/S1/no-show", { method: "POST" }));
   });
   it("assigns and clears a bay", async () => {
     mockApi.mockResolvedValue({ ...mockStays[0], bayId: "B2" });

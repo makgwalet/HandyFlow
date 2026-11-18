@@ -13,6 +13,11 @@ export const KIND_LABEL: Record<OutboxItem["kind"], string> = {
   EVIDENCE: "Photo",
   DIP_READING: "Dip reading",
   RECEIVE_FUEL: "Fuel received",
+  SHIFT_OPEN: "Open shift",
+  SHIFT_CLOSE: "Close shift and cash-up",
+  STAY_BOOK: "Book stay",
+  STAY_CHECK_IN: "Check truck in",
+  STAY_CHECK_OUT: "Check truck out",
 };
 
 export function SyncCentreScreen() {

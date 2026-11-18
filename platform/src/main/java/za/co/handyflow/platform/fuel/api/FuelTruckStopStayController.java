@@ -23,6 +23,7 @@ import java.util.UUID;
 public class FuelTruckStopStayController {
 
     private final FuelTruckStopStayService service;
+    private final za.co.handyflow.platform.fuel.application.internal.FuelOfflineService offline;
     private final za.co.handyflow.platform.fuel.application.internal.FuelStayInvoicingService invoicing;
     private final za.co.handyflow.platform.fuel.application.internal.FuelTruckStopFleetLinks fleetLinks;
     private final FeatureGuard featureGuard;
@@ -76,14 +77,14 @@ public class FuelTruckStopStayController {
     @PreAuthorize("hasAnyAuthority('FUEL_MANAGE','FUEL_TRUCKSTOP_MANAGE')")
     public ResponseEntity<ApiResponse<StayView>> book(@Valid @RequestBody BookRequest req) {
         featureGuard.requireModule("fuel");
-        return ResponseEntity.ok(ApiResponse.success("Stay booked", service.book(TenantContext.getTenantIdAsObject(), req, TenantContext.getCurrentUserId(), today())));
+        return ResponseEntity.ok(ApiResponse.success("Stay booked", offline.book(TenantContext.getTenantIdAsObject(), req, TenantContext.getCurrentUserId(), today(), java.time.Instant.now())));
     }
 
     @PostMapping("/stays/{id}/check-in")
     @PreAuthorize("hasAnyAuthority('FUEL_MANAGE','FUEL_TRUCKSTOP_MANAGE')")
-    public ResponseEntity<ApiResponse<StayView>> checkIn(@PathVariable UUID id) {
+    public ResponseEntity<ApiResponse<StayView>> checkIn(@PathVariable UUID id, @RequestBody(required = false) CheckInRequest req) {
         featureGuard.requireModule("fuel");
-        return ResponseEntity.ok(ApiResponse.success("Checked in", service.checkIn(TenantContext.getTenantIdAsObject(), id, today())));
+        return ResponseEntity.ok(ApiResponse.success("Checked in", offline.checkIn(TenantContext.getTenantIdAsObject(), id, req, TenantContext.getCurrentUserId(), today(), java.time.Instant.now())));
     }
 
     /** Checks the truck out, then raises the draft invoice if the stay is on an account. A failed invoice never undoes the check-out; it can be retried. */
@@ -92,7 +93,7 @@ public class FuelTruckStopStayController {
     public ResponseEntity<ApiResponse<StayView>> checkOut(@PathVariable UUID id, @RequestBody(required = false) CheckOutRequest req) {
         featureGuard.requireModule("fuel");
         var tenant = TenantContext.getTenantIdAsObject();
-        StayView out = service.checkOut(tenant, id, req, today());
+        StayView out = offline.checkOut(tenant, id, req, TenantContext.getCurrentUserId(), today(), java.time.Instant.now());
         if (out.accountId() == null) return ResponseEntity.ok(ApiResponse.success("Checked out", out));
         try {
             return ResponseEntity.ok(ApiResponse.success("Checked out. Draft invoice raised", invoicing.invoice(tenant, id)));

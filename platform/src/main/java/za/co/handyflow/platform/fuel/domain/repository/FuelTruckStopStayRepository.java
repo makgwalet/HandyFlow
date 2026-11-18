@@ -61,4 +61,13 @@ public interface FuelTruckStopStayRepository extends JpaRepository<FuelTruckStop
     /** Stays charged to an account that left within [from, to], oldest first. */
     @Query("SELECT s FROM FuelTruckStopStay s WHERE s.tenantId = :tenantId AND s.accountId = :accountId AND s.status = 'CHECKED_OUT' AND s.actualDepartureDate >= :from AND s.actualDepartureDate <= :to ORDER BY s.actualDepartureDate, s.createdAt")
     List<FuelTruckStopStay> findChargedToAccount(TenantId tenantId, UUID accountId, LocalDate from, LocalDate to);
+
+    @Query("SELECT s FROM FuelTruckStopStay s WHERE s.tenantId = :tenantId AND s.bookRequestId = :requestId")
+    Optional<FuelTruckStopStay> findByBookRequest(TenantId tenantId, UUID requestId);
+
+    @Query("SELECT s FROM FuelTruckStopStay s WHERE s.tenantId = :tenantId AND s.checkInRequestId = :requestId")
+    Optional<FuelTruckStopStay> findByCheckInRequest(TenantId tenantId, UUID requestId);
+
+    @Query("SELECT s FROM FuelTruckStopStay s WHERE s.tenantId = :tenantId AND s.checkOutRequestId = :requestId")
+    Optional<FuelTruckStopStay> findByCheckOutRequest(TenantId tenantId, UUID requestId);
 }
