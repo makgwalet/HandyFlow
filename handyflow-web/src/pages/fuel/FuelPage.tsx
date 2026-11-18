@@ -32,6 +32,7 @@ import ContractsTab from "./ContractsTab"
 import StaysTab from "./StaysTab"
 import GroupReportTab from "./GroupReportTab"
 import DivisionSalesTab from "./DivisionSalesTab"
+import FleetMapTab from "./FleetMapTab"
 import AutomationTab from "./AutomationTab"
 import SettingsTab from "./SettingsTab"
 import VariancesTab from "./VariancesTab"
@@ -87,6 +88,7 @@ export function FuelPage() {
         case "orders":     return <OrdersTab />
         case "invoicing":  return <InvoicingTab />
         case "planning":   return <PlanningTab />
+        case "fleet-map":  return <FleetMapTab />
         case "eligibility": return <EligibilityTab />
         case "driver":     return <DriverTab />
         case "pricing":    return <PricingTab />
