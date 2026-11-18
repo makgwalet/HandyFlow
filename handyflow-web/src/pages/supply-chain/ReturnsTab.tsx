@@ -7,6 +7,7 @@ import { Undo2 } from "lucide-react"
 import { TH, TD, Modal, ModalFooter, ErrBox, Spinner, EmptyState, filterPill, fmtR, fmtDate } from "./scm.shared"
 import { asList, errorText, returnStep, returnActions, creditProblem, RETURN_STEPS, type ReturnAction } from "./scmOps"
 import { StatCard, Panel, Pill, Stepper, grid, type Tone } from "./scmUi"
+import { NewReturnDialog } from "./NewReturnDialog"
 
 export interface SupplierReturn { id: string; returnNumber: string; kind: string; reason: string; status: string; supplierName: string; expectedCredit: number | null; creditNoteRef: string | null; creditAmount: number | null; statusReason: string | null; createdAt: string; lines: { id: string; itemName: string; qty: number; lineTotal: number }[] }
 const BASE = "/api/v1/supply-chain/returns"
@@ -25,6 +26,7 @@ export function ReturnsTab() {
   const [pending, setPending] = useState<{ r: SupplierReturn; action: ReturnAction } | null>(null)
   const [note, setNote] = useState(""); const [ref, setRef] = useState(""); const [amount, setAmount] = useState("")
   const [err, setErr] = useState("")
+  const [creating, setCreating] = useState(false)
 
   const q = useQuery({ queryKey: ["scm-returns"], queryFn: () => apiClient.get(BASE).then(asList<SupplierReturn>) })
   const run = useMutation({
@@ -65,7 +67,7 @@ export function ReturnsTab() {
         <StatCard label="Credit recovered" value={fmtR(recovered)} tone="ok" />
       </div>
       {err && !pending && <ErrBox msg={err} />}
-      <div style={{ display: "flex", gap: 8 }}>{FILTERS.map(f => <button key={f} style={filterPill(filter === f)} onClick={() => setFilter(f)}>{f[0] + f.slice(1).toLowerCase()}</button>)}</div>
+      <div style={{ display: "flex", gap: 8, alignItems: "center" }}>{FILTERS.map(f => <button key={f} style={filterPill(filter === f)} onClick={() => setFilter(f)}>{f[0] + f.slice(1).toLowerCase()}</button>)}<div style={{ flex: 1 }} />{canManage && <button style={filterPill(true)} onClick={() => setCreating(true)}>New return or claim</button>}</div>
 
       {q.isLoading ? <Spinner /> : q.isError ? <ErrBox msg={errorText(q.error, "Could not load returns")} /> : rows.length === 0 ? (
         <EmptyState icon={Undo2} title="No returns" sub="Goods sent back to suppliers, and claims, appear here." />
@@ -97,6 +99,8 @@ export function ReturnsTab() {
           })}
         </div>
       )}
+
+      {creating && <NewReturnDialog onClose={() => setCreating(false)} />}
 
       {pending && (
         <Modal title={`${LABEL[pending.action]} — ${pending.r.returnNumber}`} onClose={() => { setPending(null); setErr("") }}>

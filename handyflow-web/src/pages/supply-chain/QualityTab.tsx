@@ -7,8 +7,9 @@ import { ShieldAlert } from "lucide-react"
 import { TH, TD, Modal, ModalFooter, ErrBox, Spinner, EmptyState, filterPill, fmtDate } from "./scm.shared"
 import { asList, errorText, quarantineProblem } from "./scmOps"
 import { StatCard, Panel, Pill, grid, type Tone } from "./scmUi"
+import { StartInspection, RecordInspection, type InspectionDto } from "./InspectionRecorder"
 
-interface Inspection { id: string; inspectionNumber: string; status: string; result: string | null; inspectedByName: string | null; createdAt: string; returnId: string | null; lines: { id: string; itemName: string; qtyInspected: number; qtyPassed: number; qtyFailed: number; defectCode: string | null }[] }
+type Inspection = InspectionDto & { result: string | null; inspectedByName: string | null; createdAt: string; returnId: string | null }
 interface Hold { id: string; itemName: string; qty: number; released: number; returned: number; writtenOff: number; open: number; status: string; defectCode: string | null; createdAt: string }
 const BASE = "/api/v1/supply-chain"
 const RESULT_TONE: Record<string, Tone> = { PASSED: "ok", PASS: "ok", FAILED: "bad", FAIL: "bad", PARTIAL: "warn" }
@@ -18,6 +19,8 @@ export function QualityTab() {
   const canManage = usePermissions(["SCM_QUALITY_MANAGE", "SCM_ADMIN"])
   const [view, setView] = useState<"quarantine" | "inspections">("quarantine")
   const [act, setAct] = useState<{ hold: Hold; kind: "release" | "write-off" } | null>(null)
+  const [starting, setStarting] = useState(false)
+  const [recording, setRecording] = useState<InspectionDto | null>(null)
   const [qty, setQty] = useState(""); const [reason, setReason] = useState(""); const [err, setErr] = useState("")
 
   const holds = useQuery({ queryKey: ["scm-quarantine"], queryFn: () => apiClient.get(`${BASE}/quarantine`, { params: { status: "OPEN" } }).then(asList<Hold>) })
@@ -47,6 +50,8 @@ export function QualityTab() {
       <div style={{ display: "flex", gap: 8 }}>
         <button style={filterPill(view === "quarantine")} onClick={() => setView("quarantine")}>Quarantine</button>
         <button style={filterPill(view === "inspections")} onClick={() => setView("inspections")}>Inspections</button>
+        <div style={{ flex: 1 }} />
+        {canManage && <button style={filterPill(true)} onClick={() => setStarting(true)}>Start inspection</button>}
       </div>
 
       {view === "quarantine" && (holds.isLoading ? <Spinner /> : holds.isError ? <ErrBox msg={errorText(holds.error, "Could not load quarantine")} /> : h.length === 0 ? (
@@ -72,15 +77,19 @@ export function QualityTab() {
         <EmptyState icon={ShieldAlert} title="No inspections" sub="Inspections of received goods appear here." />
       ) : (
         <div style={{ display: "grid", gap: 10 }}>{inspections.map(i => {
-          const passed = i.lines.reduce((s, l) => s + l.qtyPassed, 0), failed = i.lines.reduce((s, l) => s + l.qtyFailed, 0)
+          const passed = i.lines.reduce((s, l) => s + Number(l.qtyPassed), 0), failed = i.lines.reduce((s, l) => s + Number(l.qtyFailed), 0)
           return (
             <Panel key={i.id} title={i.inspectionNumber} right={<Pill tone={i.result ? RESULT_TONE[i.result] ?? "neutral" : "info"}>{i.result ?? i.status}</Pill>}>
               <div style={{ display: "flex", gap: 18, flexWrap: "wrap", fontSize: 13, color: "var(--hf-text-secondary)" }}>
                 <span>{fmtDate(i.createdAt)}</span><span>By {i.inspectedByName ?? "—"}</span><span>Passed {passed}</span><span>Failed {failed}</span>{i.returnId && <span>Return raised</span>}
+                {canManage && i.status === "OPEN" && <button style={filterPill(true)} onClick={() => setRecording(i)}>Record results</button>}
               </div>
             </Panel>)
         })}</div>
       ))}
+
+      {starting && <StartInspection onClose={() => setStarting(false)} onStarted={i => { setStarting(false); setView("inspections"); setRecording(i) }} />}
+      {recording && <RecordInspection inspection={recording} onClose={() => setRecording(null)} />}
 
       {act && (
         <Modal title={`${act.kind === "release" ? "Release" : "Scrap"} — ${act.hold.itemName}`} onClose={() => setAct(null)}>

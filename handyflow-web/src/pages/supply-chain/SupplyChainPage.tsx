@@ -9,9 +9,10 @@ import { PurchaseOrdersTab }  from "./PurchaseOrdersTab"
 import { InventoryTab }       from "./InventoryTab"
 import { InvoicesTab }        from "./InvoicesTab"
 import { RequisitionsTab }    from "./RequisitionsTab"
-import { RfqTab }             from "./RfqTab"
+import { TendersTab }         from "./TendersTab"
 import { BudgetsTab }         from "./BudgetsTab"
 import { AnalyticsTab }       from "./AnalyticsTab"
+import { AccessTab }          from "./AccessTab"
 import { PolicyTab }          from "./PolicyTab"
 import { ContractsTab }       from "./ContractsTab"
 import { ReturnsTab }         from "./ReturnsTab"
@@ -32,12 +33,13 @@ export function SupplyChainPage() {
           case "inventory":       return <InventoryTab />
           case "invoices":        return <InvoicesTab />
           case "requisitions":    return <RequisitionsTab />
-          case "rfqs":            return <RfqTab />
+          case "rfqs":            return <TendersTab />
           case "budgets":         return <BudgetsTab />
           case "contracts":       return <ContractsTab />
           case "returns":         return <ReturnsTab />
           case "quality":         return <QualityTab />
           case "replenishment":   return <ReplenishmentTab />
+          case "access":          return <AccessTab />
           case "policy":          return <PolicyTab />
           case "analytics":       return <AnalyticsTab />
           default:                return null

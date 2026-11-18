@@ -412,3 +412,204 @@ export function monthSeries(byMonth: { label: string; amount: number }[], months
   const m = new Map(byMonth.map(x => [x.label, Number(x.amount)]))
   return months.map(month => ({ month, amount: m.get(month) ?? 0 }))
 }
+
+// ── Tenders (RFQ workspace) ─────────────────────────────────────────────────────────────────────────────────────────────────────
+export const TENDER_STEPS = ["Draft", "Open", "Closed", "Awarded", "Order placed"] as const
+/** Index on the tender stepper, or -1 when cancelled. */
+export function tenderStep(status: string, hasPo: boolean): number {
+  if (status === "CANCELLED") return -1
+  if (status === "AWARDED") return hasPo ? 4 : 3
+  return ({ DRAFT: 0, OPEN: 1, CLOSED: 2 } as Record<string, number>)[status] ?? 0
+}
+
+export const CREATE_STEPS = ["Details", "Items", "Suppliers", "Scoring", "Review"] as const
+/** What blocks moving on from each create step (null = can continue). The server re-checks everything on save. */
+export function createStepProblem(step: number, f: RfqForm): string | null {
+  if (step === 0) return f.title.trim() ? null : "Give the tender a title"
+  if (step === 1) {
+    if (f.lines.some(l => !l.itemName.trim())) return "Every line needs an item"
+    if (f.lines.some(l => !(Number(l.quantity) > 0))) return "Every line needs a quantity above zero"
+    return null
+  }
+  if (step === 2) return f.supplierIds.length === 0 ? "Invite at least one supplier" : null
+  if (step === 3) return weightsProblem(f.weights)
+  return rfqProblem(f)
+}
+
+/** The row's best cell: lowest for "low" metrics, highest for "high". Ties and missing values never win. */
+export function bestIndex(values: (number | null | undefined)[], better: "low" | "high"): number | null {
+  let best: number | null = null
+  values.forEach((v, i) => {
+    if (v == null || !Number.isFinite(v)) return
+    if (best == null) { best = i; return }
+    const b = values[best] as number
+    if (better === "low" ? v < b : v > b) best = i
+  })
+  if (best == null) return null
+  const b = values[best] as number
+  return values.filter(v => v === b).length > 1 ? null : best
+}
+
+/** Totals for a quotation being captured: lines × (1 − discount) + delivery + other charges (before VAT). */
+export function quoteTotals(f: QuoteForm): { subtotal: number; landed: number } {
+  const subtotal = f.lines.reduce((s, l) => {
+    if (l.noBid) return s
+    const q = Number(l.quantity), p = Number(l.unitPrice), d = Number(l.discountPct || 0)
+    return s + (Number.isFinite(q) && Number.isFinite(p) ? q * p * (1 - (Number.isFinite(d) ? d : 0) / 100) : 0)
+  }, 0)
+  const extra = (Number(f.deliveryCost) || 0) + (Number(f.otherCharges) || 0)
+  return { subtotal, landed: subtotal + extra }
+}
+
+export function technicalScoreProblem(score: string): string | null {
+  if (score.trim() === "") return "Enter a score from 0 to 100"
+  const n = Number(score)
+  return Number.isInteger(n) && n >= 0 && n <= 100 ? null : "The score is a whole number from 0 to 100"
+}
+
+/** Invitation progress: how many invited suppliers answered (quoted or declined). */
+export function responseProgress(inv: { status: string }[]): { answered: number; total: number; pct: number } {
+  const answered = inv.filter(i => i.status !== "INVITED").length
+  return { answered, total: inv.length, pct: inv.length ? Math.round((answered / inv.length) * 100) : 0 }
+}
+
+// ── Budgets: allocation, variance, commitments ─────────────────────────────────────────────────────────────────────────────────
+export interface BudgetLike { id: string; name: string; scopeType: string; scopeValue: string; amount: number; committed: number; actual: number; used: number; available: number; utilisationPct: number; state: string; status?: string }
+
+export function budgetTotals(list: BudgetLike[]) {
+  const live = list.filter(b => b.status !== "CLOSED")
+  const sum = (f: (b: BudgetLike) => number) => live.reduce((s, b) => s + Number(f(b) || 0), 0)
+  const allocated = sum(b => b.amount), used = sum(b => b.used)
+  return { allocated, committed: sum(b => b.committed), actual: sum(b => b.actual), used, available: allocated - used,
+    exceeded: live.filter(b => b.state === "EXCEEDED").length, near: live.filter(b => b.state === "NEAR_LIMIT").length, count: live.length }
+}
+
+/** How the money is allocated: per kind of scope, each budget's share of that kind's total. Largest first. */
+export function allocationBy(list: BudgetLike[]): { scopeType: string; allocated: number; used: number; items: (BudgetLike & { sharePct: number })[] }[] {
+  const groups = new Map<string, BudgetLike[]>()
+  for (const b of list.filter(x => x.status !== "CLOSED")) groups.set(b.scopeType, [...(groups.get(b.scopeType) ?? []), b])
+  return [...groups].map(([scopeType, items]) => {
+    const allocated = items.reduce((s, b) => s + Number(b.amount), 0)
+    return { scopeType, allocated, used: items.reduce((s, b) => s + Number(b.used), 0),
+      items: [...items].sort((a, b) => b.amount - a.amount).map(b => ({ ...b, sharePct: allocated > 0 ? (Number(b.amount) / allocated) * 100 : 0 })) }
+  }).sort((a, b) => b.allocated - a.allocated)
+}
+
+/** Variance = allocated − used. Negative means overspent. */
+export const budgetVariance = (b: { amount: number; used: number }) => Number(b.amount) - Number(b.used)
+
+/** Bar segments as percentages of the allocation: invoiced, committed-but-not-yet-invoiced, and anything over. Always sums to ≤ 100 plus `over`. */
+export function budgetBar(b: { amount: number; actual: number; used: number }): { actualPct: number; committedPct: number; overPct: number } {
+  const amt = Number(b.amount); if (!(amt > 0)) return { actualPct: 0, committedPct: 0, overPct: 0 }
+  const used = Number(b.used), actual = Math.min(Number(b.actual), used)
+  const within = Math.min(used, amt)
+  const actualPct = Math.min(actual, within) / amt * 100
+  return { actualPct, committedPct: (within / amt * 100) - actualPct, overPct: used > amt ? (used - amt) / amt * 100 : 0 }
+}
+
+export interface BudgetCheckForm { department: string; costCentre: string; projectRef: string; amount: string }
+export function budgetCheckProblem(f: BudgetCheckForm): string | null {
+  if (!(Number(f.amount) > 0)) return "Enter the amount to test, above zero"
+  if (!f.department.trim() && !f.costCentre.trim() && !f.projectRef.trim()) return "Enter a department, cost centre or project"
+  return null
+}
+export function budgetCheckParams(f: BudgetCheckForm) {
+  const p: Record<string, string | number> = { amount: Number(f.amount) }
+  if (f.department.trim()) p.department = f.department.trim()
+  if (f.costCentre.trim()) p.costCentre = f.costCentre.trim()
+  if (f.projectRef.trim()) p.projectRef = f.projectRef.trim()
+  return p
+}
+
+// ── Inspection recording ────────────────────────────────────────────────────────────────────────────────────────────────────────
+export interface InspectLineForm { lineId: string; itemName: string; accepted: number; passed: string; failed: string; defectCode: string; notes: string }
+export function inspectionProblem(lines: InspectLineForm[]): string | null {
+  if (!lines.some(l => Number(l.passed) + Number(l.failed) > 0)) return "Record a result for at least one line"
+  for (const l of lines) {
+    const p = Number(l.passed || 0), f = Number(l.failed || 0)
+    if (![p, f].every(n => Number.isFinite(n) && n >= 0)) return `${l.itemName}: quantities cannot be negative`
+    if (p + f > l.accepted) return `${l.itemName}: ${p + f} inspected is more than the ${l.accepted} received`
+    if (f > 0 && !l.defectCode.trim()) return `${l.itemName}: say what is wrong with the failed units`
+  }
+  return null
+}
+export const inspectionBody = (lines: InspectLineForm[], notes: string) => ({
+  notes: notes.trim() || null,
+  lines: lines.map(l => ({ lineId: l.lineId, qtyPassed: Number(l.passed || 0), qtyFailed: Number(l.failed || 0), defectCode: l.defectCode.trim() || null, notes: l.notes.trim() || null })),
+})
+export function inspectionOutcome(lines: InspectLineForm[]): { passed: number; failed: number; text: string } {
+  const passed = lines.reduce((s, l) => s + Number(l.passed || 0), 0), failed = lines.reduce((s, l) => s + Number(l.failed || 0), 0)
+  return { passed, failed, text: failed === 0 ? "All inspected units pass" : passed === 0 ? "Every inspected unit fails" : `${failed} of ${passed + failed} units fail` }
+}
+
+// ── New return or claim ─────────────────────────────────────────────────────────────────────────────────────────────────────────
+export const RETURN_REASONS: { value: string; label: string }[] = [
+  { value: "DAMAGED", label: "Damaged" }, { value: "WRONG_ITEM", label: "Wrong item" }, { value: "SHORT_SUPPLY", label: "Short supply" },
+  { value: "QUALITY", label: "Quality" }, { value: "OVERCHARGE", label: "Overcharge" }, { value: "OTHER", label: "Other" },
+]
+export interface ReturnLineForm { grLineId: string | null; itemName: string; qty: string; unitCost: string; max: number | null }
+export interface ReturnForm { kind: "RETURN" | "CLAIM"; reason: string; supplierId: string; goodsReceiptId: string; notes: string; lines: ReturnLineForm[] }
+export const emptyReturn = (): ReturnForm => ({ kind: "RETURN", reason: "DAMAGED", supplierId: "", goodsReceiptId: "", notes: "", lines: [{ grLineId: null, itemName: "", qty: "1", unitCost: "", max: null }] })
+export function returnProblem(f: ReturnForm): string | null {
+  if (!f.supplierId && !f.goodsReceiptId) return "Choose the supplier, or the goods receipt it is about"
+  if (f.reason === "OTHER" && !f.notes.trim()) return "Explain the reason in the notes"
+  const used = f.lines.filter(l => Number(l.qty) > 0)
+  if (used.length === 0) return "Add at least one line with a quantity"
+  for (const l of used) {
+    if (l.max != null && Number(l.qty) > l.max) return `${l.itemName}: only ${l.max} can be returned`
+    if (!l.grLineId && !l.itemName.trim()) return "Name the item on each line"
+    if (!l.grLineId && !(Number(l.unitCost) >= 0 && l.unitCost.trim() !== "")) return `${l.itemName || "A line"}: enter the unit cost`
+  }
+  return null
+}
+export const returnBody = (f: ReturnForm) => ({
+  kind: f.kind, reason: f.reason, supplierId: f.supplierId || null, goodsReceiptId: f.goodsReceiptId || null, notes: f.notes.trim() || null,
+  lines: f.lines.filter(l => Number(l.qty) > 0).map(l => l.grLineId ? { grLineId: l.grLineId, itemName: null, qty: Number(l.qty), unitCost: null } : { grLineId: null, itemName: l.itemName.trim(), qty: Number(l.qty), unitCost: Number(l.unitCost) }),
+})
+export const returnValue = (f: ReturnForm) => f.lines.reduce((s, l) => s + (Number(l.qty) > 0 ? Number(l.qty) * (Number(l.unitCost) || 0) : 0), 0)
+
+// ── Roles & permissions ─────────────────────────────────────────────────────────────────────────────────────────────────────────
+/** Supply Chain permissions whose approval needs a different person from the one who raised the work (see the server's separation-of-duties rules). */
+export const SECOND_PERSON_PERMISSIONS = ["SCM_REQUISITION_APPROVE", "SCM_PRICE_OVERRIDE_APPROVE", "SCM_BUDGET_OVERRIDE", "SCM_RETURN_APPROVE", "SCM_SUPPLIER_BANK_VERIFY", "SCM_RFQ_MANAGE"] as const
+export const SECOND_PERSON_NOTE: Record<string, string> = {
+  SCM_REQUISITION_APPROVE: "Approver is not the requester",
+  SCM_PRICE_OVERRIDE_APPROVE: "Approver is not the buyer who set the price",
+  SCM_BUDGET_OVERRIDE: "Override needs a reason and a second person",
+  SCM_RETURN_APPROVE: "Approver is not who raised the return",
+  SCM_SUPPLIER_BANK_VERIFY: "Verifier is not who captured the bank change",
+  SCM_RFQ_MANAGE: "Awarding: the tender's creator cannot award it",
+}
+
+/** SCM_<AREA>_<ACTION> → area label. SCM_ADMIN and other two-part names go under "General". */
+export function permissionArea(name: string): string {
+  const parts = name.split("_")
+  if (parts.length < 3) return "General"
+  return parts[1][0] + parts[1].slice(1).toLowerCase()
+}
+export function scmPermissionGroups<T extends { name: string }>(perms: T[]): { area: string; items: T[] }[] {
+  const m = new Map<string, T[]>()
+  for (const p of perms.filter(x => x.name.startsWith("SCM_"))) m.set(permissionArea(p.name), [...(m.get(permissionArea(p.name)) ?? []), p])
+  return [...m].map(([area, items]) => ({ area, items: [...items].sort((a, b) => a.name.localeCompare(b.name)) }))
+    .sort((a, b) => (a.area === "General" ? -1 : b.area === "General" ? 1 : a.area.localeCompare(b.area)))
+}
+
+/** A role's permissions after edits: `edits` maps permission name → granted (true) / revoked (false). */
+export function effectivePermissions(current: string[], edits: Record<string, boolean>): string[] {
+  const s = new Set(current)
+  for (const [name, on] of Object.entries(edits)) { if (on) s.add(name); else s.delete(name) }
+  return [...s]
+}
+/** Ids to send to the server (it replaces the whole list), skipping names it does not know. */
+export function permissionIds(names: string[], idOf: Record<string, string>): string[] {
+  return names.map(n => idOf[n]).filter((x): x is string => !!x)
+}
+/** Only the edits that actually change something. */
+export function realEdits(current: string[], edits: Record<string, boolean>): Record<string, boolean> {
+  const cur = new Set(current)
+  return Object.fromEntries(Object.entries(edits).filter(([n, on]) => cur.has(n) !== on))
+}
+/** Warns before a role loses the ability to administer Supply Chain or approve anything. */
+export function revokeWarning(roleName: string, edits: Record<string, boolean>, userCount: number): string | null {
+  if (edits["SCM_ADMIN"] === false && userCount > 0) return `${userCount} user${userCount === 1 ? "" : "s"} in ${roleName} will lose Supply Chain admin rights.`
+  return null
+}

@@ -115,3 +115,56 @@ describe("ScmDashboard", () => {
     expect(await screen.findByText("Nothing needs attention.")).toBeTruthy()
   })
 })
+
+describe("Inspection and return creation", () => {
+  it("records inspection results and completes, refusing more than was received", async () => {
+    get.mockImplementation((u: string) => u.includes("quality-inspections") ? ok([{ id: "i1", inspectionNumber: "QI-1", status: "OPEN", goodsReceiptId: "g1", result: null, inspectedByName: null, createdAt: "2026-11-01T00:00:00Z", returnId: null, lines: [{ id: "il1", grLineId: "gl1", itemName: "Valve", qtyAcceptedOnReceipt: 10, qtyInspected: 0, qtyPassed: 0, qtyFailed: 0, defectCode: null, notes: null }] }]) : ok([]))
+    post.mockImplementation(() => ok({})); const put = vi.fn(() => ok({})); (await import("../../api/client")).apiClient.put = put as never
+    wrap(<QualityTab />); fireEvent.click(await screen.findByRole("button", { name: "Inspections" }))
+    fireEvent.click(await screen.findByRole("button", { name: "Record results" }))
+    fireEvent.change(screen.getByLabelText("Passed Valve"), { target: { value: "9" } }); fireEvent.change(screen.getByLabelText("Failed Valve"), { target: { value: "2" } })
+    fireEvent.click(screen.getByRole("button", { name: "Complete inspection" }))
+    expect(await screen.findByText(/more than the 10 received/)).toBeTruthy(); expect(put).not.toHaveBeenCalled()
+    fireEvent.change(screen.getByLabelText("Passed Valve"), { target: { value: "8" } })
+    fireEvent.click(screen.getByRole("button", { name: "Complete inspection" }))
+    expect(await screen.findByText(/what is wrong/)).toBeTruthy()
+    fireEvent.change(screen.getByLabelText("Defect Valve"), { target: { value: "cracked" } })
+    fireEvent.click(screen.getByRole("button", { name: "Complete inspection" }))
+    await waitFor(() => expect(post).toHaveBeenCalledWith(expect.stringMatching(/quality-inspections\/i1\/complete$/), { raiseReturnForFailures: true }))
+    expect(put).toHaveBeenCalledWith(expect.stringMatching(/i1\/results$/), expect.objectContaining({ lines: [expect.objectContaining({ qtyPassed: 8, qtyFailed: 2, defectCode: "cracked" })] }))
+  })
+  it("raises a return by hand and checks the form first", async () => {
+    get.mockImplementation((u: string) => u.endsWith("/suppliers") ? ok([{ id: "s1", name: "Acme" }]) : ok([])); post.mockImplementation(() => ok({}))
+    wrap(<ReturnsTab />); fireEvent.click(await screen.findByRole("button", { name: "New return or claim" }))
+    fireEvent.click(screen.getByRole("button", { name: "Save as draft" }))
+    expect(await screen.findByText(/Choose the supplier/)).toBeTruthy(); expect(post).not.toHaveBeenCalled()
+    await screen.findByRole("option", { name: "Acme" }); fireEvent.change(screen.getByLabelText("Supplier"), { target: { value: "s1" } }); fireEvent.change(screen.getByLabelText("Item 1"), { target: { value: "Bolts" } }); fireEvent.change(screen.getByLabelText("Unit cost 1"), { target: { value: "10" } })
+    fireEvent.click(screen.getByRole("button", { name: "Save as draft" }))
+    await waitFor(() => expect(post).toHaveBeenCalledWith(expect.stringMatching(/\/returns$/), expect.objectContaining({ kind: "RETURN", supplierId: "s1", lines: [{ grLineId: null, itemName: "Bolts", qty: 1, unitCost: 10 }] })))
+  })
+})
+
+import { AccessTab } from "./AccessTab"
+describe("AccessTab", () => {
+  const roles = [{ id: "r1", name: "Buyer", description: "", permissions: ["SCM_READ", "FUEL_READ"], userCount: 3 }, { id: "r2", name: "Manager", description: "", permissions: ["SCM_ADMIN"], userCount: 1 }]
+  const permsList = [{ id: "p1", name: "SCM_READ", description: "Read" }, { id: "p2", name: "SCM_ADMIN", description: "Admin" }, { id: "p3", name: "FUEL_READ", description: "Fuel" }, { id: "p4", name: "SCM_PRICE_OVERRIDE_APPROVE", description: "Approve price" }]
+  const route = () => get.mockImplementation((u: string) => u.endsWith("/roles") ? ok(roles) : ok(permsList))
+  it("lists only Supply Chain permissions and flags second-person approvals", async () => {
+    route(); perms = ["ROLE_MANAGE"]; wrap(<AccessTab />)
+    expect(await screen.findByLabelText("Buyer SCM_READ")).toBeTruthy(); expect(screen.queryByLabelText("Buyer FUEL_READ")).toBeNull()
+    expect(screen.getAllByText("2nd person").length).toBeGreaterThan(0)
+  })
+  it("saves the whole permission list, keeping permissions from other modules", async () => {
+    route(); perms = ["ROLE_MANAGE"]; const put = vi.fn(() => ok({})); (await import("../../api/client")).apiClient.put = put as never
+    wrap(<AccessTab />); fireEvent.click(await screen.findByLabelText("Buyer SCM_PRICE_OVERRIDE_APPROVE"))
+    fireEvent.click(await screen.findByRole("button", { name: "Save Buyer" }))
+    await waitFor(() => expect(put).toHaveBeenCalledWith(expect.stringMatching(/roles\/r1\/permissions$/), expect.arrayContaining(["p1", "p3", "p4"])))
+    expect((put.mock.calls[0] as unknown[])[1]).toHaveLength(3)
+  })
+  it("warns before admin is taken from a role with users, and is read-only without ROLE_MANAGE", async () => {
+    route(); perms = ["ROLE_MANAGE"]; wrap(<AccessTab />); fireEvent.click(await screen.findByLabelText("Manager SCM_ADMIN"))
+    expect(await screen.findByText(/1 user in Manager will lose Supply Chain admin/)).toBeTruthy()
+    cleanup(); perms = ["ROLE_READ"]; route(); wrap(<AccessTab />)
+    expect(((await screen.findByLabelText("Buyer SCM_READ")) as HTMLInputElement).disabled).toBe(true)
+  })
+})

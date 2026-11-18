@@ -616,7 +616,7 @@ export const SUPPLY_CHAIN_SECTIONS: ModuleSections = {
         { id: 'purchase-orders', label: 'Purchase Orders', icon: ShoppingCart },
         { id: 'invoices', label: 'Supplier Invoices', icon: FileText },
         { id: 'requisitions', label: 'Requisitions', icon: ClipboardList, anyPermission: ['SCM_REQUISITION_CREATE', 'SCM_REQUISITION_APPROVE', 'SCM_ADMIN'] },
-        { id: 'rfqs', label: 'RFQs', icon: Scale, anyPermission: ['SCM_RFQ_MANAGE', 'SCM_ORDER', 'SCM_READ', 'SCM_ADMIN'] },
+        { id: 'rfqs', label: 'Tenders & RFQs', icon: Scale, anyPermission: ['SCM_RFQ_MANAGE', 'SCM_ORDER', 'SCM_READ', 'SCM_ADMIN'] },
         { id: 'budgets', label: 'Budgets', icon: Wallet, anyPermission: ['SCM_BUDGET_READ', 'SCM_BUDGET_MANAGE', 'SCM_ADMIN'] },
         { id: 'contracts', label: 'Contracts', icon: FileSignature, anyPermission: ['SCM_READ', 'SCM_CONTRACT_READ', 'SCM_CONTRACT_MANAGE', 'SCM_ADMIN'] },
         { id: 'policy', label: 'Policy & price approvals', icon: Scale, anyPermission: ['SCM_READ', 'SCM_PRICE_OVERRIDE_APPROVE', 'SCM_ADMIN'] },
@@ -632,6 +632,7 @@ export const SUPPLY_CHAIN_SECTIONS: ModuleSections = {
       ],
     },
     { label: 'Insight', sections: [{ id: 'analytics', label: 'Analytics', icon: BarChart3, anyPermission: ['SCM_READ', 'SCM_ADMIN'] }] },
+    { label: 'Administration', sections: [{ id: 'access', label: 'Roles & approvals', icon: ShieldCheck, anyPermission: ['ROLE_READ', 'ROLE_MANAGE'] }] },
   ],
 }
 

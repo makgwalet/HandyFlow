@@ -3,7 +3,6 @@ import { render, screen, fireEvent, waitFor, cleanup } from "@testing-library/re
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import { RequisitionsTab } from "./RequisitionsTab"
 import { BudgetsTab } from "./BudgetsTab"
-import { RfqTab } from "./RfqTab"
 
 const get = vi.fn(); const post = vi.fn()
 let perms: string[] = []
@@ -80,52 +79,5 @@ describe("BudgetsTab", () => {
     get.mockImplementation(() => ok([{ id: "b1", name: "Workshop", scopeType: "DEPARTMENT", scopeValue: "Workshop", periodStart: "2026-01-01", periodEnd: "2026-12-31", amount: 1000, committed: 900, actual: 300, used: 1200, available: -200, utilisationPct: 120, state: "EXCEEDED", controlMode: "HARD_STOP" }]))
     wrap(<BudgetsTab />)
     expect(await screen.findByText(/120% — exceeded/)).toBeTruthy()
-  })
-})
-
-describe("RfqTab", () => {
-  const rfq = { id: "q1", rfqNumber: "RFQ-1", status: "CLOSED", title: "Tyres", closesAt: null, estimatedTotal: 8000, quotationCount: 2, awardedQuotationId: null, awardReason: null, overridesRecommendation: false, poId: null,
-    weights: { price: 50, leadTime: 15, technical: 15, performance: 10, bbbee: 10 }, lines: [{ id: "l1", itemName: "Tyre", quantity: 8 }], invitations: [{ supplierId: "s1", supplierName: "Alpha", status: "QUOTED" }, { supplierId: "s2", supplierName: "Beta", status: "QUOTED" }] }
-  const cmp = { recommendedQuotationId: "qa", lowestPriceQuotationId: "qb", rows: [
-    { quotationId: "qa", supplierName: "Alpha", status: "SUBMITTED", landedCost: 8200, totalInclVat: 9430, leadTimeDays: 5, rank: 1, totalScore: 88, ranked: true, flags: [], estimatedSaving: null },
-    { quotationId: "qb", supplierName: "Beta", status: "SUBMITTED", landedCost: 7900, totalInclVat: 9085, leadTimeDays: 14, rank: 2, totalScore: 79, ranked: true, flags: ["LONG_LEAD_TIME"], estimatedSaving: null }] }
-  const route = () => get.mockImplementation((u: string) => u.endsWith("/comparison") ? ok(cmp) : u.endsWith("/q1") ? ok(rfq) : ok([rfq]))
-
-  it("shows the recommendation and the lowest price", async () => {
-    route(); wrap(<RfqTab />)
-    fireEvent.click(await screen.findByText("RFQ-1"))
-    expect(await screen.findByText(/Recommended/)).toBeTruthy()
-    expect(screen.getByText("Lowest price")).toBeTruthy()
-    expect(screen.getByText("long lead time")).toBeTruthy()
-  })
-  it("awarding needs a reason, and warns when not the recommended quotation", async () => {
-    route(); wrap(<RfqTab />)
-    fireEvent.click(await screen.findByText("RFQ-1"))
-    await screen.findByText(/Recommended/)
-    fireEvent.click(screen.getAllByText("Choose")[1])
-    expect(await screen.findByText(/overriding the recommendation/)).toBeTruthy()
-    fireEvent.click(screen.getByText("Award"))
-    expect(await screen.findByText(/Record why/)).toBeTruthy()
-    expect(post).not.toHaveBeenCalled()
-    fireEvent.change(screen.getByLabelText("Award reason"), { target: { value: "Cheaper and in stock" } })
-    fireEvent.click(screen.getByText("Award"))
-    await waitFor(() => expect(post).toHaveBeenCalledWith(expect.stringContaining("/q1/award"), { quotationId: "qb", reason: "Cheaper and in stock" }))
-  })
-  it("will not save an RFQ whose weights do not add to 100", async () => {
-    route(); get.mockImplementation((u: string) => u.includes("suppliers") ? ok([{ id: "s1", name: "Alpha" }]) : ok([]))
-    wrap(<RfqTab />)
-    fireEvent.click(await screen.findByText("New RFQ"))
-    fireEvent.change(screen.getByLabelText("Title"), { target: { value: "Tyres" } })
-    fireEvent.change(screen.getByLabelText("Item 1"), { target: { value: "Tyre" } })
-    fireEvent.change(screen.getByLabelText("Price weight"), { target: { value: "70" } })
-    fireEvent.click(screen.getByText("Save draft"))
-    expect(await screen.findByText(/add up to 120/)).toBeTruthy()
-    expect(post).not.toHaveBeenCalled()
-  })
-  it("a person who cannot award sees no award controls", async () => {
-    perms = ["SCM_RFQ_MANAGE"]; route(); wrap(<RfqTab />)
-    fireEvent.click(await screen.findByText("RFQ-1"))
-    await screen.findByText(/Recommended/)
-    expect(screen.queryByText("Award")).toBeNull()
   })
 })
