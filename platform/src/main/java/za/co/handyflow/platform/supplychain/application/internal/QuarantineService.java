@@ -51,7 +51,7 @@ public class QuarantineService {
         int held = 0;
         for (Failed f : ordered) {
             Optional<ScInventory> src = inventoryRepo.lockByTenantIdAndLocationIdAndCatalogueItemId(tid, source, f.catalogueItemId());
-            BigDecimal qty = src.map(i -> f.qty().min(i.getQtyOnHand().max(BigDecimal.ZERO))).orElse(BigDecimal.ZERO);
+            BigDecimal qty = src.isPresent() ? f.qty().min(src.get().getQtyOnHand().max(BigDecimal.ZERO)) : BigDecimal.ZERO;
             if (qty.signum() <= 0) { log.warn("[SCM] Nothing left to quarantine for {} on inspection {}: the stock has been used", f.itemName(), inspectionId); continue; }
             ScInventory out = src.get();
             move(tid, out, "TRANSFER_OUT", qty.negate(), f.unitCost(), inspectionId, userId, userName);
