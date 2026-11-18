@@ -31,6 +31,7 @@ public class FuelTransportController {
 
     private final FuelTransportService transport;
     private final FuelDeliveryExceptionService exceptionService;
+    private final za.co.handyflow.platform.fuel.application.internal.FuelDeliveryExecutionService execution;
     private final FeatureGuard featureGuard;
     private final za.co.handyflow.platform.fuel.application.internal.FuelArrivalCheckService arrivalChecks;
 
@@ -151,6 +152,14 @@ public class FuelTransportController {
     }
 
     // ── C04: delivery windows and failed attempts ────────────────────────────
+
+    /** What happened to one load, in time order, for the office. Read-only. */
+    @GetMapping("/deliveries/{id}/execution")
+    @PreAuthorize("hasAuthority('FUEL_READ')")
+    public ResponseEntity<ApiResponse<za.co.handyflow.platform.fuel.dto.DeliveryExecutionDtos.Execution>> execution(@PathVariable UUID id) {
+        featureGuard.requireModule("fuel");
+        return ResponseEntity.ok(ApiResponse.success(execution.execution(TenantContext.getTenantIdAsObject(), id)));
+    }
 
     @GetMapping("/deliveries/{id}/exceptions")
     @PreAuthorize("hasAuthority('FUEL_READ')")

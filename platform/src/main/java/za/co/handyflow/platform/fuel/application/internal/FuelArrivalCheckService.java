@@ -67,6 +67,13 @@ public class FuelArrivalCheckService {
                 .map(c -> new ArrivalCheckView(c.getDeliveryId(), c.isAllowed(), fromJson(c.getFindings()), c.getCheckedAt()));
     }
 
+    /** Every check made on a load, newest first, for the office's view of the load. Read-only. */
+    @Transactional(readOnly = true)
+    public List<ArrivalCheckView> history(TenantId tenantId, UUID deliveryId) {
+        return checks.latest(tenantId, deliveryId, PageRequest.of(0, 50)).stream()
+                .map(c -> new ArrivalCheckView(c.getDeliveryId(), c.isAllowed(), fromJson(c.getFindings()), c.getCheckedAt())).toList();
+    }
+
     private FuelDelivery ownLoad(TenantId tenantId, UUID userId, UUID deliveryId) {
         if (userId == null) throw new IllegalStateException("You are not signed in as a user.");
         EmployeeSummary me = hr.findEmployeeByUserId(tenantId, userId)
