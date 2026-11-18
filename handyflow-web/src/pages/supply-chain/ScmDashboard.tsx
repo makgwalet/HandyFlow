@@ -1,233 +1,138 @@
-// src/pages/supply-chain/ScmDashboard.tsx
+// src/pages/supply-chain/ScmDashboard.tsx — Supply Chain overview: KPIs with trend, spend, order status, stock risk, supplier performance, alerts.
 import { useQuery } from "@tanstack/react-query"
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts"
+import { Users, ShoppingCart, FileText, Package, TrendingUp, Plus, ArrowRight } from "lucide-react"
 import { apiClient } from "../../api/client"
+import { usePermissions } from "../../hooks/usePermission"
 import { useThemeColors } from "../../theme/ThemeContext"
-import { Users, ShoppingCart, FileText, Package, AlertTriangle, TrendingUp, ArrowRight, CheckCircle } from "lucide-react"
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from "recharts"
+import { Badge, TH, TD, Spinner, fmtR, fmtDate } from "./scm.shared"
+import { asList, asOne, lastMonths, monthSeries, deltaPct, deltaText, statusBreakdown, dashboardAlerts, contractCounts, barWidth, pctText } from "./scmOps"
+import { StatCard, Panel, Pill, grid, toneColors } from "./scmUi"
 
-interface Summary {
-  totalSuppliers: number; openPurchaseOrders: number; pendingInvoices: number
-  invoicesForApproval: number; lowStockItems: number; overdueInvoices: number
-}
-interface PO {
-  id: string; orderNumber: string; supplierName: string; status: string
-  totalAmount: number; orderDate: string; requiredByDate: string | null
-}
-interface LowStockItem {
-  id: string; catalogueItemId: string; qtyOnHand: number; reorderPoint: number; avgCost: number
-}
-// NEW: backs real item names on the low-stock chart — same fix already
-// applied in InventoryTab.tsx for the identical truncated-UUID issue.
-interface CatalogueItem { id: string; name: string }
+const BASE = "/api/v1/supply-chain"
+interface Summary { totalSuppliers: number; openPurchaseOrders: number; pendingInvoices: number; invoicesForApproval: number; lowStockItems: number; overdueInvoices: number }
+interface PO { id: string; orderNumber: string; supplierName: string; status: string; totalAmount: number; orderDate: string }
+interface Spend { invoiced: number; byMonth: { label: string; amount: number }[] }
+interface SupplierView { supplierId: string; supplierName: string; score: number | null; rating: string | null; onTimePct: number | null; flag: string | null }
+interface RepItem { catalogueItemId: string; itemName: string; available: number; reorderLevel: number; urgency: string }
+const STATUS_VAR = ["--hf-info", "--hf-success", "--hf-warning", "--hf-violet", "--hf-danger", "--hf-text-faint"]
+const MONTHS = 6
 
-const fmtR  = (n: number) => `R ${Number(n ?? 0).toLocaleString("en-ZA", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
-const fmtD  = (d: string | null) => d ? new Date(d).toLocaleDateString("en-ZA") : "—"
-const ACCENT_TEXT = "var(--hf-warning-text)"  // text and icons (lighter in dark mode)
-// theme-codemod: charts-use-useThemeColors  (recharts colours are read via useThemeColors below)
+export function ScmDashboard({ onNav }: { onNav: (section: string) => void }) {
+  const color = useThemeColors()
+  const canAnalyse = usePermissions(["SCM_READ", "SCM_ADMIN"])
+  const canPrice = usePermissions(["SCM_PRICE_OVERRIDE_APPROVE", "SCM_ADMIN"])
+  const canRaise = usePermissions(["SCM_REQUISITION_CREATE", "SCM_ADMIN"])
+  const months = lastMonths(MONTHS)
+  const range = { from: `${months[0]}-01`, to: new Date().toISOString().slice(0, 10) }
+  const opt = { retry: false, staleTime: 60_000 } as const
 
-const PO_STATUS: Record<string, { bg: string; color: string; label: string }> = {
-  DRAFT:              { bg: "var(--hf-surface-sunken)", color: "var(--hf-text-tertiary)",  label: "Draft" },
-  PENDING_APPROVAL:   { bg: "var(--hf-warning-soft-strong)", color: "var(--hf-warning-text-deep)",  label: "Pending" },
-  APPROVED:           { bg: "var(--hf-info-soft-strong)", color: "var(--hf-info-text)",  label: "Approved" },
-  SENT:               { bg: "var(--hf-violet-soft-strong)", color: "var(--hf-violet-text)",  label: "Sent" },
-  ACKNOWLEDGED:       { bg: "var(--hf-success-soft-strong)", color: "var(--hf-success-text-strong)",  label: "Acknowledged" },
-  PARTIALLY_RECEIVED: { bg: "var(--hf-warning-soft)", color: "var(--hf-warning-text-deep)",  label: "Partial" },
-  FULLY_RECEIVED:     { bg: "var(--hf-success-soft-strong)", color: "var(--hf-success-text-strong)",  label: "Received" },
-  INVOICED:           { bg: "var(--hf-info-soft-strong)", color: "var(--hf-info-text-strong)",  label: "Invoiced" },
-  CANCELLED:          { bg: "var(--hf-danger-soft-strong)", color: "var(--hf-danger-text)",  label: "Cancelled" },
-}
+  const summary = useQuery({ queryKey: ["scm-summary"], queryFn: () => apiClient.get(`${BASE}/summary`).then(r => asOne<Summary>(r)), ...opt })
+  const pos = useQuery({ queryKey: ["scm-dash-pos"], queryFn: () => apiClient.get(`${BASE}/purchase-orders`, { params: { size: 100 } }).then(asList<PO>), ...opt })
+  const spend = useQuery({ queryKey: ["scm-dash-spend", range], enabled: canAnalyse, queryFn: () => apiClient.get(`${BASE}/analytics/spend`, { params: range }).then(r => asOne<Spend>(r)), ...opt })
+  const suppliers = useQuery({ queryKey: ["scm-dash-suppliers"], enabled: canAnalyse, queryFn: () => apiClient.get(`${BASE}/analytics/suppliers`, { params: { months: 12 } }).then(asList<SupplierView>), ...opt })
+  const replen = useQuery({ queryKey: ["scm-replenishment"], enabled: canAnalyse || canRaise, queryFn: () => apiClient.get(`${BASE}/replenishment`).then(asList<RepItem>), ...opt })
+  const contracts = useQuery({ queryKey: ["scm-contracts"], enabled: canAnalyse, queryFn: () => apiClient.get(`${BASE}/contracts`).then(asList<{ status: string; endDate: string | null; renewalNoticeDue?: boolean }>), ...opt })
+  const quarantine = useQuery({ queryKey: ["scm-quarantine"], enabled: canAnalyse, queryFn: () => apiClient.get(`${BASE}/quarantine`, { params: { status: "OPEN" } }).then(asList<unknown>), ...opt })
+  const prices = useQuery({ queryKey: ["scm-price-overrides"], enabled: canPrice, queryFn: () => apiClient.get(`${BASE}/requisitions/price-overrides`).then(asList<unknown>), ...opt })
 
-function KpiCard({ label, value, icon: Icon, color, bg, onClick, urgent }:
-  { label: string; value: number; icon: React.ElementType; color: string; bg: string; onClick?: () => void; urgent?: boolean }) {
+  if (summary.isLoading || pos.isLoading) return <Spinner />
+  const s = summary.data
+  const poList = pos.data ?? []
+  const series = monthSeries(spend.data?.byMonth ?? [], months)
+  const thisM = series[series.length - 1]?.amount ?? 0, lastM = series[series.length - 2]?.amount ?? 0
+  const delta = deltaPct(thisM, lastM)
+  const mix = statusBreakdown(poList)
+  const rep = replen.data ?? []
+  const atRisk = rep.filter(r => r.urgency !== "REORDER").slice(0, 6)
+  const ranked = [...(suppliers.data ?? [])].filter(x => x.score != null).sort((a, b) => (b.score ?? 0) - (a.score ?? 0))
+  const cc = contractCounts(contracts.data ?? [])
+  const alerts = dashboardAlerts({
+    overdueInvoices: s?.overdueInvoices ?? 0, invoicesForApproval: s?.invoicesForApproval ?? 0, priceApprovals: (prices.data ?? []).length,
+    quarantineOpen: (quarantine.data ?? []).length, contractsExpiring: cc.EXPIRING + cc.EXPIRED, stockouts: rep.filter(r => r.urgency === "STOCKOUT").length, reorders: rep.filter(r => r.urgency === "REORDER").length,
+  })
+
   return (
-    <div
-      onClick={onClick}
-      style={{
-        background: "var(--hf-surface)", border: `1px solid ${urgent && value > 0 ? color : "var(--hf-border)"}`,
-        borderRadius: 12, padding: "18px 20px", cursor: onClick ? "pointer" : "default",
-        transition: "box-shadow 0.15s",
-        boxShadow: urgent && value > 0 ? `0 0 0 3px ${bg}` : "none",
-      }}
-      onMouseEnter={e => { if (onClick) (e.currentTarget as HTMLElement).style.boxShadow = "0 4px 12px rgba(0,0,0,0.08)" }}
-      onMouseLeave={e => { if (onClick) (e.currentTarget as HTMLElement).style.boxShadow = urgent && value > 0 ? `0 0 0 3px ${bg}` : "none" }}
-    >
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
-        <div style={{ fontSize: 11, fontWeight: 700, color: "var(--hf-text-faint)", textTransform: "uppercase", letterSpacing: "0.06em" }}>
-          {label}
-        </div>
-        <div style={{ width: 34, height: 34, borderRadius: 9, background: bg, display: "flex", alignItems: "center", justifyContent: "center" }}>
-          <Icon size={16} style={{ color }} />
-        </div>
+    <div style={{ padding: 20, display: "grid", gap: 14 }}>
+      <div style={grid(190)}>
+        <StatCard label="Spend this month" value={fmtR(thisM)} sub={<span>{deltaText(delta)} vs last month</span>} icon={TrendingUp} tone="info" onClick={() => onNav("analytics")} />
+        <StatCard label="Open orders" value={s?.openPurchaseOrders ?? 0} icon={ShoppingCart} tone="info" onClick={() => onNav("purchase-orders")} />
+        <StatCard label="Invoices to pay" value={s?.invoicesForApproval ?? 0} sub={`${s?.pendingInvoices ?? 0} pending · ${s?.overdueInvoices ?? 0} overdue`} icon={FileText} tone={(s?.overdueInvoices ?? 0) > 0 ? "bad" : "ok"} onClick={() => onNav("invoices")} />
+        <StatCard label="Low stock" value={s?.lowStockItems ?? 0} icon={Package} tone={(s?.lowStockItems ?? 0) > 0 ? "warn" : "neutral"} onClick={() => onNav("inventory")} />
+        <StatCard label="Suppliers" value={s?.totalSuppliers ?? 0} icon={Users} tone="ok" onClick={() => onNav("suppliers")} />
       </div>
-      <div style={{ fontSize: 32, fontWeight: 800, color: urgent && value > 0 ? color : "var(--hf-text)" }}>
-        {value}
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: 14 }}>
+        <Panel title={`Spend, last ${MONTHS} months`}>
+          {!canAnalyse ? <Muted>Spend analytics need read access to Supply Chain.</Muted> : spend.isLoading ? <Spinner /> : (
+            <div style={{ height: 210 }}>
+              <ResponsiveContainer>
+                <AreaChart data={series} margin={{ left: 0, right: 8, top: 8 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke={color("--hf-border")} />
+                  <XAxis dataKey="month" tick={{ fontSize: 11, fill: color("--hf-text-faint") }} />
+                  <YAxis tick={{ fontSize: 11, fill: color("--hf-text-faint") }} tickFormatter={v => `${Math.round(Number(v) / 1000)}k`} width={40} />
+                  <Tooltip formatter={v => fmtR(Number(v))} />
+                  <Area type="monotone" dataKey="amount" stroke={color("--hf-info")} fill={color("--hf-info")} fillOpacity={0.15} />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>)}
+        </Panel>
+        <Panel title="Orders by status" right={<LinkBtn onClick={() => onNav("purchase-orders")}>All orders</LinkBtn>}>
+          {mix.length === 0 ? <Muted>No purchase orders yet.</Muted> : (
+            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              <div style={{ width: 150, height: 150 }}>
+                <ResponsiveContainer><PieChart><Pie data={mix} dataKey="count" nameKey="status" innerRadius={42} outerRadius={68} paddingAngle={2}>
+                  {mix.map((m, i) => <Cell key={m.status} fill={color(STATUS_VAR[i % STATUS_VAR.length])} />)}</Pie><Tooltip /></PieChart></ResponsiveContainer>
+              </div>
+              <ul style={{ listStyle: "none", margin: 0, padding: 0, fontSize: 12, display: "grid", gap: 4 }}>
+                {mix.slice(0, 6).map((m, i) => <li key={m.status}><span style={{ display: "inline-block", width: 9, height: 9, borderRadius: 5, background: color(STATUS_VAR[i % STATUS_VAR.length]), marginRight: 6 }} />{m.status.replace(/_/g, " ").toLowerCase()} · {m.count}</li>)}
+              </ul>
+            </div>)}
+        </Panel>
       </div>
-      {onClick && (
-        <div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 8, fontSize: 12, color: ACCENT_TEXT, fontWeight: 600 }}>
-          View all <ArrowRight size={12} />
-        </div>
-      )}
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: 14 }}>
+        <Panel title="Needs attention">
+          {alerts.length === 0 ? <Muted>Nothing needs attention.</Muted> : (
+            <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "grid", gap: 8 }}>
+              {alerts.map(a => (
+                <li key={a.key}><button onClick={() => onNav(a.section)} style={{ width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, padding: "8px 10px", borderRadius: 8, border: "1px solid var(--hf-border)", background: toneColors(a.tone === "bad" ? "bad" : a.tone === "warn" ? "warn" : "info").bg, color: toneColors(a.tone === "bad" ? "bad" : a.tone === "warn" ? "warn" : "info").fg, cursor: "pointer", fontSize: 13, textAlign: "left" }}>
+                  {a.text}<ArrowRight size={14} /></button></li>))}
+            </ul>)}
+        </Panel>
+        <Panel title="Stock at risk" right={<LinkBtn onClick={() => onNav("replenishment")}>Replenishment</LinkBtn>}>
+          {atRisk.length === 0 ? <Muted>No item is out of stock or critical.</Muted> : (
+            <div style={{ display: "grid", gap: 10 }}>{atRisk.map(r => {
+              const pct = r.reorderLevel > 0 ? (r.available / r.reorderLevel) * 100 : 0
+              return (<div key={r.catalogueItemId}>
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 3 }}><span>{r.itemName}</span><span>{r.available} / {r.reorderLevel}</span></div>
+                <div style={{ background: "var(--hf-surface-sunken)", borderRadius: 4, height: 8 }}><div style={{ width: barWidth(pct), height: 8, borderRadius: 4, background: r.urgency === "STOCKOUT" ? "var(--hf-danger)" : "var(--hf-warning)" }} /></div>
+              </div>)
+            })}</div>)}
+        </Panel>
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: 14 }}>
+        <Panel title="Recent purchase orders" right={<span style={{ display: "flex", gap: 8 }}>{canRaise && <LinkBtn onClick={() => onNav("requisitions")}><Plus size={12} /> Requisition</LinkBtn>}<LinkBtn onClick={() => onNav("purchase-orders")}>View all</LinkBtn></span>}>
+          {poList.length === 0 ? <Muted>No purchase orders yet.</Muted> : (
+            <div style={{ overflowX: "auto" }}><table style={{ width: "100%", borderCollapse: "collapse" }}>
+              <thead><tr><th style={TH}>Order</th><th style={TH}>Supplier</th><th style={TH}>Total</th><th style={TH}>Status</th></tr></thead>
+              <tbody>{poList.slice(0, 6).map(p => <tr key={p.id} style={{ borderTop: "1px solid var(--hf-border)" }}><td style={TD}><strong>{p.orderNumber}</strong><div style={{ fontSize: 11 }}>{fmtDate(p.orderDate)}</div></td><td style={TD}>{p.supplierName}</td><td style={TD}>{fmtR(p.totalAmount)}</td><td style={TD}><Badge status={p.status} /></td></tr>)}</tbody>
+            </table></div>)}
+        </Panel>
+        <Panel title="Supplier performance" right={<LinkBtn onClick={() => onNav("analytics")}>Details</LinkBtn>}>
+          {ranked.length === 0 ? <Muted>No scored suppliers yet.</Muted> : (
+            <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "grid", gap: 8 }}>
+              {ranked.slice(0, 5).map(x => <li key={x.supplierId} style={{ display: "flex", justifyContent: "space-between", gap: 8, fontSize: 13 }}>
+                <span>{x.supplierName}<span style={{ fontSize: 11, color: "var(--hf-text-faint)" }}> · on time {pctText(x.onTimePct)}</span></span>
+                <Pill tone={(x.score ?? 0) >= 80 ? "ok" : (x.score ?? 0) >= 60 ? "warn" : "bad"}>{x.score}</Pill></li>)}
+            </ul>)}
+        </Panel>
+      </div>
     </div>
   )
 }
 
-type ScmTab = "dashboard" | "suppliers" | "purchase-orders" | "inventory" | "invoices"
-
-export function ScmDashboard({ onNav }: { onNav: (tab: ScmTab) => void }) {
-  // recharts draws SVG attributes, which cannot use CSS variables: read literal values.
-  const c = useThemeColors()
-  const { data: summary } = useQuery<Summary>({
-    queryKey: ["scm-summary"],
-    queryFn: async () => { const r = await apiClient.get("/api/v1/supply-chain/summary"); return r.data?.data ?? r.data },
-    staleTime: 60_000,
-  })
-
-  const { data: recentPOs } = useQuery<{ content: PO[] }>({
-    queryKey: ["scm-recent-pos"],
-    queryFn: async () => {
-      const r = await apiClient.get("/api/v1/supply-chain/purchase-orders?size=6")
-      const d = r.data?.data ?? r.data
-      return Array.isArray(d) ? { content: d } : d
-    },
-    staleTime: 60_000,
-  })
-
-  const { data: lowStock } = useQuery<LowStockItem[]>({
-    queryKey: ["scm-low-stock"],
-    queryFn: async () => {
-      const r = await apiClient.get("/api/v1/supply-chain/inventory/low-stock")
-      const d = r.data?.data ?? r.data; return Array.isArray(d) ? d : []
-    },
-    staleTime: 60_000,
-  })
-
-  // NEW: same fix already applied in InventoryTab.tsx — fetched once,
-  // used to show real item names instead of truncated UUIDs. A chart
-  // labeled with raw UUIDs would be useless, so this is a prerequisite
-  // for the low-stock chart below, not just a cosmetic fix.
-  const { data: catalogueItems = [] } = useQuery<CatalogueItem[]>({
-    queryKey: ["catalogue-items-all-dashboard"],
-    queryFn: async () => { const r = await apiClient.get("/api/v1/catalogue/items"); const d = r.data?.data ?? r.data; return Array.isArray(d) ? d : [] },
-    staleTime: 60_000,
-  })
-  const itemNameById = new Map(catalogueItems.map(i => [i.id, i.name]))
-
-  const pos = recentPOs?.content ?? []
-  const s = summary
-
-  // NEW: dashboard trend chart — the one genuinely chartable dataset
-  // without new backend work. Summary only returns current-moment
-  // counts, not historical data, so a real spend/volume-over-time trend
-  // isn't possible without a new aggregation endpoint; this is scoped
-  // to what's actually available, not a placeholder pretending otherwise.
-  const lowStockChartData = (lowStock ?? []).slice(0, 8).map(item => ({
-    name: itemNameById.get(item.catalogueItemId) ?? `Item ${item.catalogueItemId.slice(0, 8)}…`,
-    onHand: item.qtyOnHand,
-    reorderPoint: item.reorderPoint,
-    critical: item.qtyOnHand === 0,
-  }))
-
-  return (
-    <div>
-      {/* KPI grid */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 14, marginBottom: 28 }}>
-        <KpiCard label="Active Suppliers"   value={s?.totalSuppliers ?? 0}      icon={Users}         color="var(--hf-success-text)" bg="var(--hf-success-soft-strong)" onClick={() => onNav("suppliers")} />
-        <KpiCard label="Open Orders"        value={s?.openPurchaseOrders ?? 0}  icon={ShoppingCart}  color="var(--hf-info-text)" bg="var(--hf-info-soft-strong)" onClick={() => onNav("purchase-orders")} />
-        <KpiCard label="Pending Invoices"   value={s?.pendingInvoices ?? 0}     icon={FileText}      color="var(--hf-violet-text)" bg="var(--hf-violet-soft-strong)" onClick={() => onNav("invoices")} />
-        <KpiCard label="Low Stock Items"    value={s?.lowStockItems ?? 0}       icon={Package}       color="var(--hf-warning-text)" bg="var(--hf-warning-soft-strong)" onClick={() => onNav("inventory")} urgent />
-        <KpiCard label="Overdue Invoices"   value={s?.overdueInvoices ?? 0}     icon={AlertTriangle} color="var(--hf-danger-text)" bg="var(--hf-danger-soft-strong)" onClick={() => onNav("invoices")} urgent />
-        <KpiCard label="Ready for Payment"  value={s?.invoicesForApproval ?? 0} icon={CheckCircle}   color="var(--hf-success-text)" bg="var(--hf-success-soft-strong)" onClick={() => onNav("invoices")} />
-      </div>
-
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 380px", gap: 18 }}>
-        {/* Recent Purchase Orders */}
-        <div>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
-            <div style={{ fontSize: 14, fontWeight: 700, color: "var(--hf-text)" }}>Recent Purchase Orders</div>
-            <button onClick={() => onNav("purchase-orders")}
-              style={{ fontSize: 12, color: ACCENT_TEXT, fontWeight: 600, background: "none", border: "none", cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }}>
-              View all <ArrowRight size={12} />
-            </button>
-          </div>
-          {pos.length === 0
-            ? <div style={{ textAlign: "center", padding: "40px 0", color: "var(--hf-text-faint)" }}>
-                <ShoppingCart size={32} style={{ opacity: .3, marginBottom: 8 }} />
-                <div style={{ fontSize: 13 }}>No purchase orders yet</div>
-              </div>
-            : <div style={{ border: "1px solid var(--hf-border)", borderRadius: 10, overflow: "hidden" }}>
-                <table style={{ width: "100%", borderCollapse: "collapse" }}>
-                  <thead>
-                    <tr style={{ background: "var(--hf-surface-muted)" }}>
-                      {["Order #", "Supplier", "Amount", "Required By", "Status"].map(h => (
-                        <th key={h} style={{ padding: "9px 14px", textAlign: "left", fontSize: 11, fontWeight: 700, color: "var(--hf-text-faint)", textTransform: "uppercase", letterSpacing: "0.05em" }}>{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {pos.map((po, i) => {
-                      const st = PO_STATUS[po.status] ?? PO_STATUS.DRAFT
-                      return (
-                        <tr key={po.id} style={{ borderTop: "1px solid var(--hf-border-subtle)", background: i % 2 === 0 ? "var(--hf-surface)" : "var(--hf-surface-muted)" }}>
-                          <td style={{ padding: "10px 14px", fontSize: 12, fontWeight: 700, color: ACCENT_TEXT }}>{po.orderNumber}</td>
-                          <td style={{ padding: "10px 14px", fontSize: 13, color: "var(--hf-text)" }}>{po.supplierName}</td>
-                          <td style={{ padding: "10px 14px", fontSize: 13, fontWeight: 600 }}>{fmtR(po.totalAmount)}</td>
-                          <td style={{ padding: "10px 14px", fontSize: 12, color: "var(--hf-text-muted)" }}>{fmtD(po.requiredByDate)}</td>
-                          <td style={{ padding: "10px 14px" }}>
-                            <span style={{ background: st.bg, color: st.color, fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 20 }}>
-                              {st.label}
-                            </span>
-                          </td>
-                        </tr>
-                      )
-                    })}
-                  </tbody>
-                </table>
-              </div>
-          }
-        </div>
-
-        {/* Low Stock Panel */}
-        <div>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
-            <div style={{ fontSize: 14, fontWeight: 700, color: "var(--hf-text)" }}>Low Stock Alerts</div>
-            <button onClick={() => onNav("inventory")}
-              style={{ fontSize: 12, color: ACCENT_TEXT, fontWeight: 600, background: "none", border: "none", cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }}>
-              View all <ArrowRight size={12} />
-            </button>
-          </div>
-          {!lowStock || lowStock.length === 0
-            ? <div style={{ border: "1px solid var(--hf-border)", borderRadius: 10, padding: "32px 20px", textAlign: "center", color: "var(--hf-text-faint)" }}>
-                <TrendingUp size={28} style={{ opacity: .3, marginBottom: 8 }} />
-                <div style={{ fontSize: 13 }}>All stock levels healthy</div>
-              </div>
-            : <div style={{ border: "1px solid var(--hf-warning-border-strong)", borderRadius: 10, padding: "14px 10px 6px 6px", background: "var(--hf-warning-soft)" }}>
-                {/* NEW: dashboard trend chart — quantity on hand vs
-                    reorder point per item, real item names (not
-                    truncated UUIDs). Critical items (zero on hand)
-                    render in red instead of amber, same distinction the
-                    old list made via its "⚠" prefix. */}
-                <ResponsiveContainer width="100%" height={Math.max(180, lowStockChartData.length * 34)}>
-                  <BarChart data={lowStockChartData} layout="vertical" margin={{ top: 0, right: 16, bottom: 0, left: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke={c("warning-border")} horizontal={false} />
-                    <XAxis type="number" tick={{ fontSize: 10, fill: c("warning-text-deep") }} axisLine={false} tickLine={false} />
-                    <YAxis type="category" dataKey="name" width={110}
-                      tick={{ fontSize: 11, fill: c("warning-text-deep") }} axisLine={false} tickLine={false} />
-                    <Tooltip
-                      contentStyle={{ fontSize: 12, borderRadius: 8, border: "1px solid var(--hf-warning-border-strong)", background: "var(--hf-surface)", color: "var(--hf-text)" }}
-                      formatter={(value, key) => [Number(value).toFixed(1), key === "onHand" ? "On Hand" : "Reorder Point"]}
-                    />
-                    <Bar dataKey="reorderPoint" fill={c("warning-border")} radius={[0, 4, 4, 0]} barSize={8} name="Reorder Point" />
-                    <Bar dataKey="onHand" radius={[0, 4, 4, 0]} barSize={8} name="On Hand">
-                      {lowStockChartData.map((d, i) => (
-                        <Cell key={i} fill={d.critical ? c("danger") : c("warning")} />
-                      ))}
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-          }
-        </div>
-      </div>
-    </div>
-  )
-}
+const Muted = ({ children }: { children: React.ReactNode }) => <div style={{ fontSize: 13, color: "var(--hf-text-faint)" }}>{children}</div>
+const LinkBtn = ({ onClick, children }: { onClick: () => void; children: React.ReactNode }) =>
+  <button onClick={onClick} style={{ background: "none", border: "none", color: "var(--hf-primary)", fontSize: 12, fontWeight: 600, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 3 }}>{children}</button>

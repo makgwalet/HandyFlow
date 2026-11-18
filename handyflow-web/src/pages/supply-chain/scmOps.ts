@@ -285,3 +285,130 @@ export const policyBody = (f: PolicyForm) => ({
   budgetBasis: f.budgetBasis, vatRecoverablePct: Number(f.vatRecoverablePct),
   includeNonRecoverableVat: f.includeNonRecoverableVat, priceIncreaseTolerancePct: Number(f.priceIncreaseTolerancePct),
 })
+
+// ── Contracts ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+export const EXPIRING_DAYS = 60
+export type ContractBucket = "ACTIVE" | "EXPIRING" | "EXPIRED" | "DRAFT" | "TERMINATED"
+
+/** Whole days from `today` to `date` (negative when past). Dates are compared as calendar days, not instants. */
+export function daysUntil(date: string | null | undefined, today: Date = new Date()): number | null {
+  if (!date) return null
+  const d = Date.UTC(Number(date.slice(0, 4)), Number(date.slice(5, 7)) - 1, Number(date.slice(8, 10)))
+  const t = Date.UTC(today.getFullYear(), today.getMonth(), today.getDate())
+  return Math.round((d - t) / 86_400_000)
+}
+
+export function contractBucket(c: { status: string; endDate: string | null; renewalNoticeDue?: boolean }, today: Date = new Date()): ContractBucket {
+  if (c.status === "DRAFT") return "DRAFT"
+  if (c.status === "TERMINATED") return "TERMINATED"
+  const left = daysUntil(c.endDate, today)
+  if (c.status === "EXPIRED" || (left != null && left < 0)) return "EXPIRED"
+  if (c.renewalNoticeDue || (left != null && left <= EXPIRING_DAYS)) return "EXPIRING"
+  return "ACTIVE"
+}
+
+export function contractCounts(list: { status: string; endDate: string | null; renewalNoticeDue?: boolean }[], today: Date = new Date()): Record<ContractBucket, number> {
+  const out: Record<ContractBucket, number> = { ACTIVE: 0, EXPIRING: 0, EXPIRED: 0, DRAFT: 0, TERMINATED: 0 }
+  for (const c of list) out[contractBucket(c, today)]++
+  return out
+}
+
+/** "in 12 days" / "today" / "3 days ago" / "—". */
+export function dueText(days: number | null): string {
+  if (days == null) return "—"
+  if (days === 0) return "today"
+  return days > 0 ? `in ${days} day${days === 1 ? "" : "s"}` : `${-days} day${days === -1 ? "" : "s"} ago`
+}
+
+// ── Returns & claims ────────────────────────────────────────────────────────────────────────────────────────────────────────────
+export const RETURN_STEPS = ["Request", "Authorised", "Processing", "Completed"] as const
+const RETURN_STEP_OF: Record<string, number> = { DRAFT: 0, SUBMITTED: 0, APPROVED: 1, DISPATCHED: 2, CREDITED: 3 }
+
+/** Index of the current stepper step, or -1 when the return left the path (rejected / cancelled). */
+export function returnStep(status: string): number {
+  return status in RETURN_STEP_OF ? RETURN_STEP_OF[status] : -1
+}
+
+export type ReturnAction = "submit" | "approve" | "reject" | "cancel" | "dispatch" | "credit"
+export function returnActions(status: string, canManage: boolean, canApprove: boolean): ReturnAction[] {
+  const out: ReturnAction[] = []
+  if (status === "DRAFT" && canManage) out.push("submit")
+  if (status === "SUBMITTED" && canApprove) out.push("approve", "reject")
+  if (status === "APPROVED" && canManage) out.push("dispatch")
+  if (status === "DISPATCHED" && canManage) out.push("credit")
+  if (["DRAFT", "SUBMITTED", "APPROVED"].includes(status) && canManage) out.push("cancel")
+  return out
+}
+
+export function creditProblem(ref: string, amount: string): string | null {
+  if (!ref.trim()) return "Enter the supplier's credit note reference."
+  const n = Number(amount)
+  if (!amount.trim() || !Number.isFinite(n) || n <= 0) return "Enter the credit note total, more than zero."
+  return null
+}
+
+// ── Quarantine ──────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+export function quarantineProblem(action: "release" | "write-off", qty: string, open: number, reason: string): string | null {
+  const n = Number(qty)
+  if (!qty.trim() || !Number.isFinite(n) || n <= 0) return "Enter a quantity more than zero."
+  if (n > open) return `Only ${open} is still held.`
+  if (action === "write-off" && !reason.trim()) return "A reason is required to scrap stock."
+  return null
+}
+
+// ── Replenishment ───────────────────────────────────────────────────────────────────────────────────────────────────────────────
+export const URGENCY_ORDER = ["STOCKOUT", "CRITICAL", "REORDER"] as const
+export const URGENCY_LABEL: Record<string, string> = { STOCKOUT: "Out of stock", CRITICAL: "Critical", REORDER: "Reorder" }
+export const urgencyTone = (u: string): "bad" | "warn" | "ok" => (u === "STOCKOUT" || u === "CRITICAL" ? "bad" : "warn")
+
+export function replenishmentPicks(items: { catalogueItemId: string; suggestedQty: number }[], selected: Record<string, boolean>, edited: Record<string, string>) {
+  return items
+    .filter(i => selected[i.catalogueItemId])
+    .map(i => ({ catalogueItemId: i.catalogueItemId, qty: Number(edited[i.catalogueItemId] ?? i.suggestedQty) }))
+}
+export function replenishmentProblem(picks: { qty: number }[]): string | null {
+  if (picks.length === 0) return "Tick at least one item."
+  if (picks.some(p => !Number.isFinite(p.qty) || p.qty <= 0)) return "Every ticked item needs a quantity above zero."
+  return null
+}
+
+// ── Dashboard ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+/** Change between two period totals as a percentage; null when there is nothing to compare with. */
+export function deltaPct(current: number, previous: number): number | null {
+  if (!previous) return null
+  return ((current - previous) / Math.abs(previous)) * 100
+}
+export const deltaText = (d: number | null) => (d == null ? "—" : `${d >= 0 ? "▲" : "▼"} ${Math.abs(d).toFixed(1)}%`)
+
+export function statusBreakdown<T extends { status: string }>(rows: T[]): { status: string; count: number }[] {
+  const m = new Map<string, number>()
+  for (const r of rows) m.set(r.status, (m.get(r.status) ?? 0) + 1)
+  return [...m].map(([status, count]) => ({ status, count })).sort((a, b) => b.count - a.count)
+}
+
+export type AlertTone = "bad" | "warn" | "info"
+export interface DashAlert { key: string; tone: AlertTone; text: string; section: string }
+export function dashboardAlerts(c: { overdueInvoices: number; priceApprovals: number; quarantineOpen: number; contractsExpiring: number; stockouts: number; reorders: number; invoicesForApproval: number }): DashAlert[] {
+  const out: DashAlert[] = []
+  const add = (n: number, key: string, tone: AlertTone, one: string, many: string, section: string) => { if (n > 0) out.push({ key, tone, text: `${n} ${n === 1 ? one : many}`, section }) }
+  add(c.overdueInvoices, "overdue", "bad", "supplier invoice overdue", "supplier invoices overdue", "invoices")
+  add(c.stockouts, "stockout", "bad", "item out of stock", "items out of stock", "replenishment")
+  add(c.priceApprovals, "price", "warn", "price increase awaiting approval", "price increases awaiting approval", "policy")
+  add(c.invoicesForApproval, "inv-approve", "warn", "invoice awaiting approval", "invoices awaiting approval", "invoices")
+  add(c.quarantineOpen, "quarantine", "warn", "quarantine hold open", "quarantine holds open", "quality")
+  add(c.contractsExpiring, "contracts", "warn", "contract expiring or due for renewal", "contracts expiring or due for renewal", "contracts")
+  add(c.reorders, "reorder", "info", "item to reorder", "items to reorder", "replenishment")
+  return out
+}
+
+/** Last `n` calendar months ending in `today`'s month, as "YYYY-MM" labels (oldest first) — the dashboard trend axis. */
+export function lastMonths(n: number, today: Date = new Date()): string[] {
+  const out: string[] = []
+  for (let i = n - 1; i >= 0; i--) { const d = new Date(today.getFullYear(), today.getMonth() - i, 1); out.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`) }
+  return out
+}
+/** Fills months with no spend with zero so the trend line is not drawn across a gap. */
+export function monthSeries(byMonth: { label: string; amount: number }[], months: string[]): { month: string; amount: number }[] {
+  const m = new Map(byMonth.map(x => [x.label, Number(x.amount)]))
+  return months.map(month => ({ month, amount: m.get(month) ?? 0 }))
+}

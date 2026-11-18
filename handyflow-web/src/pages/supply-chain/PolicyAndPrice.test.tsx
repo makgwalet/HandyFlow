@@ -10,7 +10,7 @@ vi.mock("../../api/client", () => ({ apiClient: { get: (...a: unknown[]) => get(
 let perms = ["SCM_ADMIN"]
 vi.mock("../../hooks/usePermission", () => ({ usePermissions: (needed: string[]) => needed.some(n => perms.includes(n)) }))
 const ok = (d: unknown) => Promise.resolve({ data: { data: d } })
-const wrap = (ui: JSX.Element) => render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>{ui}</QueryClientProvider>)
+const wrap = (ui: React.ReactElement) => render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>{ui}</QueryClientProvider>)
 beforeEach(() => { get.mockReset(); post.mockReset(); put.mockReset(); perms = ["SCM_ADMIN"] }); afterEach(cleanup)
 
 const POLICY = { effective: { budgetBasis: "EX_VAT", vatRecoverablePct: 100, includeNonRecoverableVat: true, priceIncreaseTolerancePct: 5 }, customised: false }

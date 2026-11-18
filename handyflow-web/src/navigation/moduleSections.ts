@@ -26,7 +26,7 @@ import {
   UserCheck, Palette, Headphones, Wallet, Receipt, CheckSquare, LayoutGrid, ListChecks, ScanBarcode, PackageCheck, ArrowDownUp, Sprout, FlaskConical,
   Columns3, Zap, History, Plug, Filter, Copy, SlidersHorizontal, Tags, Target, Ruler,
   UserPlus, Mail, KeyRound, Layers,
-  BarChart3,
+  BarChart3, FileSignature, Undo2, ShieldAlert, PackageSearch,
 } from 'lucide-react'
 
 export interface ModuleSection {
@@ -618,10 +618,19 @@ export const SUPPLY_CHAIN_SECTIONS: ModuleSections = {
         { id: 'requisitions', label: 'Requisitions', icon: ClipboardList, anyPermission: ['SCM_REQUISITION_CREATE', 'SCM_REQUISITION_APPROVE', 'SCM_ADMIN'] },
         { id: 'rfqs', label: 'RFQs', icon: Scale, anyPermission: ['SCM_RFQ_MANAGE', 'SCM_ORDER', 'SCM_READ', 'SCM_ADMIN'] },
         { id: 'budgets', label: 'Budgets', icon: Wallet, anyPermission: ['SCM_BUDGET_READ', 'SCM_BUDGET_MANAGE', 'SCM_ADMIN'] },
+        { id: 'contracts', label: 'Contracts', icon: FileSignature, anyPermission: ['SCM_READ', 'SCM_CONTRACT_READ', 'SCM_CONTRACT_MANAGE', 'SCM_ADMIN'] },
         { id: 'policy', label: 'Policy & price approvals', icon: Scale, anyPermission: ['SCM_READ', 'SCM_PRICE_OVERRIDE_APPROVE', 'SCM_ADMIN'] },
       ],
     },
-    { label: 'Stock', sections: [{ id: 'inventory', label: 'Inventory', icon: Package }] },
+    {
+      label: 'Stock',
+      sections: [
+        { id: 'inventory', label: 'Inventory', icon: Package },
+        { id: 'replenishment', label: 'Replenishment', icon: PackageSearch, anyPermission: ['SCM_READ', 'SCM_REQUISITION_CREATE', 'SCM_ADMIN'] },
+        { id: 'quality', label: 'Quality & quarantine', icon: ShieldAlert, anyPermission: ['SCM_READ', 'SCM_QUALITY_MANAGE', 'SCM_ADMIN'] },
+        { id: 'returns', label: 'Returns & claims', icon: Undo2, anyPermission: ['SCM_READ', 'SCM_RETURN_MANAGE', 'SCM_RETURN_APPROVE', 'SCM_ADMIN'] },
+      ],
+    },
     { label: 'Insight', sections: [{ id: 'analytics', label: 'Analytics', icon: BarChart3, anyPermission: ['SCM_READ', 'SCM_ADMIN'] }] },
   ],
 }

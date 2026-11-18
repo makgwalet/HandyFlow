@@ -13,6 +13,10 @@ import { RfqTab }             from "./RfqTab"
 import { BudgetsTab }         from "./BudgetsTab"
 import { AnalyticsTab }       from "./AnalyticsTab"
 import { PolicyTab }          from "./PolicyTab"
+import { ContractsTab }       from "./ContractsTab"
+import { ReturnsTab }         from "./ReturnsTab"
+import { QualityTab }         from "./QualityTab"
+import { ReplenishmentTab }   from "./ReplenishmentTab"
 import { SectionedModulePage } from "../../components/shell/SectionedModulePage"
 import { SUPPLY_CHAIN_SECTIONS } from "../../navigation/moduleSections"
 
@@ -30,6 +34,10 @@ export function SupplyChainPage() {
           case "requisitions":    return <RequisitionsTab />
           case "rfqs":            return <RfqTab />
           case "budgets":         return <BudgetsTab />
+          case "contracts":       return <ContractsTab />
+          case "returns":         return <ReturnsTab />
+          case "quality":         return <QualityTab />
+          case "replenishment":   return <ReplenishmentTab />
           case "policy":          return <PolicyTab />
           case "analytics":       return <AnalyticsTab />
           default:                return null
