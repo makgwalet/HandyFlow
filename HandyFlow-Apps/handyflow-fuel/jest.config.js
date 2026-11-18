@@ -1,5 +1,7 @@
 module.exports = {
   preset: "jest-expo",
+  // The first run on a cold cache transforms the whole React Native tree; 5 s is too tight for the screen tests on a laptop.
+  testTimeout: 30000,
   moduleNameMapper: {
     "^@/(.*)$": "<rootDir>/src/$1",
     "^@driver/(.*)$": "<rootDir>/packages/fuel-driver/src/$1",
