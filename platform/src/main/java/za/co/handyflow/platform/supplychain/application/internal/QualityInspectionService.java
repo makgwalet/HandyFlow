@@ -30,6 +30,7 @@ public class QualityInspectionService {
     private final JdbcTemplate jdbc;
     private final TenantSequenceService sequenceService;
     private final SupplierReturnService returns;
+    private final QuarantineService quarantine;
 
     @Transactional
     public Response start(TenantId tenantId, UUID userId, String userName, UUID receiptId) {
@@ -78,10 +79,18 @@ public class QualityInspectionService {
     public Response complete(TenantId tenantId, UUID id, UUID userId, String userName, boolean raiseReturnForFailures) {
         UUID tid = tenantId.getValue();
         Map<String, Object> insp = requireOpen(tid, id);
-        List<Map<String, Object>> lines = jdbc.queryForList("SELECT gr_line_id, item_name, qty_inspected, qty_passed, qty_failed, unit_cost FROM sc_quality_inspection_lines WHERE tenant_id = ? AND inspection_id = ?", tid, id);
+        List<Map<String, Object>> lines = jdbc.queryForList("SELECT gr_line_id, catalogue_item_id, item_name, defect_code, qty_inspected, qty_passed, qty_failed, unit_cost FROM sc_quality_inspection_lines WHERE tenant_id = ? AND inspection_id = ?", tid, id);
         String result = QualityInspectionRules.result(lines.stream().map(l -> new QualityInspectionRules.Result(
                 (BigDecimal) l.get("qty_inspected"), (BigDecimal) l.get("qty_passed"), (BigDecimal) l.get("qty_failed"))).toList());
         if (result == null) throw new HandyFlowException("Record at least one result before completing the inspection", HttpStatus.CONFLICT, "NOTHING_INSPECTED");
+
+        // Failed stock leaves available stock now, before anyone decides what to do with it.
+        List<QuarantineService.Failed> toHold = new ArrayList<>();
+        for (Map<String, Object> l : lines) {
+            BigDecimal f = (BigDecimal) l.get("qty_failed");
+            if (f.signum() > 0) toHold.add(new QuarantineService.Failed((UUID) l.get("catalogue_item_id"), (String) l.get("item_name"), f, (BigDecimal) l.get("unit_cost"), (String) l.get("defect_code")));
+        }
+        int held = quarantine.hold(tenantId, userId, userName, id, (UUID) insp.get("goods_receipt_id"), toHold);
 
         UUID returnId = null;
         if (raiseReturnForFailures && !"PASSED".equals(result)) {
@@ -94,7 +103,7 @@ public class QualityInspectionService {
         }
         jdbc.update("UPDATE sc_quality_inspections SET status = 'COMPLETED', result = ?, completed_at = now(), inspected_by = ?, inspected_by_name = ?, return_id = ?, updated_at = now() WHERE tenant_id = ? AND id = ?",
                 result, userId, userName, returnId, tid, id);
-        log.info("[SCM] Inspection {} completed: {}{}", insp.get("inspection_number"), result, returnId != null ? " (draft return raised)" : "");
+        log.info("[SCM] Inspection {} completed: {}{}", insp.get("inspection_number"), result, (held > 0 ? " (" + held + " line(s) quarantined)" : "") + (returnId != null ? " (draft return raised)" : ""));
         return get(tenantId, id);
     }
 

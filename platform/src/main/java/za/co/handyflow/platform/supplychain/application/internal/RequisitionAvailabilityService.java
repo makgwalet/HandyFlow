@@ -29,7 +29,7 @@ public class RequisitionAvailabilityService {
         if (catalogueItemId == null) return Availability.NONE;
 
         BigDecimal onHand = jdbc.queryForObject(
-                "SELECT COALESCE(SUM(qty_on_hand - qty_reserved), 0) FROM sc_inventory WHERE tenant_id = ? AND catalogue_item_id = ?",
+                "SELECT COALESCE(SUM(i.qty_on_hand - i.qty_reserved), 0) FROM sc_inventory i WHERE i.tenant_id = ? AND i.catalogue_item_id = ? AND NOT EXISTS (SELECT 1 FROM sc_stock_locations q WHERE q.id = i.location_id AND q.is_quarantine)",
                 BigDecimal.class, tenantId, catalogueItemId);
 
         BigDecimal onOrder = jdbc.queryForObject("""

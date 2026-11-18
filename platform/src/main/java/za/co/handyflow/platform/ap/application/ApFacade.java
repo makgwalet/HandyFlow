@@ -3,7 +3,9 @@ package za.co.handyflow.platform.ap.application;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import za.co.handyflow.platform.ap.application.internal.ApCreditNoteService;
 import za.co.handyflow.platform.ap.application.internal.ApService;
+import za.co.handyflow.platform.ap.dto.CreateApCreditNoteRequest;
 import za.co.handyflow.platform.ap.domain.model.ApBill;
 import za.co.handyflow.platform.ap.domain.repository.ApBillRepository;
 import za.co.handyflow.platform.shared.TenantId;
@@ -31,6 +33,7 @@ public class ApFacade {
 
     private final ApService apService;
     private final ApBillRepository billRepository;
+    private final ApCreditNoteService creditNoteService;
 
     /**
      * Runs the overdue-bill sweep — marks any APPROVED bill whose due date
@@ -89,5 +92,25 @@ public class ApFacade {
                 .orElseGet(() -> billRepository.save(ApBill.createFromSource(tenantId, "FUEL", supplierName, billNumber, billDate, dueDate,
                         amountExVat, vatAmount, "Fuel supplier invoice " + billNumber, sourceReference, createdBy)))
                 .getId();
+    }
+
+    /**
+     * Supply Chain -> AP hand-off for a supplier's credit note (a return or claim that the supplier has agreed to credit).
+     * The credit note goes through AP's own capture and approval, so it is issued, and applied to the bill, only once AP's
+     * controls allow. {@code billId} is used only if AP would accept a credit against that bill (approved or later);
+     * otherwise the credit is captured against the supplier alone. Returns the AP credit note id. AP refuses a duplicate
+     * number for the same supplier, and a supplier it has no bills from, with a 4xx the caller passes on.
+     */
+    @Transactional
+    public UUID captureSupplierCreditNote(TenantId tenantId, String creditNoteNumber, String supplierName, UUID billId,
+                                          LocalDate creditDate, String reason, BigDecimal amountExclVat, BigDecimal vatAmount, UUID createdBy) {
+        UUID usable = null;
+        if (billId != null) {
+            usable = billRepository.findByIdAndTenantId(billId, tenantId)
+                    .filter(b -> !java.util.Set.of("DRAFT", "REJECTED", "CANCELLED", "SECOND_APPROVAL").contains(b.getStatus()))
+                    .map(ApBill::getId).orElse(null);
+        }
+        return creditNoteService.create(tenantId, new CreateApCreditNoteRequest(creditNoteNumber, supplierName, usable, "OTHER",
+                creditDate, reason, amountExclVat, vatAmount), createdBy).id();
     }
 }

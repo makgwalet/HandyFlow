@@ -26,7 +26,7 @@ import java.util.*;
  *   <li>A line against a receipt line can return at most what that line accepted, less what other live returns already take.</li>
  *   <li>Approval is a second pair of eyes (SCM_RETURN_APPROVE): the person who raised it cannot approve it unless nobody else can.</li>
  *   <li>Dispatching a RETURN takes the stock out of the location it was received into, refusing if it has been used since.</li>
- *   <li>The credit note is recorded, not posted: it is what Accounts Payable matches against the supplier's account.</li>
+ *   <li>The credit note is handed to Accounts Payable on recording; AP captures, approves and applies it.</li>
  * </ul>
  */
 @Slf4j
@@ -39,6 +39,8 @@ public class SupplierReturnService {
     private final ScInventoryRepository inventoryRepo;
     private final ScStockMovementRepository movementRepo;
     private final ScmSeparationOfDuties sod;
+    private final QuarantineService quarantine;
+    private final za.co.handyflow.platform.ap.application.ApFacade apFacade;
 
     // ── Create ────────────────────────────────────────────────────────────────
 
@@ -142,6 +144,12 @@ public class SupplierReturnService {
             UUID item = (UUID) l.get("catalogue_item_id");
             if (item == null) continue;                                   // a service / non-stock line has no stock to move
             BigDecimal qty = (BigDecimal) l.get("qty");
+            // A return raised from an inspection ships the quarantined stock first; only the rest comes from the receiving location.
+            UUID inspection = (UUID) r.get("inspection_id");
+            if (inspection != null) {
+                qty = qty.subtract(quarantine.takeForReturn(tid, inspection, item, qty, id, number, userId, userName));
+                if (qty.signum() <= 0) continue;
+            }
             ScInventory inv = inventoryRepo.lockByTenantIdAndLocationIdAndCatalogueItemId(tid, location, item)
                     .orElseThrow(() -> new HandyFlowException("No stock record for " + l.get("item_name") + " at the receiving location", HttpStatus.CONFLICT, "NO_STOCK_RECORD"));
             if (inv.getQtyOnHand().compareTo(qty) < 0)
@@ -149,7 +157,7 @@ public class SupplierReturnService {
                         + inv.getQtyOnHand().stripTrailingZeros().toPlainString() + " on hand — the stock has been used. Adjust stock first.",
                         HttpStatus.CONFLICT, "STOCK_CONSUMED");
             BigDecimal delta = qty.negate();
-            ScStockMovement mv = ScStockMovement.record(tid, inv, "SUPPLIER_RETURN", delta, (BigDecimal) l.get("unit_cost"),
+            ScStockMovement mv = ScStockMovement.record(tid, inv, "RETURN_OUT", delta, (BigDecimal) l.get("unit_cost"),
                     "SUPPLIER_RETURN", id, number, userId, userName);
             inv.adjustQty(delta, (BigDecimal) l.get("unit_cost"));
             inventoryRepo.save(inv);
@@ -161,7 +169,7 @@ public class SupplierReturnService {
     }
 
     @Transactional
-    public Response recordCredit(TenantId tenantId, UUID id, CreditRequest req) {
+    public Response recordCredit(TenantId tenantId, UUID id, CreditRequest req, UUID userId) {
         UUID tid = tenantId.getValue();
         if (req == null || req.creditNoteRef() == null || req.creditNoteRef().isBlank()) throw bad("The supplier's credit note reference is required");
         if (req.creditAmount() == null || req.creditAmount().signum() <= 0) throw bad("The credit amount must be above zero");
@@ -171,8 +179,18 @@ public class SupplierReturnService {
         if (SupplierReturnRules.creditExceedsExpected(expected, req.creditAmount()))
             throw new HandyFlowException("The credit note (" + req.creditAmount() + ") is more than the " + expected + " this " + r.get("kind").toString().toLowerCase()
                     + " expected — correct the credit note or amend the claim", HttpStatus.CONFLICT, "CREDIT_EXCEEDS_CLAIM");
-        jdbc.update("UPDATE sc_supplier_returns SET status = 'CREDITED', credit_note_ref = ?, credit_amount = ?, credited_at = now(), updated_at = now() WHERE tenant_id = ? AND id = ?",
-                req.creditNoteRef().trim(), req.creditAmount(), tid, id);
+        BigDecimal vat = req.creditVat() == null ? BigDecimal.ZERO : req.creditVat();
+        if (vat.signum() < 0 || vat.compareTo(req.creditAmount()) >= 0) throw bad("The VAT on the credit note must be from zero to less than the credit amount");
+
+        // Hand the credit note to Accounts Payable: it is captured there (and approved there, if AP's policy asks) and applied
+        // to the bill this order was invoiced on. If AP refuses it, nothing here is marked credited either (one transaction).
+        UUID billId = jdbc.query("SELECT ap_bill_id FROM sc_supplier_invoices WHERE tenant_id = ? AND purchase_order_id = ? AND ap_bill_id IS NOT NULL ORDER BY created_at DESC LIMIT 1",
+                (rs, n) -> (UUID) rs.getObject(1), tid, r.get("purchase_order_id")).stream().findFirst().orElse(null);
+        UUID apCreditNoteId = apFacade.captureSupplierCreditNote(tenantId, req.creditNoteRef().trim(), (String) r.get("supplier_name"), billId,
+                java.time.LocalDate.now(), "Supplier " + r.get("kind").toString().toLowerCase() + " " + r.get("return_number") + ": " + r.get("reason"),
+                req.creditAmount().subtract(vat), vat, userId);
+        jdbc.update("UPDATE sc_supplier_returns SET status = 'CREDITED', credit_note_ref = ?, credit_amount = ?, ap_credit_note_id = ?, credited_at = now(), updated_at = now() WHERE tenant_id = ? AND id = ?",
+                req.creditNoteRef().trim(), req.creditAmount(), apCreditNoteId, tid, id);
         return get(tenantId, id);
     }
 

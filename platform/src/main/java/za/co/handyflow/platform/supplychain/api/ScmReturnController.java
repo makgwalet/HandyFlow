@@ -83,5 +83,5 @@ public class ScmReturnController {
     @PostMapping("/{id}/credit")
     @PreAuthorize(CAN_APPROVE)
     @Operation(summary = "Record the supplier's credit note against this return or claim")
-    public ResponseEntity<ApiResponse<Response>> credit(@PathVariable UUID id, @RequestBody CreditRequest req) { return ok("Credit recorded", service.recordCredit(tenant(), id, req)); }
+    public ResponseEntity<ApiResponse<Response>> credit(@PathVariable UUID id, @RequestBody CreditRequest req) { return ok("Credit recorded", service.recordCredit(tenant(), id, req, uid())); }
 }

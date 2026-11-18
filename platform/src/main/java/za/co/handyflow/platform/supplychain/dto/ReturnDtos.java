@@ -17,7 +17,10 @@ public final class ReturnDtos {
 
     public record DecisionRequest(String note) {}
 
-    public record CreditRequest(String creditNoteRef, BigDecimal creditAmount) {}
+    /** creditAmount is the credit note's total including VAT; creditVat (optional, default 0) is the VAT inside it. */
+    public record CreditRequest(String creditNoteRef, BigDecimal creditAmount, BigDecimal creditVat) {
+        public CreditRequest(String creditNoteRef, BigDecimal creditAmount) { this(creditNoteRef, creditAmount, null); }
+    }
 
     public record LineResponse(UUID id, UUID grLineId, UUID poLineId, UUID catalogueItemId, String itemName, BigDecimal qty,
                                BigDecimal unitCost, BigDecimal lineTotal) {}
