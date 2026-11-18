@@ -1,5 +1,6 @@
 package za.co.handyflow.platform.supplychain.api;
 
+import za.co.handyflow.platform.billing.FeatureGuard;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -19,7 +20,13 @@ import za.co.handyflow.platform.supplychain.application.internal.ScmMatchToleran
 @Tag(name = "Supply Chain", description = "Match tolerances")
 public class ScmMatchSettingsController {
 
+    private final FeatureGuard featureGuard;
     private final ScmMatchTolerances tolerances;
+
+
+    /** Module entitlement: a company whose plan does not include Supply Chain cannot reach any endpoint here. Runs before every handler. */
+    @ModelAttribute
+    void requireSupplyChainModule() { featureGuard.requireModule("supply_chain"); }
 
     @GetMapping
     @PreAuthorize("hasAuthority('SCM_READ')")

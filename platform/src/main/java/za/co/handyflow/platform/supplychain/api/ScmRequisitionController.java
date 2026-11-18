@@ -1,5 +1,6 @@
 package za.co.handyflow.platform.supplychain.api;
 
+import za.co.handyflow.platform.billing.FeatureGuard;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -30,12 +31,18 @@ import java.util.UUID;
 @Tag(name = "Supply Chain", description = "Purchase requisitions")
 public class ScmRequisitionController {
 
+    private final FeatureGuard featureGuard;
     private final RequisitionService service;
 
     private static final String CAN_REQUEST = "hasAnyAuthority('SCM_REQUISITION_CREATE','SCM_ORDER','SCM_ADMIN')";
     private static final String CAN_APPROVE = "hasAnyAuthority('SCM_REQUISITION_APPROVE','SCM_ADMIN')";
     private static final String CAN_CONVERT = "hasAnyAuthority('SCM_PO_CREATE','SCM_ORDER','SCM_ADMIN')";
     private static final String CAN_VIEW = "hasAnyAuthority('SCM_READ','SCM_REQUISITION_CREATE','SCM_REQUISITION_APPROVE','SCM_ORDER','SCM_ADMIN')";
+
+
+    /** Module entitlement: a company whose plan does not include Supply Chain cannot reach any endpoint here. Runs before every handler. */
+    @ModelAttribute
+    void requireSupplyChainModule() { featureGuard.requireModule("supply_chain"); }
 
     @PostMapping
     @PreAuthorize(CAN_REQUEST)

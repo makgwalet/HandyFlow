@@ -1,5 +1,6 @@
 package za.co.handyflow.platform.supplychain.api;
 
+import za.co.handyflow.platform.billing.FeatureGuard;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -23,9 +24,15 @@ import java.util.List;
 @Tag(name = "Supply Chain", description = "Replenishment recommendations")
 public class ScmReplenishmentController {
 
+    private final FeatureGuard featureGuard;
     private final ReplenishmentService service;
 
     private static TenantId tenant() { return TenantContext.getTenantIdAsObject(); }
+
+
+    /** Module entitlement: a company whose plan does not include Supply Chain cannot reach any endpoint here. Runs before every handler. */
+    @ModelAttribute
+    void requireSupplyChainModule() { featureGuard.requireModule("supply_chain"); }
 
     @GetMapping
     @PreAuthorize("hasAnyAuthority('SCM_READ','SCM_REQUISITION_CREATE','SCM_ADMIN')")

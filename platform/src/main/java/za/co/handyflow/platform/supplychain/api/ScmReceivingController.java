@@ -1,5 +1,6 @@
 package za.co.handyflow.platform.supplychain.api;
 
+import za.co.handyflow.platform.billing.FeatureGuard;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -24,7 +25,13 @@ import java.util.UUID;
 @Tag(name = "Supply Chain", description = "Goods receiving controls")
 public class ScmReceivingController {
 
+    private final FeatureGuard featureGuard;
     private final GoodsReceivingService receivingService;
+
+
+    /** Module entitlement: a company whose plan does not include Supply Chain cannot reach any endpoint here. Runs before every handler. */
+    @ModelAttribute
+    void requireSupplyChainModule() { featureGuard.requireModule("supply_chain"); }
 
     @GetMapping("/{id}/lines")
     @PreAuthorize("hasAuthority('SCM_READ')")

@@ -1,5 +1,6 @@
 package za.co.handyflow.platform.supplychain.api;
 
+import za.co.handyflow.platform.billing.FeatureGuard;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -25,10 +26,16 @@ import java.util.UUID;
 @Tag(name = "Supply Chain", description = "PO versioning and amendments")
 public class ScmAmendmentController {
 
+    private final FeatureGuard featureGuard;
     private final PoAmendmentService amendmentService;
     private final PoVersionService versionService;
 
     // ── DRAFT line editing ────────────────────────────────────────────────────
+
+
+    /** Module entitlement: a company whose plan does not include Supply Chain cannot reach any endpoint here. Runs before every handler. */
+    @ModelAttribute
+    void requireSupplyChainModule() { featureGuard.requireModule("supply_chain"); }
 
     @PutMapping("/purchase-orders/{id}/lines/{lineId}")
     @PreAuthorize("hasAuthority('SCM_ORDER')")

@@ -1,5 +1,6 @@
 package za.co.handyflow.platform.supplychain.api;
 
+import za.co.handyflow.platform.billing.FeatureGuard;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -28,11 +29,17 @@ import java.util.UUID;
 @Tag(name = "Supply Chain", description = "Supplier lifecycle and bank-detail control")
 public class ScmSupplierGovernanceController {
 
+    private final FeatureGuard featureGuard;
     private final SupplierLifecycleService lifecycle;
     private final SupplierBankChangeService bankChanges;
     private final SupplierAuditService audit;
 
     // ── Lifecycle ─────────────────────────────────────────────────────────────
+
+
+    /** Module entitlement: a company whose plan does not include Supply Chain cannot reach any endpoint here. Runs before every handler. */
+    @ModelAttribute
+    void requireSupplyChainModule() { featureGuard.requireModule("supply_chain"); }
 
     @PostMapping("/suppliers/{id}/approve")
     @PreAuthorize("hasAnyAuthority('SCM_SUPPLIER_APPROVE','SCM_ADMIN')")

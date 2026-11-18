@@ -1,5 +1,6 @@
 package za.co.handyflow.platform.supplychain.api;
 
+import za.co.handyflow.platform.billing.FeatureGuard;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -28,11 +29,17 @@ import java.util.UUID;
 @Tag(name = "Supply Chain", description = "Procurement budgets and commitments")
 public class ScmBudgetController {
 
+    private final FeatureGuard featureGuard;
     private final BudgetService service;
 
     private static final String CAN_MANAGE = "hasAnyAuthority('SCM_BUDGET_MANAGE','SCM_ADMIN')";
     private static final String CAN_READ = "hasAnyAuthority('SCM_BUDGET_READ','SCM_READ','SCM_ADMIN')";
     private static final String CAN_OVERRIDE = "hasAnyAuthority('SCM_BUDGET_OVERRIDE','SCM_ADMIN')";
+
+
+    /** Module entitlement: a company whose plan does not include Supply Chain cannot reach any endpoint here. Runs before every handler. */
+    @ModelAttribute
+    void requireSupplyChainModule() { featureGuard.requireModule("supply_chain"); }
 
     @PostMapping("/budgets")
     @PreAuthorize(CAN_MANAGE)

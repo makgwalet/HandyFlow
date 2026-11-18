@@ -1,5 +1,6 @@
 package za.co.handyflow.platform.supplychain.api;
 
+import za.co.handyflow.platform.billing.FeatureGuard;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -27,12 +28,18 @@ public class ScmReturnController {
     private static final String CAN_MANAGE = "hasAnyAuthority('SCM_RETURN_MANAGE','SCM_ADMIN')";
     private static final String CAN_APPROVE = "hasAnyAuthority('SCM_RETURN_APPROVE','SCM_ADMIN')";
 
+    private final FeatureGuard featureGuard;
     private final SupplierReturnService service;
 
     private static TenantId tenant() { return TenantContext.getTenantIdAsObject(); }
     private static UUID uid() { return TenantContext.getCurrentUserId(); }
     private static String uname() { return TenantContext.getCurrentUserName(); }
     private static <T> ResponseEntity<ApiResponse<T>> ok(String m, T body) { return ResponseEntity.ok(ApiResponse.success(m, body)); }
+
+
+    /** Module entitlement: a company whose plan does not include Supply Chain cannot reach any endpoint here. Runs before every handler. */
+    @ModelAttribute
+    void requireSupplyChainModule() { featureGuard.requireModule("supply_chain"); }
 
     @GetMapping
     @PreAuthorize(CAN_READ)

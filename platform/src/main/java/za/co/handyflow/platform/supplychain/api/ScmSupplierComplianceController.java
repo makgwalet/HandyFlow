@@ -1,5 +1,6 @@
 package za.co.handyflow.platform.supplychain.api;
 
+import za.co.handyflow.platform.billing.FeatureGuard;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -33,11 +34,17 @@ import java.util.UUID;
 @Tag(name = "Supply Chain", description = "Supplier compliance and performance")
 public class ScmSupplierComplianceController {
 
+    private final FeatureGuard featureGuard;
     private final SupplierDocumentService documents;
     private final SupplierComplianceService compliance;
     private final SupplierScorecardService scorecards;
 
     // ── Documents ─────────────────────────────────────────────────────────────
+
+
+    /** Module entitlement: a company whose plan does not include Supply Chain cannot reach any endpoint here. Runs before every handler. */
+    @ModelAttribute
+    void requireSupplyChainModule() { featureGuard.requireModule("supply_chain"); }
 
     @PostMapping(value = "/{id}/documents", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @PreAuthorize("hasAnyAuthority('SCM_SUPPLIER_MANAGE','SCM_ADMIN')")
