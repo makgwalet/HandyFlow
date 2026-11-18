@@ -15,6 +15,7 @@ import za.co.handyflow.platform.shared.EmailService;
 import za.co.handyflow.platform.shared.EmailTemplates;
 import za.co.handyflow.platform.documents.application.DocumentsFacade;
 import za.co.handyflow.platform.shared.ResourceNotFoundException;
+import za.co.handyflow.platform.shared.TenantContext;
 import za.co.handyflow.platform.shared.TenantId;
 import za.co.handyflow.platform.shared.SmsService;
 
@@ -53,6 +54,7 @@ public class ContractingService {
     private final ContractRedlineService         redline;      // body version history
     private final DocumentsFacade                documents;   // legal review evidence
     private final ContractRiskService            riskService;   // risk rules that block sending
+    private final ContractNegotiationService     negotiationService; // counterparty negotiation: blocks sending while proposals wait
     private final ContractRecordsService         records;   // executed copy + records retention (V581)
 
     @Value("${contracting.signing.base-url:http://localhost:5173}")
@@ -565,11 +567,15 @@ public class ContractingService {
         // Published risk rules marked "blocks sending" (none exist unless the legal reviewer publishes some)
         riskService.assertNoBlockingFindings(tenantId, c);
 
+        // Counterparty negotiation (none unless one was opened): nothing pending, final wording pinned
+        negotiationService.assertReadyForSigning(tenantId, c);
+
         // Lock body — SHA-256 hash prevents tamper after sending
         String bodyHash = signingTokenService.sha256(c.getBody() != null ? c.getBody() : "");
         c.lockBody(bodyHash);
         c.send();
         contractRepo.save(c);
+        negotiationService.freezeOnSend(tenantId, c, TenantContext.getCurrentUserId());
 
         // Issue a signing token and send invitation per party
         for (ContractParty party : parties) {
