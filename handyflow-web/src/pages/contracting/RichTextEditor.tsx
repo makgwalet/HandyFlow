@@ -6,7 +6,7 @@ import { useState, type CSSProperties, type ReactNode } from 'react'
 import { useEditor, EditorContent, type Editor } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import { Table, TableRow, TableCell, TableHeader } from '@tiptap/extension-table'
-import { normalizeEditorHtml } from './richText'
+import { normalizeEditorHtml, unsupportedMarkup } from './richText'
 
 const bar: CSSProperties = { display: 'flex', flexWrap: 'wrap', gap: 4, padding: '6px 8px', borderBottom: '1px solid var(--hf-border)', background: 'var(--hf-surface-muted)' }
 const tb = (active = false): CSSProperties => ({
@@ -53,6 +53,8 @@ function Toolbar({ editor }: { editor: Editor }) {
 
 export function RichTextEditor({ value, onChange, minHeight = 220 }: { value: string; onChange: (html: string) => void; minHeight?: number }) {
   const [raw, setRaw] = useState(false)
+  // Checked once, on the text the editor was given: what the editor would simplify if this text is edited in it.
+  const [simplified] = useState(() => unsupportedMarkup(value))
 
   // The editor starts from `value` and then owns the text; callers remount it (a new key) to load different text.
   const editor = useEditor({
@@ -77,6 +79,11 @@ export function RichTextEditor({ value, onChange, minHeight = 220 }: { value: st
       <div style={{ display: 'flex', justifyContent: 'flex-end', padding: '4px 8px', borderBottom: raw ? '1px solid var(--hf-border)' : 'none', background: 'var(--hf-surface-muted)' }}>
         <button type="button" onClick={toggleRaw} style={tb(raw)}>{raw ? 'Back to editor' : 'HTML'}</button>
       </div>
+      {!raw && simplified.length > 0 && (
+        <div role="note" style={{ padding: '6px 10px', fontSize: 12, lineHeight: 1.5, background: 'var(--hf-warning-soft)', color: 'var(--hf-warning-text)', borderBottom: '1px solid var(--hf-warning-border)' }}>
+          This text uses formatting the editor does not keep ({simplified.join(', ')}). Editing here will simplify it. Use the HTML view to change the text and keep its markup exactly.
+        </div>
+      )}
       {raw ? (
         <textarea value={value} onChange={e => onChange(e.target.value)} rows={12} aria-label="HTML"
           style={{ width: '100%', boxSizing: 'border-box', border: 'none', padding: 12, fontFamily: 'monospace', fontSize: 12, lineHeight: 1.6, background: 'var(--hf-surface)', color: 'var(--hf-text-secondary)', resize: 'vertical' }} />

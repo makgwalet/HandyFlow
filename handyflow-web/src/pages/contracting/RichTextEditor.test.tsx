@@ -45,3 +45,14 @@ describe('RichTextEditor', () => {
     expect(el.textContent).toContain('Hi')
   })
 })
+
+describe('RichTextEditor formatting notice', () => {
+  it('warns when the text has markup the editor would simplify', async () => {
+    const el = await mount('<div><span style="color:red">Hello</span></div>')
+    expect(el.querySelector('[role="note"]')?.textContent).toContain('<div>')
+  })
+  it('says nothing for text the editor keeps', async () => {
+    const el = await mount('<p>Plain <strong>text</strong></p>')
+    expect(el.querySelector('[role="note"]')).toBeNull()
+  })
+})

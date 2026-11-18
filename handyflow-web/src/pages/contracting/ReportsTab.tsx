@@ -3,7 +3,7 @@
 import { useState, type CSSProperties } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { apiClient } from '../../api/client'
-import { fmtR } from './ContractingPage'
+import { fmtR } from './contractingApi'
 
 interface Slow { contractNumber: string; title: string; days: number }
 interface Report {

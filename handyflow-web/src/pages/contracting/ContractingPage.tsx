@@ -1,6 +1,7 @@
 // src/pages/contracting/ContractingPage.tsx
 import { useQuery } from '@tanstack/react-query'
 import { apiClient } from '../../api/client'
+import { unwrap, fmtR } from './contractingApi'
 import ContractsDashboard from './ContractsDashboard'
 import ContractsTab       from './ContractsTab'
 import TemplatesTab       from './TemplatesTab'
@@ -12,21 +13,10 @@ import ReportsTab         from './ReportsTab'
 import { SectionedModulePage } from '../../components/shell/SectionedModulePage'
 import { CONTRACTING_SECTIONS } from '../../navigation/moduleSections'
 
-// Unwrap ApiResponse<Page<T>> or ApiResponse<List<T>>
-export const unwrap = (r: any): any[] => {
-  const payload = r.data?.data ?? r.data
-  return Array.isArray(payload) ? payload : payload?.content ?? []
-}
-
-export const fmtR = (n: any) =>
-  n != null
-    ? `R ${Number(n).toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-    : '—'
-
 export default function ContractingPage() {
-  const { data: contracts = [] } = useQuery<any[]>({
+  const { data: contracts = [] } = useQuery<{ status: string; valueAmount?: number | string | null }[]>({
     queryKey: ['contracts', 'all'],
-    queryFn: async () => unwrap(await apiClient.get('/api/v1/contracts?size=200')),
+    queryFn: async () => unwrap<{ status: string; valueAmount?: number | string | null }>(await apiClient.get('/api/v1/contracts?size=200')),
   })
 
   const signed  = contracts.filter(c => c.status === 'SIGNED')

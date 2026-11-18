@@ -4,7 +4,7 @@ import { useState, type CSSProperties } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { apiClient } from '../../api/client'
 import { X } from 'lucide-react'
-import { unwrap } from './ContractingPage'
+import { unwrap } from './contractingApi'
 import { usePermissions } from '../../hooks/usePermission'
 
 interface RenewalItem {

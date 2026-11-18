@@ -25,7 +25,7 @@ import {
   AlertTriangle, ChevronDown, FileText, PenLine, Search,
   Calendar, MessageSquare, RefreshCw, Eye, EyeOff,
 } from 'lucide-react'
-import { unwrap, fmtR } from './ContractingPage'
+import { unwrap, fmtR, apiError, type ContractRow, type ContractParty, type ContractComment, type ContractTemplateRow, type SignIcon } from './contractingApi'
 import { ContractSharingSection } from './ContractSharingSection'
 import { ContractRedlineSection } from './ContractRedlineSection'
 import { ContractRiskSection } from './ContractRiskSection'
@@ -34,9 +34,9 @@ import { usePermissions } from '../../hooks/usePermission'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const fmtDate = (d: any) =>
+const fmtDate = (d: string | null | undefined) =>
   d ? new Date(d).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'
-const fmtDT = (d: any) =>
+const fmtDT = (d: string | null | undefined) =>
   d ? new Date(d).toLocaleString('en-ZA', { dateStyle: 'medium', timeStyle: 'short' }) : '—'
 
 const STATUS_CFG: Record<string, { color: string; bg: string; border: string; label: string }> = {
@@ -48,7 +48,7 @@ const STATUS_CFG: Record<string, { color: string; bg: string; border: string; la
   EXPIRED:      { color: 'var(--hf-text-faint)', bg: 'var(--hf-surface-sunken)', border: 'var(--hf-border)', label: 'Expired'       },
 }
 
-const SIGN_CFG: Record<string, { color: string; Icon: any }> = {
+const SIGN_CFG: Record<string, { color: string; Icon: SignIcon }> = {
   PENDING:  { color: 'var(--hf-warning-text)', Icon: Clock          },
   SENT:     { color: 'var(--hf-info-text)', Icon: Send            },
   SIGNED:   { color: 'var(--hf-success-text-strong)', Icon: CheckCircle     },
@@ -238,7 +238,7 @@ export default function ContractsTab() {
     autoRenew: false, renewalNoticeDays: '30', notes: '',
     variables: {} as Record<string, string>,
   })
-  const ef = (k: string, v: any) => setEditForm(p => ({ ...p, [k]: v }))
+  const ef = (k: string, v: string | boolean | Record<string, string>) => setEditForm(p => ({ ...p, [k]: v }))
   const [showOtp,      setShowOtp]      = useState<{ contractId: string; partyId: string; name: string; isResend: boolean } | null>(null)
   const [showSign,     setShowSign]     = useState<{ contractId: string; partyId: string } | null>(null)
   const [showComments, setShowComments] = useState<string | null>(null)
@@ -250,7 +250,7 @@ export default function ContractsTab() {
   const [isAmendment,  setIsAmendment]  = useState(false)
   const [clauseRef,    setClauseRef]    = useState('')
   const [error,        setError]        = useState('')
-  const [selectedTemplate, setSelectedTemplate] = useState<any | null>(null)
+  const [selectedTemplate, setSelectedTemplate] = useState<ContractTemplateRow | null>(null)
 
   const INIT_FORM = () => ({
     title: '', contractType: 'SERVICE_AGREEMENT', templateId: '',
@@ -259,7 +259,7 @@ export default function ContractsTab() {
     variables: {} as Record<string, string>,
   })
   const [form, setForm] = useState(INIT_FORM())
-  const sf = (k: string, v: any) => setForm(p => ({ ...p, [k]: v }))
+  const sf = (k: string, v: string | boolean | Record<string, string>) => setForm(p => ({ ...p, [k]: v }))
 
   const [partyForm, setPartyForm] = useState({
     partyType: 'INDIVIDUAL', partyRole: 'COUNTERPARTY',
@@ -270,16 +270,16 @@ export default function ContractsTab() {
 
   // ── Queries ──────────────────────────────────────────────────────────────────
 
-  const { data: contracts = [], isLoading } = useQuery<any[]>({
+  const { data: contracts = [], isLoading } = useQuery<ContractRow[]>({
     queryKey: ['contracts', statusFilter],
     queryFn: async () => {
       const params = new URLSearchParams({ size: '100' })
       if (statusFilter) params.set('status', statusFilter)
-      return unwrap(await apiClient.get(`/api/v1/contracts?${params}`))
+      return unwrap<ContractRow>(await apiClient.get(`/api/v1/contracts?${params}`))
     },
   })
 
-  const { data: contractDetail } = useQuery<any>({
+  const { data: contractDetail } = useQuery<ContractRow>({
     queryKey: ['contract-detail', expanded],
     queryFn: async () => {
       const r = await apiClient.get(`/api/v1/contracts/${expanded}`)
@@ -289,9 +289,9 @@ export default function ContractsTab() {
     staleTime: 10_000,
   })
 
-  const { data: templates = [] } = useQuery<any[]>({
+  const { data: templates = [] } = useQuery<ContractTemplateRow[]>({
     queryKey: ['contract-templates'],
-    queryFn: async () => unwrap(await apiClient.get('/api/v1/contracts/templates')),
+    queryFn: async () => unwrap<ContractTemplateRow>(await apiClient.get('/api/v1/contracts/templates')),
   })
 
   // ── Mutations ────────────────────────────────────────────────────────────────
@@ -302,29 +302,29 @@ export default function ContractsTab() {
   }
 
   const createContract = useMutation({
-    mutationFn: (body: any) => apiClient.post('/api/v1/contracts', body),
+    mutationFn: (body: Record<string, unknown>) => apiClient.post('/api/v1/contracts', body),
     onSuccess: () => { invalidate(); setShowCreate(false); setForm(INIT_FORM()); setSelectedTemplate(null); setError('') },
-    onError: (e: any) => setError(e.response?.data?.message ?? 'Failed to create contract'),
+    onError: (e: unknown) => setError(apiError(e, 'Failed to create contract')),
   })
 
   const contractAction = useMutation({
-    mutationFn: ({ id, action, body }: { id: string; action: string; body?: any }) =>
+    mutationFn: ({ id, action, body }: { id: string; action: string; body?: Record<string, unknown> }) =>
       apiClient.post(`/api/v1/contracts/${id}/${action}`, body ?? {}),
     onSuccess: () => { invalidate(); setShowTerminate(null); setTerminateReason(''); setError('') },
-    onError: (e: any) => setError(e.response?.data?.message ?? 'Action failed'),
+    onError: (e: unknown) => setError(apiError(e, 'Action failed')),
   })
 
   // NEW: fills in remaining {{variables}} and/or updates dates, value,
   // notes, auto-renew on a DRAFT/UNDER_REVIEW contract.
   const updateContract = useMutation({
-    mutationFn: ({ id, body }: { id: string; body: any }) =>
+    mutationFn: ({ id, body }: { id: string; body: Record<string, unknown> }) =>
       apiClient.put(`/api/v1/contracts/${id}`, body),
     onSuccess: () => { invalidate(); setShowEditContract(null); setError('') },
-    onError: (e: any) => setError(e.response?.data?.message ?? 'Failed to update contract'),
+    onError: (e: unknown) => setError(apiError(e, 'Failed to update contract')),
   })
 
   const addParty = useMutation({
-    mutationFn: ({ id, body }: { id: string; body: any }) =>
+    mutationFn: ({ id, body }: { id: string; body: Record<string, unknown> }) =>
       apiClient.post(`/api/v1/contracts/${id}/parties`, body),
     onSuccess: () => {
       invalidate()
@@ -332,7 +332,7 @@ export default function ContractsTab() {
       setShowParty(null); setError('')
       setPartyForm({ partyType: 'INDIVIDUAL', partyRole: 'COUNTERPARTY', fullName: '', email: '', phone: '', companyName: '', idNumber: '', signingOrder: '1' })
     },
-    onError: (e: any) => setError(e.response?.data?.message ?? 'Failed to add party'),
+    onError: (e: unknown) => setError(apiError(e, 'Failed to add party')),
   })
 
   const requestOtp = useMutation({
@@ -351,14 +351,14 @@ export default function ContractsTab() {
         }
       } catch { /* production: endpoint disabled */ }
     },
-    onError: (e: any) => setError(e.response?.data?.message ?? 'Failed to send OTP'),
+    onError: (e: unknown) => setError(apiError(e, 'Failed to send OTP')),
   })
 
   const resendLink = useMutation({
     mutationFn: ({ contractId, partyId }: { contractId: string; partyId: string }) =>
       apiClient.post(`/api/v1/contracts/${contractId}/parties/${partyId}/resend`),
     onSuccess: () => { invalidate(); setError('') },
-    onError: (e: any) => setError(e.response?.data?.message ?? 'Failed to resend'),
+    onError: (e: unknown) => setError(apiError(e, 'Failed to resend')),
   })
 
   const signContract = useMutation({
@@ -367,17 +367,17 @@ export default function ContractsTab() {
         otpCode, signatureData,
       }),
     onSuccess: () => { invalidate(); setShowSign(null); setOtpCode(''); setSignatureData(null); setError('') },
-    onError: (e: any) => setError(e.response?.data?.message ?? 'Incorrect OTP — please try again'),
+    onError: (e: unknown) => setError(apiError(e, 'Incorrect OTP — please try again')),
   })
 
   const postComment = useMutation({
-    mutationFn: ({ contractId, body }: { contractId: string; body: any }) =>
+    mutationFn: ({ contractId, body }: { contractId: string; body: Record<string, unknown> }) =>
       apiClient.post(`/api/v1/contracts/${contractId}/comments`, body),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['contract-detail'] })
       setCommentText(''); setIsAmendment(false); setClauseRef(''); setError('')
     },
-    onError: (e: any) => setError(e.response?.data?.message ?? 'Failed to post comment'),
+    onError: (e: unknown) => setError(apiError(e, 'Failed to post comment')),
   })
 
   const downloadPdf = async (id: string, number: string) => {
@@ -391,7 +391,7 @@ export default function ContractsTab() {
   }
 
   const handleTemplateChange = (templateId: string) => {
-    const tmpl = templates.find((t: any) => t.id === templateId) ?? null
+    const tmpl = templates.find(t => t.id === templateId) ?? null
     setSelectedTemplate(tmpl)
     sf('templateId', templateId)
     if (tmpl) sf('contractType', tmpl.contractType)
@@ -473,7 +473,7 @@ export default function ContractsTab() {
             const cfg    = STATUS_CFG[c.status] ?? STATUS_CFG.DRAFT
             const isOpen = expanded === c.id
             const canPdf = c.status === 'SIGNED' || c.status === 'TERMINATED'
-            const unresolvedAmendments = (c.comments ?? []).filter((cm: any) => cm.isAmendmentRequest && !cm.resolved).length
+            const unresolvedAmendments = (c.comments ?? []).filter(cm => cm.isAmendmentRequest && !cm.resolved).length
 
             return (
               <div key={c.id} style={{ border: `1px solid ${cfg.border}`, borderLeft: `3px solid ${cfg.color}`, borderRadius: 10, overflow: 'hidden' }}>
@@ -524,7 +524,7 @@ export default function ContractsTab() {
                         { l: 'Auto-renew',  v: c.autoRenew ? `Yes (${c.renewalNoticeDays ?? 30}d notice)` : 'No' },
                         c.sentAt   && { l: 'Sent',    v: fmtDT(c.sentAt)   },
                         c.signedAt && { l: 'Signed',  v: fmtDT(c.signedAt) },
-                      ].filter(Boolean).map((item: any) => (
+                      ].filter((item): item is { l: string; v: string } => !!item).map(item => (
                         <div key={item.l} style={{ background: 'var(--hf-surface)', border: '1px solid var(--hf-border)', borderRadius: 7, padding: '8px 12px' }}>
                           <div style={{ fontSize: 9, fontWeight: 700, color: 'var(--hf-text-faint)', textTransform: 'uppercase', marginBottom: 2 }}>{item.l}</div>
                           <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--hf-text)' }}>{item.v}</div>
@@ -588,7 +588,7 @@ export default function ContractsTab() {
                           </div>
                         ) : (
                           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                          {parties.map((party: any) => {
+                          {parties.map((party: ContractParty) => {
                             const sCfg = SIGN_CFG[party.signingStatus] ?? SIGN_CFG.PENDING
                             const SIcon = sCfg.Icon
                             const otpExpired = party.signingStatus === 'SENT' && party.otpSentAt
@@ -681,7 +681,7 @@ export default function ContractsTab() {
                       <button onClick={() => { setShowComments(showComments === c.id ? null : c.id); setError('') }}
                         style={{ display: 'flex', alignItems: 'center', gap: 5, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--hf-text-muted)', fontSize: 12, fontWeight: 500, marginBottom: showComments === c.id ? 10 : 0 }}>
                         <MessageSquare size={13} />
-                        {showComments === c.id ? 'Hide comments' : `Comments${(c.comments?.length ?? 0) > 0 ? ` (${c.comments.length})` : ''}`}
+                        {showComments === c.id ? 'Hide comments' : `Comments${(c.comments?.length ?? 0) > 0 ? ` (${c.comments?.length})` : ''}`}
                       </button>
 
                       {showComments === c.id && (
@@ -691,7 +691,7 @@ export default function ContractsTab() {
                             <div style={{ fontSize: 13, color: 'var(--hf-text-faint)', padding: '10px 0' }}>No comments yet.</div>
                           ) : (
                             <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 14 }}>
-                              {(contractDetail?.comments ?? c.comments ?? []).map((cm: any) => (
+                              {(contractDetail?.comments ?? c.comments ?? []).map((cm: ContractComment) => (
                                 <div key={cm.id} style={{ padding: '10px 14px', background: cm.isAmendmentRequest ? 'var(--hf-warning-soft)' : 'var(--hf-surface-muted)', border: `1px solid ${cm.isAmendmentRequest ? 'var(--hf-warning-border)' : 'var(--hf-border)'}`, borderRadius: 8 }}>
                                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -832,7 +832,7 @@ export default function ContractsTab() {
                 <label style={lbl}>Start from template (optional)</label>
                 <select value={form.templateId} onChange={e => handleTemplateChange(e.target.value)} style={{ ...inp, background: 'var(--hf-surface)' }}>
                   <option value="">Blank contract</option>
-                  {templates.map((t: any) => <option key={t.id} value={t.id}>{t.name}</option>)}
+                  {templates.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
                 </select>
               </div>
             </Sect>
@@ -1021,7 +1021,7 @@ export default function ContractsTab() {
                 onClick={() => {
                   const order = parseInt(partyForm.signingOrder) || 1
                   const existingParties = contractDetail?.parties ?? []
-                  const duplicate = existingParties.find((p: any) =>
+                  const duplicate = existingParties.find(p =>
                     p.signingOrder === order && p.signingStatus !== 'DECLINED'
                   )
                   if (duplicate) {
@@ -1202,7 +1202,7 @@ export default function ContractsTab() {
               // before only if the template can't be found (deleted since,
               // or the contract was never created from a template at all).
               const sourceTemplate = isCurrent
-                ? (templates as any[]).find(t => t.id === contractDetail.templateId)
+                ? templates.find(t => t.id === contractDetail.templateId)
                 : null
               const fieldType = (key: string): 'date' | 'number' | 'text' => {
                 const declared = sourceTemplate?.variables?.[key]

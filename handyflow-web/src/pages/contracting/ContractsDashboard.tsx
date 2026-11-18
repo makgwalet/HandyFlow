@@ -5,12 +5,12 @@ import {
   FileText, Clock, CheckCircle, AlertTriangle,
   ArrowRight, Calendar, TrendingUp, XCircle,
 } from 'lucide-react'
-import { unwrap, fmtR } from './ContractingPage'
+import { unwrapOne, fmtR, type ContractDashboard } from './contractingApi'
 
-const fmtDate = (d: any) =>
+const fmtDate = (d: string | null | undefined) =>
   d ? new Date(d).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'
 
-const daysUntil = (d: string) =>
+const daysUntil = (d: string | null | undefined) => d == null ? 0 :
   Math.ceil((new Date(d).getTime() - Date.now()) / 86_400_000)
 
 const TYPE_COLOR: Record<string, string> = {
@@ -27,17 +27,17 @@ const TYPE_LABEL: Record<string, string> = {
   RETAINER: 'Retainer', SUPPLY: 'Supply Agreement', ACKNOWLEDGMENT_OF_DEBT: 'Acknowledgment of Debt', OTHER: 'Other',
 }
 
-export default function ContractsDashboard({ onNavigate }: { onNavigate: (t: any) => void }) {
+export default function ContractsDashboard({ onNavigate }: { onNavigate: (t: string) => void }) {
   // The figures are calculated on the server, so the page no longer loads and counts every contract in the browser.
-  const { data: dash } = useQuery<any>({
+  const { data: dash } = useQuery<ContractDashboard>({
     queryKey: ['contracts', 'dashboard'],
-    queryFn: async () => unwrap(await apiClient.get('/api/v1/contracts/dashboard')),
+    queryFn: async () => unwrapOne<ContractDashboard>(await apiClient.get('/api/v1/contracts/dashboard')),
   })
 
   const statusCounts: Record<string, number> = dash?.statusCounts ?? {}
   const count = (status: string) => statusCounts[status] ?? 0
   const signed     = { length: count('SIGNED') }
-  const pending    = (dash?.awaitingSignature ?? []) as any[]
+  const pending    = dash?.awaitingSignature ?? []
   const pendingCount = count('SENT')
   const draft      = { length: count('DRAFT') }
   const review     = { length: count('UNDER_REVIEW') }
@@ -49,7 +49,7 @@ export default function ContractsDashboard({ onNavigate }: { onNavigate: (t: any
   const pendingVal     = Number(dash?.pendingValue) || 0
 
   // Expiring in 30 days (soonest first, from the server)
-  const expiringSoon = (dash?.expiringSoon ?? []) as any[]
+  const expiringSoon = dash?.expiringSoon ?? []
 
   // Type breakdown
   const typeEntries = Object.entries((dash?.typeCounts ?? {}) as Record<string, number>).sort((a, b) => b[1] - a[1])
