@@ -29,6 +29,7 @@ import { unwrap, fmtR } from './ContractingPage'
 import { ContractSharingSection } from './ContractSharingSection'
 import { ContractRedlineSection } from './ContractRedlineSection'
 import { ContractRiskSection } from './ContractRiskSection'
+import { linkStatus, LINK_TONE_COLOR } from './signingLink'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -610,6 +611,10 @@ export default function ContractsTab() {
                                       {party.companyName && ` · ${party.companyName}`}
                                       {party.email && ` · ${party.email}`}
                                     </div>
+                                    {c.status !== 'DRAFT' && (() => {
+                                      const ls = linkStatus(party, fmtDT)
+                                      return <div style={{ fontSize: 11, color: LINK_TONE_COLOR[ls.tone] }}>{ls.text}</div>
+                                    })()}
                                   </div>
                                 </div>
 
