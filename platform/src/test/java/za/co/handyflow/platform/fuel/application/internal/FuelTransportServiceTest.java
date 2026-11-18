@@ -53,6 +53,7 @@ class FuelTransportServiceTest {
     @Mock FleetVehicleLookup fleetLookup;
     @Mock FuelPushService push;
     @Mock FuelArrivalCheckService arrivalChecks;
+    @Mock FuelPodPolicyService podPolicy;
     @InjectMocks FuelTransportService service;
 
     static final TenantId T = TenantId.of(UUID.randomUUID());
@@ -249,14 +250,14 @@ class FuelTransportServiceTest {
         assertThrows(ResourceNotFoundException.class, () -> service.myDispatch(T, me, load.getId()));
         assertThrows(ResourceNotFoundException.class, () -> service.myComplete(T, me, load.getId(),
                 new CompleteDeliveryRequest(bd("100"), "R", null, null, null, false, null, null, UUID.randomUUID())));
-        verify(fuelService, never()).completeDelivery(any(), any(), any());
+        verify(podPolicy, never()).complete(any(), any(), any(), any());
         verify(arrivalChecks, never()).requireClear(any(), any());
         // allocated to me
         FuelDelivery mine = FuelDelivery.create(T, UUID.randomUUID(), null, Map.of(), "DIESEL", bd("100"), bd("22"), Instant.now(), null, null);
         mine.allocate(tanker.getId(), "GP 12 AB", driver.id(), driver.fullName());
         when(deliveries.findActiveById(eq(T), eq(mine.getId()))).thenReturn(Optional.of(mine));
         service.myComplete(T, me, mine.getId(), new CompleteDeliveryRequest(bd("100"), "R", null, null, null, false, null, null, UUID.randomUUID()));
-        verify(fuelService).completeDelivery(eq(T), eq(mine.getId()), any());
+        verify(podPolicy).complete(eq(T), eq(me), eq(mine.getId()), any());
     }
 
     @Test @DisplayName("a login not linked to an employee gets a clear message")
@@ -390,6 +391,6 @@ class FuelTransportServiceTest {
         doThrow(new IllegalStateException("Do the arrival check at the site before offloading.")).when(arrivalChecks).requireClear(eq(T), eq(mine.getId()));
         assertThrows(IllegalStateException.class, () -> service.myComplete(T, me, mine.getId(),
                 new CompleteDeliveryRequest(bd("100"), "R", null, null, null, false, null, null, UUID.randomUUID())));
-        verify(fuelService, never()).completeDelivery(any(), any(), any());
+        verify(podPolicy, never()).complete(any(), any(), any(), any());
     }
 }

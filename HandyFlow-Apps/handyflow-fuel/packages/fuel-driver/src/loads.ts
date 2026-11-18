@@ -128,7 +128,18 @@ export interface CompleteForm {
   meterEnd: string;
   onBehalf: boolean;
   onBehalfOf: string;
+  /** Set only when nobody can receive the fuel. The server checks it against the company's policy, the site and the evidence on the load. */
+  exceptionType?: string;
+  exceptionReason?: string;
 }
+
+/** The four authorised reasons for no receiver. Which ones apply is the company's and the site's decision; the server refuses the rest. */
+export const POD_EXCEPTIONS: { type: string; label: string; hint: string }[] = [
+  { type: "UNATTENDED_SITE", label: "Unattended site", hint: "The site is marked unattended." },
+  { type: "AUTOMATED_RECEIVING", label: "Automated receiving", hint: "The site is marked as automated receiving." },
+  { type: "AFTER_HOURS_APPROVED", label: "Approved after hours", hint: "The office approved this drop first." },
+  { type: "CONTACTLESS_AUTHORISED", label: "Authorised contactless", hint: "The office authorised a contactless drop." },
+];
 
 const num = (s: string): number | null => {
   const t = s.trim().replace(",", ".");
@@ -142,7 +153,10 @@ export function validateComplete(f: CompleteForm, loadedLitres?: number | null):
   const litres = num(f.litres);
   if (litres === null || Number.isNaN(litres) || litres <= 0) return "Enter the litres delivered. It must be more than zero.";
   if (loadedLitres != null && litres > loadedLitres) return `Litres delivered cannot be more than the ${loadedLitres} L loaded.`;
-  if (!f.receiverName.trim()) return "Enter the name of the person who received the fuel.";
+  if (f.exceptionType) {
+    if (f.receiverName.trim()) return "Give either the receiver's name or an exception, not both.";
+    if ((f.exceptionReason ?? "").trim().length < 10) return "Explain why nobody could receive the fuel (at least 10 characters).";
+  } else if (!f.receiverName.trim()) return "Enter the name of the person who received the fuel, or choose an exception.";
   if (f.onBehalf && !f.onBehalfOf.trim()) return "Enter the name of the receiver you signed on behalf of.";
   const a = num(f.meterStart), b = num(f.meterEnd);
   if ((a !== null && Number.isNaN(a)) || (b !== null && Number.isNaN(b))) return "Meter readings must be numbers.";
@@ -169,6 +183,8 @@ export const completeBody = (f: CompleteForm) => ({
   meterReadingEnd: num(f.meterEnd),
   signedOnBehalf: f.onBehalf,
   onBehalfOf: f.onBehalf ? f.onBehalfOf.trim() : null,
+  podExceptionType: f.exceptionType || null,
+  podExceptionReason: f.exceptionType ? (f.exceptionReason ?? "").trim() : null,
 });
 
 export interface FailedForm { reason: string; note: string; litresReturned: string }

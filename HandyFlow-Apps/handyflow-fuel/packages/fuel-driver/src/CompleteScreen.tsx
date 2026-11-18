@@ -7,7 +7,7 @@ import { Button } from "@/ui/Button";
 import { Field } from "@/ui/Field";
 import { Screen } from "@/ui/Screen";
 import { colors } from "@/ui/theme";
-import { completeBody, meterWarning, validateComplete, type CompleteForm } from "./loads";
+import { completeBody, meterWarning, POD_EXCEPTIONS, validateComplete, type CompleteForm } from "./loads";
 import { useLoads } from "./useLoads";
 
 type Props = NativeStackScreenProps<RootStackParamList, "CompleteLoad">;
@@ -39,7 +39,26 @@ export function CompleteScreen({ route, navigation }: Props) {
   return (
     <Screen title="Record delivery">
       <Field label="Litres delivered" value={f.litres} onChangeText={(v) => set("litres", v)} keyboardType="decimal-pad" />
-      <Field label="Received by (name)" value={f.receiverName} onChangeText={(v) => set("receiverName", v)} autoCapitalize="words" />
+      {!f.exceptionType ? <Field label="Received by (name)" value={f.receiverName} onChangeText={(v) => set("receiverName", v)} autoCapitalize="words" /> : null}
+      <Pressable accessibilityRole="checkbox" accessibilityState={{ checked: !!f.exceptionType }} onPress={() => setF((p) => ({ ...p, exceptionType: p.exceptionType ? undefined : "UNATTENDED_SITE", exceptionReason: "", receiverName: "" }))}>
+        <Text style={{ color: colors.text, fontSize: 17 }}>{f.exceptionType ? "☑" : "☐"} Nobody could receive the fuel</Text>
+      </Pressable>
+      {f.exceptionType ? (
+        <>
+          {POD_EXCEPTIONS.map((x) => {
+            const on = x.type === f.exceptionType;
+            return (
+              <Pressable key={x.type} accessibilityRole="radio" accessibilityState={{ selected: on }} accessibilityLabel={x.label} onPress={() => set("exceptionType", x.type)}
+                style={{ minHeight: 48, justifyContent: "center", paddingHorizontal: 14, borderRadius: 10, borderWidth: 1, borderColor: on ? colors.primary : colors.border }}>
+                <Text style={{ color: colors.text, fontSize: 16, fontWeight: on ? "700" : "400" }}>{x.label}</Text>
+                <Text style={{ color: colors.muted, fontSize: 13 }}>{x.hint}</Text>
+              </Pressable>
+            );
+          })}
+          <Field label="Why nobody could receive it" value={f.exceptionReason ?? ""} onChangeText={(v) => set("exceptionReason", v)} multiline maxLength={500} />
+          <Text style={{ color: colors.muted, fontSize: 14 }}>Take a photo of the delivery first (on the load screen). The office checks the exception and the photo.</Text>
+        </>
+      ) : null}
       <Field label="ID or site badge number (optional)" value={f.receiverIdBadge} onChangeText={(v) => set("receiverIdBadge", v)} autoCapitalize="characters" />
       <Field label="Pump meter start (optional)" value={f.meterStart} onChangeText={(v) => set("meterStart", v)} keyboardType="decimal-pad" />
       <Field label="Pump meter end (optional)" value={f.meterEnd} onChangeText={(v) => set("meterEnd", v)} keyboardType="decimal-pad" />

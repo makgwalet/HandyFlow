@@ -62,6 +62,7 @@ public class FuelTankController {
     private final za.co.handyflow.platform.fuel.application.internal.FuelReceiptFreightService receiptFreightService;
     private final FuelSupplierApprovalService supplierApproval;
     private final FeatureGuard             featureGuard;
+    private final za.co.handyflow.platform.fuel.application.internal.FuelPodPolicyService podPolicy;
     private final DeliveryReceiptPdfService receiptPdfService;
     private final za.co.handyflow.platform.fuel.application.internal.FuelScopeService scopeService;
 
@@ -367,7 +368,7 @@ public class FuelTankController {
             @Valid @RequestBody CompleteDeliveryRequest request) {
         featureGuard.requireModule("fuel");
         return ResponseEntity.ok(ApiResponse.success("Delivery completed",
-                fuelService.completeDelivery(TenantContext.getTenantIdAsObject(), id, request)));
+                podPolicy.complete(TenantContext.getTenantIdAsObject(), TenantContext.getCurrentUserId(), id, request)));
     }
 
     @PostMapping("/deliveries/{id}/dispatch")

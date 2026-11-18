@@ -53,6 +53,10 @@ public class FuelCustomerSite {
     private java.math.BigDecimal latitude;
     @Column(precision = 9, scale = 6)
     private java.math.BigDecimal longitude;
+    /** UNATTENDED_SITE or AUTOMATED_RECEIVING when nobody receives fuel here; null for an ordinary attended site. */
+    @Column(name = "pod_exception_type", length = 30)
+    private String podExceptionType;
+
     @Column(nullable = false)
     private boolean active = true;
 
@@ -83,6 +87,12 @@ public class FuelCustomerSite {
         this.name = name.trim(); this.address = clean(address); this.contactName = clean(contactName);
         this.contactPhone = clean(contactPhone); this.deliveryInstructions = clean(instructions); this.operatingHours = clean(hours);
         this.updatedAt = Instant.now();
+    }
+
+    public void setPodExceptionType(String type) {
+        if (type != null && !type.isBlank() && !"UNATTENDED_SITE".equals(type) && !"AUTOMATED_RECEIVING".equals(type))
+            throw new IllegalArgumentException("A site can be marked UNATTENDED_SITE or AUTOMATED_RECEIVING.");
+        this.podExceptionType = type == null || type.isBlank() ? null : type; this.updatedAt = Instant.now();
     }
 
     public void setDistanceKm(java.math.BigDecimal km) {

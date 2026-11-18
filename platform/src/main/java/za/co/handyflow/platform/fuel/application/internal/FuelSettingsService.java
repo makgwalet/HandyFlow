@@ -97,6 +97,14 @@ public class FuelSettingsService {
         return new za.co.handyflow.platform.fuel.dto.ArrivalCheckDtos.ArrivalPolicy(hours, FuelArrivalCheckPolicy.DEFAULT_FRESH_HOURS, s.isArrivalCheckEnforced());
     }
 
+    @Transactional
+    public za.co.handyflow.platform.fuel.dto.PodDtos.PodPolicy updatePodPolicy(TenantId tenantId, za.co.handyflow.platform.fuel.dto.PodDtos.PodPolicyRequest req) {
+        FuelSettings s = settings.findByTenant(tenantId).orElseGet(() -> FuelSettings.forTenant(tenantId));
+        s.updatePodPolicy(req.enforced(), req.allowedExceptions());
+        FuelSettings saved = settings.save(s);
+        return new za.co.handyflow.platform.fuel.dto.PodDtos.PodPolicy(saved.isPodPolicyEnforced(), saved.allowedPodExceptions().stream().sorted().toList());
+    }
+
     @Transactional(readOnly = true)
     public ControlsResponse controls(TenantId tenantId) {
         FuelSettings s = current(tenantId);

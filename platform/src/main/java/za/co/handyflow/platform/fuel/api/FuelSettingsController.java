@@ -23,6 +23,7 @@ public class FuelSettingsController {
 
     private final FuelSettingsService settings;
     private final FeatureGuard featureGuard;
+    private final za.co.handyflow.platform.fuel.application.internal.FuelPodPolicyService pod;
 
     @GetMapping
     @PreAuthorize("hasAuthority('FUEL_READ')")
@@ -57,6 +58,20 @@ public class FuelSettingsController {
     public ResponseEntity<ApiResponse<za.co.handyflow.platform.fuel.dto.ArrivalCheckDtos.ArrivalPolicy>> updateArrivalPolicy(@Valid @RequestBody za.co.handyflow.platform.fuel.dto.ArrivalCheckDtos.ArrivalPolicyRequest req) {
         featureGuard.requireModule("fuel");
         return ResponseEntity.ok(ApiResponse.success("Saved", settings.updateArrivalPolicy(TenantContext.getTenantIdAsObject(), req)));
+    }
+
+    @GetMapping("/pod-policy")
+    @PreAuthorize("hasAnyAuthority('FUEL_READ','FUEL_DRIVER')")
+    public ResponseEntity<ApiResponse<za.co.handyflow.platform.fuel.dto.PodDtos.PodPolicy>> podPolicy() {
+        featureGuard.requireModule("fuel");
+        return ResponseEntity.ok(ApiResponse.success(pod.policy(TenantContext.getTenantIdAsObject())));
+    }
+
+    @PutMapping("/pod-policy")
+    @PreAuthorize("hasAuthority('FUEL_CONFIGURATION_MANAGE')")
+    public ResponseEntity<ApiResponse<za.co.handyflow.platform.fuel.dto.PodDtos.PodPolicy>> updatePodPolicy(@RequestBody za.co.handyflow.platform.fuel.dto.PodDtos.PodPolicyRequest req) {
+        featureGuard.requireModule("fuel");
+        return ResponseEntity.ok(ApiResponse.success("Saved", pod.updatePolicy(TenantContext.getTenantIdAsObject(), req)));
     }
 
     @PutMapping("/emergency-contact")

@@ -96,8 +96,23 @@ describe("delivery form", () => {
   });
   it("builds the request body the server expects", () => {
     expect(completeBody(form({ litres: "9900", receiverIdBadge: " B12 ", meterStart: "1", meterEnd: "9901" }))).toEqual({
-      litresDelivered: 9900, receiverName: "Sipho", receiverIdBadge: "B12", meterReadingStart: 1, meterReadingEnd: 9901, signedOnBehalf: false, onBehalfOf: null,
+      litresDelivered: 9900, receiverName: "Sipho", receiverIdBadge: "B12", meterReadingStart: 1, meterReadingEnd: 9901, signedOnBehalf: false, onBehalfOf: null, podExceptionType: null, podExceptionReason: null,
     });
+  });
+});
+
+describe("received-by exception", () => {
+  it("accepts an exception with no name and a real reason, and sends both", () => {
+    const f = form({ receiverName: "", exceptionType: "UNATTENDED_SITE", exceptionReason: "Gate locked, tank filled and photographed." });
+    expect(validateComplete(f)).toBeNull();
+    expect(completeBody(f)).toMatchObject({ receiverName: "", podExceptionType: "UNATTENDED_SITE", podExceptionReason: "Gate locked, tank filled and photographed." });
+  });
+  it("needs a reason, and does not mix a name with an exception", () => {
+    expect(validateComplete(form({ receiverName: "", exceptionType: "UNATTENDED_SITE", exceptionReason: "short" }))).toMatch(/Explain/);
+    expect(validateComplete(form({ exceptionType: "UNATTENDED_SITE", exceptionReason: "Gate locked, tank filled." }))).toMatch(/not both/);
+  });
+  it("still needs a name when there is no exception", () => {
+    expect(validateComplete(form({ receiverName: "" }))).toMatch(/received/i);
   });
 });
 

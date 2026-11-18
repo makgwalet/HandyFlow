@@ -33,6 +33,7 @@ public class FuelTransportController {
     private final FuelDeliveryExceptionService exceptionService;
     private final za.co.handyflow.platform.fuel.application.internal.FuelDeliveryExecutionService execution;
     private final FeatureGuard featureGuard;
+    private final za.co.handyflow.platform.fuel.application.internal.FuelPodPolicyService podPolicy;
     private final za.co.handyflow.platform.fuel.application.internal.FuelArrivalCheckService arrivalChecks;
 
     @GetMapping("/tankers")
@@ -166,6 +167,22 @@ public class FuelTransportController {
     public ResponseEntity<ApiResponse<za.co.handyflow.platform.fuel.dto.ArrivalCheckDtos.ArrivalCheckView>> arrivalCheckStatus(@PathVariable UUID id) {
         featureGuard.requireModule("fuel");
         return ResponseEntity.ok(ApiResponse.success(arrivalChecks.status(TenantContext.getTenantIdAsObject(), id)));
+    }
+
+    /** Approve an after-hours or contactless delivery before the driver completes it. ADMIN does not hold this by default. */
+    @PostMapping("/deliveries/{id}/pod-exception/approve")
+    @PreAuthorize("hasAuthority('FUEL_POD_EXCEPTION_APPROVE')")
+    public ResponseEntity<ApiResponse<za.co.handyflow.platform.fuel.dto.PodDtos.PodExceptionView>> approvePodException(
+            @PathVariable UUID id, @Valid @RequestBody za.co.handyflow.platform.fuel.dto.PodDtos.ApproveRequest req) {
+        featureGuard.requireModule("fuel");
+        return ResponseEntity.ok(ApiResponse.success("Approved", podPolicy.approve(TenantContext.getTenantIdAsObject(), TenantContext.getCurrentUserId(), id, req)));
+    }
+
+    @GetMapping("/deliveries/{id}/pod-exceptions")
+    @PreAuthorize("hasAuthority('FUEL_READ')")
+    public ResponseEntity<ApiResponse<java.util.List<za.co.handyflow.platform.fuel.dto.PodDtos.PodExceptionView>>> podExceptions(@PathVariable UUID id) {
+        featureGuard.requireModule("fuel");
+        return ResponseEntity.ok(ApiResponse.success(podPolicy.forDelivery(TenantContext.getTenantIdAsObject(), id)));
     }
 
     // ── C04: delivery windows and failed attempts ────────────────────────────

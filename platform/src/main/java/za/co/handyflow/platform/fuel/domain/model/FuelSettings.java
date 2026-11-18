@@ -115,6 +115,14 @@ public class FuelSettings {
     @Column(name = "arrival_check_enforced", nullable = false)
     private boolean arrivalCheckEnforced = false;
 
+    /** When on, the server refuses a delivery with no receiver name unless an authorised exception applies. */
+    @Column(name = "pod_policy_enforced", nullable = false)
+    private boolean podPolicyEnforced = false;
+
+    /** Comma separated exception types this company allows. Empty: none. */
+    @Column(name = "pod_exception_types", nullable = false, length = 200)
+    private String podExceptionTypes = "";
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt = Instant.now();
 
@@ -228,6 +236,18 @@ public class FuelSettings {
         }
         this.arrivalCheckFreshHours = freshHours; this.arrivalCheckEnforced = enforced; this.updatedAt = Instant.now();
     }
+    public static final java.util.Set<String> POD_EXCEPTION_TYPES = java.util.Set.of("UNATTENDED_SITE", "AFTER_HOURS_APPROVED", "AUTOMATED_RECEIVING", "CONTACTLESS_AUTHORISED");
+
+    public void updatePodPolicy(boolean enforced, java.util.List<String> allowedTypes) {
+        java.util.List<String> types = allowedTypes == null ? java.util.List.of() : allowedTypes.stream().map(String::trim).filter(t -> !t.isEmpty()).distinct().sorted().toList();
+        for (String t : types) if (!POD_EXCEPTION_TYPES.contains(t)) throw new IllegalArgumentException("Unknown exception type: " + t);
+        this.podPolicyEnforced = enforced; this.podExceptionTypes = String.join(",", types); this.updatedAt = Instant.now();
+    }
+
+    public java.util.Set<String> allowedPodExceptions() {
+        return podExceptionTypes == null || podExceptionTypes.isBlank() ? java.util.Set.of() : java.util.Set.of(podExceptionTypes.split(","));
+    }
+
     public void updateRequireVerifiedCleaning(boolean on) { this.requireVerifiedCleaning = on; this.updatedAt = Instant.now(); }
     public void updateRequireCompartmentRating(boolean on) { this.requireCompartmentRating = on; this.updatedAt = Instant.now(); }
 

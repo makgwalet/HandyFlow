@@ -27,5 +27,17 @@ public record CompleteDeliveryRequest(
         // was already there.
         String receiverSignatureUrl,
         // Stage 3: generated once on the device. Sending the same id again returns the first result instead of failing or repeating.
-        java.util.UUID clientRequestId
-) {}
+        java.util.UUID clientRequestId,
+        // Batch B: set only when nobody can receive the fuel. One of UNATTENDED_SITE, AFTER_HOURS_APPROVED, AUTOMATED_RECEIVING,
+        // CONTACTLESS_AUTHORISED. The server checks it against the company's policy, the site and the evidence on the load.
+        String podExceptionType,
+        String podExceptionReason
+) {
+    /** The shape before exceptions existed, so existing callers and tests keep working. */
+    public CompleteDeliveryRequest(BigDecimal litresDelivered, String receiverName, String receiverIdBadge, BigDecimal meterReadingStart,
+                                   BigDecimal meterReadingEnd, Boolean signedOnBehalf, String onBehalfOf, String receiverSignatureUrl,
+                                   java.util.UUID clientRequestId) {
+        this(litresDelivered, receiverName, receiverIdBadge, meterReadingStart, meterReadingEnd, signedOnBehalf, onBehalfOf,
+                receiverSignatureUrl, clientRequestId, null, null);
+    }
+}

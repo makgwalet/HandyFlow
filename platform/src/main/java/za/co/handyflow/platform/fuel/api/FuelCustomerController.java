@@ -80,6 +80,14 @@ public class FuelCustomerController {
                 customers.updateSite(TenantContext.getTenantIdAsObject(), siteId, req)));
     }
 
+    /** Marks a delivery site as unattended or automated-receiving, so a delivery there may be recorded with no receiver. */
+    @PutMapping("/customer-sites/{siteId}/pod-exception")
+    @PreAuthorize("hasAuthority('FUEL_CONFIGURATION_MANAGE')")
+    public ResponseEntity<ApiResponse<String>> setSitePodException(@PathVariable UUID siteId, @RequestBody za.co.handyflow.platform.fuel.dto.PodDtos.SitePodRequest req) {
+        featureGuard.requireModule("fuel");
+        return ResponseEntity.ok(ApiResponse.success("Saved", customers.setSitePodException(TenantContext.getTenantIdAsObject(), siteId, req.exceptionType())));
+    }
+
     @DeleteMapping("/customer-sites/{siteId}")
     @PreAuthorize("hasAnyAuthority('FUEL_MANAGE','FUEL_CUSTOMERS_MANAGE')")
     public ResponseEntity<ApiResponse<Void>> removeSite(@PathVariable UUID siteId) {

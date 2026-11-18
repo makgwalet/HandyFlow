@@ -90,6 +90,14 @@ public class FuelCustomerService {
         return toResponse(sites.save(s));
     }
 
+    /** Marks a site as unattended or automated-receiving (or clears it). Only those two exception types can come from a site. */
+    @Transactional
+    public String setSitePodException(TenantId tenantId, UUID siteId, String type) {
+        FuelCustomerSite s = findSite(tenantId, siteId);
+        s.setPodExceptionType(type);
+        return sites.save(s).getPodExceptionType();
+    }
+
     @Transactional
     public void removeSite(TenantId tenantId, UUID siteId) {
         FuelCustomerSite s = findSite(tenantId, siteId);
