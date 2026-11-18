@@ -42,7 +42,7 @@ class ContractReportServiceTest {
     @Test
     void signedValueByTypeCountsContractsWithoutAValueInsteadOfGuessing() {
         List<TypeValue> r = ContractReportService.signedByType(List.of(
-                new Object[]{"LEASE", new BigDecimal("1000.00"), null}, new Object[]{"LEASE", null, null}, new Object[]{"NDA", null, null}));
+                new Object[]{"LEASE", new BigDecimal("1000.00"), null, "ZAR"}, new Object[]{"LEASE", null, null, "ZAR"}, new Object[]{"NDA", null, null, "ZAR"}));
         TypeValue lease = r.stream().filter(x -> x.contractType().equals("LEASE")).findFirst().orElseThrow();
         assertEquals(2, lease.contracts());
         assertEquals(new BigDecimal("1000.00"), lease.totalValue());
@@ -53,15 +53,15 @@ class ContractReportServiceTest {
     void expiryProfileHasTwelveMonthsAndSkipsPastAndMissingDates() {
         LocalDate today = LocalDate.of(2026, 11, 18);
         List<ExpiryMonth> p = ContractReportService.expiryProfile(List.of(
-                new Object[]{"LEASE", new BigDecimal("500"), LocalDate.of(2026, 11, 30)},
-                new Object[]{"LEASE", new BigDecimal("700"), LocalDate.of(2027, 1, 5)},
-                new Object[]{"LEASE", new BigDecimal("999"), LocalDate.of(2026, 11, 1)},      // already past
-                new Object[]{"LEASE", new BigDecimal("999"), LocalDate.of(2028, 1, 1)},       // beyond twelve months
-                new Object[]{"LEASE", new BigDecimal("999"), null}), today);
+                new Object[]{"LEASE", new BigDecimal("500"), LocalDate.of(2026, 11, 30), "ZAR"},
+                new Object[]{"LEASE", new BigDecimal("700"), LocalDate.of(2027, 1, 5), "ZAR"},
+                new Object[]{"LEASE", new BigDecimal("999"), LocalDate.of(2026, 11, 1), "ZAR"},      // already past
+                new Object[]{"LEASE", new BigDecimal("999"), LocalDate.of(2028, 1, 1), "ZAR"},       // beyond twelve months
+                new Object[]{"LEASE", new BigDecimal("999"), null, "ZAR"}), today);
         assertEquals(12, p.size());
         assertEquals("2026-11", p.get(0).month());
         assertEquals(1, p.get(0).contracts());
-        assertEquals(new BigDecimal("500"), p.get(0).totalValue());
+        assertEquals(new BigDecimal("500"), p.get(0).valueByCurrency().get("ZAR"));
         assertEquals(1, p.get(2).contracts());
         assertEquals(2, p.stream().mapToLong(ExpiryMonth::contracts).sum());
     }
@@ -102,5 +102,25 @@ class ContractReportServiceTest {
         assertEquals("\"'@cmd\"", ContractReportService.csv("@cmd"));
         assertEquals("\"-500\"", ContractReportService.csv(new BigDecimal("-500")));   // a real negative number stays a number
         assertEquals("", ContractReportService.csv(null));
+    }
+
+    @Test
+    void valuesInDifferentCurrenciesAreNeverAddedTogether() {
+        List<TypeValue> r = ContractReportService.signedByType(List.of(
+                new Object[]{"LEASE", new BigDecimal("1000"), null, "ZAR"}, new Object[]{"LEASE", new BigDecimal("50"), null, "USD"},
+                new Object[]{"LEASE", new BigDecimal("200"), null, "ZAR"}, new Object[]{"LEASE", new BigDecimal("5"), null, null}));
+        assertEquals(2, r.size());
+        TypeValue zar = r.stream().filter(x -> x.currency().equals("ZAR")).findFirst().orElseThrow();
+        TypeValue usd = r.stream().filter(x -> x.currency().equals("USD")).findFirst().orElseThrow();
+        assertEquals(new BigDecimal("1205"), zar.totalValue(), "a missing currency counts as ZAR");
+        assertEquals(3, zar.contracts());
+        assertEquals(new BigDecimal("50"), usd.totalValue());
+
+        LocalDate today = LocalDate.of(2026, 11, 18);
+        List<ExpiryMonth> p = ContractReportService.expiryProfile(List.of(
+                new Object[]{"LEASE", new BigDecimal("500"), LocalDate.of(2026, 11, 30), "ZAR"},
+                new Object[]{"LEASE", new BigDecimal("20"), LocalDate.of(2026, 11, 29), "EUR"}), today);
+        assertEquals(new BigDecimal("500"), p.get(0).valueByCurrency().get("ZAR"));
+        assertEquals(new BigDecimal("20"), p.get(0).valueByCurrency().get("EUR"));
     }
 }

@@ -70,33 +70,42 @@ public class ContractReportService {
         return new Turnaround(n, round1(avg), round1(median), round1(p90), slowest);
     }
 
+    /** Rows are type, value, end date, currency. A missing currency is treated as ZAR (the system default). */
     static List<TypeValue> signedByType(List<Object[]> rows) {
         Map<String, long[]> counts = new TreeMap<>();
         Map<String, BigDecimal> totals = new TreeMap<>();
         for (Object[] r : rows) {
-            String type = (String) r[0];
+            String key = (String) r[0] + "\u0000" + currencyOf(r);
             BigDecimal v = (BigDecimal) r[1];
-            long[] c = counts.computeIfAbsent(type, k -> new long[2]);
+            long[] c = counts.computeIfAbsent(key, k -> new long[2]);
             c[0]++;
             if (v == null) c[1]++;
-            totals.merge(type, v == null ? BigDecimal.ZERO : v, BigDecimal::add);
+            totals.merge(key, v == null ? BigDecimal.ZERO : v, BigDecimal::add);
         }
-        return counts.entrySet().stream().map(e -> new TypeValue(e.getKey(), e.getValue()[0], totals.get(e.getKey()), e.getValue()[1])).toList();
+        return counts.entrySet().stream().map(e -> {
+            String[] k = e.getKey().split("\u0000", 2);
+            return new TypeValue(k[0], k[1], e.getValue()[0], totals.get(e.getKey()), e.getValue()[1]);
+        }).toList();
+    }
+
+    private static String currencyOf(Object[] row) {
+        String c = row.length > 3 ? (String) row[3] : null;
+        return c == null || c.isBlank() ? "ZAR" : c.trim().toUpperCase();
     }
 
     /** The twelve calendar months starting with the current one; a signed contract counts in the month its end date falls in. */
     static List<ExpiryMonth> expiryProfile(List<Object[]> rows, LocalDate today) {
         YearMonth first = YearMonth.from(today);
         Map<YearMonth, long[]> n = new LinkedHashMap<>();
-        Map<YearMonth, BigDecimal> v = new LinkedHashMap<>();
-        for (int i = 0; i < 12; i++) { n.put(first.plusMonths(i), new long[1]); v.put(first.plusMonths(i), BigDecimal.ZERO); }
+        Map<YearMonth, Map<String, BigDecimal>> v = new LinkedHashMap<>();
+        for (int i = 0; i < 12; i++) { n.put(first.plusMonths(i), new long[1]); v.put(first.plusMonths(i), new TreeMap<>()); }
         for (Object[] r : rows) {
             LocalDate endDate = (LocalDate) r[2];
             if (endDate == null || endDate.isBefore(today)) continue;
             YearMonth m = YearMonth.from(endDate);
             if (!n.containsKey(m)) continue;
             n.get(m)[0]++;
-            if (r[1] != null) v.merge(m, (BigDecimal) r[1], BigDecimal::add);
+            if (r[1] != null) v.get(m).merge(currencyOf(r), (BigDecimal) r[1], BigDecimal::add);
         }
         return n.keySet().stream().map(m -> new ExpiryMonth(m.toString(), n.get(m)[0], v.get(m))).toList();
     }

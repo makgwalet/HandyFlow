@@ -14,10 +14,11 @@ public final class ContractReportDtos {
     /** Days from sending a contract for signature to the last signature. {@code count} is 0 when nothing was signed in the window. */
     public record Turnaround(long count, double averageDays, double medianDays, double p90Days, List<SlowContract> slowest) {}
 
-    public record TypeValue(String contractType, long contracts, BigDecimal totalValue, long withoutValue) {}
+    /** One row per contract type and currency: values in different currencies are never added together. */
+    public record TypeValue(String contractType, String currency, long contracts, BigDecimal totalValue, long withoutValue) {}
 
     /** One calendar month of the expiry profile (month is yyyy-MM). */
-    public record ExpiryMonth(String month, long contracts, BigDecimal totalValue) {}
+    public record ExpiryMonth(String month, long contracts, Map<String, BigDecimal> valueByCurrency) {}
 
     /** Obligations due in the window. {@code onTimeRate} is completed-on-time over all completed, or null when none were completed. */
     public record ObligationStats(long due, long completedOnTime, long completedLate, long waived, long stillOpenOverdue, long stillOpenNotYetDue, Double onTimeRate) {}

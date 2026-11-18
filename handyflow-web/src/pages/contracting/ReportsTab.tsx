@@ -3,14 +3,14 @@
 import { useState, type CSSProperties } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { apiClient } from '../../api/client'
-import { fmtR } from './contractingApi'
+import { fmtMoney, fmtByCurrency } from './contractingApi'
 
 interface Slow { contractNumber: string; title: string; days: number }
 interface Report {
   from: string; to: string
   turnaround: { count: number; averageDays: number; medianDays: number; p90Days: number; slowest: Slow[] }
-  signedByType: { contractType: string; contracts: number; totalValue: number; withoutValue: number }[]
-  expiryProfile: { month: string; contracts: number; totalValue: number }[]
+  signedByType: { contractType: string; currency: string; contracts: number; totalValue: number; withoutValue: number }[]
+  expiryProfile: { month: string; contracts: number; valueByCurrency: Record<string, number> }[]
   obligations: { due: number; completedOnTime: number; completedLate: number; waived: number; stillOpenOverdue: number; stillOpenNotYetDue: number; onTimeRate: number | null }
   renewals: { decisionsByType: Record<string, number>; noticePassedWithoutDecision: number }
   templates: { publishedByLegalStatus: Record<string, number> }
@@ -86,7 +86,7 @@ export default function ReportsTab() {
             {r.signedByType.length === 0 ? <div style={{ fontSize: 13, color: 'var(--hf-text-faint)' }}>No signed contracts.</div> : (
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead><tr><td style={tdl}>Type</td><td style={td}>Contracts</td><td style={td}>Value</td><td style={td}>No value set</td></tr></thead>
-                <tbody>{r.signedByType.map(t => <tr key={t.contractType}><td style={tdl}>{label(t.contractType)}</td><td style={td}>{t.contracts}</td><td style={td}>{fmtR(t.totalValue)}</td><td style={td}>{t.withoutValue}</td></tr>)}</tbody>
+                <tbody>{r.signedByType.map(t => <tr key={t.contractType + t.currency}><td style={tdl}>{label(t.contractType)}</td><td style={td}>{t.contracts}</td><td style={td}>{fmtMoney(t.totalValue, t.currency)}</td><td style={td}>{t.withoutValue}</td></tr>)}</tbody>
               </table>
             )}
           </div>
@@ -95,7 +95,7 @@ export default function ReportsTab() {
             <h4 style={h}>Expiry profile (next 12 months)</h4>
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead><tr><td style={tdl}>Month</td><td style={td}>Contracts ending</td><td style={td}>Value</td></tr></thead>
-              <tbody>{r.expiryProfile.map(m => <tr key={m.month}><td style={tdl}>{m.month}</td><td style={td}>{m.contracts}</td><td style={td}>{fmtR(m.totalValue)}</td></tr>)}</tbody>
+              <tbody>{r.expiryProfile.map(m => <tr key={m.month}><td style={tdl}>{m.month}</td><td style={td}>{m.contracts}</td><td style={td}>{fmtByCurrency(m.valueByCurrency)}</td></tr>)}</tbody>
             </table>
           </div>
 

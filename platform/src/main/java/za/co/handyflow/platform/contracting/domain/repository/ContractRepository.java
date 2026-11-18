@@ -55,6 +55,11 @@ public interface ContractRepository extends JpaRepository<Contract, UUID> {
             "AND c.endDate IS NOT NULL AND c.endDate > :today AND c.endDate <= :cutoff AND c.deletedAt IS NULL")
     List<Contract> findSignedExpiringWithin(TenantId tenantId, LocalDate today, LocalDate cutoff);
 
+    /** Signed auto-renewing contracts whose end date has passed. They are neither expired nor extended until someone decides. */
+    @Query("SELECT c FROM Contract c WHERE c.tenantId = :#{#tenantId.value} AND c.status = 'SIGNED' AND c.autoRenew = true "
+            + "AND c.endDate IS NOT NULL AND c.endDate < :today AND c.deletedAt IS NULL")
+    List<Contract> findSignedAutoRenewPastEnd(TenantId tenantId, LocalDate today);
+
     /** Contracts made for one business record, oldest first (the original, then its addenda). */
     @Query("SELECT c FROM Contract c WHERE c.tenantId = :#{#tenantId.value} AND c.refType = :refType AND c.refId = :refId AND c.deletedAt IS NULL ORDER BY c.createdAt")
     List<Contract> findByReference(TenantId tenantId, String refType, UUID refId);
@@ -112,8 +117,8 @@ public interface ContractRepository extends JpaRepository<Contract, UUID> {
             + "AND c.status = 'SIGNED' AND c.sentAt IS NOT NULL AND c.signedAt >= :from AND c.signedAt < :to AND c.deletedAt IS NULL")
     List<Object[]> signingTimes(TenantId tenantId, java.time.Instant from, java.time.Instant to);
 
-    /** Type, value and end date of every signed contract. */
-    @Query("SELECT c.contractType, c.valueAmount, c.endDate FROM Contract c WHERE c.tenantId = :#{#tenantId.value} "
+    /** Type, value, end date and currency of every signed contract. */
+    @Query("SELECT c.contractType, c.valueAmount, c.endDate, c.currency FROM Contract c WHERE c.tenantId = :#{#tenantId.value} "
             + "AND c.status = 'SIGNED' AND c.deletedAt IS NULL")
     List<Object[]> signedPortfolio(TenantId tenantId);
 

@@ -9,13 +9,13 @@ import { usePermissions } from '../../hooks/usePermission'
 
 interface RenewalItem {
   contractId: string; contractNumber: string; title: string; endDate: string; autoRenew: boolean; renewalNoticeDays: number
-  noticeDeadline: string; daysToEnd: number; daysToNotice: number; state: 'DECISION_NEEDED' | 'NOTICE_PASSED' | 'DECIDED'
+  noticeDeadline: string; daysToEnd: number; daysToNotice: number; state: 'DECISION_NEEDED' | 'NOTICE_PASSED' | 'PAST_END' | 'DECIDED'
   latestDecision?: string | null; successorContractId?: string | null
 }
 
 const WINDOWS = [30, 60, 90, 180]
-const STATE_LABEL: Record<string, string> = { DECISION_NEEDED: 'Decision needed', NOTICE_PASSED: 'Notice date passed, no decision', DECIDED: 'Decided' }
-const STATE_COLOR: Record<string, string> = { DECISION_NEEDED: 'var(--hf-warning-text)', NOTICE_PASSED: 'var(--hf-danger-text)', DECIDED: 'var(--hf-success-text-strong)' }
+const STATE_LABEL: Record<string, string> = { DECISION_NEEDED: 'Decision needed', NOTICE_PASSED: 'Notice date passed, no decision', PAST_END: 'Past end date, auto-renews, no decision', DECIDED: 'Decided' }
+const STATE_COLOR: Record<string, string> = { DECISION_NEEDED: 'var(--hf-warning-text)', NOTICE_PASSED: 'var(--hf-danger-text)', PAST_END: 'var(--hf-danger-text)', DECIDED: 'var(--hf-success-text-strong)' }
 const DECISION_LABEL: Record<string, string> = { RENEW: 'Renew', RENEGOTIATE: 'Renegotiate', DO_NOT_RENEW: 'Do not renew' }
 
 const inp: CSSProperties = { width: '100%', padding: '9px 12px', border: '1.5px solid var(--hf-border)', borderRadius: 8, fontSize: 14, boxSizing: 'border-box', background: 'var(--hf-surface)' }

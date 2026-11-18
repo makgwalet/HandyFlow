@@ -8,6 +8,8 @@ import org.springframework.transaction.annotation.Transactional;
 import za.co.handyflow.platform.contracting.domain.model.Contract;
 import za.co.handyflow.platform.contracting.domain.model.ContractParty;
 import za.co.handyflow.platform.contracting.domain.repository.ContractPartyRepository;
+import za.co.handyflow.platform.contracting.domain.model.ContractRenewalDecision;
+import za.co.handyflow.platform.contracting.domain.repository.ContractRenewalDecisionRepository;
 import za.co.handyflow.platform.contracting.domain.repository.ContractRepository;
 import za.co.handyflow.platform.shared.EmailService;
 import za.co.handyflow.platform.shared.TenantId;
@@ -16,7 +18,9 @@ import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 /**
  * Scheduled jobs for contract lifecycle management.
@@ -71,6 +75,7 @@ public class ContractExpiryScheduler {
 
     private final ContractRepository contractRepo;
     private final ContractPartyRepository partyRepo;
+    private final ContractRenewalDecisionRepository decisionRepo;
     private final EmailService emailService;
 
     private static final DateTimeFormatter DATE_FMT = DateTimeFormatter.ofPattern("d MMMM yyyy");
@@ -87,7 +92,15 @@ public class ContractExpiryScheduler {
         for (UUID rawId : tenantIds) {
             TenantId tenantId = TenantId.of(rawId);
             List<Contract> expired = contractRepo.findExpired(tenantId, today);
+            Set<UUID> decided = expired.isEmpty() ? Set.of()
+                    : decisionRepo.findByContracts(rawId, expired.stream().map(Contract::getId).toList()).stream()
+                            .map(ContractRenewalDecision::getContractId).collect(Collectors.toSet());
             for (Contract c : expired) {
+                if (!shouldExpire(c, decided.contains(c.getId()))) {
+                    log.info("[SCHEDULER] Contract={} tenant={} is past its end date but auto-renews; left signed until a renewal decision is recorded",
+                            c.getContractNumber(), rawId);
+                    continue;
+                }
                 try {
                     c.expire();
                     contractRepo.save(c);
@@ -100,6 +113,15 @@ public class ContractExpiryScheduler {
             }
         }
         log.info("[SCHEDULER] Expiry run complete — {} contracts expired", count);
+    }
+
+    /**
+     * A signed contract past its end date expires, except an auto-renewing one with no renewal decision recorded. That one is neither
+     * expired nor extended here: how and for how long it renews is set by its own terms, so a person records the decision (it shows
+     * on the Renewals screen as past its end date).
+     */
+    static boolean shouldExpire(Contract c, boolean renewalDecisionRecorded) {
+        return !c.isAutoRenew() || renewalDecisionRecorded;
     }
 
     /**

@@ -14,6 +14,19 @@ export const unwrapOne = <T>(r: unknown): T => {
   return (res.data?.data ?? res.data) as T
 }
 
+/** An amount in its own currency (for example R 1 000,00 or US$ 50,00). Falls back to the code if the currency is not recognised. */
+export const fmtMoney = (n: number | string | null | undefined, currency: string | null | undefined): string => {
+  if (n == null || n === '') return '—'
+  try { return new Intl.NumberFormat('en-ZA', { style: 'currency', currency: currency || 'ZAR' }).format(Number(n)) }
+  catch { return `${currency ?? ''} ${Number(n).toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`.trim() }
+}
+
+/** Amounts by currency on one line, for example "R 500,00 · US$ 20,00"; a dash when there are none. */
+export const fmtByCurrency = (byCurrency: Record<string, number | string> | null | undefined): string => {
+  const parts = Object.entries(byCurrency ?? {}).map(([cur, v]) => fmtMoney(v, cur))
+  return parts.length ? parts.join(' · ') : '—'
+}
+
 export const fmtR = (n: number | string | null | undefined): string =>
   n != null && n !== ''
     ? `R ${Number(n).toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`

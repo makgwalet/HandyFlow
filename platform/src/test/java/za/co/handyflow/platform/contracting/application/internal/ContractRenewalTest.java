@@ -117,4 +117,19 @@ class ContractRenewalTest {
         when(contractRepo.findActiveById(tenant, draft.getId())).thenReturn(Optional.of(draft));
         assertThrows(IllegalStateException.class, () -> service.decide(tenant, draft.getId(), new RenewalDecisionRequest("DO_NOT_RENEW", null, null, null), null));
     }
+
+    @Test
+    void anAutoRenewingContractPastItsEndDateStaysOnTheListAsPastEndUntilDecided() {
+        Contract past = Contract.create(tenant, "C-9", "Old lease", "LEASE", "<p>b</p>", null, null);
+        past.setDates(today.minusDays(400), today.minusDays(10));
+        past.setAutoRenew(true, 30);
+        past.markSigned();
+        org.mockito.Mockito.when(contractRepo.findSignedExpiringWithin(org.mockito.ArgumentMatchers.eq(tenant), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any())).thenReturn(List.of());
+        org.mockito.Mockito.when(contractRepo.findSignedAutoRenewPastEnd(org.mockito.ArgumentMatchers.eq(tenant), org.mockito.ArgumentMatchers.any())).thenReturn(List.of(past));
+        org.mockito.Mockito.when(decisionRepo.findByContracts(org.mockito.ArgumentMatchers.eq(tenant.getValue()), org.mockito.ArgumentMatchers.any())).thenReturn(List.of());
+        List<RenewalItem> items = service.renewals(tenant, 90);
+        assertEquals(1, items.size());
+        assertEquals("PAST_END", items.get(0).state());
+        assertNull(items.get(0).latestDecision());
+    }
 }

@@ -126,7 +126,7 @@ export default function ObligationsTab() {
                     {o.recurrence !== 'NONE' ? ` · repeats ${o.recurrence.toLowerCase()}` : ''}{o.status === 'IN_PROGRESS' ? ' · in progress' : ''}
                   </div>
                   {o.description && <div style={{ fontSize: 12, color: 'var(--hf-text-secondary)', marginTop: 2 }}>{o.description}</div>}
-                  <div style={{ fontSize: 11, color: 'var(--hf-text-faint)', marginTop: 2 }}>{o.ownerEmail ? `Reminders go to ${o.ownerEmail}` : 'No reminder address, so no email reminders'}</div>
+                  <div style={{ fontSize: 11, color: 'var(--hf-text-faint)', marginTop: 2 }}>{o.ownerEmail ? `Reminders go to ${o.ownerEmail}` : 'No reminder address: reminders go to whoever created the contract, or the administrators'}</div>
                 </div>
                 <div style={{ textAlign: 'right' }}>
                   <div style={{ fontSize: 13, fontWeight: 700, color: o.overdue ? 'var(--hf-danger-text)' : 'var(--hf-text)' }}>{dueLabel(o)}</div>

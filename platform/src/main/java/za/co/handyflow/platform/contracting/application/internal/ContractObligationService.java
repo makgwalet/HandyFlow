@@ -112,7 +112,10 @@ public class ContractObligationService {
     @Transactional(readOnly = true)
     public List<RenewalItem> renewals(TenantId tenantId, int withinDays) {
         LocalDate today = LocalDate.now();
-        List<Contract> ending = contractRepo.findSignedExpiringWithin(tenantId, today.minusDays(1), today.plusDays(withinDays));
+        List<Contract> ending = new ArrayList<>(contractRepo.findSignedExpiringWithin(tenantId, today.minusDays(1), today.plusDays(withinDays)));
+        // Auto-renewing contracts past their end date stay here until someone decides; they are not expired or extended automatically.
+        Set<UUID> seen = ending.stream().map(Contract::getId).collect(Collectors.toSet());
+        for (Contract c : contractRepo.findSignedAutoRenewPastEnd(tenantId, today)) if (seen.add(c.getId())) ending.add(c);
         if (ending.isEmpty()) return List.of();
         Map<UUID, ContractRenewalDecision> latest = new HashMap<>();
         for (ContractRenewalDecision d : decisionRepo.findByContracts(tenantId.getValue(), ending.stream().map(Contract::getId).toList()))
@@ -175,7 +178,7 @@ public class ContractObligationService {
     static RenewalItem renewalItem(Contract c, ContractRenewalDecision latest, LocalDate today) {
         LocalDate deadline = c.getEndDate().minusDays(c.getRenewalNoticeDays());
         long toNotice = ChronoUnit.DAYS.between(today, deadline);
-        String state = latest != null ? "DECIDED" : toNotice < 0 ? "NOTICE_PASSED" : "DECISION_NEEDED";
+        String state = latest != null ? "DECIDED" : c.getEndDate().isBefore(today) ? "PAST_END" : toNotice < 0 ? "NOTICE_PASSED" : "DECISION_NEEDED";
         return new RenewalItem(c.getId(), c.getContractNumber(), c.getTitle(), c.getEndDate(), c.isAutoRenew(), c.getRenewalNoticeDays(),
                 deadline, ChronoUnit.DAYS.between(today, c.getEndDate()), toNotice, state,
                 latest == null ? null : latest.getDecision(), latest == null ? null : latest.getDecidedAt(),

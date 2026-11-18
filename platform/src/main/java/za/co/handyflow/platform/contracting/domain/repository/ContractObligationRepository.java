@@ -29,8 +29,8 @@ public interface ContractObligationRepository extends JpaRepository<ContractObli
     @Query("SELECT count(o) FROM ContractObligation o WHERE o.tenantId = :tenantId AND o.status IN ('OPEN','IN_PROGRESS') AND o.dueDate >= :today AND o.dueDate <= :until")
     long countDueBetween(UUID tenantId, LocalDate today, LocalDate until);
 
-    /** For the reminder job: open obligations with a reminder address that are due within a week or already overdue. */
-    @Query("SELECT o FROM ContractObligation o WHERE o.status IN ('OPEN','IN_PROGRESS') AND o.ownerEmail IS NOT NULL AND o.dueDate <= :until")
+    /** For the reminder job: open obligations due within a week or already overdue (with or without a reminder address). */
+    @Query("SELECT o FROM ContractObligation o WHERE o.status IN ('OPEN','IN_PROGRESS') AND o.dueDate <= :until")
     List<ContractObligation> findForReminders(LocalDate until);
 
     /** Obligations whose due date falls in the window, any status. */
