@@ -35,14 +35,20 @@ public class FuelAlertRecipientService {
     public static final String SHIFT_EXCEPTION = "SHIFT_EXCEPTION";
     /** The same attendant closing shifts outside tolerance again and again, as the company defines it. */
     public static final String SHIFT_REPEAT = "SHIFT_REPEAT";
+    /** A driver's arrival check was blocked. The driver is always told; these people are told as well. */
+    public static final String ARRIVAL_BLOCKED = "ARRIVAL_BLOCKED";
+    /** A delivery is still open well past its time. Dispatch escalation: told after the driver, if it is still open. */
+    public static final String DELIVERY_OVERDUE = "DELIVERY_OVERDUE";
     static {
+        TOPICS.put(ARRIVAL_BLOCKED, "Blocked arrival checks");
+        TOPICS.put(DELIVERY_OVERDUE, "Overdue deliveries (dispatch)");
         TOPICS.put(VARIANCE, "Delivery variances");
         TOPICS.put(SHIFT_ACCEPTED, "Shifts accepted automatically");
         TOPICS.put(SHIFT_EXCEPTION, "Shifts that need review");
         TOPICS.put(SHIFT_REPEAT, "Repeated shift variances");
     }
     /** Topics where administrators are told unless the company leaves them off. The others go only to the people chosen. */
-    static final Set<String> ADMINS_BY_DEFAULT = Set.of(VARIANCE, SHIFT_EXCEPTION, SHIFT_REPEAT);
+    static final Set<String> ADMINS_BY_DEFAULT = Set.of(VARIANCE, SHIFT_EXCEPTION, SHIFT_REPEAT, ARRIVAL_BLOCKED, DELIVERY_OVERDUE);
     static final int MAX_EXTRA = 10;
 
     private final FuelAlertRecipientRepository repo;

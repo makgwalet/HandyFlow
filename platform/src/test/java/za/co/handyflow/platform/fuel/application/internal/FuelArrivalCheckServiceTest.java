@@ -54,6 +54,8 @@ class FuelArrivalCheckServiceTest {
     @Mock FuelSettingsService settings;
     @Mock FuelComplianceService compliance;
     @Mock AuditTrailFacade audit;
+    @Mock FuelPushEventService pushEvents;
+    @Mock FuelAlertRecipientService alertRecipients;
 
     static final TenantId T = TenantId.of(UUID.randomUUID());
     static final UUID USER = UUID.randomUUID();
@@ -65,7 +67,7 @@ class FuelArrivalCheckServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new FuelArrivalCheckService(deliveries, tankers, compartments, loadSplits, checks, eligibility, hr, new ObjectMapper(), releases, settings, compliance, audit);
+        service = new FuelArrivalCheckService(deliveries, tankers, compartments, loadSplits, checks, eligibility, hr, new ObjectMapper(), releases, settings, compliance, audit, pushEvents, alertRecipients);
         me = new EmployeeSummary(UUID.randomUUID(), "E1", "Moses", "Sithole", "Moses Sithole", null, null, "Driver", null, "ACTIVE");
         tanker = FuelTanker.create(T, "CA 123-456", "Tanker 1");
         load = FuelDelivery.create(T, UUID.randomUUID(), UUID.randomUUID(), Map.of(), "DIESEL", new BigDecimal("1000"), new BigDecimal("20"), Instant.now(), null, null);
@@ -298,5 +300,43 @@ class FuelArrivalCheckServiceTest {
         policy(null, false);
         when(checks.latest(eq(T), eq(load.getId()), any())).thenReturn(List.of());
         assertDoesNotThrow(() -> service.requireClear(T, load.getId(), NOW));
+    }
+
+    // ---- Batch C: blocked check alerts ----
+
+    @Test @DisplayName("a blocked check tells the driver, and the chosen operations people but not the driver twice")
+    void blockedTellsDriverAndOps() {
+        UUID ops = UUID.randomUUID();
+        when(alertRecipients.recipientsFor(T, FuelAlertRecipientService.ARRIVAL_BLOCKED)).thenReturn(List.of(
+                new za.co.handyflow.platform.notifications.application.Recipient(ops, "ops@x.co.za", "Ops", null),
+                new za.co.handyflow.platform.notifications.application.Recipient(USER, "driver@x.co.za", "Driver", null)));
+        result(new Finding("SITE_DRIVER_SUSPENDED", Severity.BLOCK, "Suspended at this site."));
+        service.check(T, USER, load.getId());
+        ArgumentCaptor<java.util.Collection<UUID>> to = ArgumentCaptor.forClass(java.util.Collection.class);
+        verify(pushEvents, times(2)).publish(eq(T), eq(FuelPushEventService.ARRIVAL_CHECK_BLOCKED), any(), to.capture(), any(), any(), any());
+        assertEquals(List.of(USER), List.copyOf(to.getAllValues().get(0)));
+        assertEquals(List.of(ops), List.copyOf(to.getAllValues().get(1)));
+    }
+
+    @Test @DisplayName("the event key is the load and the reasons, so the same blocked reasons are told once")
+    void blockedDedupKey() {
+        when(alertRecipients.recipientsFor(eq(T), any())).thenReturn(List.of());
+        result(new Finding("B", Severity.BLOCK, "b"), new Finding("A", Severity.BLOCK, "a"));
+        service.check(T, USER, load.getId());
+        service.check(T, USER, load.getId());
+        ArgumentCaptor<String> key = ArgumentCaptor.forClass(String.class);
+        verify(pushEvents, atLeast(2)).publish(eq(T), any(), key.capture(), any(), any(), any(), any());
+        assertEquals(1, key.getAllValues().stream().distinct().count());
+        assertTrue(key.getValue().endsWith(":A,B"));
+    }
+
+    @Test @DisplayName("an allowed check sends nothing, and a failing alert never fails the check")
+    void allowedNoAlertAndAlertsNeverFail() {
+        result();
+        service.check(T, USER, load.getId());
+        verifyNoInteractions(pushEvents);
+        when(alertRecipients.recipientsFor(eq(T), any())).thenThrow(new RuntimeException("down"));
+        result(new Finding("X", Severity.BLOCK, "x"));
+        assertFalse(service.check(T, USER, load.getId()).allowed());
     }
 }

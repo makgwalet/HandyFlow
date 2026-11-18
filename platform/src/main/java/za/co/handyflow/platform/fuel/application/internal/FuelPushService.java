@@ -54,6 +54,35 @@ public class FuelPushService {
         this.executor = executor;
     }
 
+    public boolean isEnabled() { return enabled; }
+
+    /** What one synchronous attempt came to. NO_DEVICE: the person has no phone signed in, so retrying cannot help. */
+    public enum Outcome { SENT, NO_DEVICE, FAILED }
+    public record Attempt(Outcome outcome, String error) {}
+
+    /** Sends now, on the caller's thread, and says what happened. Never throws. Used by the alert queue, which owns retries. */
+    public Attempt attempt(TenantId tenantId, UUID userId, String title, String body, Map<String, String> data) {
+        try {
+            List<String> tokens = jdbc.queryForList("SELECT expo_token FROM fuel_push_tokens WHERE tenant_id = ? AND user_id = ? AND revoked_at IS NULL",
+                    String.class, tenantId.getValue(), userId);
+            if (tokens.isEmpty()) return new Attempt(Outcome.NO_DEVICE, null);
+            List<FuelExpoPushClient.Message> messages = tokens.stream().map(t -> new FuelExpoPushClient.Message(t, title, body, data)).toList();
+            List<FuelExpoPushClient.Result> results = client.send(messages);
+            boolean any = false; String err = null;
+            for (int i = 0; i < results.size() && i < tokens.size(); i++) {
+                FuelExpoPushClient.Result r = results.get(i);
+                if (r.deadToken()) jdbc.update("UPDATE fuel_push_tokens SET revoked_at = NOW(), updated_at = NOW() WHERE tenant_id = ? AND expo_token = ?", tenantId.getValue(), tokens.get(i));
+                if (r.ok()) any = true; else if (err == null) err = r.error();
+            }
+            if (any) return new Attempt(Outcome.SENT, null);
+            // Every token was dead: the person no longer has a working phone, so retrying cannot help either.
+            boolean allDead = !results.isEmpty() && results.stream().allMatch(FuelExpoPushClient.Result::deadToken);
+            return allDead ? new Attempt(Outcome.NO_DEVICE, null) : new Attempt(Outcome.FAILED, err == null ? "The push service did not accept the message." : err);
+        } catch (Exception e) {
+            return new Attempt(Outcome.FAILED, e.toString());
+        }
+    }
+
     /** The phone's token now belongs to this user. Any other token held for this phone is revoked. */
     @Transactional
     public void register(TenantId tenantId, UUID userId, String deviceId, String expoToken) {

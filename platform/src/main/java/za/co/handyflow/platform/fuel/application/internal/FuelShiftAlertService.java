@@ -14,6 +14,7 @@ import za.co.handyflow.platform.shared.TenantId;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
+import java.util.UUID;
 
 /**
  * Tells the right people about shifts: a routine notice when a shift was accepted automatically, an exception when one needs review, and an
@@ -30,6 +31,7 @@ public class FuelShiftAlertService {
     private final NotificationService notifications;
     private final FuelToleranceService tolerances;
     private final FuelShiftRepository shifts;
+    private final FuelPushEventService pushEvents;
 
     public void autoAccepted(TenantId tenant, FuelShift s) {
         send(tenant, FuelAlertRecipientService.SHIFT_ACCEPTED, NotificationType.FUEL_SHIFT_AUTO_ACCEPTED,
@@ -49,6 +51,7 @@ public class FuelShiftAlertService {
     public void afterClose(TenantId tenant, FuelShift s) {
         try {
             if (!s.isOutsideTolerance()) return;
+            pushShiftOutside(tenant, s);
             send(tenant, FuelAlertRecipientService.SHIFT_EXCEPTION, NotificationType.FUEL_SHIFT_NEEDS_REVIEW,
                     "Fuel: shift closed outside tolerance",
                     "Shift " + s.getShiftNumber() + " (" + s.getAttendantName() + ") closed R " + plain(s.getVarianceAmount().abs())
@@ -66,6 +69,15 @@ public class FuelShiftAlertService {
         } catch (RuntimeException ex) {
             log.warn("Shift alerts failed for {}: {}", s.getShiftNumber(), ex.getMessage());
         }
+    }
+
+    /** The same people as the shift-review notice (topic SHIFT_EXCEPTION). Each shift once. */
+    private void pushShiftOutside(TenantId tenant, FuelShift s) {
+        try {
+            List<UUID> to = recipients.recipientsFor(tenant, FuelAlertRecipientService.SHIFT_EXCEPTION).stream().map(Recipient::userId).filter(java.util.Objects::nonNull).toList();
+            pushEvents.publish(tenant, FuelPushEventService.SHIFT_OUTSIDE_TOLERANCE, "SHIFT:" + s.getId(), to, "Shift closed outside tolerance",
+                    "Shift " + s.getShiftNumber() + " needs a supervisor's review.", java.util.Map.of("screen", "ShiftDetail", "shiftId", String.valueOf(s.getId())));
+        } catch (RuntimeException ex) { log.warn("Shift push failed for {}: {}", s.getShiftNumber(), ex.getMessage()); }
     }
 
     private void send(TenantId tenant, String topic, NotificationType type, String title, String message, String entityId) {

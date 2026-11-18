@@ -106,6 +106,20 @@ public class FuelSettingsService {
     }
 
     @Transactional(readOnly = true)
+    public za.co.handyflow.platform.fuel.dto.PushDtos.OverduePolicy overduePolicy(TenantId tenantId) {
+        FuelSettings s = current(tenantId);
+        return new za.co.handyflow.platform.fuel.dto.PushDtos.OverduePolicy(s.getOverdueGraceMinutes(), s.getOverdueEscalationMinutes());
+    }
+
+    @Transactional
+    public za.co.handyflow.platform.fuel.dto.PushDtos.OverduePolicy updateOverduePolicy(TenantId tenantId, za.co.handyflow.platform.fuel.dto.PushDtos.OverduePolicy req) {
+        FuelSettings s = settings.findByTenant(tenantId).orElseGet(() -> FuelSettings.forTenant(tenantId));
+        s.updateOverduePolicy(req.graceMinutes(), req.escalationMinutes());
+        FuelSettings saved = settings.save(s);
+        return new za.co.handyflow.platform.fuel.dto.PushDtos.OverduePolicy(saved.getOverdueGraceMinutes(), saved.getOverdueEscalationMinutes());
+    }
+
+    @Transactional(readOnly = true)
     public ControlsResponse controls(TenantId tenantId) {
         FuelSettings s = current(tenantId);
         return toControls(s);

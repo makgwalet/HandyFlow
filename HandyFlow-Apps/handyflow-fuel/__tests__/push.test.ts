@@ -30,10 +30,16 @@ describe("opening a screen from an alert", () => {
     expect(targetFromData({ screen: "DriverLoads" })).toEqual({ screen: "DriverLoads" });
     expect(targetFromData({ screen: "LoadDetail", loadId: ID })).toEqual({ screen: "LoadDetail", params: { loadId: ID } });
   });
+  it("opens the tank and the shift an alert names", () => {
+    expect(targetFromData({ screen: "TankDetail", tankId: ID })).toEqual({ screen: "TankDetail", params: { tankId: ID } });
+    expect(targetFromData({ screen: "ShiftDetail", shiftId: ID })).toEqual({ screen: "ShiftDetail", params: { shiftId: ID } });
+  });
   it("ignores anything else, including a load with no valid id", () => {
     expect(targetFromData({ screen: "LoadDetail" })).toBeNull();
     expect(targetFromData({ screen: "LoadDetail", loadId: "../../x" })).toBeNull();
-    expect(targetFromData({ screen: "CloseShift", shiftId: "1" })).toBeNull();
+    expect(targetFromData({ screen: "CloseShift", shiftId: ID })).toBeNull();
+    expect(targetFromData({ screen: "TankDetail", tankId: "../x" })).toBeNull();
+    expect(targetFromData({ screen: "ShiftDetail" })).toBeNull();
     expect(targetFromData({ screen: 42 })).toBeNull();
     expect(targetFromData({})).toBeNull();
     expect(targetFromData(null)).toBeNull();

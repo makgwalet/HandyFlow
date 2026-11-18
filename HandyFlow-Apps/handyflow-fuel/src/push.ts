@@ -10,16 +10,21 @@ import type { RootStackParamList } from "@/navigation/types";
 export type AlertTarget =
   | { screen: "DriverLoads" }
   | { screen: "LoadDetail"; params: RootStackParamList["LoadDetail"] }
+  | { screen: "TankDetail"; params: RootStackParamList["TankDetail"] }
+  | { screen: "ShiftDetail"; params: RootStackParamList["ShiftDetail"] }
   | { screen: "StayRequests" }
   | { screen: "Overview" };
 
 const PLAIN = ["DriverLoads", "StayRequests", "Overview"] as const;
 
 export function targetFromData(data: unknown): AlertTarget | null {
-  const d = data as { screen?: unknown; loadId?: unknown } | null | undefined;
+  const d = data as { screen?: unknown; loadId?: unknown; tankId?: unknown; shiftId?: unknown } | null | undefined;
+  const id = (v: unknown): v is string => typeof v === "string" && /^[0-9a-fA-F-]{36}$/.test(v);
   if (!d || typeof d.screen !== "string") return null;
   if ((PLAIN as readonly string[]).includes(d.screen)) return { screen: d.screen } as AlertTarget;
   if (d.screen === "LoadDetail" && typeof d.loadId === "string" && /^[0-9a-fA-F-]{36}$/.test(d.loadId)) return { screen: "LoadDetail", params: { loadId: d.loadId } };
+  if (d.screen === "TankDetail" && id(d.tankId)) return { screen: "TankDetail", params: { tankId: d.tankId } };
+  if (d.screen === "ShiftDetail" && id(d.shiftId)) return { screen: "ShiftDetail", params: { shiftId: d.shiftId } };
   return null;
 }
 

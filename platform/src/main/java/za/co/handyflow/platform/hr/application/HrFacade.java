@@ -83,7 +83,11 @@ public class HrFacade {
      */
     public Optional<EmployeeSummary> findEmployeeById(TenantId tenantId, UUID employeeId) {
         try {
-            return Optional.of(EmployeeSummary.from(hrService.getEmployee(tenantId, employeeId)));
+            EmployeeSummary s = EmployeeSummary.from(hrService.getEmployee(tenantId, employeeId));
+            // from(EmployeeResponse) cannot carry the login link, so add it: callers that alert a person on their phone need it.
+            UUID userId = hrService.linkedUserId(tenantId, employeeId).orElse(null);
+            return Optional.of(new EmployeeSummary(s.id(), s.employeeNumber(), s.firstName(), s.lastName(), s.fullName(), s.email(), s.phone(),
+                    s.jobTitle(), s.department(), s.status(), s.managerId(), userId));
         } catch (ResourceNotFoundException e) {
             return Optional.empty();
         }

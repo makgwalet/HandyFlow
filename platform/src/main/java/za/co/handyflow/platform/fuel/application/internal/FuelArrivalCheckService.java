@@ -56,6 +56,8 @@ public class FuelArrivalCheckService {
     private final FuelSettingsService settings;
     private final FuelComplianceService compliance;
     private final AuditTrailFacade audit;
+    private final FuelPushEventService pushEvents;
+    private final FuelAlertRecipientService alertRecipients;
 
     @Transactional
     public ArrivalCheckView check(TenantId tenantId, UUID userId, UUID deliveryId) {
@@ -65,7 +67,25 @@ public class FuelArrivalCheckService {
         }
         EligibilityResult r = evaluateLive(tenantId, d);
         FuelArrivalCheck saved = checks.save(FuelArrivalCheck.record(tenantId, d.getId(), userId, r.allowed(), toJson(r.findings())));
+        if (!r.allowed()) tellBlocked(tenantId, d, userId, r);
         return view(tenantId, saved, r.findings(), Instant.now());
+    }
+
+    /**
+     * A blocked check: the driver and the company's chosen people (topic ARRIVAL_BLOCKED, administrators by default) are told.
+     * The same reasons on the same load are told once. The alert authorises nothing; the server checks again at each protected step.
+     */
+    private void tellBlocked(TenantId tenantId, FuelDelivery d, UUID driverUserId, EligibilityResult r) {
+        try {
+            String reasons = r.blocks().stream().map(Finding::code).sorted().collect(java.util.stream.Collectors.joining(","));
+            String key = "ARRIVAL:" + d.getId() + ":" + reasons;
+            pushEvents.publish(tenantId, FuelPushEventService.ARRIVAL_CHECK_BLOCKED, key, List.of(driverUserId), "Arrival check blocked",
+                    "You may not offload this load. Open it for the reason.", Map.of("screen", "LoadDetail", "loadId", String.valueOf(d.getId())));
+            List<UUID> ops = alertRecipients.recipientsFor(tenantId, FuelAlertRecipientService.ARRIVAL_BLOCKED).stream()
+                    .map(za.co.handyflow.platform.notifications.application.Recipient::userId).filter(java.util.Objects::nonNull).filter(u -> !u.equals(driverUserId)).toList();
+            pushEvents.publish(tenantId, FuelPushEventService.ARRIVAL_CHECK_BLOCKED, key, ops, "Arrival check blocked",
+                    "A driver's arrival check was blocked" + (d.getVehicleReg() == null ? "." : " (" + d.getVehicleReg() + ")."), Map.of("screen", "Overview"));
+        } catch (RuntimeException e) { /* an alert never fails the check */ }
     }
 
     /** Runs the eligibility rules now against the load's tanker, driver and compartment split. */

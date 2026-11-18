@@ -49,6 +49,16 @@ class HrFacadeTest {
     }
 
     @Test
+    void findingAnEmployeeCarriesTheLoginLinkSoAPersonCanBeAlertedOnTheirPhone() {
+        when(hr.getEmployee(tenant, id)).thenReturn(full());
+        UUID login = UUID.randomUUID();
+        when(hr.linkedUserId(tenant, id)).thenReturn(Optional.of(login));
+        assertThat(facade.findEmployeeById(tenant, id).orElseThrow().userId()).isEqualTo(login);
+        when(hr.linkedUserId(tenant, id)).thenReturn(Optional.empty());
+        assertThat(facade.findEmployeeById(tenant, id).orElseThrow().userId()).isNull();
+    }
+
+    @Test
     void payIsAVeryNarrowSeparateCall() {
         when(hr.getEmployee(tenant, id)).thenReturn(full());
         EmployeePay pay = facade.findEmployeePay(tenant, id).orElseThrow();

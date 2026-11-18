@@ -10,6 +10,8 @@ export const navigationRef = createNavigationContainerRef<RootStackParamList>();
 function open(t: AlertTarget | null) {
   if (!t || !navigationRef.isReady()) return;
   if (t.screen === "LoadDetail") navigationRef.navigate("LoadDetail", t.params);
+  else if (t.screen === "TankDetail") navigationRef.navigate("TankDetail", t.params);
+  else if (t.screen === "ShiftDetail") navigationRef.navigate("ShiftDetail", t.params);
   else navigationRef.navigate(t.screen);
 }
 

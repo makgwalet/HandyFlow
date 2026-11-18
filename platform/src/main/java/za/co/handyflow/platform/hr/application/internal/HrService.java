@@ -50,6 +50,12 @@ public class HrService {
                 .orElseThrow(() -> new ResourceNotFoundException("Employee", id.toString()));
     }
 
+    /** The login linked to an employee, if any. Other modules use it to reach a person (for example to send a phone alert). */
+    @Transactional(readOnly = true)
+    public java.util.Optional<UUID> linkedUserId(TenantId tenantId, UUID employeeId) {
+        return employeeRepo.findActiveById(tenantId, employeeId).map(HrEmployee::getUserId);
+    }
+
     @Transactional
     public EmployeeResponse createEmployee(TenantId tenantId, CreateEmployeeRequest req) {
         validateNew(tenantId, req);

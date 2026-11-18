@@ -134,6 +134,10 @@ public interface FuelDeliveryRepository extends JpaRepository<FuelDelivery, UUID
     List<FuelDelivery> findDeliveredForCustomer(TenantId tenantId, UUID customerId);
 
     /** Scheduled or on the road: work a division cannot be switched off underneath. */
+    /** Open loads scheduled before the cutoff, across companies, for the overdue alert sweep. The caller applies each company's own grace. */
+    @Query("SELECT d FROM FuelDelivery d WHERE d.status IN ('SCHEDULED','IN_TRANSIT') AND d.scheduledAt < :cutoff AND d.deletedAt IS NULL ORDER BY d.scheduledAt")
+    List<FuelDelivery> findOpenScheduledBeforeAnyTenant(java.time.Instant cutoff);
+
     @Query("SELECT COUNT(d) FROM FuelDelivery d WHERE d.tenantId = :tenantId AND d.status IN ('SCHEDULED','IN_TRANSIT') AND d.deletedAt IS NULL")
     long countOpen(TenantId tenantId);
 

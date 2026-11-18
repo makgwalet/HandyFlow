@@ -123,6 +123,14 @@ public class FuelSettings {
     @Column(name = "pod_exception_types", nullable = false, length = 200)
     private String podExceptionTypes = "";
 
+    /** Minutes past its scheduled time before an open delivery counts as overdue for push alerts. */
+    @Column(name = "overdue_grace_minutes", nullable = false)
+    private int overdueGraceMinutes = 120;
+
+    /** Minutes after the driver is told before dispatch is told, if the delivery is still open. */
+    @Column(name = "overdue_escalation_minutes", nullable = false)
+    private int overdueEscalationMinutes = 60;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt = Instant.now();
 
@@ -246,6 +254,12 @@ public class FuelSettings {
 
     public java.util.Set<String> allowedPodExceptions() {
         return podExceptionTypes == null || podExceptionTypes.isBlank() ? java.util.Set.of() : java.util.Set.of(podExceptionTypes.split(","));
+    }
+
+    public void updateOverduePolicy(int graceMinutes, int escalationMinutes) {
+        if (graceMinutes < 15 || graceMinutes > 1440) throw new IllegalArgumentException("The overdue grace must be between 15 and 1440 minutes.");
+        if (escalationMinutes < 15 || escalationMinutes > 1440) throw new IllegalArgumentException("The escalation delay must be between 15 and 1440 minutes.");
+        this.overdueGraceMinutes = graceMinutes; this.overdueEscalationMinutes = escalationMinutes; this.updatedAt = Instant.now();
     }
 
     public void updateRequireVerifiedCleaning(boolean on) { this.requireVerifiedCleaning = on; this.updatedAt = Instant.now(); }

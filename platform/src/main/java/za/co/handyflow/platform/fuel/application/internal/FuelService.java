@@ -78,6 +78,8 @@ public class FuelService {
     private final FuelCustomerSiteRepository siteRepository;
     private final FuelOrderFulfilment orderFulfilment;
     private final FuelStockService stockService;
+    private final FuelPushEventService pushEvents;
+    private final FuelAlertRecipientService alertRecipients;
 
     @Value("${fuel.forecast.lookback-days:30}")
     private int forecastLookbackDays = 30;
@@ -635,6 +637,7 @@ public class FuelService {
      * catch-all for a site-security-relevant event like this.
      */
     private void notifyNegativeVariance(TenantId tenantId, FuelTank tank, DipReading dip) {
+        pushDipVariance(tenantId, tank, dip);
         List<Recipient> recipients = tenantAdminRecipients.resolveTenantAdmins(tenantId);
         if (recipients.isEmpty()) return;
 
@@ -650,6 +653,15 @@ public class FuelService {
                 .sourceEntityId(dip.getId().toString())
                 .recipients(recipients)
                 .build());
+    }
+
+    /** Push to the people chosen for variance alerts (topic VARIANCE; administrators by default). Each dip reading once. Never fails the reading. */
+    private void pushDipVariance(TenantId tenantId, FuelTank tank, DipReading dip) {
+        try {
+            List<UUID> to = alertRecipients.recipientsFor(tenantId, FuelAlertRecipientService.VARIANCE).stream().map(Recipient::userId).filter(java.util.Objects::nonNull).toList();
+            pushEvents.publish(tenantId, FuelPushEventService.DIP_VARIANCE, "DIP:" + dip.getId(), to, "Fuel shortfall: " + tank.getName(),
+                    "A dip reading came in below the book level. Open the tank to review.", java.util.Map.of("screen", "TankDetail", "tankId", String.valueOf(tank.getId())));
+        } catch (RuntimeException e) { log.warn("Dip variance push failed: {}", e.toString()); }
     }
 
     /**
