@@ -1,4 +1,4 @@
-import { FRESH_HOURS, arrivalCheckSchema, blocks, isFresh, notes, offloadGate, reviews, type ArrivalCheck } from "@driver/arrival";
+import { FRESH_HOURS, arrivalCheckSchema, blocks, isFresh, isReleasable, notes, offloadGate, releaseSchema, reviews, windowHours, type ArrivalCheck } from "@driver/arrival";
 
 const NOW = Date.parse("2026-01-01T12:00:00Z");
 const hoursAgo = (h: number) => new Date(NOW - h * 3_600_000).toISOString();
@@ -36,5 +36,32 @@ describe("arrival gate", () => {
   it("accepts the server shape", () => {
     expect(arrivalCheckSchema.safeParse({ deliveryId: "a", allowed: true, findings: [{ code: "C", severity: "INFO", message: "m" }], checkedAt: "2026-01-01T00:00:00Z" }).success).toBe(true);
     expect(arrivalCheckSchema.safeParse({ deliveryId: "a", allowed: true, findings: [{ code: "C", severity: "MAYBE", message: "m" }], checkedAt: "x" }).success).toBe(false);
+  });
+});
+
+describe("arrival freshness is set by the server", () => {
+  it("uses the company's window from the server instead of 12", () => {
+    const c = check({ checkedAt: hoursAgo(5), freshHours: 4 });
+    expect(windowHours(c)).toBe(4);
+    expect(offloadGate(c, NOW).ok).toBe(false);
+    expect(offloadGate(check({ checkedAt: hoursAgo(5), freshHours: 6 }), NOW).ok).toBe(true);
+  });
+  it("falls back to 12 hours for an older cached check that has no window", () => {
+    expect(windowHours(check())).toBe(FRESH_HOURS);
+  });
+  it("honours the server's expiry, which counts a supervisor's release", () => {
+    const released = check({ checkedAt: hoursAgo(20), freshHours: 12, status: "RELEASED", expiresAt: new Date(NOW + 3_600_000).toISOString() });
+    expect(offloadGate(released, NOW).ok).toBe(true);
+    expect(offloadGate({ ...released, expiresAt: new Date(NOW - 1000).toISOString() }, NOW).ok).toBe(false);
+  });
+  it("only a passed, aged-out check can be released; a blocked one cannot", () => {
+    expect(isReleasable(check({ checkedAt: hoursAgo(20) }), NOW)).toBe(true);
+    expect(isReleasable(check({ checkedAt: hoursAgo(1) }), NOW)).toBe(false);
+    expect(isReleasable(check({ allowed: false, checkedAt: hoursAgo(20) }), NOW)).toBe(false);
+  });
+  it("a release needs a reason and a real explanation", () => {
+    expect(releaseSchema.safeParse({ reasonCode: "SITE_QUEUE", explanation: "short" }).success).toBe(false);
+    expect(releaseSchema.safeParse({ reasonCode: "", explanation: "Waited in the queue for hours." }).success).toBe(false);
+    expect(releaseSchema.safeParse({ reasonCode: "SITE_QUEUE", explanation: "Waited in the queue for hours." }).success).toBe(true);
   });
 });

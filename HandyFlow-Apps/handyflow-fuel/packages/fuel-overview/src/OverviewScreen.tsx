@@ -1,5 +1,8 @@
 import React from "react";
 import { RefreshControl, ScrollView, Text, View } from "react-native";
+import { useNavigation } from "@react-navigation/native";
+import { useAuth } from "@/auth/AuthContext";
+import { canReleaseArrivalCheck } from "./ReleaseCheckScreen";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Card, styles as ui } from "@/ui/Screen";
 import { SyncBanner } from "@/ui/SyncBanner";
@@ -20,6 +23,9 @@ function Tile({ label, value, hint }: { label: string; value: string; hint?: str
 export function OverviewScreen() {
   const { summary: s, isLoading, error, savedAt, refetch } = useSummary();
   const [refreshing, setRefreshing] = React.useState(false);
+  const nav = useNavigation<any>();
+  const { session } = useAuth();
+  const mayRelease = canReleaseArrivalCheck(session?.permissions ?? []);
   return (
     <SafeAreaView style={ui.root} edges={["bottom"]}>
       <SyncBanner />
@@ -42,7 +48,7 @@ export function OverviewScreen() {
               <Card>
                 <Text style={{ color: colors.text, fontSize: 17, fontWeight: "700" }}>Next deliveries</Text>
                 {s.nextDeliveries.map((d) => (
-                  <Text key={d.id} style={{ color: colors.text }}>
+                  <Text key={d.id} style={{ color: colors.text }} onPress={mayRelease ? () => nav.navigate("ReleaseCheck", { loadId: d.id }) : undefined} accessibilityRole={mayRelease ? "button" : undefined}>
                     {d.fuelType ?? "Fuel"} · {litres(d.litresOrdered)} · {d.status.replace(/_/g, " ").toLowerCase()}{d.scheduledAt ? ` · ${new Date(d.scheduledAt).toLocaleDateString("en-ZA")}` : ""}
                   </Text>
                 ))}

@@ -151,6 +151,23 @@ public class FuelTransportController {
         return ResponseEntity.ok(ApiResponse.success(arrivalChecks.latest(TenantContext.getTenantIdAsObject(), TenantContext.getCurrentUserId(), id).orElse(null)));
     }
 
+    /** Release a stale arrival check. Needs the explicit FUEL_ARRIVAL_CHECK_OVERRIDE permission; ADMIN does not hold it by default. */
+    @PostMapping("/deliveries/{id}/arrival-check/release")
+    @PreAuthorize("hasAuthority('FUEL_ARRIVAL_CHECK_OVERRIDE')")
+    public ResponseEntity<ApiResponse<za.co.handyflow.platform.fuel.dto.ArrivalCheckDtos.ArrivalCheckView>> releaseArrivalCheck(
+            @PathVariable UUID id, @Valid @RequestBody za.co.handyflow.platform.fuel.dto.ArrivalCheckDtos.ReleaseRequest req) {
+        featureGuard.requireModule("fuel");
+        return ResponseEntity.ok(ApiResponse.success("Released", arrivalChecks.release(TenantContext.getTenantIdAsObject(), TenantContext.getCurrentUserId(), id, req)));
+    }
+
+    /** The load's arrival check as it stands now (status decided by the server). For the supervisor's view. */
+    @GetMapping("/deliveries/{id}/arrival-check")
+    @PreAuthorize("hasAnyAuthority('FUEL_READ','FUEL_ARRIVAL_CHECK_OVERRIDE')")
+    public ResponseEntity<ApiResponse<za.co.handyflow.platform.fuel.dto.ArrivalCheckDtos.ArrivalCheckView>> arrivalCheckStatus(@PathVariable UUID id) {
+        featureGuard.requireModule("fuel");
+        return ResponseEntity.ok(ApiResponse.success(arrivalChecks.status(TenantContext.getTenantIdAsObject(), id)));
+    }
+
     // ── C04: delivery windows and failed attempts ────────────────────────────
 
     /** What happened to one load, in time order, for the office. Read-only. */

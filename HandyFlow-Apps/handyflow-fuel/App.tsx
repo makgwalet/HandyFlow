@@ -7,7 +7,7 @@ import { DarkTheme, NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { ArrivalCheckScreen, SignatureScreen, CompleteScreen, FailedAttemptScreen, LoadDetailScreen, MyLoadsScreen } from "@driver/index";
 import { ReceiveFuelScreen, TankDetailScreen, TanksScreen } from "@depot/index";
-import { OverviewScreen } from "@overview/index";
+import { OverviewScreen, ReleaseCheckScreen } from "@overview/index";
 import { StayDetailScreen, StayRequestsScreen, YardScreen } from "@truckstop/index";
 import { AdjustmentScreen, CloseShiftScreen, OpenShiftScreen, ShiftDetailScreen, ShiftsScreen } from "@forecourt/index";
 import { AuthProvider, useAuth } from "@/auth/AuthContext";
@@ -52,6 +52,7 @@ function SignedIn() {
           <Stack.Screen name="StayDetail" component={StayDetailScreen} options={{ title: "Stay" }} />
           <Stack.Screen name="StayRequests" component={StayRequestsScreen} options={{ title: "Stay requests" }} />
           <Stack.Screen name="Overview" component={OverviewScreen} options={{ title: "Overview" }} />
+          <Stack.Screen name="ReleaseCheck" component={ReleaseCheckScreen} options={{ title: "Release arrival check" }} />
           <Stack.Screen name="TankDetail" component={TankDetailScreen} options={{ title: "Tank" }} />
         </Stack.Navigator>
       </NavigationContainer>

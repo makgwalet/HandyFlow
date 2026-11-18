@@ -83,6 +83,21 @@ public class FuelSettingsService {
     }
 
     @Transactional(readOnly = true)
+    public za.co.handyflow.platform.fuel.dto.ArrivalCheckDtos.ArrivalPolicy arrivalPolicy(TenantId tenantId) { return arrivalPolicy0(current(tenantId)); }
+
+    @Transactional
+    public za.co.handyflow.platform.fuel.dto.ArrivalCheckDtos.ArrivalPolicy updateArrivalPolicy(TenantId tenantId, za.co.handyflow.platform.fuel.dto.ArrivalCheckDtos.ArrivalPolicyRequest req) {
+        FuelSettings s = settings.findByTenant(tenantId).orElseGet(() -> FuelSettings.forTenant(tenantId));
+        s.updateArrivalCheckPolicy(req.freshHours(), req.enforced());
+        return arrivalPolicy0(settings.save(s));
+    }
+
+    private static za.co.handyflow.platform.fuel.dto.ArrivalCheckDtos.ArrivalPolicy arrivalPolicy0(FuelSettings s) {
+        int hours = s.getArrivalCheckFreshHours() == null ? FuelArrivalCheckPolicy.DEFAULT_FRESH_HOURS : s.getArrivalCheckFreshHours();
+        return new za.co.handyflow.platform.fuel.dto.ArrivalCheckDtos.ArrivalPolicy(hours, FuelArrivalCheckPolicy.DEFAULT_FRESH_HOURS, s.isArrivalCheckEnforced());
+    }
+
+    @Transactional(readOnly = true)
     public ControlsResponse controls(TenantId tenantId) {
         FuelSettings s = current(tenantId);
         return toControls(s);

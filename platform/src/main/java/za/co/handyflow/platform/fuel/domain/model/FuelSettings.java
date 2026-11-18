@@ -107,6 +107,14 @@ public class FuelSettings {
     @Column(name = "emergency_contact_phone", length = 30)
     private String emergencyContactPhone;
 
+    /** How many hours an arrival check stays fresh. Null: the system default (12). */
+    @Column(name = "arrival_check_fresh_hours")
+    private Integer arrivalCheckFreshHours;
+
+    /** When on, the server refuses to complete a delivery unless the driver's arrival check is fresh (or released). */
+    @Column(name = "arrival_check_enforced", nullable = false)
+    private boolean arrivalCheckEnforced = false;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt = Instant.now();
 
@@ -209,6 +217,16 @@ public class FuelSettings {
         if ((n == null) != (p == null)) throw new IllegalArgumentException("Enter both a name and a phone number, or leave both empty.");
         if (p != null && !PHONE.matcher(p).matches()) throw new IllegalArgumentException("The phone number must be digits, with an optional + at the start.");
         this.emergencyContactName = n; this.emergencyContactPhone = p; this.updatedAt = Instant.now();
+    }
+    public static final int MIN_FRESH_HOURS = 1;
+    public static final int MAX_FRESH_HOURS = 72;
+
+    /** Null hours means the system default. */
+    public void updateArrivalCheckPolicy(Integer freshHours, boolean enforced) {
+        if (freshHours != null && (freshHours < MIN_FRESH_HOURS || freshHours > MAX_FRESH_HOURS)) {
+            throw new IllegalArgumentException("The arrival check window must be between " + MIN_FRESH_HOURS + " and " + MAX_FRESH_HOURS + " hours.");
+        }
+        this.arrivalCheckFreshHours = freshHours; this.arrivalCheckEnforced = enforced; this.updatedAt = Instant.now();
     }
     public void updateRequireVerifiedCleaning(boolean on) { this.requireVerifiedCleaning = on; this.updatedAt = Instant.now(); }
     public void updateRequireCompartmentRating(boolean on) { this.requireCompartmentRating = on; this.updatedAt = Instant.now(); }

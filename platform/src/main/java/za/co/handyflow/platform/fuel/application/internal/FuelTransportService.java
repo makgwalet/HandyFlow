@@ -47,6 +47,7 @@ public class FuelTransportService {
     private final FuelEligibilityService eligibility;
     private final ObjectProvider<FleetVehicleLookup> fleet;
     private final FuelPushService push;
+    private final FuelArrivalCheckService arrivalChecks;
 
     // ── Tankers ──────────────────────────────────────────────────────────────
 
@@ -316,6 +317,8 @@ public class FuelTransportService {
     @Transactional
     public DeliveryResponse myComplete(TenantId tenantId, UUID userId, UUID deliveryId, CompleteDeliveryRequest req) {
         FuelDelivery d = ownLoad(tenantId, userId, deliveryId);
+        // Offloading is complete and the delivery is final: the server asks for a clear arrival check itself (when the company enforces it).
+        arrivalChecks.requireClear(tenantId, d.getId());
         return fuelService.completeDelivery(tenantId, d.getId(), req);
     }
 

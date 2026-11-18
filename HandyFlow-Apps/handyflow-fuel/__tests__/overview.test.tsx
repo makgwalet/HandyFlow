@@ -7,6 +7,8 @@ let mockState: any = {};
 jest.mock("@overview/useSummary", () => ({ useSummary: () => mockState }));
 jest.mock("react-native-safe-area-context", () => ({ SafeAreaView: ({ children }: any) => children }));
 jest.mock("@/ui/SyncBanner", () => ({ SyncBanner: () => null }));
+jest.mock("@react-navigation/native", () => ({ useNavigation: () => ({ navigate: jest.fn() }) }));
+jest.mock("@/auth/AuthContext", () => ({ useAuth: () => ({ session: { permissions: ["FUEL_READ"] } }) }));
 
 const sum = (o: Partial<Summary> = {}): Summary => ({ today: "2026-11-18", monthLitres: 123456.4, monthDispatches: 1, monthReceipts: 2, dailyLitres: [], negativeVarianceReadings: 0, openDeliveries: 5, inTransitDeliveries: 2, overdueDeliveries: 0, nextDeliveries: [], ...o });
 const base = { summary: null, savedAt: null, isLoading: false, error: null, refetch: jest.fn() };

@@ -45,6 +45,20 @@ public class FuelSettingsController {
         return ResponseEntity.ok(ApiResponse.success("Saved", settings.updateControls(TenantContext.getTenantIdAsObject(), req)));
     }
 
+    @GetMapping("/arrival-check")
+    @PreAuthorize("hasAnyAuthority('FUEL_READ','FUEL_DRIVER')")
+    public ResponseEntity<ApiResponse<za.co.handyflow.platform.fuel.dto.ArrivalCheckDtos.ArrivalPolicy>> arrivalPolicy() {
+        featureGuard.requireModule("fuel");
+        return ResponseEntity.ok(ApiResponse.success(settings.arrivalPolicy(TenantContext.getTenantIdAsObject())));
+    }
+
+    @PutMapping("/arrival-check")
+    @PreAuthorize("hasAuthority('FUEL_CONFIGURATION_MANAGE')")
+    public ResponseEntity<ApiResponse<za.co.handyflow.platform.fuel.dto.ArrivalCheckDtos.ArrivalPolicy>> updateArrivalPolicy(@Valid @RequestBody za.co.handyflow.platform.fuel.dto.ArrivalCheckDtos.ArrivalPolicyRequest req) {
+        featureGuard.requireModule("fuel");
+        return ResponseEntity.ok(ApiResponse.success("Saved", settings.updateArrivalPolicy(TenantContext.getTenantIdAsObject(), req)));
+    }
+
     @PutMapping("/emergency-contact")
     @PreAuthorize("hasAuthority('FUEL_CONFIGURATION_MANAGE')")
     public ResponseEntity<ApiResponse<FuelSettingsDtos.EmergencyContact>> updateEmergencyContact(@Valid @RequestBody FuelSettingsDtos.EmergencyContact req) {
