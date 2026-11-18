@@ -272,16 +272,18 @@ export const BUDGET_BASES: { value: string; label: string; help: string }[] = [
   { value: "NET_OF_RECOVERABLE", label: "Net of recoverable VAT", help: "Budgets count the net cost plus only the VAT the business cannot claim back." },
 ]
 
-export interface PolicyForm { budgetBasis: string; vatRecoverablePct: string; includeNonRecoverableVat: boolean; priceIncreaseTolerancePct: string }
+export interface PolicyForm { budgetBasis: string; vatRecoverablePct: string; includeNonRecoverableVat: boolean; priceIncreaseTolerancePct: string; baseCurrency?: string }
 
 export function policyProblem(f: PolicyForm): string | null {
   const r = Number(f.vatRecoverablePct), t = Number(f.priceIncreaseTolerancePct)
   if (f.vatRecoverablePct.trim() === "" || !(r >= 0 && r <= 100)) return "Recoverable VAT must be between 0 and 100"
   if (f.priceIncreaseTolerancePct.trim() === "" || !(t >= 0 && t <= 100)) return "The price increase tolerance must be between 0 and 100"
+  if (f.baseCurrency !== undefined && !/^[A-Za-z]{3}$/.test(f.baseCurrency.trim())) return "The base currency must be a 3-letter code such as ZAR"
   return null
 }
 
 export const policyBody = (f: PolicyForm) => ({
+  baseCurrency: f.baseCurrency?.trim().toUpperCase(),
   budgetBasis: f.budgetBasis, vatRecoverablePct: Number(f.vatRecoverablePct),
   includeNonRecoverableVat: f.includeNonRecoverableVat, priceIncreaseTolerancePct: Number(f.priceIncreaseTolerancePct),
 })

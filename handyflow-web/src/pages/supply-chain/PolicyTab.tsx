@@ -6,9 +6,10 @@ import { apiClient } from "../../api/client"
 import { usePermissions } from "../../hooks/usePermission"
 import { inp, TH, TD, Field, ErrBox, Spinner, EmptyState, Banner, filterPill, fmtR, fmtDate } from "./scm.shared"
 import { Scale } from "lucide-react"
+import { PolicyRefinements, ContractSavings } from "./PolicyRefinements"
 import { asList, asOne, errorText, BUDGET_BASES, policyProblem, policyBody, type PolicyForm } from "./scmOps"
 
-interface PolicyView { effective: { budgetBasis: string; vatRecoverablePct: number; includeNonRecoverableVat: boolean; priceIncreaseTolerancePct: number }; customised: boolean }
+interface PolicyView { effective: { budgetBasis: string; vatRecoverablePct: number; includeNonRecoverableVat: boolean; priceIncreaseTolerancePct: number; baseCurrency?: string }; customised: boolean }
 interface Override { id: string; requisitionNumber: string; orderNumber: string; itemName: string; quantity: number; requisitionUnitCost: number; unitCost: number; reason: string | null; note: string | null; quotationRef: string | null; convertedByName: string | null; createdAt: string }
 
 const BASE = "/api/v1/supply-chain"
@@ -31,7 +32,7 @@ export function PolicyTab() {
 
   if (!form && policy.data) {
     const e = policy.data.effective
-    setForm({ budgetBasis: e.budgetBasis, vatRecoverablePct: String(e.vatRecoverablePct), includeNonRecoverableVat: e.includeNonRecoverableVat, priceIncreaseTolerancePct: String(e.priceIncreaseTolerancePct) })
+    setForm({ budgetBasis: e.budgetBasis, vatRecoverablePct: String(e.vatRecoverablePct), includeNonRecoverableVat: e.includeNonRecoverableVat, priceIncreaseTolerancePct: String(e.priceIncreaseTolerancePct), baseCurrency: e.baseCurrency ?? "ZAR" })
   }
 
   const save = useMutation({
@@ -60,7 +61,7 @@ export function PolicyTab() {
       {policy.isError ? <ErrBox msg={errorText(policy.error, "Could not load the policy. The server may need restarting after an update.")} /> : policy.isLoading || !form ? <Spinner /> : (
         <>
           {err && <ErrBox msg={err} />}
-          {saved && <Banner variant="info">Saved. New purchase orders use it from now on; existing commitments are not restated, so choose before go-live rather than mid-year.</Banner>}
+          {saved && <Banner variant="info">Saved. If the basis, VAT or base currency changed, existing budget commitments were restated and the change is on the audit trail.</Banner>}
           <Field label="Budgets count">
             <select style={inp} aria-label="Budget basis" value={form.budgetBasis} disabled={!isAdmin} onChange={e => setForm({ ...form, budgetBasis: e.target.value })}>
               {BUDGET_BASES.map(b => <option key={b.value} value={b.value}>{b.label}</option>)}
@@ -77,10 +78,16 @@ export function PolicyTab() {
           <Field label="Buyer price increase allowed without approval (%)">
             <input style={inp} aria-label="Price tolerance" value={form.priceIncreaseTolerancePct} disabled={!isAdmin} onChange={e => setForm({ ...form, priceIncreaseTolerancePct: e.target.value })} />
           </Field>
+          <Field label="Base currency (budgets are measured in this)">
+            <input style={inp} aria-label="Base currency" maxLength={3} value={form.baseCurrency ?? ""} disabled={!isAdmin} onChange={e => setForm({ ...form, baseCurrency: e.target.value.toUpperCase() })} />
+          </Field>
           {isAdmin ? <button style={filterPill(true)} disabled={save.isPending} onClick={submit}>Save policy</button>
             : <p style={{ fontSize: 13 }}>Only a Supply Chain administrator can change the policy.</p>}
         </>
       )}
+
+      <PolicyRefinements isAdmin={isAdmin} />
+      <ContractSavings />
 
       {canDecide && (
         <>

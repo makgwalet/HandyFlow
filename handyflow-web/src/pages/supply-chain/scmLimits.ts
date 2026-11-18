@@ -7,6 +7,7 @@ export const LIMIT_DOCS: { value: string; label: string }[] = [
   { value: "RFQ_AWARD", label: "RFQ awards" },
   { value: "PO_AMENDMENT", label: "Order amendments" },
   { value: "SUPPLIER_INVOICE", label: "Supplier invoices" },
+  { value: "PRICE_OVERRIDE", label: "Price increases" },
 ]
 export const docLabel = (v: string) => LIMIT_DOCS.find(d => d.value === v)?.label ?? v
 
