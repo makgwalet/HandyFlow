@@ -46,6 +46,7 @@ import StayRequestsTab from "./StayRequestsTab"
 import GaugeImportsTab from "./GaugeImportsTab"
 import LegalEntitiesTab from "./LegalEntitiesTab"
 import EligibilityTab from "./EligibilityTab"
+import OperationsPolicyTab from "./OperationsPolicyTab"
 import { useEffect } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
@@ -117,6 +118,7 @@ export function FuelPage() {
         case "variances": return <VariancesTab />
         case "setup":      return <SetupTab />
         case "access-limits": return <AccessLimitsTab />
+        case "operations-policy": return <OperationsPolicyTab />
         case "imports": return <ImportsTab />
         case "gauge-readings": return <GaugeImportsTab />
         case "legal-entities": return <LegalEntitiesTab />
