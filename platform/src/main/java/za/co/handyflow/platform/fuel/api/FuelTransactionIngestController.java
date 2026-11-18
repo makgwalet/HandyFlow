@@ -12,7 +12,7 @@ import za.co.handyflow.platform.fuel.dto.PosImportDtos.TransactionIngestResult;
 import za.co.handyflow.platform.shared.ApiResponse;
 
 /**
- * Live pump transactions (sales, refunds, voids) from a pump or POS system. Same rules as the shift import: no login and no TenantContext, the company comes
+ * Live pump transactions (sales, refunds, voids) from a pump or POS system. Same rules as the shift import: no login and no tenant context, the company comes
  * from the key in the {@code X-Fuel-Import-Key} header (unknown, missing or revoked gets 401), the exact path is permitted in SecurityConfig and rate
  * limited in RateLimitFilter. It only stores the transactions against their shift for review.
  */

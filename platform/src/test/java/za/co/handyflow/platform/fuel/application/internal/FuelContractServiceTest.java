@@ -57,7 +57,7 @@ class FuelContractServiceTest {
         when(contracts.save(any())).thenAnswer(i -> { FuelContract c = i.getArgument(0); if (!saved.contains(c)) saved.add(c); return c; });
         when(contracts.findActiveById(eq(T), any())).thenAnswer(i -> saved.stream().filter(c -> c.getId().equals(i.getArgument(1))).findFirst());
         when(contracts.numberTaken(eq(T), any())).thenAnswer(i -> saved.stream().anyMatch(c -> c.getContractNumber().equalsIgnoreCase(i.getArgument(1))));
-        when(links.save(any())).thenAnswer(i -> { linked.add(i.getArgument(0)); return i.getArgument(0); });
+        when(links.save(any())).thenAnswer(i -> { FuelContractPrice l = i.getArgument(0); if (!linked.contains(l)) linked.add(l); return l; }); // saving a row already held is an update, not a second row
         when(links.findLink(eq(T), any(), any())).thenAnswer(i -> linked.stream().filter(l -> l.getContractId().equals(i.getArgument(1)) && l.getPriceId().equals(i.getArgument(2))).findFirst());
         when(links.findByContract(eq(T), any())).thenAnswer(i -> linked.stream().filter(l -> l.getContractId().equals(i.getArgument(1))).toList());
         when(crm.findCustomerById(eq(T), any())).thenReturn(Optional.empty());

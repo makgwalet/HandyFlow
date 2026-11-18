@@ -138,8 +138,8 @@ class FuelGroupReportServiceTest {
     void openVariances() {
         FuelDelivery d = load(acmeTank, "1000", "20000", "18", false);
         FuelDeliveryVariance open = mock(FuelDeliveryVariance.class), closed = mock(FuelDeliveryVariance.class), orphan = mock(FuelDeliveryVariance.class);
-        when(open.getStatus()).thenReturn("OPEN"); when(open.getDeliveryId()).thenReturn(d.getId());
-        when(closed.getStatus()).thenReturn("REVIEWED"); when(closed.getDeliveryId()).thenReturn(d.getId());
+        when(open.getStatus()).thenReturn("OPEN"); var hoisted1 = d.getId(); when(open.getDeliveryId()).thenReturn(hoisted1);
+        when(closed.getStatus()).thenReturn("REVIEWED"); var hoisted2 = d.getId(); when(closed.getDeliveryId()).thenReturn(hoisted2);
         when(orphan.getStatus()).thenReturn("OPEN"); when(orphan.getDeliveryId()).thenReturn(UUID.randomUUID());
         when(variances.findAllForTenant(T)).thenReturn(List.of(open, closed, orphan));
         when(deliveries.findAllByIds(any(), any())).thenReturn(List.of(d));

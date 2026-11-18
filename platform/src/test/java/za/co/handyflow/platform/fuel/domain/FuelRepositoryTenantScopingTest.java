@@ -22,17 +22,19 @@ class FuelRepositoryTenantScopingTest {
     private static final Path REPOS = Path.of("src/main/java/za/co/handyflow/platform/fuel/domain/repository");
 
     /** "Repository.method" -> why it is intentionally not tenant-filtered. */
-    private static final Map<String, String> ALLOWED = Map.of(
-            "FuelComplianceItemRepository.findExpiringBetweenAllTenants", "scheduler sweeps all tenants",
-            "FuelComplianceReminderRepository.findByItemIds", "item ids come from the scheduler sweep",
-            "FuelDeliveryRepository.findUpcomingNeedingReminder", "scheduler sweeps all tenants",
-            "FuelDeliveryRepository.findOverdueNeedingAlert", "scheduler sweeps all tenants",
-            "FuelDispatchRepository.sumLitresDispensedByTankIdsRaw", "tank ids come from a tenant-scoped tank list",
-            "FuelPortalAccessGrantRepository.findActiveGrantsForUser", "portal identity is global; tenant derived from grant",
-            "FuelPortalAccessGrantRepository.findActiveGrant", "portal identity is global; tenant derived from grant",
-            "FuelSettingsRepository.findTenantsWithVarianceTolerance", "scheduler sweeps all tenants",
-            "FuelSettingsRepository.findTenantsAlertingOverduePurchaseOrders", "scheduler sweeps all tenants",
-            "FuelAutomationRuleRepository.findTenantsWithEnabledRules", "scheduler sweeps all tenants");
+    private static final Map<String, String> ALLOWED = Map.ofEntries(
+            Map.entry("FuelComplianceItemRepository.findExpiringBetweenAllTenants", "scheduler sweeps all tenants"),
+            Map.entry("FuelComplianceReminderRepository.findByItemIds", "item ids come from the scheduler sweep"),
+            Map.entry("FuelDeliveryRepository.findUpcomingNeedingReminder", "scheduler sweeps all tenants"),
+            Map.entry("FuelDeliveryRepository.findOverdueNeedingAlert", "scheduler sweeps all tenants"),
+            Map.entry("FuelDispatchRepository.sumLitresDispensedByTankIdsRaw", "tank ids come from a tenant-scoped tank list"),
+            Map.entry("FuelPortalAccessGrantRepository.findActiveGrantsForUser", "portal identity is global; tenant derived from grant"),
+            Map.entry("FuelPortalAccessGrantRepository.findActiveGrant", "portal identity is global; tenant derived from grant"),
+            Map.entry("FuelSettingsRepository.findTenantsWithVarianceTolerance", "scheduler sweeps all tenants"),
+            Map.entry("FuelSettingsRepository.findTenantsAlertingOverduePurchaseOrders", "scheduler sweeps all tenants"),
+            Map.entry("FuelAutomationRuleRepository.findTenantsWithEnabledRules", "scheduler sweeps all tenants"),
+            Map.entry("FuelDeliveryRepository.findOpenScheduledBeforeAnyTenant", "scheduler sweeps all tenants; the caller applies each company's own grace"),
+            Map.entry("FuelSettingsRepository.findWithVarianceReviewDays", "scheduler sweeps all tenants"));
 
     private static final Pattern QUERY = Pattern.compile("@Query\\((.*?)\\)\\s*\\n\\s*[^\\n]*?\\s(\\w+)\\(", Pattern.DOTALL);
 

@@ -26,14 +26,14 @@ public class FuelPushEventController {
     private final FeatureGuard featureGuard;
 
     @GetMapping("/preferences")
-    @PreAuthorize("hasAuthority('FUEL_DRIVER') or hasAuthority('FUEL_READ') or hasAuthority('FUEL_MANAGE')")
+    @PreAuthorize("hasAnyAuthority('FUEL_DRIVER','FUEL_READ','FUEL_MANAGE')")
     public ResponseEntity<ApiResponse<Map<String, Boolean>>> preferences() {
         featureGuard.requireModule("fuel");
         return ResponseEntity.ok(ApiResponse.success(events.preferences(TenantContext.getTenantIdAsObject(), TenantContext.getCurrentUserId())));
     }
 
     @PutMapping("/preferences")
-    @PreAuthorize("hasAuthority('FUEL_DRIVER') or hasAuthority('FUEL_READ') or hasAuthority('FUEL_MANAGE')")
+    @PreAuthorize("hasAnyAuthority('FUEL_DRIVER','FUEL_READ','FUEL_MANAGE')")
     public ResponseEntity<ApiResponse<Map<String, Boolean>>> setPreferences(@RequestBody PushDtos.Preferences req) {
         featureGuard.requireModule("fuel");
         return ResponseEntity.ok(ApiResponse.success("Saved", events.setPreferences(TenantContext.getTenantIdAsObject(), TenantContext.getCurrentUserId(), req.enabled() == null ? Map.of() : req.enabled())));

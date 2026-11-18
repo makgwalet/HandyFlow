@@ -64,10 +64,11 @@ public class DipReading {
         d.readAt            = readAt;
         d.actualLitres      = actualLitres;
         d.calculatedLitres  = calculatedLitres;
-        // WHY calculated - actual? Positive = we have more than expected (good)
-        // Negative = fuel is missing (theft/leak — needs investigation)
+        // actual - calculated: positive = more fuel than the book says, negative = fuel is missing (theft or leak, needs a look).
+        // Everything that reads this (the dashboard's "below -5 L", the alert, the app's "Short by") takes negative as the loss.
+        // (It was calculated - actual, which flipped every one of those: a shortfall read as a surplus and raised no alert.)
         d.varianceLitres    = calculatedLitres != null
-                ? calculatedLitres.subtract(actualLitres)
+                ? actualLitres.subtract(calculatedLitres)
                 : null;
         d.readBy            = readBy;
         d.notes             = notes;

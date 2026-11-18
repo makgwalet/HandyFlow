@@ -47,9 +47,9 @@ class FuelDeliveryExecutionServiceTest {
     private FuelDelivery load() {
         FuelDelivery d = mock(FuelDelivery.class);
         when(d.getId()).thenReturn(UUID.randomUUID()); when(d.getStatus()).thenReturn("DELIVERED");
-        when(d.getCreatedAt()).thenReturn(at("05:00")); when(d.getScheduledAt()).thenReturn(at("08:00"));
-        when(d.getLoadedAt()).thenReturn(at("07:00")); when(d.getLoadedLitres()).thenReturn(new BigDecimal("10000.00")); when(d.getSealNumbers()).thenReturn("A1, A2");
-        when(d.getDeliveredAt()).thenReturn(at("11:00")); when(d.getLitresDelivered()).thenReturn(new BigDecimal("9980")); when(d.getReceiverName()).thenReturn("Sipho");
+        var hoisted1 = at("05:00"); when(d.getCreatedAt()).thenReturn(hoisted1); var hoisted2 = at("08:00"); when(d.getScheduledAt()).thenReturn(hoisted2);
+        var hoisted3 = at("07:00"); when(d.getLoadedAt()).thenReturn(hoisted3); when(d.getLoadedLitres()).thenReturn(new BigDecimal("10000.00")); when(d.getSealNumbers()).thenReturn("A1, A2");
+        var hoisted4 = at("11:00"); when(d.getDeliveredAt()).thenReturn(hoisted4); when(d.getLitresDelivered()).thenReturn(new BigDecimal("9980")); when(d.getReceiverName()).thenReturn("Sipho");
         when(deliveries.findActiveById(T, d.getId())).thenReturn(Optional.of(d));
         when(arrivalChecks.history(any(), any())).thenReturn(List.of());
         when(evidence.list(any(), any())).thenReturn(List.of());
@@ -64,11 +64,11 @@ class FuelDeliveryExecutionServiceTest {
     @Test @DisplayName("events from every source come out oldest first, with problems marked")
     void orderedAndMarked() {
         FuelDelivery d = load();
-        when(arrivalChecks.history(T, d.getId())).thenReturn(List.of(
+        var hoisted5 = List.of(
                 new ArrivalCheckView(d.getId(), false, List.of(new Finding("X", Severity.BLOCK, "Tanker cert expired")), at("09:00")),
-                new ArrivalCheckView(d.getId(), true, List.of(), at("09:30"))));
-        when(evidence.list(T, d.getId())).thenReturn(List.of(photo("SIGNATURE", at("10:50"), "ACTIVE", null)));
-        when(exceptions.list(T, d.getId())).thenReturn(List.of(new ExceptionView(UUID.randomUUID(), d.getId(), "FAILED_ATTEMPT", "SITE_CLOSED", "gate locked", new BigDecimal("10000"), null, 1, null, at("09:10"))));
+                new ArrivalCheckView(d.getId(), true, List.of(), at("09:30"))); when(arrivalChecks.history(T, d.getId())).thenReturn(hoisted5);
+        var hoisted6 = List.of(photo("SIGNATURE", at("10:50"), "ACTIVE", null)); when(evidence.list(T, d.getId())).thenReturn(hoisted6);
+        var hoisted7 = List.of(new ExceptionView(UUID.randomUUID(), d.getId(), "FAILED_ATTEMPT", "SITE_CLOSED", "gate locked", new BigDecimal("10000"), null, 1, null, at("09:10"))); when(exceptions.list(T, d.getId())).thenReturn(hoisted7);
         Execution x = service.execution(T, d.getId());
         assertEquals(List.of("SCHEDULED", "LOADED", "ARRIVAL_CHECK", "FAILED_ATTEMPT", "ARRIVAL_CHECK", "EVIDENCE", "DELIVERED"), x.events().stream().map(Event::type).toList());
         assertEquals("PROBLEM", x.events().get(2).severity());
@@ -81,7 +81,7 @@ class FuelDeliveryExecutionServiceTest {
     @Test @DisplayName("a replaced piece of evidence is shown as replaced, not as good")
     void replacedEvidence() {
         FuelDelivery d = load();
-        when(evidence.list(T, d.getId())).thenReturn(List.of(photo("PHOTO", at("10:00"), "SUPERSEDED", "wrong site")));
+        var hoisted8 = List.of(photo("PHOTO", at("10:00"), "SUPERSEDED", "wrong site")); when(evidence.list(T, d.getId())).thenReturn(hoisted8);
         Event e = service.execution(T, d.getId()).events().stream().filter(x -> x.type().equals("EVIDENCE")).findFirst().orElseThrow();
         assertEquals("REVIEW", e.severity());
         assertTrue(e.text().contains("replaced: wrong site"));
@@ -90,7 +90,7 @@ class FuelDeliveryExecutionServiceTest {
     @Test @DisplayName("a load with nothing recorded beyond its creation has only that event")
     void sparse() {
         FuelDelivery d = mock(FuelDelivery.class);
-        when(d.getId()).thenReturn(UUID.randomUUID()); when(d.getStatus()).thenReturn("SCHEDULED"); when(d.getCreatedAt()).thenReturn(at("05:00"));
+        when(d.getId()).thenReturn(UUID.randomUUID()); when(d.getStatus()).thenReturn("SCHEDULED"); var hoisted9 = at("05:00"); when(d.getCreatedAt()).thenReturn(hoisted9);
         when(deliveries.findActiveById(T, d.getId())).thenReturn(Optional.of(d));
         when(arrivalChecks.history(any(), any())).thenReturn(List.of()); when(evidence.list(any(), any())).thenReturn(List.of()); when(exceptions.list(any(), any())).thenReturn(List.of());
         assertEquals(1, service.execution(T, d.getId()).events().size());

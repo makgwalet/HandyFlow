@@ -655,10 +655,10 @@ public class FuelService {
                 .build());
     }
 
-    /** Push to the people chosen for variance alerts (topic VARIANCE; administrators by default). Each dip reading once. Never fails the reading. */
+    /** Push to the people chosen for tank dip alerts (topic DIP_VARIANCE, separate from delivery variances; administrators by default). Each dip reading once. Never fails the reading. */
     private void pushDipVariance(TenantId tenantId, FuelTank tank, DipReading dip) {
         try {
-            List<UUID> to = alertRecipients.recipientsFor(tenantId, FuelAlertRecipientService.VARIANCE).stream().map(Recipient::userId).filter(java.util.Objects::nonNull).toList();
+            List<UUID> to = alertRecipients.recipientsFor(tenantId, FuelAlertRecipientService.DIP_VARIANCE).stream().map(Recipient::userId).filter(java.util.Objects::nonNull).toList();
             pushEvents.publish(tenantId, FuelPushEventService.DIP_VARIANCE, "DIP:" + dip.getId(), to, "Fuel shortfall: " + tank.getName(),
                     "A dip reading came in below the book level. Open the tank to review.", java.util.Map.of("screen", "TankDetail", "tankId", String.valueOf(tank.getId())));
         } catch (RuntimeException e) { log.warn("Dip variance push failed: {}", e.toString()); }

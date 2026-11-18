@@ -275,7 +275,7 @@ class FuelForecourtServiceTest {
     @Test @DisplayName("a depot's own tolerance is used for the close: R1,000 short is refused at R5 but closes inside a R2,000 tolerance")
     void depotToleranceIsUsed() {
         UUID depot = UUID.randomUUID();
-        diesel.place(depot, null);
+        diesel.place(depot, d("0"));
         FuelShift s = opened();
         when(tolerances.cashToleranceFor(eq(TENANT), eq(java.util.Set.of(depot)), any())).thenReturn(d("2000.00"));
         ShiftResponse r = service.closeShift(TENANT, s.getId(), close("3000", "2000", null, "1210", "10", "5100"), USER);

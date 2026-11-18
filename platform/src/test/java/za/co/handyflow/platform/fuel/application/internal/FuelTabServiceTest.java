@@ -57,7 +57,7 @@ class FuelTabServiceTest {
         when(tabs.save(any())).thenAnswer(i -> i.getArgument(0));
         when(tabs.saveAndFlush(any())).thenAnswer(i -> i.getArgument(0));
         when(lines.findForTab(eq(T), eq(t.getId()))).thenAnswer(i -> new ArrayList<>(stored));
-        when(lines.save(any())).thenAnswer(i -> { stored.add(i.getArgument(0)); return i.getArgument(0); });
+        when(lines.save(any())).thenAnswer(i -> { if (i.getArgument(0) != null) stored.add(i.getArgument(0)); return i.getArgument(0); }); // re-stubbing calls save(null) once
         when(offerings.findOwned(T, shower.getId())).thenReturn(Optional.of(shower));
         when(bookings.services(T)).thenReturn(List.of(new ServiceInfo(serviceId, "Shower", 20, new BigDecimal("45.00"), true)));
         return t;

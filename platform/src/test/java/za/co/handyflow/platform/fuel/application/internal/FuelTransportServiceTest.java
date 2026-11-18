@@ -282,7 +282,7 @@ class FuelTransportServiceTest {
         FuelDelivery s = FuelDelivery.create(T, UUID.randomUUID(), UUID.randomUUID(), Map.of(), fuel, bd(litres), bd("22"), Instant.now(), null, null);
         s.joinRoute(routeId, 1);
         when(deliveries.findByRoute(T, routeId)).thenReturn(List.of(s));
-        when(loadSplits.findByDelivery(T, s.getId())).thenReturn(List.of(FuelDeliveryCompartment.create(T, s.getId(), inComp.getId(), bd(litres))));
+        var hoisted1 = List.of(FuelDeliveryCompartment.create(T, s.getId(), inComp.getId(), bd(litres))); when(loadSplits.findByDelivery(T, s.getId())).thenReturn(hoisted1);
         return s;
     }
 
@@ -360,14 +360,14 @@ class FuelTransportServiceTest {
     void compartmentLoadsForOneTanker() {
         UUID comp = UUID.randomUUID();
         FuelDelivery mine = mock(FuelDelivery.class), other = mock(FuelDelivery.class), cancelled = mock(FuelDelivery.class), early = mock(FuelDelivery.class);
-        for (var d : List.of(mine, other, cancelled, early)) { when(d.getId()).thenReturn(UUID.randomUUID()); when(d.getStatus()).thenReturn("SCHEDULED"); when(d.getFuelType()).thenReturn("DIESEL"); when(d.getScheduledAt()).thenReturn(Instant.parse("2026-11-18T10:00:00Z")); when(d.getTankerId()).thenReturn(tanker.getId()); }
+        for (var d : List.of(mine, other, cancelled, early)) { when(d.getId()).thenReturn(UUID.randomUUID()); when(d.getStatus()).thenReturn("SCHEDULED"); when(d.getFuelType()).thenReturn("DIESEL"); when(d.getScheduledAt()).thenReturn(Instant.parse("2026-11-18T10:00:00Z")); var hoisted2 = tanker.getId(); when(d.getTankerId()).thenReturn(hoisted2); }
         when(other.getTankerId()).thenReturn(UUID.randomUUID());
         when(cancelled.getStatus()).thenReturn("CANCELLED");
         when(early.getScheduledAt()).thenReturn(Instant.parse("2026-11-18T05:00:00Z"));
         when(tankers.findActiveById(T, tanker.getId())).thenReturn(Optional.of(tanker));
         when(deliveries.findScheduledBetween(eq(T), any(), any())).thenReturn(List.of(mine, other, cancelled, early));
-        when(loadSplits.findByDelivery(T, mine.getId())).thenReturn(List.of(FuelDeliveryCompartment.create(T, mine.getId(), comp, bd("4000"))));
-        when(loadSplits.findByDelivery(T, early.getId())).thenReturn(List.of(FuelDeliveryCompartment.create(T, early.getId(), comp, bd("1000"))));
+        var hoisted3 = List.of(FuelDeliveryCompartment.create(T, mine.getId(), comp, bd("4000"))); when(loadSplits.findByDelivery(T, mine.getId())).thenReturn(hoisted3);
+        var hoisted4 = List.of(FuelDeliveryCompartment.create(T, early.getId(), comp, bd("1000"))); when(loadSplits.findByDelivery(T, early.getId())).thenReturn(hoisted4);
         var out = service.compartmentLoads(T, tanker.getId(), java.time.LocalDate.of(2026, 11, 18));
         assertEquals(2, out.size());
         assertEquals(early.getId(), out.get(0).deliveryId());

@@ -106,8 +106,14 @@ public class FuelArrivalCheckService {
 
     /** The view of one stored check with its status as of {@code now}. */
     private ArrivalCheckView view(TenantId tenantId, FuelArrivalCheck c, List<Finding> findings, Instant now) {
+        return view(tenantId, c, findings, now, null);
+    }
+
+    /** knownReleasedAt: a release made in this very call, so the answer does not depend on the query seeing the row just saved. */
+    private ArrivalCheckView view(TenantId tenantId, FuelArrivalCheck c, List<Finding> findings, Instant now, Instant knownReleasedAt) {
         int hours = freshHours(tenantId);
-        Instant releasedAt = releases.forCheck(tenantId, c.getId(), PageRequest.of(0, 1)).stream().findFirst().map(FuelArrivalCheckRelease::getReleasedAt).orElse(null);
+        Instant releasedAt = knownReleasedAt != null ? knownReleasedAt
+                : releases.forCheck(tenantId, c.getId(), PageRequest.of(0, 1)).stream().findFirst().map(FuelArrivalCheckRelease::getReleasedAt).orElse(null);
         Status st = FuelArrivalCheckPolicy.status(c.getCheckedAt(), c.isAllowed(), releasedAt, hours, now);
         return new ArrivalCheckView(c.getDeliveryId(), c.isAllowed(), findings, c.getCheckedAt(), c.getId(), st.name(), hours,
                 FuelArrivalCheckPolicy.expiresAt(c.getCheckedAt(), releasedAt, hours), releasedAt);
@@ -184,7 +190,7 @@ public class FuelArrivalCheckService {
                 Map.of("status", Status.STALE.name(), "checkedAt", original.getCheckedAt().toString()),
                 Map.of("status", Status.RELEASED.name(), "reasonCode", req.reasonCode(), "explanation", why, "releaseId", rel.getId().toString(),
                         "deliveryId", deliveryId.toString(), "approver", approverUserId.toString(), "releasedAt", now.toString()));
-        return view(tenantId, original, fromJson(original.getFindings()), now);
+        return view(tenantId, original, fromJson(original.getFindings()), now, rel.getReleasedAt());
     }
 
     /** The latest check on one of the driver's own loads, or empty if none has been made. */

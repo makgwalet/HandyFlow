@@ -8,7 +8,7 @@ Status: implemented; backend not compiled or run in the build sandbox. Push stay
 | New stay request (existing) | staff chosen for stay requests | `FuelAlertRecipientService` | none | Stay requests | none |
 | Overdue delivery, level 1 | the assigned driver | the load | `OVERDUE:{load}:L1` | Load | OVERDUE_DELIVERY |
 | Overdue delivery, level 2 (escalation) | dispatch recipients, not the driver again | topic `DELIVERY_OVERDUE` (new topic in the same recipient service; administrators by default) | `OVERDUE:{load}:L2` | Overview | OVERDUE_DELIVERY |
-| Dip variance | the people chosen for variance alerts | topic `VARIANCE` (existing) | `DIP:{reading}` | Tank | DIP_VARIANCE |
+| Dip variance | the people chosen for dip alerts (own topic, separate from delivery variances) | topic `DIP_VARIANCE` | `DIP:{reading}` | Tank | DIP_VARIANCE |
 | Shift closed outside tolerance | the people chosen for shift review | topic `SHIFT_EXCEPTION` (existing) | `SHIFT:{shift}` | Shift | SHIFT_OUTSIDE_TOLERANCE |
 | Driver arrival check blocked | the driver, plus operations recipients | driver from the check; topic `ARRIVAL_BLOCKED` (new topic; administrators by default) | `ARRIVAL:{load}:{block codes}` | Load (driver), Overview (operations) | ARRIVAL_CHECK_BLOCKED |
 

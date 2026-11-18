@@ -72,7 +72,7 @@ class FuelDispatchIntoForecourtTankTest {
         source = tank(terminalId, "DIESEL", "4000");
         dest = tank(forecourtId, "DIESEL", "1000");
         when(crmFacade.customerExists(any(), any())).thenReturn(true);
-        when(stockService.transfer(eq(T), any())).thenReturn(new TransferResponse(transferId, source.getId(), dest.getId(), bd("1000"), "Supply run to Forecourt", Instant.now()));
+        var hoisted1 = new TransferResponse(transferId, source.getId(), dest.getId(), bd("1000"), "Supply run to Forecourt", Instant.now()); when(stockService.transfer(eq(T), any())).thenReturn(hoisted1);
         when(dispatchRepository.save(any())).thenAnswer(i -> i.getArgument(0));
     }
 

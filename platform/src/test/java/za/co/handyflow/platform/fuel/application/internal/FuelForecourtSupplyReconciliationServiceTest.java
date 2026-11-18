@@ -53,7 +53,7 @@ class FuelForecourtSupplyReconciliationServiceTest {
         tTerminal = tank(terminal); tOther = tank(other); tFc = tank(fc); tFc2 = tank(fc);
         when(depots.findAllActive(T)).thenReturn(List.of(terminal, other, fc));
         when(tanks.findAllActive(T)).thenReturn(List.of(tTerminal, tOther, tFc, tFc2));
-        FuelPump p = mock(FuelPump.class); when(p.getTankId()).thenReturn(tFc.getId());
+        FuelPump p = mock(FuelPump.class); var hoisted1 = tFc.getId(); when(p.getTankId()).thenReturn(hoisted1);
         when(pumps.findAllActive(T)).thenReturn(List.of(p));
         when(transfers.findBetween(eq(T), any(), any())).thenReturn(List.of());
         when(receipts.findReceivedBetween(eq(T), any(), any())).thenReturn(List.of());
@@ -67,25 +67,25 @@ class FuelForecourtSupplyReconciliationServiceTest {
     }
     private FuelTank tank(FuelDepot d) {
         FuelTank t = mock(FuelTank.class);
-        when(t.getId()).thenReturn(UUID.randomUUID()); when(t.getDepotId()).thenReturn(d.getId());
+        when(t.getId()).thenReturn(UUID.randomUUID()); var hoisted2 = d.getId(); when(t.getDepotId()).thenReturn(hoisted2);
         return t;
     }
     private FuelTransfer transfer(FuelTank from, FuelTank to, String litres) {
         FuelTransfer t = mock(FuelTransfer.class);
-        when(t.getFromTankId()).thenReturn(from.getId()); when(t.getToTankId()).thenReturn(to.getId()); when(t.getLitres()).thenReturn(bd(litres));
+        var hoisted3 = from.getId(); when(t.getFromTankId()).thenReturn(hoisted3); var hoisted4 = to.getId(); when(t.getToTankId()).thenReturn(hoisted4); when(t.getLitres()).thenReturn(bd(litres));
         return t;
     }
     private FuelReceipt receipt(FuelTank to, String litres) {
         FuelReceipt r = mock(FuelReceipt.class);
-        when(r.getTankId()).thenReturn(to.getId()); when(r.getLitresReceived()).thenReturn(bd(litres));
+        var hoisted5 = to.getId(); when(r.getTankId()).thenReturn(hoisted5); when(r.getLitresReceived()).thenReturn(bd(litres));
         return r;
     }
 
     @Test @DisplayName("inbound litres are split by source: supplying depot, other depot, direct supplier; moves inside the depot are ignored")
     void splitsBySource() {
-        when(transfers.findBetween(eq(T), any(), any())).thenReturn(List.of(
-                transfer(tTerminal, tFc, "6000"), transfer(tOther, tFc, "1000"), transfer(tFc2, tFc, "500"), transfer(tFc, tOther, "300")));
-        when(receipts.findReceivedBetween(eq(T), any(), any())).thenReturn(List.of(receipt(tFc, "3000"), receipt(tOther, "9999")));
+        var hoisted6 = List.of(
+                transfer(tTerminal, tFc, "6000"), transfer(tOther, tFc, "1000"), transfer(tFc2, tFc, "500"), transfer(tFc, tOther, "300")); when(transfers.findBetween(eq(T), any(), any())).thenReturn(hoisted6);
+        var hoisted7 = List.of(receipt(tFc, "3000"), receipt(tOther, "9999")); when(receipts.findReceivedBetween(eq(T), any(), any())).thenReturn(hoisted7);
         Reconciliation r = svc.report(T, 30, null);
         assertEquals(1, r.forecourts().size());
         var f = r.forecourts().get(0);
@@ -102,8 +102,8 @@ class FuelForecourtSupplyReconciliationServiceTest {
         FuelShift s = mock(FuelShift.class); when(s.getId()).thenReturn(UUID.randomUUID()); when(s.getClosedAt()).thenReturn(Instant.now().minusSeconds(60));
         when(shifts.findClosedSince(eq(T), any())).thenReturn(List.of(s));
         FuelShiftReading a = mock(FuelShiftReading.class), b = mock(FuelShiftReading.class);
-        when(a.getTankId()).thenReturn(tFc.getId()); when(a.getLitresSold()).thenReturn(bd("120"));
-        when(b.getTankId()).thenReturn(tFc.getId()); when(b.getLitresSold()).thenReturn(null);
+        var hoisted8 = tFc.getId(); when(a.getTankId()).thenReturn(hoisted8); when(a.getLitresSold()).thenReturn(bd("120"));
+        var hoisted9 = tFc.getId(); when(b.getTankId()).thenReturn(hoisted9); when(b.getLitresSold()).thenReturn(null);
         when(readings.findByShifts(eq(T), any())).thenReturn(List.of(a, b));
         var f = svc.report(T, 30, null).forecourts().get(0);
         assertEquals(0, bd("120").compareTo(f.litresSold()));
@@ -119,10 +119,10 @@ class FuelForecourtSupplyReconciliationServiceTest {
     @Test @DisplayName("with a saved split, transfers from any depot in the split count as from the supplying depots")
     void split() {
         FuelDepotSupplyShare a = mock(FuelDepotSupplyShare.class), b = mock(FuelDepotSupplyShare.class);
-        when(a.getDepotId()).thenReturn(fc.getId()); when(a.getSupplyingDepotId()).thenReturn(terminal.getId()); when(a.getPercentage()).thenReturn(bd("70"));
-        when(b.getDepotId()).thenReturn(fc.getId()); when(b.getSupplyingDepotId()).thenReturn(other.getId()); when(b.getPercentage()).thenReturn(bd("30"));
+        var hoisted10 = fc.getId(); when(a.getDepotId()).thenReturn(hoisted10); var hoisted11 = terminal.getId(); when(a.getSupplyingDepotId()).thenReturn(hoisted11); when(a.getPercentage()).thenReturn(bd("70"));
+        var hoisted12 = fc.getId(); when(b.getDepotId()).thenReturn(hoisted12); var hoisted13 = other.getId(); when(b.getSupplyingDepotId()).thenReturn(hoisted13); when(b.getPercentage()).thenReturn(bd("30"));
         when(shareRepo.findAllForTenant(T)).thenReturn(List.of(a, b));
-        when(transfers.findBetween(eq(T), any(), any())).thenReturn(List.of(transfer(tTerminal, tFc, "700"), transfer(tOther, tFc, "300")));
+        var hoisted14 = List.of(transfer(tTerminal, tFc, "700"), transfer(tOther, tFc, "300")); when(transfers.findBetween(eq(T), any(), any())).thenReturn(hoisted14);
         var f = svc.report(T, 30, null).forecourts().get(0);
         assertEquals(0, bd("1000").compareTo(f.fromSupplierDepot()));
         assertEquals(0, BigDecimal.ZERO.compareTo(f.fromOtherDepots()));

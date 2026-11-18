@@ -82,7 +82,7 @@ class FuelGaugeImportServiceTest {
 
     @Test @DisplayName("a label mapped for the source finds the tank")
     void aliasFindsTank() {
-        when(aliases.findBySource(T, "acme-gauge")).thenReturn(List.of(FuelImportTankAlias.of(T, "acme-gauge", "T-9", tank.getId(), USER)));
+        var hoisted1 = List.of(FuelImportTankAlias.of(T, "acme-gauge", "T-9", tank.getId(), USER)); when(aliases.findBySource(T, "acme-gauge")).thenReturn(hoisted1);
         assertTrue(svc.ingest("hf_fuel_k", gauge("G3", "t-9", "100")).problems().isEmpty());
     }
 
@@ -99,7 +99,7 @@ class FuelGaugeImportServiceTest {
         var in = gauge("G5", "Diesel 1", "8200");
         svc.ingest("hf_fuel_k", in);
         verify(readings).save(cap.capture());
-        when(readings.findByRef(T, "ACME-GAUGE", "G5")).thenReturn(Optional.of(cap.getValue()));
+        var hoisted2 = Optional.of(cap.getValue()); when(readings.findByRef(T, "ACME-GAUGE", "G5")).thenReturn(hoisted2);
         assertTrue(svc.ingest("hf_fuel_k", in).duplicate());
         HandyFlowException e = assertThrows(HandyFlowException.class, () -> svc.ingest("hf_fuel_k", new IncomingGauge("ACME-GAUGE", "G5", "Diesel 1", d("9000"), in.readAt(), "Probe 7")));
         assertEquals(409, e.getStatus().value());
@@ -110,7 +110,8 @@ class FuelGaugeImportServiceTest {
         FuelGaugeReading g = FuelGaugeReading.receive(T, key.getId(), "acme-gauge", "G6", "Diesel 1", d("8200"), Instant.parse("2026-11-17T08:00:00Z"), "Probe 7", "h", null);
         when(readings.findOwned(T, g.getId())).thenReturn(Optional.of(g));
         DipReadingResponse dip = mock(DipReadingResponse.class); UUID dipId = UUID.randomUUID(); when(dip.id()).thenReturn(dipId);
-        when(fuel.recordDipReading(eq(T), eq(tank.getId()), any(DipReadingRequest.class))).thenReturn(dip);
+        UUID tankIdForDip = tank.getId();
+        when(fuel.recordDipReading(eq(T), eq(tankIdForDip), any(DipReadingRequest.class))).thenReturn(dip);
         GaugeView v = svc.accept(T, g.getId(), new AcceptRequest("checked on site"), USER);
         assertEquals("ACCEPTED", v.status());
         assertEquals(dipId, v.dipReadingId());
@@ -144,7 +145,7 @@ class FuelGaugeImportServiceTest {
         var v = svc.addAlias(T, USER, new AliasRequest(" ACME-GAUGE ", " T-9 ", tank.getId()));
         assertEquals("acme-gauge", v.source()); assertEquals("t-9", v.alias()); assertEquals("Diesel 1", v.tankName());
         assertThrows(ResourceNotFoundException.class, () -> svc.addAlias(T, USER, new AliasRequest("acme-gauge", "x", UUID.randomUUID())));
-        when(aliases.findOne(T, "acme-gauge", "t-9")).thenReturn(Optional.of(mock(FuelImportTankAlias.class)));
+        var hoisted3 = Optional.of(mock(FuelImportTankAlias.class)); when(aliases.findOne(T, "acme-gauge", "t-9")).thenReturn(hoisted3);
         assertThrows(IllegalStateException.class, () -> svc.addAlias(T, USER, new AliasRequest("acme-gauge", "T-9", tank.getId())));
         when(aliases.findOwned(eq(T), any())).thenReturn(Optional.empty());
         assertThrows(ResourceNotFoundException.class, () -> svc.removeAlias(T, UUID.randomUUID()));

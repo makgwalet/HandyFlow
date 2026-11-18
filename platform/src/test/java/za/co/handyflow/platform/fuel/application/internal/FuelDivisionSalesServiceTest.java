@@ -71,9 +71,9 @@ class FuelDivisionSalesServiceTest {
 
     @Test @DisplayName("loads count by invoiced amount, reversed loads do not, and the earlier period is kept for comparison")
     void distribution() {
-        when(deliveries.findDeliveredBetween(any(), any(), any())).thenReturn(List.of(
+        var hoisted1 = List.of(
                 load(tankA, "1000", "21000.00", recent, false), load(tankA, "500", null, recent, false),
-                load(tankA, "900", "9000", recent, true), load(tankA, "300", "6300", earlier, false)));
+                load(tankA, "900", "9000", recent, true), load(tankA, "300", "6300", earlier, false)); when(deliveries.findDeliveredBetween(any(), any(), any())).thenReturn(hoisted1);
         Row r = row(service.report(T, USER, 30, true, null), FuelDivision.DISTRIBUTION);
         assertEquals(2, r.count());
         assertEquals(0, bd("1500").compareTo(r.litres()));
@@ -85,8 +85,8 @@ class FuelDivisionSalesServiceTest {
 
     @Test @DisplayName("only the tanks the person may see are counted")
     void tankScope() {
-        when(deliveries.findDeliveredBetween(any(), any(), any())).thenReturn(List.of(
-                load(tankA, "1000", "21000", recent, false), load(tankB, "1000", "25000", recent, false)));
+        var hoisted2 = List.of(
+                load(tankA, "1000", "21000", recent, false), load(tankB, "1000", "25000", recent, false)); when(deliveries.findDeliveredBetween(any(), any(), any())).thenReturn(hoisted2);
         Row r = row(service.report(T, USER, 30, true, Set.of(tankA)), FuelDivision.DISTRIBUTION);
         assertEquals(1, r.count());
         assertEquals(0, bd("21000").compareTo(r.revenue()));
@@ -94,7 +94,7 @@ class FuelDivisionSalesServiceTest {
 
     @Test @DisplayName("money is hidden without the margin permission, litres and counts stay")
     void noMoney() {
-        when(deliveries.findDeliveredBetween(any(), any(), any())).thenReturn(List.of(load(tankA, "1000", "21000", recent, false)));
+        var hoisted3 = List.of(load(tankA, "1000", "21000", recent, false)); when(deliveries.findDeliveredBetween(any(), any(), any())).thenReturn(hoisted3);
         Report rep = service.report(T, USER, 30, false, null);
         Row r = row(rep, FuelDivision.DISTRIBUTION);
         assertFalse(rep.moneyShown());
@@ -146,14 +146,14 @@ class FuelDivisionSalesServiceTest {
     @Test @DisplayName("divisions the company does not run, or the person is not scoped to, do not appear")
     void divisionsFiltered() {
         when(divisions.activeDivisions(T)).thenReturn(EnumSet.of(FuelDivision.DISTRIBUTION, FuelDivision.TRUCK_STOP));
-        when(scopes.scopeOf(T, USER)).thenReturn(new FuelScopeService.Scope(Set.of(FuelDivision.TRUCK_STOP), Set.of()));
+        var hoisted4 = new FuelScopeService.Scope(Set.of(FuelDivision.TRUCK_STOP), Set.of()); when(scopes.scopeOf(T, USER)).thenReturn(hoisted4);
         Report rep = service.report(T, USER, 30, true, null);
         assertEquals(List.of("TRUCK_STOP"), rep.divisions().stream().map(Row::division).toList());
     }
 
     @Test @DisplayName("the total adds the divisions and the period length is limited")
     void totalAndSpan() {
-        when(deliveries.findDeliveredBetween(any(), any(), any())).thenReturn(List.of(load(tankA, "1000", "21000", recent, false)));
+        var hoisted5 = List.of(load(tankA, "1000", "21000", recent, false)); when(deliveries.findDeliveredBetween(any(), any(), any())).thenReturn(hoisted5);
         FuelTruckStopStay s = mock(FuelTruckStopStay.class);
         when(s.getCheckedOutAt()).thenReturn(recent); when(s.amount()).thenReturn(bd("450"));
         when(stays.findCheckedOutBetween(any(), any(), any())).thenReturn(List.of(s));

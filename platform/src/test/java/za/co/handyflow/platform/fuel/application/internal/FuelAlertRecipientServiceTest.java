@@ -174,6 +174,7 @@ class FuelAlertRecipientServiceTest {
         var topics = service.list(T);
         assertTrue(topics.stream().filter(t -> t.topic().equals("VARIANCE")).findFirst().orElseThrow().adminsByDefault());
         assertFalse(topics.stream().filter(t -> t.topic().equals("SHIFT_ACCEPTED")).findFirst().orElseThrow().adminsByDefault());
-        assertEquals(4, topics.size());
+        assertEquals(7, topics.size());
+        assertTrue(topics.stream().filter(t -> t.topic().equals("DIP_VARIANCE")).findFirst().orElseThrow().adminsByDefault());
     }
 }

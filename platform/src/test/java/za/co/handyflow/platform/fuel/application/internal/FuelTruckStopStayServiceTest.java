@@ -349,6 +349,7 @@ class FuelTruckStopStayServiceTest {
 
     @Test @DisplayName("a stay is linked to the Fleet vehicle the lookup finds, and takes Fleet's registration")
     void linksToFleetVehicle() {
+        rate("150", null);
         UUID vehicle = UUID.randomUUID();
         when(fleetLinks.resolve(eq(T), isNull(), eq("GP 5"))).thenReturn(java.util.Optional.of(new FuelTruckStopFleetLinks.Link(vehicle, "GP5 X")));
         var v = service.book(T, req("gp 5", 0, 1), BY, TODAY);
@@ -358,6 +359,7 @@ class FuelTruckStopStayServiceTest {
 
     @Test @DisplayName("a stay with no Fleet match is simply not linked")
     void noFleetMatch() {
+        rate("150", null);
         assertNull(service.book(T, req("ZZ 9", 0, 1), BY, TODAY).fleetVehicleId());
     }
 }

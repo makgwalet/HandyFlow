@@ -34,8 +34,11 @@ class FuelRouteOptimiserTest {
         Result r = FuelRouteOptimiser.optimise(List.of(at(a, "28.0"), at(b, "28.4"), at(c, "28.1"), at(d, "28.3")), bd("-26.0"), bd("28.0"));
         assertEquals(FuelRouteOptimiser.STRAIGHT_LINE, r.method());
         assertTrue(r.changed());
-        // on a closed loop from the start point a sweep either way is equally short, so accept both directions
-        assertTrue(r.order().equals(ids(a, c, d, b)) || r.order().equals(ids(b, d, c, a)), "expected a sweep along the line but got " + r.order());
+        // On a closed loop from the start point every tour that goes out along the line and comes back is equally short (a,c,d,b; a,c,b,d; b,d,c,a ...),
+        // so the order is not pinned to one of them: what matters is that every stop is still there once and the length is the shortest possible.
+        assertEquals(4, r.order().size());
+        assertTrue(new java.util.HashSet<>(r.order()).containsAll(ids(a, b, c, d)), "every stop kept once, got " + r.order());
+        assertNotEquals(ids(a, b, c, d), r.order(), "the zig-zag must not be kept");
         assertTrue(r.suggestedKm().compareTo(r.currentKm()) < 0);
         assertEquals(0, bd("80.0").compareTo(r.suggestedKm()));
     }

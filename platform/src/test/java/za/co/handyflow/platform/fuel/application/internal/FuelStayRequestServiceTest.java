@@ -181,7 +181,12 @@ class FuelStayRequestServiceTest {
     void cancel() {
         svc.request(USER, ACCOUNT, body("GP 55 TS GP"));
         UUID id = store.get(0).getId();
-        assertThrows(IllegalStateException.class, () -> svc.cancel(UUID.randomUUID(), ACCOUNT, id));
+        // a second person with access to the same account: they have a grant, but did not make this request
+        UUID colleague = UUID.randomUUID();
+        FuelPortalAccessGrant colleagueGrant = FuelPortalAccessGrant.createInvite(TENANT, ACCOUNT, "c@fleet.co.za", null);
+        colleagueGrant.acceptInvite(colleague);
+        when(portal.requireGrant(colleague, ACCOUNT)).thenReturn(colleagueGrant);
+        assertThrows(IllegalStateException.class, () -> svc.cancel(colleague, ACCOUNT, id));
         assertEquals("CANCELLED", svc.cancel(USER, ACCOUNT, id).status());
         assertThrows(IllegalStateException.class, () -> svc.cancel(USER, ACCOUNT, id));
     }

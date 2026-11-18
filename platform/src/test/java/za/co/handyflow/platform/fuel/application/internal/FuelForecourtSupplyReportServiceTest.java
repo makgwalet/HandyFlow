@@ -175,13 +175,13 @@ class FuelForecourtSupplyReportServiceTest {
         FuelTank t = tank(fc);
         FuelShift s = shift(UUID.randomUUID());
         FuelDepotSupplyShare s1 = mock(FuelDepotSupplyShare.class), s2 = mock(FuelDepotSupplyShare.class);
-        when(s1.getDepotId()).thenReturn(fc.getId()); when(s1.getSupplyingDepotId()).thenReturn(a.getId()); when(s1.getPercentage()).thenReturn(bd("70"));
-        when(s2.getDepotId()).thenReturn(fc.getId()); when(s2.getSupplyingDepotId()).thenReturn(b.getId()); when(s2.getPercentage()).thenReturn(bd("30"));
+        var hoisted1 = fc.getId(); when(s1.getDepotId()).thenReturn(hoisted1); var hoisted2 = a.getId(); when(s1.getSupplyingDepotId()).thenReturn(hoisted2); when(s1.getPercentage()).thenReturn(bd("70"));
+        var hoisted3 = fc.getId(); when(s2.getDepotId()).thenReturn(hoisted3); var hoisted4 = b.getId(); when(s2.getSupplyingDepotId()).thenReturn(hoisted4); when(s2.getPercentage()).thenReturn(bd("30"));
         when(shareRepo.findAllForTenant(T)).thenReturn(List.of(s1, s2));
         when(depots.findAllActive(T)).thenReturn(List.of(a, b, fc));
         when(tanks.findAllActive(T)).thenReturn(List.of(t));
         when(shifts.findClosedSince(eq(T), any())).thenReturn(List.of(s));
-        when(readings.findByShifts(eq(T), any())).thenReturn(List.of(reading(s.getId(), t, "100.01", "2300.01")));
+        var hoisted5 = List.of(reading(s.getId(), t, "100.01", "2300.01")); when(readings.findByShifts(eq(T), any())).thenReturn(hoisted5);
         Report r = svc.report(T, 30, true);
         assertEquals(2, r.suppliers().size());
         assertEquals(0, bd("100.01").compareTo(r.totalLitres()));
@@ -228,7 +228,7 @@ class FuelForecourtSupplyReportServiceTest {
         FuelShift s = providerShift(id, now.minusSeconds(60), now.minusSeconds(86400L * 45));
         when(depots.findAllActive(T)).thenReturn(List.of(fc)); when(tanks.findAllActive(T)).thenReturn(List.of(t));
         when(shifts.findClosedSince(eq(T), any())).thenReturn(List.of(s));
-        when(readings.findByShifts(eq(T), any())).thenReturn(List.of(reading(id, t, "40", "920")));
+        var hoisted6 = List.of(reading(id, t, "40", "920")); when(readings.findByShifts(eq(T), any())).thenReturn(hoisted6);
         Report r = svc.report(T, 30, true);
         assertEquals(0, bd("40").compareTo(r.totalLitres()));
         assertEquals("SYSTEM", r.shiftBasis().basis());
@@ -244,7 +244,7 @@ class FuelForecourtSupplyReportServiceTest {
         FuelShift imported = providerShift(importedId, now.minusSeconds(3600), null), manual = providerShift(manualId, now.minusSeconds(3600), null);
         when(depots.findAllActive(T)).thenReturn(List.of(fc)); when(tanks.findAllActive(T)).thenReturn(List.of(t));
         when(shifts.findClosedSince(eq(T), any())).thenReturn(List.of(imported, manual));
-        when(readings.findByShifts(eq(T), any())).thenReturn(List.of(reading(importedId, t, "10", "230")));
+        var hoisted7 = List.of(reading(importedId, t, "10", "230")); when(readings.findByShifts(eq(T), any())).thenReturn(hoisted7);
         when(importsRepo.findShiftIdsAmong(eq(T), any())).thenReturn(List.of(importedId));
         Report r = svc.report(T, 30, true);
         assertEquals(1, r.shiftBasis().systemTimeFallbacks());

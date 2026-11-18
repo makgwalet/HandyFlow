@@ -60,14 +60,14 @@ class FuelDispatchMatchServiceTest {
     private FuelTank tank(FuelDepot d, String name, String fuel) {
         FuelTank t = mock(FuelTank.class);
         UUID id = UUID.randomUUID();
-        when(t.getId()).thenReturn(id); when(t.getDepotId()).thenReturn(d.getId()); when(t.getName()).thenReturn(name); when(t.getFuelType()).thenReturn(fuel);
+        when(t.getId()).thenReturn(id); var hoisted1 = d.getId(); when(t.getDepotId()).thenReturn(hoisted1); when(t.getName()).thenReturn(name); when(t.getFuelType()).thenReturn(fuel);
         when(tanks.findActiveById(T, id)).thenReturn(Optional.of(t));
         return t;
     }
     private FuelDispatch dispatch(String litres, UUID dest) {
         FuelDispatch d = mock(FuelDispatch.class);
         UUID id = UUID.randomUUID();
-        when(d.getId()).thenReturn(id); when(d.getTankId()).thenReturn(tTerminal.getId()); when(d.getLitresDispensed()).thenReturn(bd(litres));
+        when(d.getId()).thenReturn(id); var hoisted2 = tTerminal.getId(); when(d.getTankId()).thenReturn(hoisted2); when(d.getLitresDispensed()).thenReturn(bd(litres));
         when(d.getDestinationDepotId()).thenReturn(dest); when(d.getDispatchedAt()).thenReturn(Instant.now().minusSeconds(7200)); when(d.isReversed()).thenReturn(false);
         when(dispatches.findActiveById(T, id)).thenReturn(Optional.of(d));
         return d;
@@ -75,14 +75,14 @@ class FuelDispatchMatchServiceTest {
     private FuelReceipt receipt(FuelTank t, String litres) {
         FuelReceipt r = mock(FuelReceipt.class);
         UUID id = UUID.randomUUID();
-        when(r.getId()).thenReturn(id); when(r.getTankId()).thenReturn(t.getId()); when(r.getLitresReceived()).thenReturn(bd(litres));
+        when(r.getId()).thenReturn(id); var hoisted3 = t.getId(); when(r.getTankId()).thenReturn(hoisted3); when(r.getLitresReceived()).thenReturn(bd(litres));
         when(r.getReceivedAt()).thenReturn(Instant.now().minusSeconds(3600)); when(r.getReversedAt()).thenReturn(null);
         when(receipts.findActiveById(T, id)).thenReturn(Optional.of(r));
         return r;
     }
     private FuelDispatchReceiptMatch link(FuelDispatch d, FuelReceipt r) {
         FuelDispatchReceiptMatch m = mock(FuelDispatchReceiptMatch.class);
-        when(m.getId()).thenReturn(UUID.randomUUID()); when(m.getDispatchId()).thenReturn(d.getId()); when(m.getReceiptId()).thenReturn(r.getId());
+        when(m.getId()).thenReturn(UUID.randomUUID()); var hoisted4 = d.getId(); when(m.getDispatchId()).thenReturn(hoisted4); var hoisted5 = r.getId(); when(m.getReceiptId()).thenReturn(hoisted5);
         return m;
     }
 
@@ -92,7 +92,7 @@ class FuelDispatchMatchServiceTest {
         FuelReceipt got = receipt(tFc, "9900"), stray = receipt(tFc, "300");
         when(dispatches.findToDepotsBetween(eq(T), any(), any(), any())).thenReturn(List.of(linked, open));
         when(receipts.findReceivedBetween(eq(T), any(), any())).thenReturn(List.of(got, stray));
-        when(matches.findForAny(eq(T), any(), any())).thenReturn(List.of(link(linked, got)));
+        var hoisted6 = List.of(link(linked, got)); when(matches.findForAny(eq(T), any(), any())).thenReturn(hoisted6);
         MatchingReport r = svc.report(T, 30, null);
         assertEquals(1, r.forecourts().size());
         var f = r.forecourts().get(0);
@@ -129,7 +129,7 @@ class FuelDispatchMatchServiceTest {
         FuelTank petrol = tank(fc, "FC petrol", "PETROL");
         assertThrows(IllegalArgumentException.class, () -> svc.match(T, d.getId(), receipt(petrol, "10").getId(), null, null));
         FuelReceipt linked = receipt(tFc, "10");
-        when(matches.findByReceipt(T, linked.getId())).thenReturn(Optional.of(mock(FuelDispatchReceiptMatch.class)));
+        var hoisted7 = Optional.of(mock(FuelDispatchReceiptMatch.class)); when(matches.findByReceipt(T, linked.getId())).thenReturn(hoisted7);
         assertThrows(IllegalStateException.class, () -> svc.match(T, d.getId(), linked.getId(), null, null));
         FuelReceipt rev = receipt(tFc, "10"); when(rev.getReversedAt()).thenReturn(Instant.now());
         assertThrows(IllegalStateException.class, () -> svc.match(T, d.getId(), rev.getId(), null, null));

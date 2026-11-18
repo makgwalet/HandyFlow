@@ -274,18 +274,19 @@ class FuelServiceStage0Test {
         return za.co.handyflow.platform.notifications.application.Recipient.user(id, "Mgr", "m@x.co", null);
     }
 
-    @Test @DisplayName("push: a dip below the book level pushes once to the people chosen for variance alerts, pointing at the tank")
+    @Test @DisplayName("push: a dip below the book level pushes once to the people chosen for dip alerts (not delivery-variance recipients), pointing at the tank")
     @SuppressWarnings("unchecked")
     void dipShortfallPushes() {
         UUID tankId = UUID.randomUUID(), m1 = UUID.randomUUID(), m2 = UUID.randomUUID();
-        when(alertRecipients.recipientsFor(TENANT, "VARIANCE")).thenReturn(List.of(manager(m1), manager(m2)));
+        when(alertRecipients.recipientsFor(TENANT, "DIP_VARIANCE")).thenReturn(List.of(manager(m1), manager(m2)));
+        when(alertRecipients.recipientsFor(TENANT, "VARIANCE")).thenReturn(List.of(manager(UUID.randomUUID()))); // dispatch's topic: not told about dips
         service.recordDipReading(TENANT, tankId, new DipReadingRequest(bd("4900"), Instant.now(), "Sipho", null, null));
         ArgumentCaptor<java.util.Collection<UUID>> to = ArgumentCaptor.forClass(java.util.Collection.class);
         ArgumentCaptor<String> key = ArgumentCaptor.forClass(String.class);
         ArgumentCaptor<java.util.Map<String, String>> data = ArgumentCaptor.forClass(java.util.Map.class);
         verify(pushEvents, times(1)).publish(eq(TENANT), eq("DIP_VARIANCE"), key.capture(), to.capture(), anyString(), anyString(), data.capture());
         assertTrue(key.getValue().startsWith("DIP:"));
-        assertTrue(to.getValue().containsAll(List.of(m1, m2)));
+        assertEquals(java.util.Set.of(m1, m2), new java.util.HashSet<>(to.getValue()), "only the dip topic's people");
         assertEquals("TankDetail", data.getValue().get("screen"));
         assertFalse(data.getValue().values().stream().anyMatch(v -> v.contains("4900")), "the push carries no litres");
     }

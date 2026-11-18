@@ -13,7 +13,7 @@ import za.co.handyflow.platform.shared.ApiResponse;
 
 /**
  * Phase 8e (D03): the sender-facing import endpoint. It is called by a pump or POS system, not by a logged-in user, so it has no
- * {@code @PreAuthorize} and does not use TenantContext: the company comes from the API key in the {@code X-Fuel-Import-Key} header
+ * a method-security annotation and does not use the request's tenant context: the company comes from the API key in the {@code X-Fuel-Import-Key} header
  * (created under {@code POST /api/v1/fuel/forecourt/imports/keys}). An unknown, missing or revoked key gets 401.
  * This exact path is permitted in SecurityConfig and rate limited in RateLimitFilter. It only stages a shift for review.
  */

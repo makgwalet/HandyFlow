@@ -13,7 +13,7 @@ import za.co.handyflow.platform.shared.ApiResponse;
 
 /**
  * The sender-facing tank-gauge endpoint. It is called by a gauge or tank-monitoring system, not by a logged-in user, so it has no
- * {@code @PreAuthorize} and does not use TenantContext: the company comes from the API key in the {@code X-Fuel-Import-Key} header. An unknown,
+ * a method-security annotation and does not use the request's tenant context: the company comes from the API key in the {@code X-Fuel-Import-Key} header. An unknown,
  * missing or revoked key gets 401. This exact path is permitted in SecurityConfig and rate limited in RateLimitFilter. It only stages a reading for review.
  */
 @RestController

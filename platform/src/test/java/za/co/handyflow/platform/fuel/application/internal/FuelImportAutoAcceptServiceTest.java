@@ -168,7 +168,7 @@ class FuelImportAutoAcceptServiceTest {
         pendingGauge(); setting(false, true, "500");
         when(gauges.differenceFromBook(T, id)).thenReturn(new BigDecimal("300"));
         when(gauges.fuelTypeOf(T, id)).thenReturn("PETROL");
-        when(tolerances.gaugeLimitFor(T, "PETROL", new BigDecimal("500.00"))).thenReturn(new BigDecimal("200"));
+        when(tolerances.gaugeLimitFor(eq(T), eq("PETROL"), argThat(b -> b != null && b.compareTo(new BigDecimal("500")) == 0))).thenReturn(new BigDecimal("200")); // by value: the stored 500 may carry any scale
         assertEquals("PENDING", service.afterGauge(pending).status());
     }
 }

@@ -77,9 +77,9 @@ class FuelDepotLimitFilteringTest {
     void listsUseTheLimit() {
         var pageable = PageRequest.of(0, 50);
         Set<UUID> ids = Set.of(mine.getId());
-        when(movements.findByTanks(T, ids, pageable)).thenReturn(new PageImpl<>(List.of()));
-        when(transfers.findInvolving(T, ids, pageable)).thenReturn(new PageImpl<>(List.of()));
-        when(reservations.findForTanks(T, ids, pageable)).thenReturn(new PageImpl<>(List.of()));
+        var hoisted1 = new PageImpl<>(List.of()); when(movements.findByTanks(T, ids, pageable)).thenReturn(hoisted1);
+        var hoisted2 = new PageImpl<>(List.of()); when(transfers.findInvolving(T, ids, pageable)).thenReturn(hoisted2);
+        var hoisted3 = new PageImpl<>(List.of()); when(reservations.findForTanks(T, ids, pageable)).thenReturn(hoisted3);
         stock.getLedger(T, null, ids, pageable); stock.getTransfers(T, ids, pageable); stock.getReservations(T, ids, pageable);
         verify(movements).findByTanks(T, ids, pageable); verify(transfers).findInvolving(T, ids, pageable); verify(reservations).findForTanks(T, ids, pageable);
         verify(movements, never()).findAllForTenant(any(), any()); verify(transfers, never()).findAllForTenant(any(), any()); verify(reservations, never()).findAllForTenant(any(), any());
@@ -92,9 +92,9 @@ class FuelDepotLimitFilteringTest {
     @Test @DisplayName("with no limit the lists are the whole company's, as before")
     void noLimit() {
         var pageable = PageRequest.of(0, 50);
-        when(movements.findAllForTenant(T, pageable)).thenReturn(new PageImpl<>(List.of()));
-        when(transfers.findAllForTenant(T, pageable)).thenReturn(new PageImpl<>(List.of()));
-        when(reservations.findAllForTenant(T, pageable)).thenReturn(new PageImpl<>(List.of()));
+        var hoisted4 = new PageImpl<>(List.of()); when(movements.findAllForTenant(T, pageable)).thenReturn(hoisted4);
+        var hoisted5 = new PageImpl<>(List.of()); when(transfers.findAllForTenant(T, pageable)).thenReturn(hoisted5);
+        var hoisted6 = new PageImpl<>(List.of()); when(reservations.findAllForTenant(T, pageable)).thenReturn(hoisted6);
         stock.getLedger(T, null, pageable); stock.getTransfers(T, pageable); stock.getReservations(T, pageable);
         verify(movements).findAllForTenant(T, pageable); verify(transfers).findAllForTenant(T, pageable); verify(reservations).findAllForTenant(T, pageable);
     }
@@ -108,7 +108,7 @@ class FuelDepotLimitFilteringTest {
         when(depots.findAllActive(T)).thenReturn(List.of(terminal, fcMine, fcOther));
         FuelShift s = shift(UUID.randomUUID());
         when(shifts.findClosedSince(eq(T), any())).thenReturn(List.of(s));
-        when(readings.findByShifts(eq(T), any())).thenReturn(List.of(reading(s.getId(), mine, "100", "2300"), reading(s.getId(), theirs, "40", "920"), reading(s.getId(), loose, "7", "161")));
+        var hoisted7 = List.of(reading(s.getId(), mine, "100", "2300"), reading(s.getId(), theirs, "40", "920"), reading(s.getId(), loose, "7", "161")); when(readings.findByShifts(eq(T), any())).thenReturn(hoisted7);
 
         var all = svc.report(T, 30, true);
         assertEquals(0, bd("147").compareTo(all.totalLitres()));
@@ -133,7 +133,7 @@ class FuelDepotLimitFilteringTest {
     }
     private FuelShiftReading reading(UUID shiftId, FuelTank t, String litres, String sales) {
         FuelShiftReading r = mock(FuelShiftReading.class);
-        when(r.getShiftId()).thenReturn(shiftId); when(r.getTankId()).thenReturn(t.getId()); when(r.getFuelType()).thenReturn("DIESEL");
+        when(r.getShiftId()).thenReturn(shiftId); var hoisted8 = t.getId(); when(r.getTankId()).thenReturn(hoisted8); when(r.getFuelType()).thenReturn("DIESEL");
         when(r.getLitresSold()).thenReturn(bd(litres)); when(r.getSalesValue()).thenReturn(bd(sales));
         return r;
     }
@@ -167,7 +167,7 @@ class FuelDepotLimitFilteringTest {
         forecourt = forecourt();
         FuelShift mixed = shift(UUID.randomUUID());
         when(shifts.findByTenantAndId(T, mixed.getId())).thenReturn(Optional.of(mixed));
-        when(readings.findByShift(T, mixed.getId())).thenReturn(List.of(reading(mixed.getId(), mine, "5", "115"), reading(mixed.getId(), theirs, "5", "115")));
+        var hoisted9 = List.of(reading(mixed.getId(), mine, "5", "115"), reading(mixed.getId(), theirs, "5", "115")); when(readings.findByShift(T, mixed.getId())).thenReturn(hoisted9);
         assertEquals(mixed.getId(), forecourt.getShift(T, mixed.getId()).id());
         HandyFlowException e = assertThrows(HandyFlowException.class, () -> forecourt.getShift(T, mixed.getId(), Set.of(mine.getId())));
         assertEquals("FUEL_SCOPE_DEPOT", e.getErrorCode());
