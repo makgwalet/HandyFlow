@@ -44,6 +44,10 @@ public class OtpVerification {
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 
+    /** Wrong codes entered against this OTP. At 5 the OTP is destroyed and a new one must be requested. */
+    @Column(name = "failed_attempts", nullable = false)
+    private int failedAttempts;
+
     public static OtpVerification create(UUID partyId, String otpHash, Instant expiresAt) {
         OtpVerification v = new OtpVerification();
         v.partyId = partyId;

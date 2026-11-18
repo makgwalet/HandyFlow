@@ -47,6 +47,11 @@ import java.util.concurrent.ConcurrentHashMap;
 public class OtpService {
 
     private final OtpVerificationRepository otpVerificationRepo;
+    private final OtpAttemptTracker attemptTracker;
+
+    /** The raw code is only kept in memory when the dev endpoint is switched on. */
+    @org.springframework.beans.factory.annotation.Value("${handyflow.dev.otp-endpoint.enabled:false}")
+    private boolean devEndpointEnabled;
 
     private final SecureRandom random = new SecureRandom();
 
@@ -83,7 +88,7 @@ public class OtpService {
         otpVerificationRepo.save(OtpVerification.create(
                 partyUuid, hash, Instant.ofEpochMilli(exp)));
 
-        rawStore.put(partyId, new RawEntry(otp, exp));   // dev only
+        if (devEndpointEnabled) rawStore.put(partyId, new RawEntry(otp, exp));   // dev only
 
         log.info("OTP generated for partyId={} — expires in 10 min", partyId);
         return otp;
@@ -115,6 +120,9 @@ public class OtpService {
             deleteIfExists(partyUuid);
             rawStore.remove(partyId);
             log.info("OTP verified for partyId={}", partyId);
+        } else {
+            attemptTracker.recordFailure(partyUuid);
+            log.warn("OTP verify: wrong code for partyId={}", partyId);
         }
         return valid;
     }

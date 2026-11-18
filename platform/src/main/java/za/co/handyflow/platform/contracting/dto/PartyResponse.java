@@ -14,5 +14,8 @@ public record PartyResponse(
         int signingOrder,
         String signingStatus,
         Instant signedAt,
-        Instant otpSentAt
+        Instant otpSentAt,
+        Instant linkIssuedAt,       // when the current or latest signing link was issued
+        String linkDeliveryStatus,  // QUEUED, FAILED or NO_CHANNEL (email is asynchronous, so QUEUED is not "delivered")
+        UUID linkIssuedBy           // staff user who issued or reissued it; null if the system did
 ) {}

@@ -33,9 +33,23 @@ public class ContractSigningToken {
     @Column(name = "party_id", nullable = false)
     private UUID partyId;
 
-    /** Raw base64url token — stored in signing URL, indexed for fast lookup. */
-    @Column(name = "token", nullable = false, unique = true, length = 512)
+    /**
+     * Legacy column. The raw token is no longer stored (V771 blanked it): only {@link #tokenHash} is kept, so a database
+     * leak cannot yield working signing links. Always null for new rows.
+     */
+    @Column(name = "token", length = 512)
     private String token;
+
+    /** Who issued or reissued the link; null when the system did (for example the next signer's turn notice). */
+    @Column(name = "issued_by")
+    private UUID issuedBy;
+
+    /** QUEUED (email queued or SMS sent), FAILED (only SMS was possible and it failed) or NO_CHANNEL. Email is sent asynchronously, so QUEUED is not "delivered". */
+    @Column(name = "delivery_status", length = 20)
+    private String deliveryStatus;
+
+    @Column(name = "delivery_attempted_at")
+    private Instant deliveryAttemptedAt;
 
     /**
      * SHA-256 hex of the raw token.
@@ -60,16 +74,22 @@ public class ContractSigningToken {
     /** Factory — always call this rather than constructor directly. */
     public static ContractSigningToken create(UUID tenantId, UUID contractId,
                                               UUID partyId, String token,
-                                              Instant expiresAt) {
+                                              Instant expiresAt, UUID issuedBy) {
         ContractSigningToken t = new ContractSigningToken();
         t.tenantId   = tenantId;
         t.contractId = contractId;
         t.partyId    = partyId;
-        t.token      = token;
-        t.tokenHash  = sha256hex(token);   // ← populate the NOT NULL column
+        t.token      = null;               // the raw token is never stored
+        t.tokenHash  = sha256hex(token);
+        t.issuedBy   = issuedBy;
         t.expiresAt  = expiresAt;
         t.createdAt  = Instant.now();
         return t;
+    }
+
+    public void recordDelivery(String status) {
+        this.deliveryStatus = status;
+        this.deliveryAttemptedAt = Instant.now();
     }
 
     public boolean isValid() {

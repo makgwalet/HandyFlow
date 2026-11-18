@@ -29,7 +29,7 @@ public class ContractingController {
     // ── Templates ─────────────────────────────────────────────────────────────
 
     @PutMapping("/templates/{id}")
-    @PreAuthorize("hasAnyAuthority('USER_UPDATE','CONTRACTS_MANAGE')")
+    @PreAuthorize("hasAnyAuthority('CONTRACTS_TEMPLATES','CONTRACTS_MANAGE','USER_UPDATE')")
     @Operation(summary = "Edit a custom template. Raises its version; existing contracts keep their text")
     public ResponseEntity<ApiResponse<TemplateResponse>> updateTemplate(
             @PathVariable UUID id, @Valid @RequestBody CreateTemplateRequest req) {
@@ -38,7 +38,7 @@ public class ContractingController {
     }
 
     @PostMapping("/templates/{id}/archive")
-    @PreAuthorize("hasAnyAuthority('USER_UPDATE','CONTRACTS_MANAGE')")
+    @PreAuthorize("hasAnyAuthority('CONTRACTS_TEMPLATES','CONTRACTS_MANAGE','USER_UPDATE')")
     @Operation(summary = "Archive a custom template so it no longer appears in the picker")
     public ResponseEntity<ApiResponse<Void>> archiveTemplate(@PathVariable UUID id) {
         contractingService.archiveTemplate(TenantContext.getTenantIdAsObject(), id);
@@ -46,7 +46,7 @@ public class ContractingController {
     }
 
     @GetMapping("/templates")
-    @PreAuthorize("hasAnyAuthority('USER_READ','USER_UPDATE')")
+    @PreAuthorize("hasAnyAuthority('CONTRACTS_READ','CONTRACTS_MANAGE','CONTRACTS_ADMIN','USER_READ','USER_UPDATE')")
     @Operation(summary = "List contract templates — seeds the SA system templates on first call")
     public ResponseEntity<ApiResponse<List<TemplateResponse>>> getTemplates() {
         return ResponseEntity.ok(ApiResponse.success("Success",
@@ -54,7 +54,7 @@ public class ContractingController {
     }
 
     @PostMapping("/templates")
-    @PreAuthorize("hasAnyAuthority('USER_UPDATE','CONTRACTS_MANAGE')")
+    @PreAuthorize("hasAnyAuthority('CONTRACTS_TEMPLATES','CONTRACTS_MANAGE','USER_UPDATE')")
     @Operation(summary = "Create a custom contract template with {{variable}} placeholders")
     public ResponseEntity<ApiResponse<TemplateResponse>> createTemplate(
             @Valid @RequestBody CreateTemplateRequest req) {
@@ -65,7 +65,7 @@ public class ContractingController {
     // ── Contracts ─────────────────────────────────────────────────────────────
 
     @GetMapping
-    @PreAuthorize("hasAnyAuthority('USER_READ','USER_UPDATE')")
+    @PreAuthorize("hasAnyAuthority('CONTRACTS_READ','CONTRACTS_MANAGE','CONTRACTS_ADMIN','USER_READ','USER_UPDATE')")
     @Operation(summary = "List contracts — lightweight summary response (no body HTML)")
     public ResponseEntity<ApiResponse<Page<ContractSummaryResponse>>> getContracts(
             @RequestParam(required = false) String status,
@@ -77,7 +77,7 @@ public class ContractingController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyAuthority('USER_READ','USER_UPDATE')")
+    @PreAuthorize("hasAnyAuthority('CONTRACTS_READ','CONTRACTS_MANAGE','CONTRACTS_ADMIN','USER_READ','USER_UPDATE')")
     @Operation(summary = "Get full contract detail including body HTML, parties and signing status")
     public ResponseEntity<ApiResponse<ContractResponse>> getContract(@PathVariable UUID id) {
         return ResponseEntity.ok(ApiResponse.success("Success",
@@ -85,7 +85,7 @@ public class ContractingController {
     }
 
     @PostMapping
-    @PreAuthorize("hasAnyAuthority('USER_UPDATE','CONTRACTS_MANAGE')")
+    @PreAuthorize("hasAnyAuthority('CONTRACTS_MANAGE','USER_UPDATE')")
     @Operation(summary = "Create contract — from template (resolves variables) or blank body")
     public ResponseEntity<ApiResponse<ContractResponse>> createContract(
             @Valid @RequestBody CreateContractRequest req) {
@@ -103,7 +103,7 @@ public class ContractingController {
     // Contract.assertEditable(), which every mutator this hits already
     // goes through.
     @PutMapping("/{id}")
-    @PreAuthorize("hasAnyAuthority('USER_UPDATE','CONTRACTS_MANAGE')")
+    @PreAuthorize("hasAnyAuthority('CONTRACTS_MANAGE','USER_UPDATE')")
     @Operation(summary = "Edit a DRAFT or UNDER_REVIEW contract — fill in remaining {{variables}} and/or update dates, value, notes, auto-renew")
     public ResponseEntity<ApiResponse<ContractResponse>> updateContract(
             @PathVariable UUID id,
@@ -113,7 +113,7 @@ public class ContractingController {
     }
 
     @PostMapping("/{id}/submit-for-review")
-    @PreAuthorize("hasAnyAuthority('USER_UPDATE','CONTRACTS_MANAGE')")
+    @PreAuthorize("hasAnyAuthority('CONTRACTS_MANAGE','USER_UPDATE')")
     @Operation(summary = "Submit contract for internal review (DRAFT → UNDER_REVIEW)")
     public ResponseEntity<ApiResponse<ContractResponse>> submitForReview(@PathVariable UUID id) {
         return ResponseEntity.ok(ApiResponse.success("Submitted for review",
@@ -121,7 +121,7 @@ public class ContractingController {
     }
 
     @PostMapping("/{id}/send-for-signing")
-    @PreAuthorize("hasAnyAuthority('USER_UPDATE','CONTRACTS_MANAGE')")
+    @PreAuthorize("hasAnyAuthority('CONTRACTS_MANAGE','USER_UPDATE')")
     @Operation(summary = "Send to parties for signing — validates no unresolved {{variables}}, " +
             "locks body hash, emails signing links, sends SMS notifications")
     public ResponseEntity<ApiResponse<ContractResponse>> sendForSigning(@PathVariable UUID id) {
@@ -130,7 +130,7 @@ public class ContractingController {
     }
 
     @PostMapping("/{id}/terminate")
-    @PreAuthorize("hasAnyAuthority('USER_UPDATE','CONTRACTS_ADMIN')")
+    @PreAuthorize("hasAnyAuthority('CONTRACTS_ADMIN','USER_UPDATE')")
     @Operation(summary = "Terminate a SIGNED contract with a reason")
     public ResponseEntity<ApiResponse<ContractResponse>> terminate(
             @PathVariable UUID id,
@@ -142,7 +142,7 @@ public class ContractingController {
     // ── Parties ───────────────────────────────────────────────────────────────
 
     @PostMapping("/{id}/parties")
-    @PreAuthorize("hasAnyAuthority('USER_UPDATE','CONTRACTS_MANAGE')")
+    @PreAuthorize("hasAnyAuthority('CONTRACTS_MANAGE','USER_UPDATE')")
     @Operation(summary = "Add a signing party to a contract")
     public ResponseEntity<ApiResponse<PartyResponse>> addParty(
             @PathVariable UUID id,
@@ -152,7 +152,7 @@ public class ContractingController {
     }
 
     @PostMapping("/{id}/parties/{partyId}/request-otp")
-    @PreAuthorize("hasAnyAuthority('USER_UPDATE','CONTRACTS_MANAGE')")
+    @PreAuthorize("hasAnyAuthority('CONTRACTS_SIGN','CONTRACTS_MANAGE','USER_UPDATE')")
     @Operation(summary = "Send OTP to party's phone — enforces signing order, rate-limited 3/10min")
     public ResponseEntity<ApiResponse<PartyResponse>> requestOtp(
             @PathVariable UUID id, @PathVariable UUID partyId) {
@@ -161,7 +161,7 @@ public class ContractingController {
     }
 
     @PostMapping("/{id}/parties/{partyId}/resend")
-    @PreAuthorize("hasAnyAuthority('USER_UPDATE','CONTRACTS_MANAGE')")
+    @PreAuthorize("hasAnyAuthority('CONTRACTS_MANAGE','USER_UPDATE')")
     @Operation(summary = "Resend signing link to a party — revokes old token, issues new 72h link")
     public ResponseEntity<ApiResponse<PartyResponse>> resendSigningLink(
             @PathVariable UUID id, @PathVariable UUID partyId) {
@@ -182,7 +182,7 @@ public class ContractingController {
     // is recorded on the signature for audit purposes — see
     // ContractSignature.witnessedByUserId's Javadoc.
     @PostMapping("/{id}/parties/{partyId}/sign")
-    @PreAuthorize("hasAnyAuthority('USER_UPDATE','CONTRACTS_MANAGE')")
+    @PreAuthorize("hasAnyAuthority('CONTRACTS_SIGN','CONTRACTS_MANAGE','USER_UPDATE')")
     @Operation(summary = "Record an in-person, staff-witnessed signature — same OTP verification as the remote flow")
     public ResponseEntity<ApiResponse<ContractResponse>> signInPerson(
             @PathVariable UUID id,
@@ -203,7 +203,7 @@ public class ContractingController {
     // ("null = posted by internal HandyFlow user") — the entity/schema was
     // ready, just had no service method or endpoint using that pathway.
     @PostMapping("/{id}/comments")
-    @PreAuthorize("hasAnyAuthority('USER_UPDATE','CONTRACTS_MANAGE')")
+    @PreAuthorize("hasAnyAuthority('CONTRACTS_MANAGE','USER_UPDATE')")
     @Operation(summary = "Post a comment or amendment request as internal staff — visible to all parties and owner")
     public ResponseEntity<ApiResponse<CommentView>> addComment(
             @PathVariable UUID id,
@@ -216,7 +216,7 @@ public class ContractingController {
     // ── PDF ───────────────────────────────────────────────────────────────────
 
     @GetMapping("/{id}/pdf")
-    @PreAuthorize("hasAnyAuthority('USER_READ','USER_UPDATE')")
+    @PreAuthorize("hasAnyAuthority('CONTRACTS_READ','CONTRACTS_MANAGE','CONTRACTS_ADMIN','USER_READ','USER_UPDATE')")
     @Operation(summary = "Download signed or terminated contract as PDF with audit trail")
     public ResponseEntity<byte[]> downloadPdf(@PathVariable UUID id) {
         byte[] pdf = contractingService.generatePdf(TenantContext.getTenantIdAsObject(), id);

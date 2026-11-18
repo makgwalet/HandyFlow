@@ -46,6 +46,7 @@ public class ContractingService {
     private final EmailService                   emailService;
     private final SmsService                     smsService;    // FIX: SMS now wired
     private final OtpRateLimitRepository          otpRateLimitRepo;
+    private final PublicSigningRateLimiter        publicRateLimiter;
     private final ContractRecordsService         records;   // executed copy + records retention (V581)
 
     @Value("${contracting.signing.base-url:http://localhost:5173}")
@@ -351,15 +352,11 @@ public class ContractingService {
 
         // Issue a signing token and send invitation per party
         for (ContractParty party : parties) {
-            revokeActiveTokens(party.getId());
-
-            String  token     = signingTokenService.generateToken(c.getId(), party.getId(), tenantId.getValue());
-            String  signUrl   = baseUrl + "/sign/" + token;
-            Instant expiresAt = Instant.now().plusSeconds(72L * 3600);
-
-            ContractSigningToken st = ContractSigningToken.create(
-                    tenantId.getValue(), c.getId(), party.getId(), token, expiresAt);
-            signingTokenRepo.save(st);
+            IssuedLink issued = issueSigningToken(tenantId, c.getId(), party.getId());
+            String signUrl = issued.url();
+            boolean hasEmail = party.getEmail() != null && !party.getEmail().isBlank();
+            issued.token().recordDelivery(hasEmail ? "QUEUED" : "NO_CHANNEL");
+            signingTokenRepo.save(issued.token());
 
             // FIX: previously also called party.setSigningToken(token) here,
             // persisting a second, unsynchronized raw copy of the same secret
@@ -422,7 +419,11 @@ public class ContractingService {
         if (!"SENT".equals(c.getStatus()))
             throw new IllegalStateException("Contract must be SENT to resend a signing link");
 
-        ContractParty party = partyRepo.findByTenantAndId(tenantId, partyId)
+        UUID issuer = currentUserOrNull();
+        if (issuer != null) publicRateLimiter.checkReissue(issuer, contractId);
+
+        // Row lock: two simultaneous reissues for the same signer run one after the other, so only one link is ever valid.
+        ContractParty party = partyRepo.findByTenantAndIdForUpdate(tenantId, partyId)
                 .orElseThrow(() -> new ResourceNotFoundException("Party", partyId.toString()));
 
         if ("SIGNED".equals(party.getSigningStatus()))
@@ -431,15 +432,10 @@ public class ContractingService {
             throw new IllegalStateException(party.getFullName() + " has declined. " +
                     "Withdraw the declination before resending.");
 
-        revokeActiveTokens(partyId);
-
-        String  token     = signingTokenService.generateToken(c.getId(), partyId, tenantId.getValue());
-        String  signUrl   = baseUrl + "/sign/" + token;
-        Instant expiresAt = Instant.now().plusSeconds(72L * 3600);
-
-        ContractSigningToken st = ContractSigningToken.create(
-                tenantId.getValue(), c.getId(), partyId, token, expiresAt);
-        signingTokenRepo.save(st);
+        IssuedLink issued = issueSigningToken(tenantId, c.getId(), partyId);
+        String signUrl = issued.url();
+        boolean emailQueued = party.getEmail() != null && !party.getEmail().isBlank();
+        boolean smsSent = false;
 
         // FIX: see the matching comment in sendForSigning() above — no longer
         // duplicating the raw token onto ContractParty.
@@ -459,13 +455,18 @@ public class ContractingService {
             partyRepo.save(party);
         }
 
-        if (party.getPhone() != null && !party.getPhone().isBlank()) {
-            safeSms(party.getPhone(),
+        boolean hasPhone = party.getPhone() != null && !party.getPhone().isBlank();
+        if (hasPhone) {
+            smsSent = safeSms(party.getPhone(),
                     "HandyFlow reminder: Sign \"" + truncate(c.getTitle(), 40)
                             + "\" at: " + signUrl);
         }
+        // If delivery failed the new link stays valid but nobody can read it back from the database; staff retry with Resend.
+        issued.token().recordDelivery(emailQueued || smsSent ? "QUEUED" : (hasPhone ? "FAILED" : "NO_CHANNEL"));
+        signingTokenRepo.save(issued.token());
 
-        log.info("Signing link resent for party={} contract={}", partyId, c.getContractNumber());
+        log.info("Signing link reissued for party={} contract={} by={} delivery={}", partyId, c.getContractNumber(),
+                issuer, issued.token().getDeliveryStatus());
         return toPartyResponse(party);
     }
 
@@ -922,6 +923,29 @@ public class ContractingService {
             t.setRevokedAt(Instant.now());
             signingTokenRepo.save(t);
         });
+        signingTokenRepo.flush();   // the revoke must reach the database before the new token is inserted (one active token per signer)
+    }
+
+    /** A freshly issued link: the stored token record (hash only) and the full URL, which exists only in memory. */
+    private record IssuedLink(ContractSigningToken token, String url) {}
+
+    /**
+     * Revokes the signer's active links and issues a new one. Only the SHA-256 hash is stored; the raw token goes to the
+     * signer through email or SMS and cannot be read back from the database.
+     */
+    private IssuedLink issueSigningToken(TenantId tenantId, UUID contractId, UUID partyId) {
+        revokeActiveTokens(partyId);
+        String token = signingTokenService.generateToken(contractId, partyId, tenantId.getValue());
+        Instant expiresAt = Instant.now().plusSeconds(72L * 3600);
+        ContractSigningToken st = ContractSigningToken.create(
+                tenantId.getValue(), contractId, partyId, token, expiresAt, currentUserOrNull());
+        signingTokenRepo.save(st);
+        return new IssuedLink(st, baseUrl + "/sign/" + token);
+    }
+
+    private static UUID currentUserOrNull() {
+        try { return za.co.handyflow.platform.shared.TenantContext.getCurrentUserId(); }
+        catch (RuntimeException e) { return null; }
     }
 
     /**
@@ -933,21 +957,13 @@ public class ContractingService {
                 .filter(p -> "PENDING".equals(p.getSigningStatus()) || "SENT".equals(p.getSigningStatus()))
                 .min(Comparator.comparingInt(ContractParty::getSigningOrder))
                 .ifPresent(next -> {
-                    // FIX: previously read next.getSigningToken() — the raw
-                    // token duplicated onto ContractParty, now removed. The
-                    // party was already issued a token when the contract was
-                    // first sent for signing (sendForSigning() mints one for
-                    // every party up front), so it should still be active here;
-                    // the empty-fallback case would mean something inconsistent
-                    // happened upstream and is logged rather than silently
-                    // sending a broken link.
-                    Optional<ContractSigningToken> activeToken = signingTokenRepo.findActiveByPartyId(next.getId());
-                    if (activeToken.isEmpty()) {
-                        log.warn("No active signing token found for next party={} contract={} — " +
-                                        "cannot include a working signing link in their turn notification",
-                                next.getId(), c.getContractNumber());
-                    }
-                    String signUrl = activeToken.map(t -> baseUrl + "/sign/" + t.getToken()).orElse(baseUrl);
+                    // Links are stored as hashes only, so the link sent when the contract went out cannot be read
+                    // back. The signer's turn notice carries a new link; the earlier one stops working.
+                    IssuedLink issued = issueSigningToken(TenantId.of(c.getTenantId()), c.getId(), next.getId());
+                    String signUrl = issued.url();
+                    boolean hasEmail = next.getEmail() != null && !next.getEmail().isBlank();
+                    issued.token().recordDelivery(hasEmail ? "QUEUED" : "NO_CHANNEL");
+                    signingTokenRepo.save(issued.token());
 
                     if (next.getEmail() != null && !next.getEmail().isBlank()) {
                         emailService.send(
@@ -1110,9 +1126,13 @@ public class ContractingService {
     }
 
     private PartyResponse toPartyResponse(ContractParty p) {
+        ContractSigningToken link = signingTokenRepo.findFirstByPartyIdOrderByCreatedAtDesc(p.getId()).orElse(null);
         return new PartyResponse(p.getId(), p.getPartyType(), p.getPartyRole(),
                 p.getFullName(), p.getEmail(), p.getPhone(), p.getCompanyName(),
-                p.getSigningOrder(), p.getSigningStatus(), p.getSignedAt(), p.getOtpSentAt());
+                p.getSigningOrder(), p.getSigningStatus(), p.getSignedAt(), p.getOtpSentAt(),
+                link != null ? link.getCreatedAt() : null,
+                link != null ? link.getDeliveryStatus() : null,
+                link != null ? link.getIssuedBy() : null);
     }
 
     private TemplateResponse toTemplateResponse(ContractTemplate t) {

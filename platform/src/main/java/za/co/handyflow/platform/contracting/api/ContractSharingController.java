@@ -25,7 +25,7 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class ContractSharingController {
 
-    private static final String READ = "hasAnyAuthority('USER_READ','USER_UPDATE','CONTRACTS_MANAGE','CONTRACTS_ADMIN')";
+    private static final String READ = "hasAnyAuthority('CONTRACTS_READ','USER_READ','USER_UPDATE','CONTRACTS_MANAGE','CONTRACTS_ADMIN')";
     private static final String CHANGE = "hasAnyAuthority('USER_UPDATE','CONTRACTS_MANAGE','CONTRACTS_ADMIN')";
 
     private final ContractSharingService sharing;

@@ -28,6 +28,9 @@ public interface ContractSigningTokenRepository
     /** Lookup by SHA-256(token) — used to validate every inbound signing request. */
     Optional<ContractSigningToken> findByTokenHash(String tokenHash);
 
+    /** The party's most recent token, active or not, for showing when the link was last issued and how delivery went. */
+    Optional<ContractSigningToken> findFirstByPartyIdOrderByCreatedAtDesc(UUID partyId);
+
     /**
      * Returns the most recent non-revoked, non-used token for a party.
      * Used when marking a token as used after signing.
