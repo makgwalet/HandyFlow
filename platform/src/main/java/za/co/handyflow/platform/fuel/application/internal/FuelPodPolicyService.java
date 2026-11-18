@@ -50,6 +50,7 @@ public class FuelPodPolicyService {
     private final FuelPodExceptionRepository exceptions;
     private final FuelSettingsService settings;
     private final FuelService fuelService;
+    private final FuelArrivalCheckService arrivalChecks;
     private final AuditTrailFacade audit;
 
     @Transactional
@@ -61,6 +62,8 @@ public class FuelPodPolicyService {
         FuelDelivery d = deliveries.findActiveById(tenantId, deliveryId).orElseThrow(() -> new ResourceNotFoundException("Delivery", deliveryId.toString()));
         // A retry of a completion that already happened is returned as it was: it is not judged again and records no second exception.
         boolean replay = req.clientRequestId() != null && req.clientRequestId().equals(d.getCompletionRequestId()) && "DELIVERED".equals(d.getStatus());
+        // Offloading is final, so the arrival check is asked for here, on the one path both the driver and the office use.
+        if (!replay) arrivalChecks.requireClear(tenantId, deliveryId);
         FuelSettings s = settings.current(tenantId);
         if (replay || !s.isPodPolicyEnforced()) return fuelService.completeDelivery(tenantId, deliveryId, req);
 

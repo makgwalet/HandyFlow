@@ -38,6 +38,7 @@ class FuelPodPolicyServiceTest {
     @Mock FuelPodExceptionRepository exceptions;
     @Mock FuelSettingsService settings;
     @Mock FuelService fuelService;
+    @Mock FuelArrivalCheckService arrivalChecks;
     @Mock AuditTrailFacade audit;
 
     static final TenantId T = TenantId.of(UUID.randomUUID());
@@ -52,7 +53,7 @@ class FuelPodPolicyServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new FuelPodPolicyService(deliveries, sites, evidence, exceptions, settings, fuelService, audit);
+        service = new FuelPodPolicyService(deliveries, sites, evidence, exceptions, settings, fuelService, arrivalChecks, audit);
         site = FuelCustomerSite.create(T, UUID.randomUUID(), "Mine gate 3", null, null, null, null, null);
         load = FuelDelivery.create(T, UUID.randomUUID(), UUID.randomUUID(), Map.of(), "DIESEL", new BigDecimal("1000"), new BigDecimal("20"), Instant.now(), null, null);
         load.assignSite(site.getId());
@@ -72,6 +73,14 @@ class FuelPodPolicyServiceTest {
 
     private void photo() {
         when(evidence.findByDelivery(eq(T), any())).thenReturn(List.of(FuelDeliveryEvidence.create(T, load.getId(), "PHOTO", "x.jpg", null, null, null, "gate", DRIVER)));
+    }
+
+    @Test @DisplayName("a refused arrival check stops completion, for the office as for the driver, before anything is changed")
+    void arrivalCheckGate() {
+        doThrow(new IllegalStateException("The arrival check found something that blocks this delivery.")).when(arrivalChecks).requireClear(T, load.getId());
+        assertThrows(IllegalStateException.class, () -> service.complete(T, DRIVER, load.getId(), req("Johannes van Wyk", null, null), NOW));
+        verify(fuelService, never()).completeDelivery(any(), any(), any());
+        verify(exceptions, never()).save(any());
     }
 
     @Test @DisplayName("an ordinary delivery with a receiver name goes through, with no exception recorded")

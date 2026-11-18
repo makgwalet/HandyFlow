@@ -318,8 +318,7 @@ public class FuelTransportService {
     @Transactional
     public DeliveryResponse myComplete(TenantId tenantId, UUID userId, UUID deliveryId, CompleteDeliveryRequest req) {
         FuelDelivery d = ownLoad(tenantId, userId, deliveryId);
-        // Offloading is complete and the delivery is final: the server asks for a clear arrival check itself (when the company enforces it).
-        arrivalChecks.requireClear(tenantId, d.getId());
+        // The clear arrival check is asked for inside podPolicy.complete, which the office's completion uses too.
         return podPolicy.complete(tenantId, userId, d.getId(), req);
     }
 

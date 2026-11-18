@@ -27,7 +27,7 @@ import java.util.*;
 @RequiredArgsConstructor
 public class FuelOverdueDeliveryAlerts {
 
-    static final Duration SHORTEST_GRACE = Duration.ofMinutes(15);
+    static final Duration SHORTEST_GRACE = FuelOverduePolicy.SHORTEST_GRACE;
 
     private final FuelDeliveryRepository deliveries;
     private final FuelSettingsService settings;
@@ -49,7 +49,7 @@ public class FuelOverdueDeliveryAlerts {
                 TenantId tenant = d.getTenantId();
                 if (!hasModule.computeIfAbsent(tenant, t -> featureGuard.hasModuleFor(t, "fuel"))) continue;
                 FuelSettings s = cfg.computeIfAbsent(tenant, settings::current);
-                Instant overdueAt = d.getScheduledAt().plus(Duration.ofMinutes(s.getOverdueGraceMinutes()));
+                Instant overdueAt = FuelOverduePolicy.overdueAt(d.getScheduledAt(), s.getOverdueGraceMinutes());
                 if (now.isBefore(overdueAt)) continue;
                 UUID driverUser = d.getDriverEmployeeId() == null ? null : hr.findEmployeeById(tenant, d.getDriverEmployeeId()).map(e -> e.userId()).orElse(null);
                 Instant escalateAt = overdueAt.plus(Duration.ofMinutes(s.getOverdueEscalationMinutes()));

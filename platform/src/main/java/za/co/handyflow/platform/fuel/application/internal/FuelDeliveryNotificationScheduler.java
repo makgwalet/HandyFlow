@@ -46,6 +46,7 @@ public class FuelDeliveryNotificationScheduler {
     private final FuelDeliveryRepository deliveryRepository;
     private final NotificationService notificationService;
     private final TenantAdminRecipients tenantAdminRecipients;
+    private final FuelSettingsService settings;
 
     @Value("${fuel.delivery.reminder-hours:24}")
     private int reminderWindowHours;
@@ -91,7 +92,12 @@ public class FuelDeliveryNotificationScheduler {
     @Scheduled(cron = "0 0 8 * * *", zone = "Africa/Johannesburg")
     @Transactional
     public void checkOverdueDeliveries() {
-        List<FuelDelivery> overdue = deliveryRepository.findOverdueNeedingAlert(Instant.now());
+        // Overdue means the same here as on the dashboard and in push: past the company's grace (default 120 minutes), not merely past the scheduled time.
+        Instant now = Instant.now();
+        Map<TenantId, Integer> grace = new HashMap<>();
+        List<FuelDelivery> overdue = deliveryRepository.findOverdueNeedingAlert(now.minus(FuelOverduePolicy.SHORTEST_GRACE)).stream()
+                .filter(d -> FuelOverduePolicy.isOverdue(d.getScheduledAt(), now, grace.computeIfAbsent(d.getTenantId(), t -> settings.current(t).getOverdueGraceMinutes())))
+                .toList();
 
         Map<TenantId, List<Recipient>> recipientCache = new HashMap<>();
         int sent = 0;

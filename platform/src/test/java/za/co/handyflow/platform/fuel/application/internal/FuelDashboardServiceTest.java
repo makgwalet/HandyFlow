@@ -68,33 +68,34 @@ class FuelDashboardServiceTest {
 
     @Test @DisplayName("a user with no tanks gets zeros and the repositories are not asked")
     void noTanks() {
-        var disp = mock(FuelDispatchRepository.class); var rec = mock(FuelReceiptRepository.class); var dip = mock(DipReadingRepository.class); var del = mock(FuelDeliveryRepository.class);
-        FuelDashboardSummary s = new FuelDashboardService(disp, rec, dip, del).summary(T, Set.of(), NOW);
+        var disp = mock(FuelDispatchRepository.class); var rec = mock(FuelReceiptRepository.class); var dip = mock(DipReadingRepository.class); var del = mock(FuelDeliveryRepository.class); var cfg = mock(FuelSettingsService.class);
+        FuelDashboardSummary s = new FuelDashboardService(disp, rec, dip, del, cfg).summary(T, Set.of(), NOW);
         assertEquals(0, s.monthDispatches());
         assertEquals(17, s.dailyLitres().size());
         assertTrue(s.nextDeliveries().isEmpty());
-        verifyNoInteractions(disp, rec, dip, del);
+        verifyNoInteractions(disp, rec, dip, del, cfg);
     }
 
     @Test @DisplayName("the month runs from the 1st to the next 1st in South African time")
     void monthWindow() {
-        var disp = mock(FuelDispatchRepository.class); var rec = mock(FuelReceiptRepository.class); var dip = mock(DipReadingRepository.class); var del = mock(FuelDeliveryRepository.class);
-        new FuelDashboardService(disp, rec, dip, del).summary(T, null, NOW);
+        var disp = mock(FuelDispatchRepository.class); var rec = mock(FuelReceiptRepository.class); var dip = mock(DipReadingRepository.class); var del = mock(FuelDeliveryRepository.class); var cfg = mock(FuelSettingsService.class);
+        when(cfg.current(T)).thenReturn(za.co.handyflow.platform.fuel.domain.model.FuelSettings.forTenant(T));
+        new FuelDashboardService(disp, rec, dip, del, cfg).summary(T, null, NOW);
         verify(disp).dashboardRows(T, LocalDate.of(2026, 11, 1).atStartOfDay(SA).toInstant(), LocalDate.of(2026, 12, 1).atStartOfDay(SA).toInstant());
         verify(dip).tankIdsWithVarianceBelow(eq(T), any(), any(), eq(new BigDecimal("-5")));
     }
 
-    @Test @DisplayName("open deliveries: counts, in transit, overdue after a day, and the next eight soonest")
+    @Test @DisplayName("open deliveries: counts, in transit, overdue after the 120-minute grace (scheduled or on the road), and the next eight soonest")
     void deliveries() {
         List<FuelDelivery> open = new ArrayList<>();
         open.add(delivery(TANK_A, NOW.minusSeconds(30 * 3600), false));   // overdue
-        open.add(delivery(TANK_A, NOW.minusSeconds(2 * 3600), false));    // late but not a day
-        open.add(delivery(TANK_A, NOW.minusSeconds(48 * 3600), true));    // on the road: not overdue
+        open.add(delivery(TANK_A, NOW.minusSeconds(90 * 60), false));     // delayed, inside the grace: not overdue
+        open.add(delivery(TANK_A, NOW.minusSeconds(48 * 3600), true));    // on the road and long past: overdue, as the push says
         for (int i = 0; i < 9; i++) open.add(delivery(TANK_A, NOW.plusSeconds((i + 1) * 3600L), false));
         FuelDashboardSummary s = FuelDashboardService.build(TODAY, NOW, null, List.of(), List.of(), List.of(), open);
         assertEquals(12, s.openDeliveries());
         assertEquals(1, s.inTransitDeliveries());
-        assertEquals(1, s.overdueDeliveries());
+        assertEquals(2, s.overdueDeliveries());
         assertEquals(8, s.nextDeliveries().size());
         assertEquals("IN_TRANSIT", s.nextDeliveries().get(0).status());   // earliest scheduled first
         assertEquals("DIESEL", s.nextDeliveries().get(0).fuelType());

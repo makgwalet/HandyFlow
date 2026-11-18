@@ -381,16 +381,4 @@ class FuelTransportServiceTest {
         when(tankers.findActiveById(any(), any())).thenReturn(Optional.empty());
         assertThrows(ResourceNotFoundException.class, () -> service.compartmentLoads(T, UUID.randomUUID(), java.time.LocalDate.now()));
     }
-
-    @Test @DisplayName("a delivery is not completed when the arrival check gate refuses it")
-    void completionBlockedWithoutFreshCheck() {
-        when(hr.findEmployeeByUserId(T, me)).thenReturn(Optional.of(driver));
-        FuelDelivery mine = FuelDelivery.create(T, UUID.randomUUID(), null, Map.of(), "DIESEL", bd("100"), bd("22"), Instant.now(), null, null);
-        mine.allocate(tanker.getId(), "GP 12 AB", driver.id(), driver.fullName());
-        when(deliveries.findActiveById(eq(T), eq(mine.getId()))).thenReturn(Optional.of(mine));
-        doThrow(new IllegalStateException("Do the arrival check at the site before offloading.")).when(arrivalChecks).requireClear(eq(T), eq(mine.getId()));
-        assertThrows(IllegalStateException.class, () -> service.myComplete(T, me, mine.getId(),
-                new CompleteDeliveryRequest(bd("100"), "R", null, null, null, false, null, null, UUID.randomUUID())));
-        verify(podPolicy, never()).complete(any(), any(), any(), any());
-    }
 }

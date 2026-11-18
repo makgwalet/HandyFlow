@@ -30,12 +30,12 @@ public class FuelDashboardService {
     static final ZoneId SA = ZoneId.of("Africa/Johannesburg");
     static final BigDecimal VARIANCE_ALERT = new BigDecimal("-5");
     static final int NEXT_DELIVERIES = 8;
-    static final long OVERDUE_AFTER_HOURS = 24;
 
     private final FuelDispatchRepository dispatches;
     private final FuelReceiptRepository receipts;
     private final DipReadingRepository dips;
     private final FuelDeliveryRepository deliveries;
+    private final FuelSettingsService settings;
 
     @Transactional(readOnly = true)
     public FuelDashboardSummary summary(TenantId tenantId, Set<UUID> allowedTankIds, Instant now) {
@@ -47,12 +47,17 @@ public class FuelDashboardService {
                 dispatches.dashboardRows(tenantId, from, to),
                 receipts.tankIdsReceivedBetween(tenantId, from, to),
                 dips.tankIdsWithVarianceBelow(tenantId, from, to, VARIANCE_ALERT),
-                deliveries.findOpen(tenantId));
+                deliveries.findOpen(tenantId), settings.current(tenantId).getOverdueGraceMinutes());
     }
 
     /** Pure, so it can be tested without a database. Dispatch rows are [tankId, dispatchedAt, litresDispensed]. */
     static FuelDashboardSummary build(LocalDate today, Instant now, Set<UUID> allowed, List<Object[]> dispatchRows, List<UUID> receiptTanks,
                                       List<UUID> varianceTanks, List<FuelDelivery> open) {
+        return build(today, now, allowed, dispatchRows, receiptTanks, varianceTanks, open, FuelOverduePolicy.DEFAULT_GRACE_MINUTES);
+    }
+
+    static FuelDashboardSummary build(LocalDate today, Instant now, Set<UUID> allowed, List<Object[]> dispatchRows, List<UUID> receiptTanks,
+                                      List<UUID> varianceTanks, List<FuelDelivery> open, int overdueGraceMinutes) {
         BigDecimal litres = BigDecimal.ZERO;
         int count = 0;
         List<BigDecimal> daily = new ArrayList<>();
@@ -69,8 +74,8 @@ public class FuelDashboardService {
 
         List<FuelDelivery> mine = open.stream().filter(d -> visible(allowed, d.getTankId())).toList();
         int inTransit = (int) mine.stream().filter(d -> "IN_TRANSIT".equals(d.getStatus())).count();
-        Instant cutoff = now.minusSeconds(OVERDUE_AFTER_HOURS * 3600);
-        int overdue = (int) mine.stream().filter(d -> "SCHEDULED".equals(d.getStatus()) && d.getScheduledAt() != null && d.getScheduledAt().isBefore(cutoff)).count();
+        // The same test the push alerts use: past the company's grace (default 120 minutes), scheduled or on the road.
+        int overdue = (int) mine.stream().filter(d -> FuelOverduePolicy.isOverdue(d.getScheduledAt(), now, overdueGraceMinutes)).count();
         List<NextDelivery> next = mine.stream()
                 .sorted(Comparator.comparing(FuelDelivery::getScheduledAt, Comparator.nullsLast(Comparator.naturalOrder())))
                 .limit(NEXT_DELIVERIES)
