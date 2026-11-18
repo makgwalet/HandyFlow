@@ -17,5 +17,15 @@ public record ConvertRequisitionRequest(
         String notes,
         List<Line> lines
 ) {
-    public record Line(UUID requisitionLineId, BigDecimal quantity, BigDecimal unitCost, BigDecimal vatRate) {}
+    /**
+     * unitCost differs from the requisition estimate: priceChangeReason is then required (SUPPLIER_QUOTATION,
+     * NEGOTIATED_DISCOUNT, MARKET_PRICE_CHANGE, CONTRACT_PRICE, SPECIFICATION_CHANGE, OTHER; OTHER needs a note).
+     * quotationRef is the supplier quotation or document the price came from.
+     */
+    public record Line(UUID requisitionLineId, BigDecimal quantity, BigDecimal unitCost, BigDecimal vatRate,
+                       String priceChangeReason, String priceChangeNote, String quotationRef) {
+        public Line(UUID requisitionLineId, BigDecimal quantity, BigDecimal unitCost, BigDecimal vatRate) {
+            this(requisitionLineId, quantity, unitCost, vatRate, null, null, null);
+        }
+    }
 }

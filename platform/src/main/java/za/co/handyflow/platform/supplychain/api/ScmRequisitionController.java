@@ -116,6 +116,23 @@ public class ScmRequisitionController {
         return ok("Requisition cancelled", service.cancel(tenant(), id, uid(), req.note()));
     }
 
+    @GetMapping("/price-overrides")
+    @PreAuthorize("hasAnyAuthority('SCM_PRICE_OVERRIDE_APPROVE','SCM_ADMIN')")
+    @Operation(summary = "Buyer price increases beyond tolerance (default: waiting for approval)")
+    public ResponseEntity<ApiResponse<List<RequisitionResponse.PriceOverride>>> priceOverrides(@RequestParam(required = false) String status) {
+        return ok("Success", service.priceOverrides(tenant(), status));
+    }
+
+    public record PriceDecision(boolean approve, String note) {}
+
+    @PostMapping("/price-overrides/{conversionId}/decision")
+    @PreAuthorize("hasAnyAuthority('SCM_PRICE_OVERRIDE_APPROVE','SCM_ADMIN')")
+    @Operation(summary = "Approve or reject a buyer's price increase beyond tolerance (not the buyer who made it)")
+    public ResponseEntity<ApiResponse<Void>> decidePrice(@PathVariable UUID conversionId, @RequestBody PriceDecision body) {
+        service.decidePriceOverride(tenant(), conversionId, body.approve(), body.note(), uid(), uname());
+        return ResponseEntity.ok(ApiResponse.success(body.approve() ? "Price increase approved" : "Price increase rejected", null));
+    }
+
     @PostMapping("/{id}/convert-to-po")
     @PreAuthorize(CAN_CONVERT)
     @Operation(summary = "Turn (part of) an approved requisition into a DRAFT purchase order with one supplier")

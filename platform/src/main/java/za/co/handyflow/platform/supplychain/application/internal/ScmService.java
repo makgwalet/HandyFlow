@@ -38,6 +38,7 @@ import java.util.stream.Stream;
 public class ScmService {
 
     private final ScmSeparationOfDuties sod;
+    private final PriceOverrideGate priceOverrideGate;
     private final ContractService contractService;
     private final ScSupplierRepository        supplierRepo;
     private final ScStockLocationRepository   locationRepo;
@@ -344,6 +345,7 @@ public class ScmService {
                                                 UUID approverId, String approverName) {
         ScPurchaseOrder po = getPurchaseOrder(tenantId, id);
         enforceSegregation(tenantId, "SCM_ORDER", "ScPurchaseOrder", id, po.getCreatedBy(), approverId, "purchase order");
+        priceOverrideGate.requireNonePending(tenantId, id);
 
         var existing = approvalFacade.getLatestRequestForEntity(tenantId, PO_APPROVALS_MODULE, PO_APPROVALS_ENTITY_TYPE, id);
         ApprovalRequestResponse result;

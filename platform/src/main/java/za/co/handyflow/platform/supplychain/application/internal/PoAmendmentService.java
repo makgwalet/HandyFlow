@@ -90,6 +90,10 @@ public class PoAmendmentService {
         if (req.qtyOrdered() != null && req.qtyOrdered().signum() <= 0)
             throw bad("Quantity must be greater than zero (delete the line instead)");
         if (req.unitCost() != null && req.unitCost().signum() < 0) throw bad("Unit cost cannot be negative");
+        if (req.unitCost() != null && po.getRequisitionId() != null && req.unitCost().compareTo(line.getUnitCost()) != 0)
+            throw new HandyFlowException("This order was raised from a requisition, so its price is set (with a reason) when the "
+                    + "requisition is converted. Cancel this draft and convert again at the new price.",
+                    HttpStatus.CONFLICT, "REQUISITION_PRICE_LOCKED");
         line.amend(req.qtyOrdered(), req.unitCost(), req.vatRate());
         poLineRepo.save(line);
         recalcTotals(po);

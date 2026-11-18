@@ -66,6 +66,8 @@ public class RequisitionService {
     private final VatRateProvider vatRateProvider;
     // NEW (chunk 7): budget check at submit and approve.
     private final BudgetService budgetService;
+    private final ProcurementPolicy procurementPolicy;
+    private final org.springframework.jdbc.core.JdbcTemplate jdbc;
     private final org.springframework.transaction.PlatformTransactionManager txManager;
 
 
@@ -231,7 +233,9 @@ public class RequisitionService {
         lineRepo.findByRequisition(tid, id).forEach(l -> lines.put(l.getId(), l));
         Map<UUID, BigDecimal> ordered = orderedByLine(tid, id);
 
-        record Pick(ScRequisitionLine line, BigDecimal qty, BigDecimal cost, BigDecimal vat) {}
+        record Pick(ScRequisitionLine line, BigDecimal qty, BigDecimal cost, BigDecimal vat,
+                    PriceOverrideRules.Assessment price, String reason, String note, String quotationRef) {}
+        BigDecimal tolerance = procurementPolicy.forTenant(tid).priceIncreaseTolerancePct();
         List<Pick> picks = new ArrayList<>();
         Set<UUID> seen = new HashSet<>();
         for (ConvertRequisitionRequest.Line c : req.lines()) {
@@ -245,7 +249,14 @@ public class RequisitionService {
                 throw conflict(l.getItemName() + ": " + plain(qty) + " exceeds the " + plain(remaining) + " still to be ordered");
             BigDecimal cost = c.unitCost() != null ? c.unitCost() : l.getEstimatedUnitCost();
             if (cost.signum() < 0) throw bad(l.getItemName() + ": unit cost cannot be negative");
-            picks.add(new Pick(l, qty, cost, c.vatRate() != null ? c.vatRate() : l.getVatRate()));
+            // Policy: the buyer may set the real price, but a change from the estimate needs a reason; a decrease is a
+            // saving; an increase beyond the company's tolerance must be approved by a second person before the PO is.
+            PriceOverrideRules.Assessment price = PriceOverrideRules.assess(l.getEstimatedUnitCost(), cost, qty, tolerance);
+            String reason = c.priceChangeReason() == null ? null : c.priceChangeReason().trim().toUpperCase(Locale.ROOT);
+            String problem = PriceOverrideRules.reasonProblem(price, reason, c.priceChangeNote());
+            if (problem != null) throw new HandyFlowException(l.getItemName() + ": " + problem, HttpStatus.BAD_REQUEST, "PRICE_REASON_REQUIRED");
+            picks.add(new Pick(l, qty, cost, c.vatRate() != null ? c.vatRate() : l.getVatRate(), price,
+                    price.changed() ? reason : null, price.changed() ? c.priceChangeNote() : null, c.quotationRef()));
         }
 
         // Reuses ScmService so the supplier-orderable rule, PO numbering and VAT handling stay in one place.
@@ -257,7 +268,10 @@ public class RequisitionService {
         for (Pick p : picks) {
             scmService.addPurchaseOrderLine(tenantId, poId, new AddPoLineRequest(
                     p.line().getItemName(), null, p.qty(), p.cost(), p.vat(), p.line().getCatalogueItemId()));
-            convRepo.save(ScRequisitionConversion.create(tid, id, p.line().getId(), poId, p.qty(), p.cost(), userId, userName));
+            ScRequisitionConversion conv = ScRequisitionConversion.create(tid, id, p.line().getId(), poId, p.qty(), p.cost(), userId, userName);
+            conv.recordPrice(p.line().getEstimatedUnitCost(), p.price().needsApproval() ? "PENDING_APPROVAL" : "NONE",
+                    p.reason(), p.note(), p.quotationRef(), p.price().saving());
+            convRepo.save(conv);
         }
         ScPurchaseOrder linked = poRepo.findByTenantIdAndId(tid, poId).orElseThrow();
         linked.linkRequisition(id);
@@ -265,6 +279,48 @@ public class RequisitionService {
 
         log.info("[SCM] Requisition {} -> PO {} ({} line(s)) by {}", r.getRequisitionNumber(), linked.getOrderNumber(), picks.size(), userName);
         return detail(r);
+    }
+
+    // ── Price increases beyond tolerance ──────────────────────────────────────
+
+    /** Conversions whose price increase is waiting for (or has had) a decision, newest first. */
+    @Transactional(readOnly = true)
+    public List<RequisitionResponse.PriceOverride> priceOverrides(TenantId tenantId, String status) {
+        String st = status == null || status.isBlank() ? "PENDING_APPROVAL" : status.trim().toUpperCase(Locale.ROOT);
+        return jdbc.query("""
+                SELECT c.id, c.requisition_id, r.requisition_number, c.purchase_order_id, po.order_number, l.item_name,
+                       c.qty, c.requisition_unit_cost, c.unit_cost, c.price_change_reason, c.price_change_note,
+                       c.quotation_ref, c.price_status, c.converted_by_name, c.created_at
+                  FROM sc_requisition_conversions c
+                  JOIN sc_requisitions r ON r.id = c.requisition_id
+                  JOIN sc_requisition_lines l ON l.id = c.requisition_line_id
+                  JOIN sc_purchase_orders po ON po.id = c.purchase_order_id
+                 WHERE c.tenant_id = ? AND c.price_status = ? ORDER BY c.created_at DESC LIMIT 200""",
+                (rs, n) -> new RequisitionResponse.PriceOverride((UUID) rs.getObject("id"), (UUID) rs.getObject("requisition_id"),
+                        rs.getString("requisition_number"), (UUID) rs.getObject("purchase_order_id"), rs.getString("order_number"),
+                        rs.getString("item_name"), rs.getBigDecimal("qty"), rs.getBigDecimal("requisition_unit_cost"),
+                        rs.getBigDecimal("unit_cost"), rs.getString("price_change_reason"), rs.getString("price_change_note"),
+                        rs.getString("quotation_ref"), rs.getString("price_status"), rs.getString("converted_by_name"),
+                        rs.getTimestamp("created_at").toInstant()), tenantId.getValue(), st);
+    }
+
+    /** A second person approves or rejects a buyer's price increase beyond tolerance. Rejecting leaves the PO unapprovable. */
+    @Transactional
+    public void decidePriceOverride(TenantId tenantId, UUID conversionId, boolean approve, String note, UUID userId, String userName) {
+        UUID tid = tenantId.getValue();
+        ScRequisitionConversion c = convRepo.findById(conversionId).filter(x -> x.getTenantId().equals(tid)).orElseThrow(
+                () -> new HandyFlowException("Price change not found", HttpStatus.NOT_FOUND, "NOT_FOUND"));
+        if (!approve && (note == null || note.isBlank()))
+            throw new HandyFlowException("Say why the price increase is rejected", HttpStatus.BAD_REQUEST, "REASON_REQUIRED");
+        sod.require(tenantId, "SCM_PRICE_OVERRIDE_APPROVE", c.getConvertedBy(), userId,
+                "You cannot approve a price increase that you made yourself", "ScRequisitionConversion", c.getId(), "price override approval");
+        try {
+            c.decidePrice(approve, userId, userName, note);
+        } catch (IllegalStateException e) {
+            throw new HandyFlowException(e.getMessage(), HttpStatus.CONFLICT, "NOT_PENDING");
+        }
+        convRepo.save(c);
+        log.info("[SCM] Price increase on conversion {} {} by {}", conversionId, approve ? "APPROVED" : "REJECTED", userName);
     }
 
     // ── Read ──────────────────────────────────────────────────────────────────
@@ -322,7 +378,8 @@ public class RequisitionService {
         for (ScRequisitionConversion c : convRepo.findByRequisition(tid, r.getId())) {
             ScPurchaseOrder po = poRepo.findByTenantIdAndId(tid, c.getPurchaseOrderId()).orElse(null);
             conv.add(new RequisitionResponse.Conversion(c.getPurchaseOrderId(), po != null ? po.getOrderNumber() : null,
-                    po != null ? po.getStatus().name() : null, c.getRequisitionLineId(), c.getQty(), c.getUnitCost(), c.getCreatedAt()));
+                    po != null ? po.getStatus().name() : null, c.getRequisitionLineId(), c.getQty(), c.getUnitCost(), c.getCreatedAt(),
+                    c.getRequisitionUnitCost(), c.getPriceStatus(), c.getPriceChangeReason(), c.getSavingAmount()));
         }
         return toResponse(r, out, conv, advisories);
     }

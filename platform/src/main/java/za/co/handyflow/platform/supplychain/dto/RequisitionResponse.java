@@ -42,5 +42,12 @@ public record RequisitionResponse(
                        BigDecimal stockOnHand, BigDecimal onOrderQty, BigDecimal alreadyRequestedQty) {}
 
     public record Conversion(UUID purchaseOrderId, String orderNumber, String poStatus, UUID requisitionLineId,
-                             BigDecimal quantity, BigDecimal unitCost, Instant createdAt) {}
+                             BigDecimal quantity, BigDecimal unitCost, Instant createdAt,
+                             BigDecimal requisitionUnitCost, String priceStatus, String priceChangeReason,
+                             BigDecimal savingAmount) {}
+
+    public record PriceOverride(UUID id, UUID requisitionId, String requisitionNumber, UUID purchaseOrderId, String orderNumber,
+                                String itemName, BigDecimal quantity, BigDecimal requisitionUnitCost, BigDecimal unitCost,
+                                String reason, String note, String quotationRef, String status, String convertedByName,
+                                Instant createdAt) {}
 }

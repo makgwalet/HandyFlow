@@ -145,8 +145,8 @@ public class GoodsReceivingService {
                         HttpStatus.CONFLICT, "OVER_RECEIPT");
             }
 
-            BigDecimal unitCost = line.unitCost() != null && line.unitCost().signum() > 0
-                    ? line.unitCost() : poLine.getUnitCost();
+            requirePoPrice(line.unitCost(), poLine);
+            BigDecimal unitCost = poLine.getUnitCost();
             // The PO line decides which stock item is received: a client-supplied catalogueItemId
             // may only fill the gap on a non-catalogue line, never redirect stock to another item.
             if (poLine.getCatalogueItemId() != null && line.catalogueItemId() != null
@@ -317,6 +317,17 @@ public class GoodsReceivingService {
     }
 
     // ── internals ─────────────────────────────────────────────────────────────
+
+    /**
+     * Policy: the receiver verifies what arrived, not what it costs. Stock is always valued at the PO price; a different
+     * supplier price shows up as an invoice-matching variance and a buyer resolves it. A client may still send the PO price.
+     */
+    static void requirePoPrice(BigDecimal supplied, ScPoLine poLine) {
+        if (supplied != null && supplied.signum() > 0 && supplied.compareTo(poLine.getUnitCost()) != 0)
+            throw new HandyFlowException(poLine.getItemName() + ": the unit cost cannot be changed when receiving goods (PO price "
+                    + poLine.getUnitCost().toPlainString() + "). A different supplier price is resolved at invoice matching "
+                    + "or through a PO amendment.", HttpStatus.CONFLICT, "RECEIVER_COST_OVERRIDE_REFUSED");
+    }
 
     /** Same total order as {@link #movementsInLockOrder}: (location, catalogue item). Lines that cannot be resolved sort last. */
     static final Comparator<UUID> UUID_ORDER = Comparator.nullsLast(Comparator.naturalOrder());

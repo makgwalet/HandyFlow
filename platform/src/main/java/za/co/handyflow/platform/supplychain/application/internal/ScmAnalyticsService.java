@@ -33,7 +33,8 @@ public class ScmAnalyticsService {
     public record RfqSaving(UUID rfqId, String rfqNumber, String title, BigDecimal estimate, BigDecimal awarded, BigDecimal highestBid, BigDecimal savedVsEstimate, BigDecimal savedVsHighestBid) {}
     public record ContractLeak(String orderNumber, String itemName, BigDecimal qty, BigDecimal unitCost, BigDecimal agreedPrice, BigDecimal overpaid) {}
     public record Savings(Period period, int rfqsAwarded, int rfqsWithEstimate, BigDecimal savedVsEstimate, BigDecimal savedVsHighestBid, List<RfqSaving> rfqs,
-                          BigDecimal paidAboveContract, int linesAboveContract, List<ContractLeak> contractLeaks, BigDecimal creditsRecovered) {}
+                          BigDecimal paidAboveContract, int linesAboveContract, List<ContractLeak> contractLeaks, BigDecimal creditsRecovered,
+                          BigDecimal negotiatedSavings) {}
 
     public record SupplierView(UUID supplierId, String supplierName, BigDecimal invoiced, Double spendSharePct, Integer score, String rating, Double onTimePct, Double fillRatePct,
                                Double rejectionPct, Double inspectionPassPct, Double returnRatePct, boolean lowConfidence, String flag) {}
@@ -112,8 +113,14 @@ public class ScmAnalyticsService {
         BigDecimal leaked = leaks.stream().map(ContractLeak::overpaid).reduce(BigDecimal.ZERO, BigDecimal::add);
         BigDecimal credits = sum("SELECT COALESCE(SUM(credit_amount),0) FROM sc_supplier_returns WHERE tenant_id = ? AND status = 'CREDITED' AND credited_at::date BETWEEN ? AND ?", tid, f, t);
 
+        // Buyer price below the requisition estimate, recorded at conversion, on orders that were actually placed.
+        BigDecimal negotiated = sum("""
+                SELECT COALESCE(SUM(c.saving_amount),0) FROM sc_requisition_conversions c
+                  JOIN sc_purchase_orders po ON po.id = c.purchase_order_id
+                 WHERE c.tenant_id = ? AND po.status NOT IN ('DRAFT','PENDING_APPROVAL','CANCELLED') AND po.order_date BETWEEN ? AND ?""", tid, f, t);
+
         return new Savings(p, rfqs.size(), (int) rfqs.stream().filter(r -> r.savedVsEstimate() != null).count(), vsEstimate, vsHighest, rfqs,
-                leaked, leaks.size(), leaks.stream().limit(20).toList(), credits);
+                leaked, leaks.size(), leaks.stream().limit(20).toList(), credits, negotiated);
     }
 
     @Transactional(readOnly = true)

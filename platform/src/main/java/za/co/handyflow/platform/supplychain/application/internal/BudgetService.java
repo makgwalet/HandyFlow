@@ -58,8 +58,7 @@ public class BudgetService {
     @Value("${app.scm.budget.near-limit-pct:90}")
     private BigDecimal nearLimitPct;
 
-    @Value("${app.scm.budget.include-vat:false}")
-    private boolean includeVat;
+    private final ProcurementPolicy policy;
 
     private record Usage(BigDecimal committed, BigDecimal actual, BigDecimal used) {}
     private record Dims(String department, String costCentre, String project, LocalDate spendDate) {}
@@ -128,7 +127,7 @@ public class BudgetService {
         jdbc.query("SELECT c.purchase_order_id, po.order_number, po.supplier_name, po.status, c.amount, "
                         + "COALESCE(inv.actual, 0) AS actual, c.spend_date "
                         + "FROM sc_budget_commitments c JOIN sc_purchase_orders po ON po.id = c.purchase_order_id AND po.status <> 'CANCELLED' "
-                        + invoiceJoin() + " WHERE c.tenant_id = ? AND " + col + " IS NOT NULL AND lower(" + col + ") = lower(?) "
+                        + invoiceJoin(tid) + " WHERE c.tenant_id = ? AND " + col + " IS NOT NULL AND lower(" + col + ") = lower(?) "
                         + "AND c.spend_date BETWEEN ? AND ? ORDER BY c.spend_date, po.order_number",
                 rs -> {
                     BigDecimal amount = rs.getBigDecimal("amount");
@@ -188,7 +187,7 @@ public class BudgetService {
     @Transactional
     public void checkRequisition(TenantId tenantId, ScRequisition r, List<ScRequisitionLine> lines, boolean alert) {
         UUID tid = tenantId.getValue();
-        BigDecimal amount = requisitionAmount(lines);
+        BigDecimal amount = requisitionAmount(tid, lines);
         Dims d = new Dims(r.getDepartment(), r.getCostCentre(), r.getProjectRef(),
                 r.getRequiredByDate() != null ? r.getRequiredByDate() : LocalDate.now());
         enforce(tenantId, ScBudgetOverride.REQUISITION, r.getId(), "Requisition " + r.getRequisitionNumber(),
@@ -213,7 +212,7 @@ public class BudgetService {
         } else {
             ScRequisition r = requisitionRepo.findByTenantAndId(tid, entityId)
                     .orElseThrow(() -> new HandyFlowException("Requisition not found", HttpStatus.NOT_FOUND, "NOT_FOUND"));
-            amount = requisitionAmount(requisitionLineRepo.findByRequisition(tid, entityId));
+            amount = requisitionAmount(tid, requisitionLineRepo.findByRequisition(tid, entityId));
             label = "Requisition " + r.getRequisitionNumber();
         }
         overrideRepo.save(ScBudgetOverride.create(tid, entityType, entityId, amount, reason.trim(), userId, userName));
@@ -295,14 +294,24 @@ public class BudgetService {
         return new Dims(dept, cc, project, po.getOrderDate() != null ? po.getOrderDate() : LocalDate.now());
     }
 
-    private BigDecimal poAmount(ScPurchaseOrder po) { return includeVat ? po.getTotalAmount() : po.getSubtotal(); }
+    private BigDecimal poAmount(ScPurchaseOrder po) {
+        BigDecimal vat = po.getTotalAmount().subtract(po.getSubtotal());
+        return ProcurementPolicy.budgetAmount(po.getSubtotal(), vat, policy.forTenant(po.getTenantId()));
+    }
 
-    private BigDecimal requisitionAmount(List<ScRequisitionLine> lines) {
+    /** SQL fragment: the budget amount of a document with subtotal and total_amount columns, under the company's VAT policy. */
+    private String amountSql(UUID tid) {
+        // The factor is a number computed from validated policy values (0..1, four decimals), never user text.
+        return "(subtotal + (total_amount - subtotal) * " + ProcurementPolicy.vatFactor(policy.forTenant(tid)).toPlainString() + ")";
+    }
+
+    private BigDecimal requisitionAmount(UUID tid, List<ScRequisitionLine> lines) {
+        BigDecimal factor = ProcurementPolicy.vatFactor(policy.forTenant(tid));
         BigDecimal total = BigDecimal.ZERO;
         for (ScRequisitionLine l : lines) {
             BigDecimal net = l.getQtyRequested().multiply(l.getEstimatedUnitCost()).setScale(2, RoundingMode.HALF_UP);
             total = total.add(net);
-            if (includeVat) total = total.add(net.multiply(l.getVatRate()).divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP));
+            total = total.add(net.multiply(l.getVatRate()).multiply(factor).divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP));
         }
         return total;
     }
@@ -313,7 +322,7 @@ public class BudgetService {
         jdbc.query("SELECT COALESCE(SUM(c.amount), 0) AS committed, COALESCE(SUM(COALESCE(inv.actual, 0)), 0) AS actual, "
                         + "COALESCE(SUM(GREATEST(c.amount, COALESCE(inv.actual, 0))), 0) AS used "
                         + "FROM sc_budget_commitments c JOIN sc_purchase_orders po ON po.id = c.purchase_order_id AND po.status <> 'CANCELLED' "
-                        + invoiceJoin() + " WHERE c.tenant_id = ? AND " + col + " IS NOT NULL AND lower(" + col + ") = lower(?) "
+                        + invoiceJoin(tid) + " WHERE c.tenant_id = ? AND " + col + " IS NOT NULL AND lower(" + col + ") = lower(?) "
                         + "AND c.spend_date BETWEEN ? AND ? AND c.purchase_order_id <> ?",
                 rs -> { box[0] = new Usage(rs.getBigDecimal("committed"), rs.getBigDecimal("actual"), rs.getBigDecimal("used")); },
                 tid, tid, b.getScopeValue(), java.sql.Date.valueOf(b.getPeriodStart()), java.sql.Date.valueOf(b.getPeriodEnd()),
@@ -332,7 +341,7 @@ public class BudgetService {
 
     /** Approved/paid invoices with no PO, coded to this budget's scope value and dated inside its period. */
     private BigDecimal noPoInvoiceActuals(UUID tid, ScBudget b) {
-        BigDecimal v = jdbc.queryForObject("SELECT COALESCE(SUM(" + (includeVat ? "total_amount" : "subtotal") + "), 0) "
+        BigDecimal v = jdbc.queryForObject("SELECT COALESCE(SUM(" + amountSql(tid) + "), 0) "
                         + "FROM sc_supplier_invoices WHERE tenant_id = ? AND purchase_order_id IS NULL AND status IN ('APPROVED','PAID') "
                         + "AND " + invoiceColumn(b.getScopeType()) + " IS NOT NULL AND lower(" + invoiceColumn(b.getScopeType()) + ") = lower(?) "
                         + "AND invoice_date BETWEEN ? AND ?",
@@ -349,8 +358,8 @@ public class BudgetService {
     }
 
     /** Approved/paid invoices per PO (ex-VAT or inc-VAT to match the commitment basis). First JDBC arg is the tenant id. */
-    private String invoiceJoin() {
-        return "LEFT JOIN (SELECT purchase_order_id, SUM(" + (includeVat ? "total_amount" : "subtotal") + ") AS actual "
+    private String invoiceJoin(UUID tid) {
+        return "LEFT JOIN (SELECT purchase_order_id, SUM(" + amountSql(tid) + ") AS actual "
                 + "FROM sc_supplier_invoices WHERE tenant_id = ? AND status IN ('APPROVED','PAID') AND purchase_order_id IS NOT NULL "
                 + "GROUP BY purchase_order_id) inv ON inv.purchase_order_id = c.purchase_order_id";
     }
