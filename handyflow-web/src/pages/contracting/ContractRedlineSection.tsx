@@ -1,6 +1,6 @@
 // src/pages/contracting/ContractRedlineSection.tsx
 // Version history and redlining of one contract's body. A body is changed by proposing a revised text; a reviewer accepts or
-// rejects each changed block. The comparison is block by block (a changed word shows its whole paragraph as removed and added).
+// rejects each changed block. The comparison is block by block; inside a changed paragraph the changed words are highlighted.
 import { useState, type CSSProperties } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { apiClient } from '../../api/client'
@@ -8,6 +8,7 @@ import { usePermissions } from '../../hooks/usePermission'
 import { sanitizeHtml } from './sanitizeHtml'
 import type { Clause } from './ClausesTab'
 import { RichTextEditor } from './RichTextEditor'
+import { hunkWordDiff, type WordOp } from './wordDiff'
 
 interface Segment { type: 'EQUAL' | 'HUNK'; hunkId: number; blocks: string[]; removed: string[]; added: string[] }
 interface VersionInfo { versionNo: number; source: string; note?: string | null; createdAt: string }
@@ -28,14 +29,29 @@ const errMsg = (e: unknown, fallback: string): string =>
   (e as { response?: { data?: { message?: string } } })?.response?.data?.message ?? fallback
 const data = <T,>(r: { data?: { data?: T } & T }): T => (r.data?.data ?? r.data) as T
 
+/** One side of a word-level comparison: unchanged words plain, changed words (deleted on the left, added on the right) marked. */
+function Words({ ops, side }: { ops: WordOp[]; side: 'del' | 'add' }) {
+  const mark = side === 'del'
+    ? { background: 'var(--hf-danger-border)', textDecoration: 'line-through' as const, borderRadius: 3 }
+    : { background: 'var(--hf-success-border)', fontWeight: 700, borderRadius: 3 }
+  return <div style={{ whiteSpace: 'pre-wrap' }}>{ops.filter(o => o.type === 'same' || o.type === side).map((o, i) => o.type === 'same' ? <span key={i}>{o.text}</span> : <span key={i} style={mark}>{o.text}</span>)}</div>
+}
+
 function Html({ html }: { html: string }) {
   return <div dangerouslySetInnerHTML={{ __html: sanitizeHtml(html) }} />
 }
 
 /** Unchanged blocks are muted; removed blocks are struck through in red, added blocks green. Optional per-change checkboxes. */
 function DiffView({ segments, accepted, onToggle }: { segments: Segment[]; accepted?: Set<number>; onToggle?: (id: number) => void }) {
+  const [words, setWords] = useState(true)
+  const anyWords = segments.some(s => s.type === 'HUNK' && hunkWordDiff(s.removed, s.added))
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+      {anyWords && (
+        <label style={{ fontSize: 12, color: 'var(--hf-text-secondary)', display: 'flex', gap: 6, alignItems: 'center' }}>
+          <input type="checkbox" checked={words} onChange={e => setWords(e.target.checked)} /> Highlight changed words
+        </label>
+      )}
       {segments.map((s, i) => s.type === 'EQUAL' ? (
         <div key={i} style={{ ...box, opacity: 0.65 }}>{s.blocks.map((b, j) => <Html key={j} html={b} />)}</div>
       ) : (
@@ -45,16 +61,23 @@ function DiffView({ segments, accepted, onToggle }: { segments: Segment[]; accep
               <input type="checkbox" checked={accepted.has(s.hunkId)} onChange={() => onToggle(s.hunkId)} /> Accept change {s.hunkId + 1}
             </label>
           )}
-          {s.removed.length > 0 && (
-            <div style={{ ...box, background: 'var(--hf-danger-soft)', textDecoration: 'line-through', color: 'var(--hf-danger-text)', border: 'none' }}>
-              {s.removed.map((b, j) => <Html key={j} html={b} />)}
-            </div>
-          )}
-          {s.added.length > 0 && (
-            <div style={{ ...box, background: 'var(--hf-success-soft-strong)', color: 'var(--hf-success-text-strong)', border: 'none' }}>
-              {s.added.map((b, j) => <Html key={j} html={b} />)}
-            </div>
-          )}
+          {(() => {
+            const ops = words ? hunkWordDiff(s.removed, s.added) : null
+            return (
+              <>
+                {s.removed.length > 0 && (
+                  <div style={{ ...box, background: 'var(--hf-danger-soft)', color: 'var(--hf-danger-text)', border: 'none', ...(ops ? {} : { textDecoration: 'line-through' }) }}>
+                    {ops ? <Words ops={ops} side="del" /> : s.removed.map((b, j) => <Html key={j} html={b} />)}
+                  </div>
+                )}
+                {s.added.length > 0 && (
+                  <div style={{ ...box, background: 'var(--hf-success-soft-strong)', color: 'var(--hf-success-text-strong)', border: 'none' }}>
+                    {ops ? <Words ops={ops} side="add" /> : s.added.map((b, j) => <Html key={j} html={b} />)}
+                  </div>
+                )}
+              </>
+            )
+          })()}
         </div>
       ))}
     </div>
