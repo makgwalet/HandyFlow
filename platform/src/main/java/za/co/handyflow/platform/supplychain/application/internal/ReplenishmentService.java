@@ -28,7 +28,10 @@ public class ReplenishmentService {
     private static final int DEMAND_DAYS = 90;
 
     public record Item(UUID catalogueItemId, String itemName, BigDecimal available, BigDecimal onOrder, BigDecimal requested, BigDecimal reorderLevel, BigDecimal dailyDemand,
-                       BigDecimal daysCover, int leadTimeDays, BigDecimal suggestedQty, String urgency, String reason, UUID suggestedSupplierId, BigDecimal suggestedUnitCost) {}
+                       BigDecimal daysCover, int leadTimeDays, BigDecimal suggestedQty, String urgency, String reason, UUID suggestedSupplierId, BigDecimal suggestedUnitCost,
+                       String priceSource, String contractNumber) {}
+
+    private record ContractPrice(UUID supplierId, BigDecimal price, BigDecimal minQty, String contractNumber) {}
 
     public record Pick(UUID catalogueItemId, BigDecimal qty) {}
     public record RaiseRequest(String title, String businessReason, String department, String costCentre, String projectRef, UUID deliverToLocation, List<Pick> items) {}
@@ -52,6 +55,17 @@ public class ReplenishmentService {
                   FROM sc_goods_receipts gr JOIN sc_purchase_orders po ON po.id = gr.purchase_order_id JOIN sc_gr_lines l ON l.goods_receipt_id = gr.id
                  WHERE gr.tenant_id = ? AND gr.status = 'POSTED' AND l.catalogue_item_id IS NOT NULL AND gr.received_date >= current_date - 365
                  GROUP BY l.catalogue_item_id""", rs -> { lead.put((UUID) rs.getObject(1), (int) Math.ceil(Math.max(rs.getDouble(2), 1))); }, tid);
+
+        // Prices agreed in a contract that is in force today, cheapest first. A line with a minimum quantity applies only to an order of at least that size.
+        Map<UUID, List<ContractPrice>> contractPrices = new HashMap<>();
+        jdbc.query("""
+                SELECT l.catalogue_item_id, c.supplier_id, l.agreed_unit_price, l.min_qty, c.contract_number
+                  FROM sc_contract_lines l JOIN sc_contracts c ON c.id = l.contract_id
+                 WHERE c.tenant_id = ? AND c.status = 'ACTIVE' AND current_date BETWEEN c.start_date AND c.end_date AND l.catalogue_item_id IS NOT NULL
+                 ORDER BY l.agreed_unit_price, c.contract_number""", rs -> {
+            contractPrices.computeIfAbsent((UUID) rs.getObject(1), k -> new ArrayList<>())
+                    .add(new ContractPrice((UUID) rs.getObject(2), rs.getBigDecimal(3), rs.getBigDecimal(4), rs.getString(5)));
+        }, tid);
 
         List<Item> out = new ArrayList<>();
         jdbc.query("""
@@ -78,8 +92,14 @@ public class ReplenishmentService {
             Recommendation r = ReplenishmentRules.recommend(new ReplenishmentRules.Input(rs.getBigDecimal("available"), av.onOrder(), av.alreadyRequested(), rp,
                     rs.getBigDecimal("rq"), rs.getBigDecimal("mx"), daily, leadDays));
             if (r == null) return;
+            UUID supplier = (UUID) rs.getObject("supplier_id");
+            BigDecimal price = rs.getBigDecimal("unit_cost");
+            String source = supplier != null ? "SUPPLIER_ITEM" : null, contractNumber = null;
+            ContractPrice agreed = contractPrices.getOrDefault(item, List.of()).stream()
+                    .filter(c -> c.minQty() == null || r.orderQty().compareTo(c.minQty()) >= 0).findFirst().orElse(null);
+            if (agreed != null) { supplier = agreed.supplierId(); price = agreed.price(); source = "CONTRACT"; contractNumber = agreed.contractNumber(); }
             out.add(new Item(item, rs.getString("item_name"), rs.getBigDecimal("available"), av.onOrder(), av.alreadyRequested(), r.reorderLevel(), daily, r.daysCover(), leadDays,
-                    r.orderQty(), r.urgency().name(), r.reason(), (UUID) rs.getObject("supplier_id"), rs.getBigDecimal("unit_cost")));
+                    r.orderQty(), r.urgency().name(), r.reason(), supplier, price, source, contractNumber));
         }, tid);
         out.sort(Comparator.comparing((Item i) -> ReplenishmentRules.Urgency.valueOf(i.urgency())).thenComparing(Item::itemName));
         return out;

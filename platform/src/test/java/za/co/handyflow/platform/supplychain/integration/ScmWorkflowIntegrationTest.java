@@ -18,6 +18,8 @@ import za.co.handyflow.platform.supplychain.application.internal.BudgetService;
 import za.co.handyflow.platform.supplychain.application.internal.GoodsReceivingService;
 import za.co.handyflow.platform.supplychain.application.internal.PoAmendmentService;
 import za.co.handyflow.platform.supplychain.application.internal.QuarantineService;
+import za.co.handyflow.platform.supplychain.application.internal.ReplenishmentService;
+import za.co.handyflow.platform.supplychain.application.internal.ScmAnalyticsService;
 import za.co.handyflow.platform.supplychain.application.internal.RequisitionService;
 import za.co.handyflow.platform.supplychain.domain.repository.ScPurchaseOrderRepository;
 
@@ -67,6 +69,8 @@ class ScmWorkflowIntegrationTest {
     @Autowired GoodsReceivingService receiving;
     @Autowired ScPurchaseOrderRepository poRepo;
     @Autowired QuarantineService quarantine;
+    @Autowired ReplenishmentService replenishment;
+    @Autowired ScmAnalyticsService analytics;
 
     final UUID tenantId = UUID.randomUUID();
     final TenantId tenant = TenantId.of(tenantId);
@@ -231,5 +235,48 @@ class ScmWorkflowIntegrationTest {
 
     private BigDecimal onHand(UUID location, UUID item) {
         return jdbc.queryForObject("SELECT qty_on_hand FROM sc_inventory WHERE tenant_id = ? AND location_id = ? AND catalogue_item_id = ?", BigDecimal.class, tenantId, location, item);
+    }
+
+    // ── 6. Replenishment prefers a contract price in force; analytics count only approved or paid invoices ──
+
+    @Test
+    void replenishmentSuggestsTheContractSupplierAndPrice() {
+        UUID location = UUID.randomUUID(), item = UUID.randomUUID(), contract = UUID.randomUUID(), contractSupplier = UUID.randomUUID();
+        insert(jdbc, "sc_stock_locations", row("id", location, "tenant_id", tenantId, "name", "Main store"));
+        insert(jdbc, "sc_inventory", row("id", UUID.randomUUID(), "tenant_id", tenantId, "location_id", location, "catalogue_item_id", item,
+                "qty_on_hand", BigDecimal.ZERO, "reorder_point", BigDecimal.TEN, "reorder_qty", BigDecimal.valueOf(20)));
+        insert(jdbc, "sc_contracts", row("id", contract, "tenant_id", tenantId, "contract_number", "CON-1", "supplier_id", contractSupplier, "supplier_name", "Contract Co",
+                "title", "Tyres", "status", "ACTIVE", "start_date", Date.valueOf(LocalDate.now().minusDays(30)), "end_date", Date.valueOf(LocalDate.now().plusDays(300))));
+        insert(jdbc, "sc_contract_lines", row("id", UUID.randomUUID(), "tenant_id", tenantId, "contract_id", contract, "catalogue_item_id", item, "description", "Tyre",
+                "agreed_unit_price", BigDecimal.valueOf(80), "min_qty", BigDecimal.valueOf(1000)));      // minimum order not reached: must not apply
+        insert(jdbc, "sc_contract_lines", row("id", UUID.randomUUID(), "tenant_id", tenantId, "contract_id", contract, "catalogue_item_id", item, "description", "Tyre",
+                "agreed_unit_price", BigDecimal.valueOf(90), "min_qty", BigDecimal.TEN));
+
+        var rec = replenishment.recommendations(tenant).stream().filter(r -> r.catalogueItemId().equals(item)).findFirst().orElseThrow();
+
+        assertThat(rec.urgency()).isEqualTo("STOCKOUT");
+        assertThat(rec.priceSource()).isEqualTo("CONTRACT");
+        assertThat(rec.contractNumber()).isEqualTo("CON-1");
+        assertThat(rec.suggestedSupplierId()).isEqualTo(contractSupplier);
+        assertThat(rec.suggestedUnitCost()).isEqualByComparingTo("90");
+    }
+
+    @Test
+    void spendCountsOnlyApprovedAndPaidInvoicesAndShowsTheNoPoShare() {
+        UUID po = purchaseOrder("PO-SP-1", BigDecimal.valueOf(100), null);
+        String[][] rows = {{"SP-1", "APPROVED", "100", "po"}, {"SP-2", "PAID", "300", "nopo"}, {"SP-3", "RECEIVED", "999", "po"}};
+        for (String[] r : rows) {
+            insert(jdbc, "sc_supplier_invoices", row("id", UUID.randomUUID(), "tenant_id", tenantId, "invoice_number", r[0], "supplier_id", supplier,
+                    "purchase_order_id", "po".equals(r[3]) ? po : null, "invoice_date", Date.valueOf(LocalDate.now().minusDays(5)), "due_date", Date.valueOf(LocalDate.now().plusDays(25)),
+                    "received_date", Date.valueOf(LocalDate.now().minusDays(5)), "subtotal", new BigDecimal(r[2]), "total_amount", new BigDecimal(r[2]), "status", r[1]));
+        }
+
+        var spend = analytics.spend(tenant, null, null);
+
+        assertThat(spend.invoiced()).as("the RECEIVED invoice is not spend yet").isEqualByComparingTo("400");
+        assertThat(spend.paid()).isEqualByComparingTo("300");
+        assertThat(spend.invoicedWithoutPo()).isEqualByComparingTo("300");
+        assertThat(spend.withoutPoSharePct()).isEqualTo(75.0);
+        assertThat(spend.bySupplier()).singleElement().satisfies(s -> assertThat(s.sharePct()).isEqualTo(100.0));
     }
 }
