@@ -27,7 +27,7 @@ describe("VariancesTab", () => {
     mount()
     expect(await screen.findByText(/200 L short/)).toBeTruthy()
     expect(screen.getByText(/tolerance 0.5%/)).toBeTruthy()
-    expect(screen.getByText(/Dan/)).toBeTruthy()
+    expect(screen.getAllByText(/Dan/).length).toBeGreaterThan(0)
   })
   it("needs a note to close, and sends the decision with it", async () => {
     mount()
@@ -56,5 +56,35 @@ describe("VariancesTab", () => {
     mount()
     await screen.findByText(/200 L short/)
     expect(screen.queryByLabelText("Close DR-001")).toBeNull()
+  })
+
+  it("adds up what is short and over, and shows where variances cluster by driver, repeats marked", async () => {
+    get.mockResolvedValue({ data: { data: { toleranceSet: true, variances: [v(), v({ id: "v2", receiptNumber: "DR-002", varianceLitres: -300 }), v({ id: "v3", receiptNumber: "DR-003", driverName: "Eve", vehicleReg: "CB 9", varianceLitres: 50 }), v({ id: "v4", receiptNumber: "DR-004", status: "CLOSED", decision: "WRITTEN_OFF", varianceLitres: -80 })] } } })
+    mount()
+    const totals = await screen.findByLabelText("Variance totals")
+    const flat = (totals.textContent ?? "").replace(/\s/g, " ")
+    expect(flat).toContain("Short, not closed500 L")
+    expect(flat).toContain("3 (3 open")
+    const rows = screen.getAllByRole("row").map(r => r.textContent)
+    expect(rows[1]).toContain("Dan"); expect(rows[1]).toContain("Repeats")
+    expect(rows[2]).toContain("Eve"); expect(rows[2]).not.toContain("Repeats")
+    fireEvent.change(screen.getByLabelText("Group by"), { target: { value: "vehicle" } })
+    expect(screen.getAllByRole("row").map(r => r.textContent).some(t => t?.includes("CB 9"))).toBe(true)
+  })
+
+  it("filters by status and search", async () => {
+    get.mockResolvedValue({ data: { data: { toleranceSet: true, variances: [v(), v({ id: "v4", receiptNumber: "DR-004", status: "CLOSED", decision: "EXPLAINED" })] } } })
+    mount()
+    await screen.findByLabelText("Variance totals")
+    fireEvent.change(screen.getByLabelText("Status"), { target: { value: "CLOSED" } })
+    expect(screen.queryByLabelText("Close DR-001")).toBeNull()
+    fireEvent.change(screen.getByLabelText("Search variances"), { target: { value: "zzz" } })
+    expect(screen.getByText("No variances match.")).toBeTruthy()
+  })
+
+  it("opens the load's timeline from a variance", async () => {
+    mount()
+    fireEvent.click(await screen.findByLabelText("Timeline for DR-001"))
+    await waitFor(() => expect(get.mock.calls.some(c => c[0] === "/api/v1/fuel/deliveries/d1/execution")).toBe(true))
   })
 })
