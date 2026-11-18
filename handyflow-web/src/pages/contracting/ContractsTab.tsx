@@ -16,6 +16,7 @@
 //  • Transaction-level discount field on create form
 //  • Contract body rendered as HTML in detail view (not raw tags)
 
+import { sanitizeHtml } from './sanitizeHtml'
 import { useState, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { apiClient } from '../../api/client'
@@ -538,7 +539,7 @@ export default function ContractsTab() {
                       </button>
                       {showBodyId === c.id && (
                         <div style={{ border: '1px solid var(--hf-border)', borderRadius: 8, padding: '14px 16px', background: 'var(--hf-surface)', maxHeight: 320, overflowY: 'auto', fontSize: 13, lineHeight: 1.8, color: 'var(--hf-text-secondary)' }}
-                          dangerouslySetInnerHTML={{ __html: (contractDetail?.id === c.id ? contractDetail?.body : null) ?? c.body ?? '<p style="color:var(--hf-text-faint)">Loading body…</p>' }}
+                          dangerouslySetInnerHTML={{ __html: sanitizeHtml((contractDetail?.id === c.id ? contractDetail?.body : null) ?? c.body ?? '<p style="color:var(--hf-text-faint)">Loading body…</p>') }}
                         />
                       )}
                     </div>

@@ -588,7 +588,7 @@ public class ContractingService {
 
         return new PublicContractView(
                 c.getId(), c.getContractNumber(), c.getTitle(), c.getContractType(),
-                c.getStatus(), c.getBody(), c.getStartDate(), c.getEndDate(),
+                c.getStatus(), HtmlSanitizer.clean(c.getBody()), c.getStartDate(), c.getEndDate(),
                 c.getValueAmount(), c.getCurrency(), c.getNotes(),
                 myView, others,
                 "SIGNED".equals(me.getSigningStatus()), me.getSignedAt(),

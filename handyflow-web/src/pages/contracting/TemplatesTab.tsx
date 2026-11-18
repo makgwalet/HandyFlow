@@ -10,6 +10,7 @@
 //  • System vs custom template section headers
 //  • "Used in N contracts" count surfaced where available
 
+import { sanitizeHtml } from './sanitizeHtml'
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { apiClient } from '../../api/client'
@@ -80,7 +81,7 @@ function HtmlPreview({ html, maxHeight = 280 }: { html: string; maxHeight?: numb
         background: 'var(--hf-surface)', border: '1px solid var(--hf-border)',
         borderRadius: 7, fontSize: 13, lineHeight: 1.8, color: 'var(--hf-text-secondary)',
       }}
-      dangerouslySetInnerHTML={{ __html: html }}
+      dangerouslySetInnerHTML={{ __html: sanitizeHtml(html) }}
     />
   )
 }
@@ -355,7 +356,7 @@ export default function TemplatesTab() {
                 {/* FIX: dangerouslySetInnerHTML renders HTML — original showed raw tags */}
                 <div
                   style={{ maxHeight: 240, overflowY: 'auto', padding: '14px 16px', background: 'var(--hf-surface-muted)', border: '1px solid var(--hf-border)', borderRadius: 7, fontSize: 13, lineHeight: 1.8, color: 'var(--hf-text-secondary)' }}
-                  dangerouslySetInnerHTML={{ __html: form.bodyTemplate }}
+                  dangerouslySetInnerHTML={{ __html: sanitizeHtml(form.bodyTemplate) }}
                 />
               </div>
             )}

@@ -33,9 +33,16 @@ import java.util.UUID;
 public class OtpDevController {
 
     private final OtpService otpService;
+    private final org.springframework.core.env.Environment environment;
 
     @jakarta.annotation.PostConstruct
     void warnEnabled() {
+        // Only the dev and test profiles may serve codes. Anything else (production, staging, no profile)
+        // refuses to start rather than quietly leak one-time codes.
+        if (!environment.acceptsProfiles(org.springframework.core.env.Profiles.of("dev", "test"))) {
+            throw new IllegalStateException("handyflow.dev.otp-endpoint.enabled=true is only allowed with the "
+                    + "'dev' or 'test' Spring profile. Unset DEV_OTP_ENDPOINT.");
+        }
         log.warn("DEV OTP endpoint (/api/v1/dev/otp/{partyId}) is ENABLED. It returns signing codes to anyone "
                 + "who can reach the API. Never enable handyflow.dev.otp-endpoint.enabled in production.");
     }

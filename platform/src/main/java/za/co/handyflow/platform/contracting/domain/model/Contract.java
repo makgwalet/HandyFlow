@@ -169,7 +169,7 @@ public class Contract {
         c.contractNumber    = contractNumber;
         c.title             = title;
         c.contractType      = contractType;
-        c.body              = body;
+        c.body              = HtmlSanitizer.clean(body);
         c.templateId        = templateId;
         c.createdBy         = createdBy;
         c.status            = "DRAFT";
@@ -246,7 +246,7 @@ public class Contract {
      */
     public void updateBody(String body) {
         assertEditable();
-        this.body      = body;
+        this.body      = HtmlSanitizer.clean(body);
         this.updatedAt = Instant.now();
     }
 

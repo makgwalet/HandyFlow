@@ -15,6 +15,7 @@
 //   • Comment / amendment request (POST /api/v1/sign/{token}/comment)
 //   • View comments thread       (GET  /api/v1/sign/{token}/comments)
 
+import { sanitizeHtml } from './sanitizeHtml'
 import { useState, useRef, useEffect } from 'react'
 import { useParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
@@ -448,7 +449,7 @@ export default function SigningPage() {
 
           {showBody && (
             <div style={{ marginTop: 14, border: '1px solid var(--hf-border)', borderRadius: 10, padding: '18px 20px', maxHeight: 480, overflowY: 'auto', fontSize: 14, lineHeight: 1.9, color: 'var(--hf-text-secondary)' }}
-              dangerouslySetInnerHTML={{ __html: contract.bodyHtml }}
+              dangerouslySetInnerHTML={{ __html: sanitizeHtml(contract.bodyHtml) }}
             />
           )}
 

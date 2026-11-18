@@ -45,7 +45,7 @@ public class ContractTemplate {
         t.name         = name;
         t.contractType = contractType;
         t.description  = description;
-        t.bodyTemplate = bodyTemplate;
+        t.bodyTemplate = HtmlSanitizer.clean(bodyTemplate);
         t.variables    = variables;
         t.isSystem     = isSystem;
         t.active       = true;
