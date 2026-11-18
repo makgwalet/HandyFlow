@@ -26,6 +26,7 @@ import {
   UserCheck, Palette, Headphones, Wallet, Receipt, CheckSquare, LayoutGrid, ListChecks, ScanBarcode, PackageCheck, ArrowDownUp, Sprout, FlaskConical,
   Columns3, Zap, History, Plug, Filter, Copy, SlidersHorizontal, Tags, Target, Ruler,
   UserPlus, Mail, KeyRound, Layers,
+  BarChart3,
 } from 'lucide-react'
 
 export interface ModuleSection {
@@ -297,6 +298,7 @@ export const FUEL_SECTIONS: ModuleSections = {
         { id: 'margin', label: 'Cost & Margin', icon: TrendingUp, permission: 'FUEL_MARGIN_READ' },
         { id: 'cost-to-serve', label: 'Cost to serve', icon: TrendingUp, permission: 'FUEL_MARGIN_READ' },
         { id: 'landed-cost', label: 'Landed cost', icon: TrendingUp, permission: 'FUEL_MARGIN_READ' },
+        { id: 'division-sales', label: 'Sales by division', icon: BarChart3 },
         { id: 'group-report', label: 'Group report', icon: Building2 },
       ],
     },

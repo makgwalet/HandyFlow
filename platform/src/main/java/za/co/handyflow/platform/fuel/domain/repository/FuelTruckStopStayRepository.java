@@ -21,6 +21,10 @@ public interface FuelTruckStopStayRepository extends JpaRepository<FuelTruckStop
     @Query("SELECT s FROM FuelTruckStopStay s WHERE s.tenantId = :tenantId AND s.accountId = :accountId ORDER BY s.arrivalDate DESC, s.createdAt DESC")
     List<FuelTruckStopStay> findForAccount(TenantId tenantId, UUID accountId, Pageable page);
 
+    /** Stays that left the yard in the window, for sales by division. */
+    @Query("SELECT s FROM FuelTruckStopStay s WHERE s.tenantId = :tenantId AND s.status = 'CHECKED_OUT' AND s.checkedOutAt >= :from AND s.checkedOutAt < :to")
+    List<FuelTruckStopStay> findCheckedOutBetween(TenantId tenantId, java.time.Instant from, java.time.Instant to);
+
     @Query("SELECT COUNT(s) FROM FuelTruckStopStay s WHERE s.tenantId = :tenantId AND s.status IN ('BOOKED','CHECKED_IN')")
     long countOpen(TenantId tenantId);
 

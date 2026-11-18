@@ -31,6 +31,7 @@ import ReturnedFuelTab from "./ReturnedFuelTab"
 import ContractsTab from "./ContractsTab"
 import StaysTab from "./StaysTab"
 import GroupReportTab from "./GroupReportTab"
+import DivisionSalesTab from "./DivisionSalesTab"
 import AutomationTab from "./AutomationTab"
 import SettingsTab from "./SettingsTab"
 import VariancesTab from "./VariancesTab"
@@ -106,6 +107,7 @@ export function FuelPage() {
         case "returned-fuel": return <ReturnedFuelTab />
         case "landed-cost": return <LandedCostTab />
         case "group-report": return <GroupReportTab />
+        case "division-sales": return <DivisionSalesTab />
         case "automation": return <AutomationTab />
         case "settings":   return <SettingsTab />
         case "variances": return <VariancesTab />
