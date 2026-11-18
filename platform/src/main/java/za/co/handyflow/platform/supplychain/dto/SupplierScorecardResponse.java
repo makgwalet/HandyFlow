@@ -23,5 +23,9 @@ public record SupplierScorecardResponse(
         Integer score,
         String rating,
         boolean lowConfidence,
-        String complianceStatus
+        String complianceStatus,
+        /** Share of inspected goods that passed; null when nothing was inspected in the window. */
+        Double inspectionPassPct,
+        /** Share of delivered quantity returned or claimed back; null when nothing was delivered. */
+        Double returnRatePct
 ) {}

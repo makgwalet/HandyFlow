@@ -1,7 +1,9 @@
 -- V762: supplier contracts, returns and claims, quality inspection, RFQ reminder marker.
 
--- ── RFQ reminders: one reminder per invitation ──────────────────────────────────────────────────────────────────────────────────
+-- ── RFQ and quotation reminders: each is sent once (supplier, buyer on close, buyer on quotation expiry) ──────────────────────────────────────────────────────────────────────────────────
 ALTER TABLE sc_rfq_invitations ADD COLUMN IF NOT EXISTS reminder_sent_at TIMESTAMPTZ;
+ALTER TABLE sc_rfqs ADD COLUMN IF NOT EXISTS buyer_close_notice_sent_at TIMESTAMPTZ;
+ALTER TABLE sc_quotations ADD COLUMN IF NOT EXISTS expiry_notice_sent_at TIMESTAMPTZ;
 
 -- ── Supplier contracts ──────────────────────────────────────────────────────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS sc_contracts (

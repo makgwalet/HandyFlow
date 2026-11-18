@@ -276,6 +276,11 @@ public class ScmNotificationService {
 
     // ─── Infrastructure ───────────────────────────────────────────────────────
 
+    /** Email every admin of the tenant (used by the contract and RFQ reminder jobs). The body must already be escaped HTML. */
+    public void notifyAdmins(UUID tenantId, String subject, String htmlBody) {
+        send(tenantId, subject, htmlBody);
+    }
+
     private void send(UUID tenantId, String subject, String htmlBody) {
         if (!notificationsEnabled) {
             log.debug("[SCM] Notifications disabled — skipping: {}", subject);

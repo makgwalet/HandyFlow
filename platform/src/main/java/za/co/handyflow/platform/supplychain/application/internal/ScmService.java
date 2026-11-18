@@ -38,6 +38,7 @@ import java.util.stream.Stream;
 public class ScmService {
 
     private final ScmSeparationOfDuties sod;
+    private final ContractService contractService;
     private final ScSupplierRepository        supplierRepo;
     private final ScStockLocationRepository   locationRepo;
     private final ScInventoryRepository       inventoryRepo;
@@ -377,6 +378,7 @@ public class ScmService {
         ScPurchaseOrder saved = poRepo.save(po);
         // NEW (chunk 3): immutable revision snapshot of exactly what was approved.
         poVersionService.recordApproval(saved, approverId, approverName);
+        warnIfAboveContractPrice(tenantId, saved);
         notificationService.notifyPoApproved(tenantId.getValue(), po.getOrderNumber(),
                 po.getSupplierName(), po.getTotalAmount(), approverName);
         return saved;
@@ -871,6 +873,20 @@ public class ScmService {
                 inv.getInvoiceNumber(), inv.getInvoiceDate(), inv.getDueDate(),
                 inv.getSubtotal(), inv.getVatAmount(), approverId);
         inv.recordApBillHandOff(bill.getId());
+    }
+
+    /** A PO priced above an active contract is flagged for review; the order itself is not blocked. */
+    private void warnIfAboveContractPrice(TenantId tenantId, ScPurchaseOrder po) {
+        try {
+            var variances = contractService.priceVariances(tenantId, po.getId());
+            if (variances.isEmpty()) return;
+            StringBuilder msg = new StringBuilder("PO " + po.getOrderNumber() + " is priced above the contract: ");
+            variances.forEach(v -> msg.append(v.itemName()).append(' ').append(v.poUnitCost()).append(" vs ").append(v.agreedUnitPrice())
+                    .append(" (+").append(v.overPct()).append("% on ").append(v.contractNumber()).append("); "));
+            controlExceptionFacade.raise(tenantId, "supplychain", "CONTRACT_PRICE_EXCEEDED", "ScPurchaseOrder", po.getId(), "WARNING", msg.toString());
+        } catch (Exception e) {
+            log.warn("[SCM] Contract price check failed for PO {}: {}", po.getOrderNumber(), e.getMessage());   // never blocks an approval
+        }
     }
 
     private void enforceSegregation(TenantId tenantId, String checkingPermission, String itemType, UUID itemId,

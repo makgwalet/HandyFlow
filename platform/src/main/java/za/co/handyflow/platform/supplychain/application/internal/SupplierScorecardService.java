@@ -33,6 +33,8 @@ import java.util.*;
  *      (price / quantity / amount / VAT / total / possible-duplicate). Missing-GRN and similar
  *      holds are the buyer's side, so they don't count against the supplier.</li>
  *  <li>Lead time: order date to first posted receipt.</li>
+ *  <li>Inspection pass rate: passed / inspected across completed quality inspections.</li>
+ *  <li>Returns: quantity on approved, dispatched or credited returns and claims, against what was delivered; the score uses 100 minus that.</li>
  * </ul>
  * Not covered yet: dispute-resolution time, price competitiveness.
  */
@@ -53,6 +55,7 @@ public class SupplierScorecardService {
     private record Qty(double ordered, double accepted) {}
     private record Quality(double delivered, double rejected) {}
     private record Invoices(int total, int withErrors) {}
+    private record Inspected(double passed, double inspected) {}
 
     @Transactional(readOnly = true)
     public SupplierScorecardResponse one(TenantId tenantId, UUID supplierId, Integer months) {
@@ -82,6 +85,8 @@ public class SupplierScorecardService {
         Map<UUID, Qty> qty = quantities(tid, since);
         Map<UUID, Quality> quality = quality(tid, since);
         Map<UUID, Invoices> invoices = invoices(tid, since);
+        Map<UUID, Inspected> inspected = inspected(tid, since);
+        Map<UUID, Double> returned = returnedQty(tid, since);
         Map<UUID, SupplierComplianceRules.Overall> comp = compliance.overallForTenant(tenantId,
                 suppliers.stream().map(ScSupplier::getId).toList());
 
@@ -98,12 +103,18 @@ public class SupplierScorecardService {
             Double qualityPct = rejectionPct == null ? null : 100.0 - rejectionPct;
             Double invAcc = SupplierScoreRules.pct(inv.total() - inv.withErrors(), inv.total());
 
-            Score score = SupplierScoreRules.score(new Metrics(onTime, fill, qualityPct, invAcc));
+            Inspected insp = inspected.get(s.getId());
+            Double inspectionPass = insp == null ? null : QualityInspectionRules.passRatePct(insp.passed(), insp.inspected());
+            Double returnRate = ql == null || ql.delivered() <= 0 ? null : SupplierScoreRules.pct(returned.getOrDefault(s.getId(), 0.0), ql.delivered());
+            Double kept = returnRate == null ? null : 100.0 - returnRate;
+
+            Score score = SupplierScoreRules.score(new Metrics(onTime, fill, qualityPct, invAcc, inspectionPass, kept));
             out.add(new SupplierScorecardResponse(s.getId(), s.getName(), s.getStatus().name(), months,
                     d.onTime(), d.late(), round1(onTime), round1(fill), round1(rejectionPct), round1(invAcc),
                     inv.total(), inv.withErrors(), round1(d.avgLead()), score.score(), score.rating(),
                     d.onTime() + d.late() < LOW_CONFIDENCE_BELOW,
-                    comp.getOrDefault(s.getId(), SupplierComplianceRules.Overall.NOT_REQUIRED).name()));
+                    comp.getOrDefault(s.getId(), SupplierComplianceRules.Overall.NOT_REQUIRED).name(),
+                    round1(inspectionPass), round1(returnRate)));
         }
         return out;
     }
@@ -144,6 +155,32 @@ public class SupplierScorecardService {
                 GROUP BY po.supplier_id
                 """, rs -> {
             m.put((UUID) rs.getObject("supplier_id"), new Qty(rs.getDouble("ordered"), rs.getDouble("accepted")));
+        }, tid, since);
+        return m;
+    }
+
+    private Map<UUID, Inspected> inspected(UUID tid, Date since) {
+        Map<UUID, Inspected> m = new HashMap<>();
+        jdbc.query("""
+                SELECT i.supplier_id, SUM(l.qty_passed) AS passed, SUM(l.qty_inspected) AS inspected
+                FROM sc_quality_inspections i JOIN sc_quality_inspection_lines l ON l.inspection_id = i.id
+                WHERE i.tenant_id = ? AND i.status = 'COMPLETED' AND i.completed_at >= ?
+                GROUP BY i.supplier_id
+                """, rs -> {
+            m.put((UUID) rs.getObject("supplier_id"), new Inspected(rs.getDouble("passed"), rs.getDouble("inspected")));
+        }, tid, since);
+        return m;
+    }
+
+    private Map<UUID, Double> returnedQty(UUID tid, Date since) {
+        Map<UUID, Double> m = new HashMap<>();
+        jdbc.query("""
+                SELECT r.supplier_id, SUM(l.qty) AS returned
+                FROM sc_supplier_returns r JOIN sc_supplier_return_lines l ON l.return_id = r.id
+                WHERE r.tenant_id = ? AND r.status IN ('APPROVED','DISPATCHED','CREDITED') AND r.created_at >= ?
+                GROUP BY r.supplier_id
+                """, rs -> {
+            m.put((UUID) rs.getObject("supplier_id"), rs.getDouble("returned"));
         }, tid, since);
         return m;
     }
