@@ -7,6 +7,7 @@ import { apiClient } from '../../api/client'
 import { usePermissions } from '../../hooks/usePermission'
 import { sanitizeHtml } from './sanitizeHtml'
 import type { Clause } from './ClausesTab'
+import { RichTextEditor } from './RichTextEditor'
 
 interface Segment { type: 'EQUAL' | 'HUNK'; hunkId: number; blocks: string[]; removed: string[]; added: string[] }
 interface VersionInfo { versionNo: number; source: string; note?: string | null; createdAt: string }
@@ -222,8 +223,8 @@ export function ContractRedlineSection({ contractId, status }: { contractId: str
             {!editable && <div style={{ fontSize: 12, color: 'var(--hf-text-faint)', marginBottom: 6 }}>The text of a contract that has been sent or signed cannot be changed.</div>}
             {drafting && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 10 }}>
-                <div style={{ fontSize: 12, color: 'var(--hf-text-muted)' }}>Edit the text below (HTML: paragraphs, headings, lists and tables). Only the changed blocks are shown for review. Scripts, links and images are removed.</div>
-                <textarea rows={12} value={text} onChange={e => setText(e.target.value)} style={{ width: '100%', boxSizing: 'border-box', fontFamily: 'monospace', fontSize: 12, padding: 8, border: '1.5px solid var(--hf-border)', borderRadius: 8, background: 'var(--hf-surface)' }} />
+                <div style={{ fontSize: 12, color: 'var(--hf-text-muted)' }}>Edit the text below. Only the changed blocks are shown for review. If the editor reformats parts you did not touch, use the HTML view to keep the original markup.</div>
+                <RichTextEditor value={text} onChange={setText} minHeight={240} />
                 <input placeholder="Why this change (optional)" value={note} onChange={e => setNote(e.target.value)} style={{ padding: '8px 10px', border: '1.5px solid var(--hf-border)', borderRadius: 8, fontSize: 13, background: 'var(--hf-surface)' }} />
                 <div style={{ display: 'flex', gap: 8 }}>
                   <button style={{ ...btn, background: 'var(--hf-primary)', color: 'var(--hf-text-on-solid)', border: 'none' }} disabled={propose.isPending} onClick={() => propose.mutate()}>{propose.isPending ? 'Saving…' : 'Submit proposal'}</button>

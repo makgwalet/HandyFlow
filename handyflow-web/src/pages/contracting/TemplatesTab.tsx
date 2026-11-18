@@ -11,6 +11,8 @@
 //  • "Used in N contracts" count surfaced where available
 
 import { sanitizeHtml } from './sanitizeHtml'
+import { RichTextEditor } from './RichTextEditor'
+import { hasContent } from './richText'
 import { useState, type CSSProperties, type ChangeEvent } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { apiClient } from '../../api/client'
@@ -621,34 +623,11 @@ export default function TemplatesTab() {
               <label style={lbl}>Template Body *</label>
               <div style={{ marginBottom: 8, padding: '10px 12px', background: 'var(--hf-info-soft)', border: '1px solid var(--hf-info-border)', borderRadius: 7, fontSize: 12, color: 'var(--hf-info-text)', lineHeight: 1.6 }}>
                 <strong>Variables:</strong>{' '}
-                Use <code style={{ background: 'var(--hf-surface)', padding: '1px 4px', borderRadius: 3 }}>{'{{variable_name}}'}</code> for dynamic fields.
-                Supports HTML: <code style={{ background: 'var(--hf-surface)', padding: '1px 4px', borderRadius: 3 }}>{'<h2>'}</code>{' '}
-                <code style={{ background: 'var(--hf-surface)', padding: '1px 4px', borderRadius: 3 }}>{'<strong>'}</code>{' '}
-                <code style={{ background: 'var(--hf-surface)', padding: '1px 4px', borderRadius: 3 }}>{'<p>'}</code>.{' '}
+                Use <code style={{ background: 'var(--hf-surface)', padding: '1px 4px', borderRadius: 3 }}>{'{{variable_name}}'}</code> for dynamic fields, typed straight into the text.
                 <code style={{ background: 'var(--hf-surface)', padding: '1px 4px', borderRadius: 3 }}>{'{{date}}'}</code> auto-resolves to today.
               </div>
-              <textarea
-                value={form.bodyTemplate}
-                onChange={e => setForm(f => ({ ...f, bodyTemplate: e.target.value }))}
-                rows={14}
-                placeholder={'<h2>NON-DISCLOSURE AGREEMENT</h2>\n<p>This agreement is entered into on {{date}} between:</p>\n<p><strong>{{party_a_name}}</strong> and <strong>{{party_b_name}}</strong></p>\n<h3>1. Purpose</h3>\n<p>{{purpose}}</p>'}
-                style={{ ...inp2, fontFamily: 'monospace', fontSize: 12, resize: 'vertical', lineHeight: 1.6 }}
-              />
+              <RichTextEditor key={editingId ?? 'new'} value={form.bodyTemplate} onChange={html => setForm(f => ({ ...f, bodyTemplate: html }))} minHeight={260} />
             </div>
-
-            {/* Live rendered preview */}
-            {form.bodyTemplate && (
-              <div style={{ marginTop: 14 }}>
-                <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--hf-text-faint)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 7 }}>
-                  Rendered preview
-                </div>
-                {/* FIX: dangerouslySetInnerHTML renders HTML — original showed raw tags */}
-                <div
-                  style={{ maxHeight: 240, overflowY: 'auto', padding: '14px 16px', background: 'var(--hf-surface-muted)', border: '1px solid var(--hf-border)', borderRadius: 7, fontSize: 13, lineHeight: 1.8, color: 'var(--hf-text-secondary)' }}
-                  dangerouslySetInnerHTML={{ __html: sanitizeHtml(form.bodyTemplate) }}
-                />
-              </div>
-            )}
 
             {error && (
               <div style={{ marginTop: 14, padding: '10px 12px', background: 'var(--hf-danger-soft)', border: '1px solid var(--hf-danger-border)', borderRadius: 8, fontSize: 13, color: 'var(--hf-danger-text)' }}>
@@ -662,8 +641,8 @@ export default function TemplatesTab() {
               </button>
               <button
                 onClick={() => createTemplate.mutate(form)}
-                disabled={!form.name || !form.bodyTemplate || createTemplate.isPending}
-                style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '9px 22px', background: !form.name || !form.bodyTemplate ? 'var(--hf-text-faint)' : 'var(--hf-primary)', color: 'var(--hf-text-on-solid)', border: 'none', borderRadius: 9, fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
+                disabled={!form.name || !hasContent(form.bodyTemplate) || createTemplate.isPending}
+                style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '9px 22px', background: !form.name || !hasContent(form.bodyTemplate) ? 'var(--hf-text-faint)' : 'var(--hf-primary)', color: 'var(--hf-text-on-solid)', border: 'none', borderRadius: 9, fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
                 {createTemplate.isPending ? 'Saving…' : editingId ? 'Save Draft' : 'Create Template'}
               </button>
             </div>

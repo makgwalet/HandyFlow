@@ -7,6 +7,8 @@ import { apiClient } from '../../api/client'
 import { Plus, X } from 'lucide-react'
 import { usePermissions } from '../../hooks/usePermission'
 import { sanitizeHtml } from './sanitizeHtml'
+import { RichTextEditor } from './RichTextEditor'
+import { hasContent } from './richText'
 
 export interface Clause {
   id: string; familyId: string; versionNo: number; title: string; category: string; body: string; legalArea?: string | null
@@ -75,7 +77,7 @@ export default function ClausesTab() {
   const openNew = () => { setEditing(null); setForm(EMPTY); setShowForm(true); setError('') }
   const openEdit = (c: Clause) => { setEditing(c); setForm({ title: c.title, category: c.category, body: c.body, legalArea: c.legalArea ?? '', jurisdiction: c.jurisdiction }); setShowForm(true); setError('') }
   const withdraw = (c: Clause) => { const r = window.prompt('Why is this clause being withdrawn?'); if (r && r.trim()) act.mutate({ id: c.id, action: 'withdraw', body: { reason: r.trim() } }) }
-  const validForm = form.title.trim() && form.body.trim()
+  const validForm = form.title.trim() && hasContent(form.body)
   const validReview = review.reviewerName.trim() && review.reviewerProfessionalDetails.trim() && review.reviewDate
 
   return (
@@ -141,10 +143,9 @@ export default function ClausesTab() {
               <div><label style={lbl}>Category</label><select style={inp} value={form.category} onChange={e => setForm(p => ({ ...p, category: e.target.value }))}>{CLAUSE_CATEGORIES.map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select></div>
               <div><label style={lbl}>Legal area</label><input style={inp} value={form.legalArea} onChange={e => setForm(p => ({ ...p, legalArea: e.target.value }))} /></div>
               <div style={{ gridColumn: '1/-1' }}>
-                <label style={lbl}>Wording * (HTML: paragraphs, headings, lists and tables)</label>
-                <textarea rows={9} style={{ ...inp, fontFamily: 'monospace', fontSize: 12 }} value={form.body} onChange={e => setForm(p => ({ ...p, body: e.target.value }))} />
+                <label style={lbl}>Wording *</label>
+                <RichTextEditor key={editing?.id ?? 'new'} value={form.body} onChange={html => setForm(p => ({ ...p, body: html }))} minHeight={200} />
               </div>
-              {form.body.trim() && <div style={{ gridColumn: '1/-1', fontSize: 13, lineHeight: 1.7, border: '1px solid var(--hf-border)', borderRadius: 8, padding: '6px 10px', maxHeight: 160, overflowY: 'auto' }} dangerouslySetInnerHTML={{ __html: sanitizeHtml(form.body) }} />}
             </div>
             {error && <div style={{ marginTop: 12, fontSize: 13, color: 'var(--hf-danger-text)' }}>{error}</div>}
             <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 18 }}>
