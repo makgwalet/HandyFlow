@@ -38,13 +38,12 @@ public class SupplierDocumentService {
     private static final String SOURCE_MODULE = "supplychain";
     private static final String ENTITY_TYPE = "ScSupplierDocument";
 
+    private final ScmSeparationOfDuties sod;
     private final ScSupplierDocumentRepository docRepo;
     private final ScSupplierRepository supplierRepo;
     private final EvidenceFacade evidenceFacade;
     private final SupplierAuditService audit;
 
-    @Value("${app.scm.sod.enforce:false}")
-    private boolean enforceSegregationOfDuties;
 
     @Transactional
     public SupplierDocumentResponse add(TenantId tenantId, UUID userId, String userName, UUID supplierId,
@@ -87,9 +86,8 @@ public class SupplierDocumentService {
         ScSupplierDocument d = requireDoc(tenantId, supplierId, docId);
         if (!d.isActive())
             throw new HandyFlowException("Only an ACTIVE document can be verified", HttpStatus.CONFLICT, "DOCUMENT_NOT_ACTIVE");
-        if (enforceSegregationOfDuties && d.getUploadedBy() != null && d.getUploadedBy().equals(userId))
-            throw new HandyFlowException("Segregation of duties: you cannot verify a document you uploaded",
-                    HttpStatus.FORBIDDEN, "SEGREGATION_OF_DUTIES");
+        sod.require(tenantId, "SCM_SUPPLIER_APPROVE", d.getUploadedBy(), userId,
+                "You cannot verify a document you uploaded", "ScSupplierDocument", docId, "Supplier document verification");
         d.markVerified(userId, userName);
         docRepo.save(d);
         audit.record(tenantId.getValue(), supplierId, "DOCUMENT_VERIFIED", null, null, d.getDocType().name(), userId, userName);

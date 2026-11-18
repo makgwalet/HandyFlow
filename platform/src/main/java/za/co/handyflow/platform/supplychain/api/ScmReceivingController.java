@@ -34,10 +34,10 @@ public class ScmReceivingController {
                 receivingService.listLines(TenantContext.getTenantIdAsObject(), id)));
     }
 
-    // SCM_ADMIN until the finer SCM_RECEIVE_POST / reversal permission exists — reversing a
-    // posted receipt changes stock and PO state, so it must not be open to every receiving clerk.
+    // Reversing a posted receipt changes stock and PO state, so it is not open to every receiving clerk (SCM_RECEIVE).
+    // SCM_RECEIVE_REVERSE can be granted on its own; SCM_ADMIN keeps working, as on every other SCM controller.
     @PostMapping("/{id}/reverse")
-    @PreAuthorize("hasAuthority('SCM_ADMIN')")
+    @PreAuthorize("hasAnyAuthority('SCM_RECEIVE_REVERSE','SCM_ADMIN')")
     @Operation(summary = "Reverse a posted goods receipt — offsets stock, rolls back PO quantities, records the reason")
     public ResponseEntity<ApiResponse<ScGoodsReceipt>> reverse(
             @PathVariable UUID id, @Valid @RequestBody ReverseGoodsReceiptRequest req) {

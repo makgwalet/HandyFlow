@@ -15,4 +15,8 @@ public interface ScMatchExceptionRepository extends JpaRepository<ScMatchExcepti
 
     @Query("SELECT e FROM ScMatchException e WHERE e.tenantId = :tenantId AND e.supplierInvoiceId = :invoiceId AND e.status = 'OPEN'")
     List<ScMatchException> findOpenForInvoice(@Param("tenantId") UUID tenantId, @Param("invoiceId") UUID invoiceId);
+
+    @Query("SELECT COUNT(e) FROM ScMatchException e WHERE e.tenantId = :tenantId AND e.supplierInvoiceId = :invoiceId AND e.status = 'OPEN' AND e.exceptionType IN :types")
+    long countOpenOfTypes(@Param("tenantId") UUID tenantId, @Param("invoiceId") UUID invoiceId,
+                          @Param("types") java.util.Collection<za.co.handyflow.platform.supplychain.domain.enums.MatchExceptionType> types);
 }

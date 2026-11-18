@@ -53,6 +53,7 @@ public class RfqService {
 
     private static final DateTimeFormatter WHEN = DateTimeFormatter.ofPattern("dd MMM yyyy HH:mm").withZone(ZoneId.of("Africa/Johannesburg"));
 
+    private final ScmSeparationOfDuties sod;
     private final ScRfqRepository rfqRepo;
     private final ScRfqLineRepository lineRepo;
     private final ScRfqInvitationRepository inviteRepo;
@@ -74,8 +75,6 @@ public class RfqService {
     @Value("${app.scm.rfq.min-invitations:2}")
     private int minInvitations;
 
-    @Value("${app.scm.sod.enforce:false}")
-    private boolean enforceSegregationOfDuties;
 
     private record Seed(UUID requisitionLineId, UUID catalogueItemId, String name, String description, BigDecimal qty, BigDecimal est) {}
 
@@ -201,8 +200,8 @@ public class RfqService {
         ScRfq rfq = rfqRepo.lockByTenantAndId(tid, id).orElseThrow(this::notFound);
         if (rfq.getStatus() != RfqStatus.CLOSED)
             throw conflict("Only a CLOSED RFQ can be awarded — this one is " + rfq.getStatus() + (rfq.getStatus() == RfqStatus.OPEN ? " (close it first)" : ""));
-        if (enforceSegregationOfDuties && rfq.getCreatedBy() != null && rfq.getCreatedBy().equals(userId))
-            throw new HandyFlowException("Segregation of duties: you cannot award an RFQ you created yourself", HttpStatus.FORBIDDEN, "SEGREGATION_OF_DUTIES");
+        sod.require(tenantId, "SCM_RFQ_MANAGE", rfq.getCreatedBy(), userId,
+                "You cannot award an RFQ you created yourself", "ScRfq", id, "RFQ award");
 
         ScQuotation q = quoteRepo.findByTenantAndId(tid, quotationId).orElseThrow(() -> bad("Quotation not found"));
         if (!q.getRfqId().equals(id)) throw bad("Quotation does not belong to this RFQ");

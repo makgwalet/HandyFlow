@@ -28,4 +28,14 @@ public enum MatchExceptionType {
     MatchExceptionType(MatchStatus resultingStatus) { this.resultingStatus = resultingStatus; }
 
     public MatchStatus resultingStatus() { return resultingStatus; }
+
+    /**
+     * Critical: a money or identity problem (DISPUTE). While one is OPEN the invoice can be neither approved nor paid;
+     * the only way past it is the manager override, which records a reason and resolves the exception.
+     */
+    public boolean blocksPayment() { return resultingStatus == MatchStatus.DISPUTE; }
+
+    public static java.util.List<MatchExceptionType> blocking() {
+        return java.util.Arrays.stream(values()).filter(MatchExceptionType::blocksPayment).toList();
+    }
 }

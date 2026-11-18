@@ -53,6 +53,7 @@ public class RequisitionService {
     private static final String APPROVALS_ENTITY_TYPE = "REQUISITION";
     private static final Set<String> SEE_ALL = Set.of("SCM_READ", "SCM_ORDER", "SCM_ADMIN", "SCM_REQUISITION_APPROVE");
 
+    private final ScmSeparationOfDuties sod;
     private final ScRequisitionRepository reqRepo;
     private final ScRequisitionLineRepository lineRepo;
     private final ScRequisitionConversionRepository convRepo;
@@ -67,8 +68,6 @@ public class RequisitionService {
     private final BudgetService budgetService;
     private final org.springframework.transaction.PlatformTransactionManager txManager;
 
-    @Value("${app.scm.sod.enforce:false}")
-    private boolean enforceSegregationOfDuties;
 
     // ── Create / edit ─────────────────────────────────────────────────────────
 
@@ -147,9 +146,8 @@ public class RequisitionService {
         if (r.getStatus() != RequisitionStatus.PENDING_APPROVAL)
             throw conflict("Only a PENDING_APPROVAL requisition can be approved — this one is " + r.getStatus());
         budgetService.checkRequisition(tenantId, r, lineRepo.findByRequisition(tenantId.getValue(), id), false);
-        if (enforceSegregationOfDuties && r.getRequestedBy().equals(approverId))
-            throw new HandyFlowException("Segregation of duties: you cannot approve a requisition you raised yourself",
-                    HttpStatus.FORBIDDEN, "SEGREGATION_OF_DUTIES");
+        sod.require(tenantId, "SCM_REQUISITION_APPROVE", r.getRequestedBy(), approverId,
+                "You cannot approve a requisition you raised yourself", "ScRequisition", id, "Requisition approval");
 
         var existing = approvalFacade.getLatestRequestForEntity(tenantId, APPROVALS_MODULE, APPROVALS_ENTITY_TYPE, id);
         ApprovalRequestResponse result;

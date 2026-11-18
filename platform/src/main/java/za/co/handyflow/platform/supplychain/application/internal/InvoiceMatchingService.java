@@ -93,6 +93,18 @@ public class InvoiceMatchingService {
         return saved;
     }
 
+    /** Critical (payment-blocking) exceptions still open on the invoice. The single source for "may this be approved / paid". */
+    @Transactional(readOnly = true)
+    public long openBlockingExceptionCount(TenantId tenantId, UUID invoiceId) {
+        return exceptionRepo.countOpenOfTypes(tenantId.getValue(), invoiceId, MatchExceptionType.blocking());
+    }
+
+    /** Manager override: the open exceptions are accepted, so they are closed as RESOLVED (kept as history, not deleted). */
+    @Transactional
+    public void resolveOpenExceptions(TenantId tenantId, UUID invoiceId) {
+        exceptionRepo.findOpenForInvoice(tenantId.getValue(), invoiceId).forEach(ScMatchException::resolve);
+    }
+
     @Transactional
     public ScSupplierInvoice rematch(TenantId tenantId, UUID invoiceId) {
         ScSupplierInvoice inv = invoiceRepo.findByTenantIdAndId(tenantId.getValue(), invoiceId)

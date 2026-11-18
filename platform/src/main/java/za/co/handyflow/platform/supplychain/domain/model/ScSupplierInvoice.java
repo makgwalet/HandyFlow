@@ -105,8 +105,8 @@ public class ScSupplierInvoice {
     }
 
     public void dispute(String reason) {
-        if (status == InvoiceStatus.PAID || status == InvoiceStatus.CANCELLED)
-            throw new IllegalStateException("Cannot dispute invoice in state: " + status);
+        if (status == InvoiceStatus.PAID || status == InvoiceStatus.CANCELLED || status == InvoiceStatus.APPROVED)
+            throw new IllegalStateException("Cannot dispute invoice in state: " + status);   // APPROVED: the AP bill is already payable
         status      = InvoiceStatus.DISPUTED;
         matchNotes  = reason;
         matchStatus = MatchStatus.DISPUTE;

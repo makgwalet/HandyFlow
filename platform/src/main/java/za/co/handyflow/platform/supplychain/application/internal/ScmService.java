@@ -37,6 +37,7 @@ import java.util.stream.Stream;
 @RequiredArgsConstructor
 public class ScmService {
 
+    private final ScmSeparationOfDuties sod;
     private final ScSupplierRepository        supplierRepo;
     private final ScStockLocationRepository   locationRepo;
     private final ScInventoryRepository       inventoryRepo;
@@ -72,15 +73,6 @@ public class ScmService {
     private final ApprovalFacade approvalFacade;
     private final VatRateProvider vatRateProvider;
 
-    /**
-     * NEW (chunk 1): segregation of duties. When true, the person who created a PO
-     * cannot approve it, and the person who captured a supplier invoice cannot approve
-     * (or override-approve) it. Defaults to false so a sole-trader tenant — one user
-     * doing everything — isn't locked out; switch on for production tenants with
-     * more than one user: app.scm.sod.enforce=true
-     */
-    @Value("${app.scm.sod.enforce:false}")
-    private boolean enforceSegregationOfDuties;
 
     /** app.scm.supplier.require-approval=true -> new suppliers start PENDING_APPROVAL and cannot be used until approved. */
     @Value("${app.scm.supplier.require-approval:false}")
@@ -350,7 +342,7 @@ public class ScmService {
     public ScPurchaseOrder approvePurchaseOrder(TenantId tenantId, UUID id,
                                                 UUID approverId, String approverName) {
         ScPurchaseOrder po = getPurchaseOrder(tenantId, id);
-        enforceSegregation(po.getCreatedBy(), approverId, "purchase order");
+        enforceSegregation(tenantId, "SCM_ORDER", "ScPurchaseOrder", id, po.getCreatedBy(), approverId, "purchase order");
 
         var existing = approvalFacade.getLatestRequestForEntity(tenantId, PO_APPROVALS_MODULE, PO_APPROVALS_ENTITY_TYPE, id);
         ApprovalRequestResponse result;
@@ -632,8 +624,9 @@ public class ScmService {
                 .orElseThrow(() -> new HandyFlowException("Invoice not found",
                         HttpStatus.NOT_FOUND, "NOT_FOUND"));
 
+        requireNoOpenCriticalException(tenantId, inv);
         requireMatchClearedForApproval(inv);
-        enforceSegregation(inv.getCapturedBy(), approverId, "supplier invoice");
+        enforceSegregation(tenantId, "SCM_INVOICE", "ScSupplierInvoice", inv.getId(), inv.getCapturedBy(), approverId, "supplier invoice");
 
         inv.approve(approverId, approverName);
         log.info("[SCM] Supplier invoice {} approved by {}", inv.getInvoiceNumber(), approverName);
@@ -647,6 +640,7 @@ public class ScmService {
         ScSupplierInvoice inv = invoiceRepo.findByTenantIdAndId(tenantId.getValue(), id)
                 .orElseThrow(() -> new HandyFlowException("Invoice not found",
                         HttpStatus.NOT_FOUND, "NOT_FOUND"));
+        requireNoOpenCriticalException(tenantId, inv);
         try {
             inv.markPaid(paymentRef);
         } catch (IllegalStateException e) {
@@ -691,9 +685,10 @@ public class ScmService {
         ScSupplierInvoice inv = invoiceRepo.findByTenantIdAndId(tenantId.getValue(), id)
                 .orElseThrow(() -> new HandyFlowException("Invoice not found",
                         HttpStatus.NOT_FOUND, "NOT_FOUND"));
-        enforceSegregation(inv.getCapturedBy(), approverId, "supplier invoice");
+        enforceSegregation(tenantId, "SCM_INVOICE", "ScSupplierInvoice", inv.getId(), inv.getCapturedBy(), approverId, "supplier invoice");
 
         inv.overrideDisputeAndApprove(approverId, approverName, reason.trim());
+        matchingService.resolveOpenExceptions(tenantId, id);
         controlExceptionFacade.resolveForEntity(tenantId, "ScSupplierInvoice", id,
                 approverId, approverName, "Overridden: " + reason);
         handOffToAp(tenantId, inv, approverId);
@@ -707,6 +702,12 @@ public class ScmService {
         ScSupplierInvoice inv = invoiceRepo.findByTenantIdAndId(tenantId.getValue(), id)
                 .orElseThrow(() -> new HandyFlowException("Invoice not found",
                         HttpStatus.NOT_FOUND, "NOT_FOUND"));
+        if (inv.getApBillId() != null) {
+            // The AP bill is already payable; cancelling here would leave it payable with no approved invoice behind it.
+            throw new HandyFlowException("Invoice " + inv.getInvoiceNumber() + " has been handed off to AP (bill "
+                    + inv.getApBillId() + ") — void the bill in Accounts Payable instead",
+                    HttpStatus.CONFLICT, "ALREADY_HANDED_OFF");
+        }
         inv.cancel(reason);
         controlExceptionFacade.resolveForEntity(tenantId, "ScSupplierInvoice", id,
                 null, "System", "Invoice cancelled: " + reason);
@@ -831,6 +832,19 @@ public class ScmService {
     }
 
     /** Only a cleared match (or a genuine non-PO invoice) may be approved for payment. */
+    /**
+     * Independent of matchStatus on purpose: matchStatus is a summary field, the open exception rows are the facts.
+     * Approval and payment both stop while a critical (DISPUTE-class) exception is open; override resolves them.
+     */
+    private void requireNoOpenCriticalException(TenantId tenantId, ScSupplierInvoice inv) {
+        long open = matchingService.openBlockingExceptionCount(tenantId, inv.getId());
+        if (open > 0) {
+            throw new HandyFlowException("Invoice " + inv.getInvoiceNumber() + " has " + open
+                    + " open critical match exception(s) — resolve them or use the override with a reason",
+                    HttpStatus.CONFLICT, "CRITICAL_EXCEPTION_OPEN");
+        }
+    }
+
     private void requireMatchClearedForApproval(ScSupplierInvoice inv) {
         MatchStatus ms = inv.getMatchStatus();
         if (ms == MatchStatus.MATCHED || ms == MatchStatus.OVERRIDDEN) return;
@@ -858,13 +872,10 @@ public class ScmService {
         inv.recordApBillHandOff(bill.getId());
     }
 
-    private void enforceSegregation(UUID creator, UUID actor, String what) {
-        if (!enforceSegregationOfDuties || creator == null || actor == null) return;
-        if (creator.equals(actor)) {
-            throw new HandyFlowException(
-                    "Segregation of duties: you cannot approve a " + what + " that you created/captured yourself",
-                    HttpStatus.FORBIDDEN, "SEGREGATION_OF_DUTIES");
-        }
+    private void enforceSegregation(TenantId tenantId, String checkingPermission, String itemType, UUID itemId,
+                                    UUID creator, UUID actor, String what) {
+        sod.require(tenantId, checkingPermission, creator, actor, "You cannot approve a " + what + " that you created yourself",
+                itemType, itemId, what + " approval");
     }
 
     private UUID currentUserIdOrNull() {

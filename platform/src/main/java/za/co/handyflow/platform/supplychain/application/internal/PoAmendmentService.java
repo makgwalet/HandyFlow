@@ -56,6 +56,7 @@ public class PoAmendmentService {
     private static final Set<PoStatus> AMENDABLE = EnumSet.of(
             PoStatus.APPROVED, PoStatus.SENT, PoStatus.ACKNOWLEDGED, PoStatus.PARTIALLY_RECEIVED);
 
+    private final ScmSeparationOfDuties sod;
     private final ScPurchaseOrderRepository poRepo;
     private final ScPoLineRepository poLineRepo;
     private final ScPoAmendmentRepository amendmentRepo;
@@ -73,9 +74,6 @@ public class PoAmendmentService {
     private final VatRateProvider vatRateProvider;
     private final org.springframework.transaction.PlatformTransactionManager txManager;
 
-    /** Same switch as ScmService: app.scm.sod.enforce=true -> the requester cannot approve their own amendment. */
-    @Value("${app.scm.sod.enforce:false}")
-    private boolean enforceSegregationOfDuties;
 
     /** app.scm.amend.delivery-terms-material=true -> changing the required-by date or delivery location needs approval. */
     @Value("${app.scm.amend.delivery-terms-material:true}")
@@ -196,9 +194,8 @@ public class PoAmendmentService {
     public PoAmendmentResponse approve(TenantId tenantId, UUID amendmentId, UUID approverId, String approverName, String note) {
         UUID tid = tenantId.getValue();
         ScPoAmendment a = requirePending(tenantId, amendmentId);
-        if (enforceSegregationOfDuties && a.getRequestedBy() != null && a.getRequestedBy().equals(approverId))
-            throw new HandyFlowException("Segregation of duties: you cannot approve an amendment you raised yourself",
-                    HttpStatus.FORBIDDEN, "SEGREGATION_OF_DUTIES");
+        sod.require(tenantId, "SCM_ADMIN", a.getRequestedBy(), approverId,
+                "You cannot approve an amendment you raised yourself", "ScPoAmendment", amendmentId, "PO amendment approval");
 
         ScPurchaseOrder po = poRepo.lockByTenantIdAndId(tid, a.getPurchaseOrderId())
                 .orElseThrow(() -> new HandyFlowException("Purchase order not found", HttpStatus.NOT_FOUND, "NOT_FOUND"));

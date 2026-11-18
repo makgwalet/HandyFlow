@@ -38,6 +38,7 @@ public class SupplierLifecycleService {
     private static final List<PoStatus> OPEN_PO_STATUSES =
             List.of(PoStatus.APPROVED, PoStatus.SENT, PoStatus.ACKNOWLEDGED, PoStatus.PARTIALLY_RECEIVED);
 
+    private final ScmSeparationOfDuties sod;
     private final ScSupplierRepository supplierRepo;
     private final ScPurchaseOrderRepository poRepo;
     private final SupplierAuditService audit;
@@ -45,8 +46,6 @@ public class SupplierLifecycleService {
     // NEW (chunk 5): required-document policy — no approval/reinstatement while non-compliant.
     private final SupplierComplianceService compliance;
 
-    @Value("${app.scm.sod.enforce:false}")
-    private boolean enforceSegregationOfDuties;
 
     @Value("${app.scm.supplier.require-approval:false}")
     private boolean requireApproval;
@@ -55,8 +54,8 @@ public class SupplierLifecycleService {
     public SupplierStatusResponse approve(TenantId tenantId, UUID id, UUID actor, String actorName, String note) {
         ScSupplier s = load(tenantId, id);
         compliance.requireCompliant(tenantId, id);
-        if (enforceSegregationOfDuties && s.getCreatedBy() != null && s.getCreatedBy().equals(actor))
-            throw forbidden("Segregation of duties: you cannot approve a supplier you registered yourself");
+        sod.require(tenantId, "SCM_SUPPLIER_APPROVE", s.getCreatedBy(), actor,
+                "You cannot approve a supplier you registered yourself", "ScSupplier", id, "Supplier approval");
         return move(tenantId, s, SupplierStatus.ACTIVE, "APPROVED", note, false, actor, actorName);
     }
 
@@ -84,9 +83,9 @@ public class SupplierLifecycleService {
         ScSupplier s = load(tenantId, id);
         if (s.getStatus() != SupplierStatus.SUSPENDED && s.getStatus() != SupplierStatus.BLACKLISTED)
             throw conflict("Only suspended or blocked suppliers can be reinstated — this one is " + s.getStatus());
-        if (enforceSegregationOfDuties && s.getStatus() == SupplierStatus.BLACKLISTED
-                && s.getStatusChangedBy() != null && s.getStatusChangedBy().equals(actor))
-            throw forbidden("Segregation of duties: the person who blocked a supplier cannot lift the block");
+        if (s.getStatus() == SupplierStatus.BLACKLISTED)
+            sod.require(tenantId, "SCM_SUPPLIER_BLOCK", s.getStatusChangedBy(), actor,
+                    "The person who blocked a supplier cannot lift the block", "ScSupplier", id, "Supplier block lifted");
         compliance.requireCompliant(tenantId, id);
         SupplierStatusResponse r = move(tenantId, s, SupplierStatus.ACTIVE, "REINSTATED", reason, true, actor, actorName);
         controlExceptionFacade.resolveForEntity(tenantId, "ScSupplier", id, actor, actorName, "Reinstated: " + reason);
