@@ -278,6 +278,25 @@ public class FuelTransportService {
         return new PlanningResponse(date, loads, days);
     }
 
+    /** The day's loads for one tanker, split by compartment, cancelled and reversed loads left out. Read-only, for the compartment view. */
+    @Transactional(readOnly = true)
+    public List<za.co.handyflow.platform.fuel.dto.CompartmentLoadView> compartmentLoads(TenantId tenantId, UUID tankerId, LocalDate date) {
+        tankers.findActiveById(tenantId, tankerId).orElseThrow(() -> new ResourceNotFoundException("Tanker", tankerId.toString()));
+        Instant from = date.atStartOfDay(SAST).toInstant(), to = date.plusDays(1).atStartOfDay(SAST).toInstant();
+        Map<UUID, String> names = new HashMap<>();
+        List<za.co.handyflow.platform.fuel.dto.CompartmentLoadView> out = new ArrayList<>();
+        for (FuelDelivery d : deliveries.findScheduledBetween(tenantId, from, to)) {
+            if (!tankerId.equals(d.getTankerId()) || "CANCELLED".equals(d.getStatus()) || "REVERSED".equals(d.getStatus())) continue;
+            String customer = d.getCustomerId() == null ? null : names.computeIfAbsent(d.getCustomerId(),
+                    id -> crm.findCustomerById(tenantId, id).map(CustomerSummary::name).orElse("(customer removed)"));
+            for (FuelDeliveryCompartment s : loadSplits.findByDelivery(tenantId, d.getId())) {
+                out.add(new za.co.handyflow.platform.fuel.dto.CompartmentLoadView(d.getId(), d.getStatus(), d.getScheduledAt(), customer, d.getFuelType(), s.getCompartmentId(), s.getLitres()));
+            }
+        }
+        out.sort(Comparator.comparing(za.co.handyflow.platform.fuel.dto.CompartmentLoadView::scheduledAt));
+        return out;
+    }
+
     // ── Driver ───────────────────────────────────────────────────────────────
 
     /** The loads allocated to the signed-in driver that are still open. */

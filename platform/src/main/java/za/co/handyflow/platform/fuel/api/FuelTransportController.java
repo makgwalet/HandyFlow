@@ -94,6 +94,15 @@ public class FuelTransportController {
         return ResponseEntity.ok(ApiResponse.success(transport.previewEligibility(TenantContext.getTenantIdAsObject(), id, req)));
     }
 
+    @GetMapping("/tankers/{id}/compartment-loads")
+    @PreAuthorize("hasAuthority('FUEL_READ')")
+    public ResponseEntity<ApiResponse<List<za.co.handyflow.platform.fuel.dto.CompartmentLoadView>>> compartmentLoads(@PathVariable UUID id,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
+        featureGuard.requireModule("fuel");
+        return ResponseEntity.ok(ApiResponse.success(transport.compartmentLoads(TenantContext.getTenantIdAsObject(), id,
+                date != null ? date : LocalDate.now(java.time.ZoneId.of("Africa/Johannesburg")))));
+    }
+
     @GetMapping("/planning")
     @PreAuthorize("hasAuthority('FUEL_READ')")
     public ResponseEntity<ApiResponse<PlanningResponse>> planning(@RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {

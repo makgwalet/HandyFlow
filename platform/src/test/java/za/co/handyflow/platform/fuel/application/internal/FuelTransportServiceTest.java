@@ -350,4 +350,32 @@ class FuelTransportServiceTest {
         assertFalse(load.isAllocated());
         verify(eligibility, never()).enforce(any(), any(), any(), any(), any(), any(), any());
     }
+
+    // ---- compartment view ----
+
+    @Test @DisplayName("compartment loads: only this tanker's open loads for the day, split by compartment, in time order")
+    void compartmentLoadsForOneTanker() {
+        UUID comp = UUID.randomUUID();
+        FuelDelivery mine = mock(FuelDelivery.class), other = mock(FuelDelivery.class), cancelled = mock(FuelDelivery.class), early = mock(FuelDelivery.class);
+        for (var d : List.of(mine, other, cancelled, early)) { when(d.getId()).thenReturn(UUID.randomUUID()); when(d.getStatus()).thenReturn("SCHEDULED"); when(d.getFuelType()).thenReturn("DIESEL"); when(d.getScheduledAt()).thenReturn(Instant.parse("2026-11-18T10:00:00Z")); when(d.getTankerId()).thenReturn(tanker.getId()); }
+        when(other.getTankerId()).thenReturn(UUID.randomUUID());
+        when(cancelled.getStatus()).thenReturn("CANCELLED");
+        when(early.getScheduledAt()).thenReturn(Instant.parse("2026-11-18T05:00:00Z"));
+        when(tankers.findActiveById(T, tanker.getId())).thenReturn(Optional.of(tanker));
+        when(deliveries.findScheduledBetween(eq(T), any(), any())).thenReturn(List.of(mine, other, cancelled, early));
+        when(loadSplits.findByDelivery(T, mine.getId())).thenReturn(List.of(FuelDeliveryCompartment.create(T, mine.getId(), comp, bd("4000"))));
+        when(loadSplits.findByDelivery(T, early.getId())).thenReturn(List.of(FuelDeliveryCompartment.create(T, early.getId(), comp, bd("1000"))));
+        var out = service.compartmentLoads(T, tanker.getId(), java.time.LocalDate.of(2026, 11, 18));
+        assertEquals(2, out.size());
+        assertEquals(early.getId(), out.get(0).deliveryId());
+        assertEquals(0, bd("4000").compareTo(out.get(1).litres()));
+        verify(loadSplits, never()).findByDelivery(T, other.getId());
+        verify(loadSplits, never()).findByDelivery(T, cancelled.getId());
+    }
+
+    @Test @DisplayName("compartment loads: an unknown tanker is refused")
+    void compartmentLoadsUnknownTanker() {
+        when(tankers.findActiveById(any(), any())).thenReturn(Optional.empty());
+        assertThrows(ResourceNotFoundException.class, () -> service.compartmentLoads(T, UUID.randomUUID(), java.time.LocalDate.now()));
+    }
 }
