@@ -13,6 +13,7 @@ import za.co.handyflow.platform.contracting.domain.repository.*;
 import za.co.handyflow.platform.contracting.dto.*;
 import za.co.handyflow.platform.shared.EmailService;
 import za.co.handyflow.platform.shared.EmailTemplates;
+import za.co.handyflow.platform.documents.application.DocumentsFacade;
 import za.co.handyflow.platform.shared.ResourceNotFoundException;
 import za.co.handyflow.platform.shared.TenantId;
 import za.co.handyflow.platform.shared.SmsService;
@@ -49,6 +50,7 @@ public class ContractingService {
     private final PublicSigningRateLimiter        publicRateLimiter;
     private final ContractTemplateLegalReviewRepository templateReviewRepo;
     private final SigningPolicy                   signingPolicy;
+    private final DocumentsFacade                documents;   // legal review evidence
     private final ContractRecordsService         records;   // executed copy + records retention (V581)
 
     @Value("${contracting.signing.base-url:http://localhost:5173}")
@@ -213,6 +215,8 @@ public class ContractingService {
         ContractTemplate t = template(tenantId, id);
         if (t.statusEnum() != TemplateStatus.LEGAL_REVIEW)
             throw new IllegalStateException("A legal review can only be recorded while the template is in LEGAL_REVIEW (it is " + t.getStatus() + ")");
+        if (req.evidenceDocumentId() != null && documents.find(tenantId, req.evidenceDocumentId()).isEmpty())
+            throw new IllegalArgumentException("The evidence document was not found");
         ContractTemplateLegalReview r = ContractTemplateLegalReview.record(tenantId.getValue(), t.getId(), t.getTemplateVersion(),
                 req.reviewerName(), req.reviewerProfessionalDetails(), req.reviewerOrganisation(), req.reviewDate(),
                 req.legalArea(), req.jurisdiction(), req.scopeAssumptions(), req.outstandingIssues(), req.outcome(),
@@ -235,6 +239,46 @@ public class ContractingService {
         templateReviewRepo.save(r);
         if (t.statusEnum() == TemplateStatus.APPROVED) { t.returnToDraft(); templateRepo.save(t); }
         return toLegalReviewResponse(r);
+    }
+
+    static final String EVIDENCE_OWNER_TYPE = "CONTRACT_LEGAL_REVIEW";
+    static final String EVIDENCE_CATEGORY = "LEGAL_REVIEW_EVIDENCE";
+
+    /**
+     * Stores the reviewer's signed-off review (or a replacement) against a recorded review. The first file creates the document;
+     * later files are added as new versions so the earlier evidence is kept. Files go through the Documents module's checks
+     * (type, size, malware-scan hook) and tenant isolation.
+     */
+    @Transactional
+    public LegalReviewResponse uploadLegalReviewEvidence(TenantId tenantId, UUID templateId, UUID reviewId, DocumentsFacade.FileUpload file) {
+        ContractTemplate t = template(tenantId, templateId);
+        ContractTemplateLegalReview r = review(tenantId, templateId, reviewId);
+        if (r.isWithdrawn()) throw new IllegalStateException("This review was withdrawn, so evidence can no longer be added");
+        UUID actor = currentUserOrNull();
+        if (r.getEvidenceDocumentId() != null && documents.find(tenantId, r.getEvidenceDocumentId()).isPresent()) {
+            documents.addVersion(tenantId, r.getEvidenceDocumentId(), file, "Replacement evidence", null, actor);
+        } else {
+            DocumentsFacade.DocumentInfo d = documents.upload(tenantId, EVIDENCE_OWNER_TYPE, r.getId(), EVIDENCE_CATEGORY,
+                    "Legal review evidence: " + t.getName() + " v" + r.getTemplateVersion(),
+                    "Reviewed by " + r.getReviewerName() + " on " + r.getReviewDate(), null, file, actor);
+            r.attachEvidence(d.id());
+            templateReviewRepo.save(r);
+        }
+        log.info("Legal review evidence stored for template={} review={}", templateId, reviewId);
+        return toLegalReviewResponse(r);
+    }
+
+    @Transactional(readOnly = true)
+    public DocumentsFacade.Download downloadLegalReviewEvidence(TenantId tenantId, UUID templateId, UUID reviewId, Integer versionNo) {
+        template(tenantId, templateId);
+        ContractTemplateLegalReview r = review(tenantId, templateId, reviewId);
+        if (r.getEvidenceDocumentId() == null) throw new ResourceNotFoundException("Legal review evidence", reviewId.toString());
+        return documents.download(tenantId, r.getEvidenceDocumentId(), versionNo, currentUserOrNull());
+    }
+
+    private ContractTemplateLegalReview review(TenantId tenantId, UUID templateId, UUID reviewId) {
+        return templateReviewRepo.findByTenantIdAndIdAndTemplateId(tenantId.getValue(), reviewId, templateId)
+                .orElseThrow(() -> new ResourceNotFoundException("Legal review", reviewId.toString()));
     }
 
     @Transactional(readOnly = true)
@@ -300,11 +344,17 @@ public class ContractingService {
                 }).orElse("NOT_REVIEWED");
     }
 
+    private String evidenceFileName(ContractTemplateLegalReview r) {
+        if (r.getEvidenceDocumentId() == null) return null;
+        return documents.find(TenantId.of(r.getTenantId()), r.getEvidenceDocumentId())
+                .map(d -> d.current() == null ? null : d.current().fileName()).orElse(null);
+    }
+
     private LegalReviewResponse toLegalReviewResponse(ContractTemplateLegalReview r) {
         return new LegalReviewResponse(r.getId(), r.getTemplateId(), r.getTemplateVersion(), r.getReviewerName(),
                 r.getReviewerProfessionalDetails(), r.getReviewerOrganisation(), r.getReviewDate(), r.getLegalArea(),
                 r.getJurisdiction(), r.getScopeAssumptions(), r.getOutstandingIssues(), r.getOutcome(), r.getNextReviewDate(),
-                r.getEvidenceDocumentId(), r.isExpired(LocalDate.now()), r.getWithdrawnAt(), r.getWithdrawnReason(), r.getCreatedAt());
+                r.getEvidenceDocumentId(), evidenceFileName(r), r.isExpired(LocalDate.now()), r.getWithdrawnAt(), r.getWithdrawnReason(), r.getCreatedAt());
     }
 
     // ═════════════════════════════════════════════════════

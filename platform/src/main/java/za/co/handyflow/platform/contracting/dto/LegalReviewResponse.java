@@ -19,6 +19,7 @@ public record LegalReviewResponse(
         String outcome,
         LocalDate nextReviewDate,
         UUID evidenceDocumentId,
+        String evidenceFileName,
         boolean expired,
         Instant withdrawnAt,
         String withdrawnReason,

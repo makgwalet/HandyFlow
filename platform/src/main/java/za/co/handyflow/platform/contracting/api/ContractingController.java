@@ -7,14 +7,19 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 import za.co.handyflow.platform.contracting.application.internal.ContractingService;
 import za.co.handyflow.platform.contracting.dto.*;
+import za.co.handyflow.platform.documents.application.DocumentsFacade;
 import za.co.handyflow.platform.shared.ApiResponse;
 import za.co.handyflow.platform.shared.TenantContext;
 
+import java.io.IOException;
 import java.util.List;
 import java.util.UUID;
 
@@ -76,6 +81,29 @@ public class ContractingController {
     public ResponseEntity<ApiResponse<List<LegalReviewResponse>>> getTemplateLegalReviews(@PathVariable UUID id) {
         return ResponseEntity.ok(ApiResponse.success("Legal reviews",
                 contractingService.getTemplateLegalReviews(TenantContext.getTenantIdAsObject(), id)));
+    }
+
+    @PostMapping(value = "/templates/{id}/legal-reviews/{reviewId}/evidence", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize("hasAnyAuthority('CONTRACTS_TEMPLATES','CONTRACTS_MANAGE')")
+    @Operation(summary = "Attach the reviewer's signed-off review to a recorded legal review. A second file is stored as a new version")
+    public ResponseEntity<ApiResponse<LegalReviewResponse>> uploadLegalReviewEvidence(
+            @PathVariable UUID id, @PathVariable UUID reviewId, @RequestParam("file") MultipartFile file) throws IOException {
+        return ResponseEntity.ok(ApiResponse.success("Evidence stored", contractingService.uploadLegalReviewEvidence(
+                TenantContext.getTenantIdAsObject(), id, reviewId,
+                new DocumentsFacade.FileUpload(file.getOriginalFilename(), file.getContentType(), file.getBytes()))));
+    }
+
+    @GetMapping("/templates/{id}/legal-reviews/{reviewId}/evidence")
+    @PreAuthorize("hasAnyAuthority('CONTRACTS_READ','CONTRACTS_TEMPLATES','CONTRACTS_MANAGE','CONTRACTS_ADMIN')")
+    @Operation(summary = "Download the evidence file of a legal review (the latest version, or the numbered one). The download is audited")
+    public ResponseEntity<byte[]> downloadLegalReviewEvidence(@PathVariable UUID id, @PathVariable UUID reviewId,
+                                                              @RequestParam(required = false) Integer version) {
+        DocumentsFacade.Download file = contractingService.downloadLegalReviewEvidence(TenantContext.getTenantIdAsObject(), id, reviewId, version);
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + file.fileName().replace("\"", "") + "\"")
+                .header("X-Content-Type-Options", "nosniff")
+                .contentType(MediaType.parseMediaType(file.contentType()))
+                .body(file.content());
     }
 
     @PostMapping("/templates/{id}/legal-reviews/{reviewId}/withdraw")

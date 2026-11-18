@@ -81,6 +81,12 @@ public class ContractTemplateLegalReview {
         this.withdrawnBy = by;
     }
 
+    /** Links the stored evidence document. A withdrawn review is closed and takes no further evidence. */
+    public void attachEvidence(UUID documentId) {
+        if (isWithdrawn()) throw new IllegalStateException("This review was withdrawn, so evidence can no longer be added");
+        this.evidenceDocumentId = documentId;
+    }
+
     public boolean isWithdrawn() { return withdrawnAt != null; }
 
     /** The review date for this review has passed its next review date. */

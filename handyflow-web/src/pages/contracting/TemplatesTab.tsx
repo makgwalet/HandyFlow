@@ -82,6 +82,7 @@ interface LegalReview {
   reviewerName: string; reviewerProfessionalDetails: string; reviewerOrganisation?: string | null
   reviewDate: string; legalArea: string; jurisdiction: string; nextReviewDate?: string | null
   outstandingIssues?: string | null; withdrawnReason?: string | null
+  evidenceDocumentId?: string | null; evidenceFileName?: string | null
 }
 
 const errMsg = (e: unknown, fallback: string): string =>
@@ -95,13 +96,14 @@ const smallBtn: CSSProperties = {
 // ─── Legal review: record a reviewer's outcome, and show the history ───────────
 
 function LegalReviewModal({ template, onClose, onSubmit, error, busy }: {
-  template: Template; onClose: () => void; onSubmit: (body: Record<string, unknown>) => void; error: string; busy: boolean
+  template: Template; onClose: () => void; onSubmit: (body: Record<string, unknown>, file: File | null) => void; error: string; busy: boolean
 }) {
   const [f, setF] = useState({
     reviewerName: '', reviewerProfessionalDetails: '', reviewerOrganisation: '', reviewDate: new Date().toISOString().slice(0, 10),
     legalArea: template.legalArea ?? '', jurisdiction: 'South Africa', scopeAssumptions: '', outstandingIssues: '',
     outcome: 'APPROVED', nextReviewDate: '', evidenceDocumentId: '',
   })
+  const [file, setFile] = useState<File | null>(null)
   const set = (k: string) => (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setF(p => ({ ...p, [k]: e.target.value }))
   const ok = f.reviewerName && f.reviewerProfessionalDetails && f.reviewDate && f.legalArea
     && (f.outcome !== 'CONDITIONAL' || f.outstandingIssues.trim())
@@ -133,14 +135,18 @@ function LegalReviewModal({ template, onClose, onSubmit, error, busy }: {
             </select>
           </div>
           <div><label style={lbl}>Next review date</label><input type="date" style={inp} value={f.nextReviewDate} onChange={set('nextReviewDate')} /></div>
-          <div style={{ gridColumn: '1/-1' }}><label style={lbl}>Evidence document id (signed-off review in Documents)</label><input style={inp} value={f.evidenceDocumentId} onChange={set('evidenceDocumentId')} /></div>
+          <div style={{ gridColumn: '1/-1' }}>
+            <label style={lbl}>Evidence: the reviewer's signed-off review (PDF or scan)</label>
+            <input type="file" accept=".pdf,.png,.jpg,.jpeg,.doc,.docx" onChange={e => setFile(e.target.files?.[0] ?? null)} style={inp} />
+            {file && <div style={{ fontSize: 11, color: 'var(--hf-text-muted)', marginTop: 4 }}>{file.name} ({Math.round(file.size / 1024)} KB), stored with the review once it is recorded.</div>}
+          </div>
         </div>
         {error && <div style={{ marginTop: 12, fontSize: 13, color: 'var(--hf-danger-text)' }}>{error}</div>}
         <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 18 }}>
           <button onClick={onClose} style={smallBtn}>Cancel</button>
           <button disabled={!ok || busy} onClick={() => onSubmit({
-            ...f, nextReviewDate: f.nextReviewDate || null, evidenceDocumentId: f.evidenceDocumentId || null,
-          })} style={{ ...smallBtn, background: ok ? 'var(--hf-primary)' : 'var(--hf-text-faint)', color: 'var(--hf-text-on-solid)', border: 'none' }}>
+            ...f, nextReviewDate: f.nextReviewDate || null, evidenceDocumentId: null,
+          }, file)} style={{ ...smallBtn, background: ok ? 'var(--hf-primary)' : 'var(--hf-text-faint)', color: 'var(--hf-text-on-solid)', border: 'none' }}>
             {busy ? 'Saving…' : 'Record review'}
           </button>
         </div>
@@ -149,7 +155,10 @@ function LegalReviewModal({ template, onClose, onSubmit, error, busy }: {
   )
 }
 
-function LegalHistory({ templateId, onWithdraw }: { templateId: string; onWithdraw: (reviewId: string) => void }) {
+function LegalHistory({ templateId, onWithdraw, onAttach, onDownload }: {
+  templateId: string; onWithdraw: (reviewId: string) => void
+  onAttach: (reviewId: string, file: File) => void; onDownload: (reviewId: string, fileName: string) => void
+}) {
   const { data: reviews = [] } = useQuery<LegalReview[]>({
     queryKey: ['contract-template-reviews', templateId],
     queryFn: async () => unwrap(await apiClient.get(`/api/v1/contracts/templates/${templateId}/legal-reviews`)),
@@ -168,7 +177,21 @@ function LegalHistory({ templateId, onWithdraw }: { templateId: string; onWithdr
           </div>
           {r.outstandingIssues && <div style={{ color: 'var(--hf-warning-text)' }}>Outstanding: {r.outstandingIssues}</div>}
           {r.withdrawnReason && <div style={{ color: 'var(--hf-danger-text)' }}>Withdrawn: {r.withdrawnReason}</div>}
-          {!r.withdrawnAt && <button style={{ ...smallBtn, marginTop: 6 }} onClick={() => onWithdraw(r.id)}>Withdraw review</button>}
+          <div style={{ color: 'var(--hf-text-muted)' }}>
+            Evidence: {r.evidenceDocumentId
+              ? <button style={{ ...smallBtn, padding: '2px 8px' }} onClick={() => onDownload(r.id, r.evidenceFileName ?? 'legal-review-evidence')}>Download {r.evidenceFileName ?? 'file'}</button>
+              : <span style={{ color: 'var(--hf-warning-text)' }}>none attached</span>}
+          </div>
+          {!r.withdrawnAt && (
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 6, flexWrap: 'wrap' }}>
+              <label style={{ ...smallBtn, display: 'inline-block' }}>
+                {r.evidenceDocumentId ? 'Upload replacement' : 'Attach evidence'}
+                <input type="file" accept=".pdf,.png,.jpg,.jpeg,.doc,.docx" style={{ display: 'none' }}
+                  onChange={e => { const fl = e.target.files?.[0]; if (fl) onAttach(r.id, fl); e.target.value = '' }} />
+              </label>
+              <button style={smallBtn} onClick={() => onWithdraw(r.id)}>Withdraw review</button>
+            </div>
+          )}
         </div>
       ))}
     </div>
@@ -211,7 +234,7 @@ function HtmlPreview({ html, maxHeight = 280 }: { html: string; maxHeight?: numb
 
 // ─── TemplateCard ─────────────────────────────────────────────────────────────
 
-function TemplateCard({ template, onCopyVar, copied, onAction, onEdit, onRecordReview, onWithdraw, busy }: {
+function TemplateCard({ template, onCopyVar, copied, onAction, onEdit, onRecordReview, onWithdraw, onAttach, onDownload, busy }: {
   template: Template
   onCopyVar: (v: string) => void
   copied: string | null
@@ -219,6 +242,8 @@ function TemplateCard({ template, onCopyVar, copied, onAction, onEdit, onRecordR
   onEdit: (t: Template) => void
   onRecordReview: (t: Template) => void
   onWithdraw: (templateId: string, reviewId: string) => void
+  onAttach: (templateId: string, reviewId: string, file: File) => void
+  onDownload: (templateId: string, reviewId: string, fileName: string) => void
   busy: boolean
 }) {
   const [expanded, setExpanded] = useState(false)
@@ -307,7 +332,8 @@ function TemplateCard({ template, onCopyVar, copied, onAction, onEdit, onRecordR
           {status === 'PUBLISHED' && !template.isSystem && <button style={smallBtn} disabled={busy} onClick={() => onAction(template.id, 'archive')}>Archive</button>}
           <button style={smallBtn} onClick={() => setShowLegal(!showLegal)}>{showLegal ? 'Hide legal reviews' : 'Legal reviews'}</button>
         </div>
-        {showLegal && <div style={{ marginBottom: 10 }}><LegalHistory templateId={template.id} onWithdraw={rid => onWithdraw(template.id, rid)} /></div>}
+        {showLegal && <div style={{ marginBottom: 10 }}><LegalHistory templateId={template.id} onWithdraw={rid => onWithdraw(template.id, rid)}
+          onAttach={(rid, fl) => onAttach(template.id, rid, fl)} onDownload={(rid, nm) => onDownload(template.id, rid, nm)} /></div>}
 
         {/* Preview toggle */}
         {template.bodyTemplate && (
@@ -399,15 +425,49 @@ export default function TemplatesTab() {
     onError: (e: unknown) => setError(errMsg(e, 'That step could not be completed')),
   })
 
+  const uploadEvidence = (id: string, reviewId: string, fl: File) => {
+    const fd = new FormData()
+    fd.append('file', fl)
+    return apiClient.post(`/api/v1/contracts/templates/${id}/legal-reviews/${reviewId}/evidence`, fd)
+  }
+
+  // Records the review first, then stores the evidence file. If only the file fails, the review stays recorded and the
+  // reviewer's file can be attached again from the review history.
   const recordReview = useMutation({
-    mutationFn: ({ id, body }: { id: string; body: Record<string, unknown> }) => apiClient.post(`/api/v1/contracts/templates/${id}/legal-reviews`, body),
-    onSuccess: (_d, v) => {
+    mutationFn: async ({ id, body, file }: { id: string; body: Record<string, unknown>; file: File | null }) => {
+      const res = await apiClient.post(`/api/v1/contracts/templates/${id}/legal-reviews`, body)
+      if (!file) return { fileError: '' }
+      try {
+        await uploadEvidence(id, (res.data?.data ?? res.data).id as string, file)
+        return { fileError: '' }
+      } catch (e: unknown) {
+        return { fileError: errMsg(e, 'The file could not be stored') }
+      }
+    },
+    onSuccess: (r, v) => {
       qc.invalidateQueries({ queryKey: ['contract-templates'] })
       qc.invalidateQueries({ queryKey: ['contract-template-reviews', v.id] })
       setReviewFor(null); setReviewError('')
+      setError(r.fileError ? `The review was recorded, but the evidence file was not stored: ${r.fileError}. Attach it from the legal reviews list.` : '')
     },
     onError: (e: unknown) => setReviewError(errMsg(e, 'Failed to record the review')),
   })
+
+  const attachEvidence = useMutation({
+    mutationFn: ({ id, reviewId, file }: { id: string; reviewId: string; file: File }) => uploadEvidence(id, reviewId, file),
+    onSuccess: (_d, v) => { qc.invalidateQueries({ queryKey: ['contract-template-reviews', v.id] }); setError('') },
+    onError: (e: unknown) => setError(errMsg(e, 'The file could not be stored')),
+  })
+
+  const downloadEvidence = async (id: string, reviewId: string, fileName: string) => {
+    try {
+      const res = await apiClient.get(`/api/v1/contracts/templates/${id}/legal-reviews/${reviewId}/evidence`, { responseType: 'blob' })
+      const url = URL.createObjectURL(res.data as Blob)
+      const a = document.createElement('a')
+      a.href = url; a.download = fileName; a.click()
+      URL.revokeObjectURL(url)
+    } catch (e: unknown) { setError(errMsg(e, 'The evidence file could not be downloaded')) }
+  }
 
   const withdrawReview = useMutation({
     mutationFn: ({ id, reviewId, reason }: { id: string; reviewId: string; reason: string }) =>
@@ -441,6 +501,8 @@ export default function TemplatesTab() {
     onAction: (id: string, action: string) => act.mutate({ id, action }),
     onEdit: startEdit, onRecordReview: (t: Template) => { setReviewFor(t); setReviewError('') },
     onWithdraw: askWithdraw, busy: act.isPending,
+    onAttach: (id: string, reviewId: string, file: File) => attachEvidence.mutate({ id, reviewId, file }),
+    onDownload: downloadEvidence,
   }
 
   const systemTemplates = templates.filter(t => t.isSystem)
@@ -513,7 +575,7 @@ export default function TemplatesTab() {
 
       {reviewFor && (
         <LegalReviewModal template={reviewFor} onClose={() => setReviewFor(null)} error={reviewError} busy={recordReview.isPending}
-          onSubmit={body => recordReview.mutate({ id: reviewFor.id, body })} />
+          onSubmit={(body, file) => recordReview.mutate({ id: reviewFor.id, body, file })} />
       )}
 
       {/* ── Create template modal ── */}
