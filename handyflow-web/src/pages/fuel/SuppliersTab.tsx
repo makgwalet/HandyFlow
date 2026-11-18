@@ -117,7 +117,7 @@ export default function SuppliersTab() {
         <div style={{ textAlign: "center", padding: 40, color: "var(--hf-text-faint)" }}>Loading suppliers...</div>
       ) : suppliers.length === 0 ? (
         <div style={{ textAlign: "center", padding: "60px 20px", color: "var(--hf-text-faint)" }}>
-          <Users size={40} style={{ marginBottom: 12, opacity: 0.4 }} />
+          <Users size={40} style={{ margin: "0 auto 12px", opacity: 0.4 }} />
           <div style={{ fontWeight: 600, color: "var(--hf-text-tertiary)" }}>No suppliers yet</div>
           <div style={{ fontSize: 14, marginTop: 4 }}>Add your fuel suppliers to track receipts.</div>
         </div>

@@ -26,7 +26,7 @@ describe("DivisionSalesTab", () => {
     expect(screen.getByText("Truck stop")).toBeTruthy()
     expect(screen.getByText("75% of revenue")).toBeTruthy()
     expect(screen.getByText(/Delivered loads, at the amount invoiced/)).toBeTruthy()
-    expect(screen.getByText(/new on the period before/)).toBeTruthy()
+    expect(screen.getByText(/nothing in the period before/)).toBeTruthy()
   })
 
   it("hides amounts and says why when the server sends none", async () => {

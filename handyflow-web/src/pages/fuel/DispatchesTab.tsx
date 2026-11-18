@@ -181,7 +181,7 @@ export default function DispatchesTab() {
         <div style={{ textAlign: "center", padding: 40, color: "var(--hf-text-faint)" }}>Loading...</div>
       ) : filtered.length === 0 ? (
         <div style={{ textAlign: "center", padding: "60px 20px", color: "var(--hf-text-faint)" }}>
-          <Fuel size={40} style={{ marginBottom: 12, opacity: 0.4 }} />
+          <Fuel size={40} style={{ margin: "0 auto 12px", opacity: 0.4 }} />
           <div style={{ fontWeight: 600, color: "var(--hf-text-tertiary)" }}>No dispatches for this period</div>
         </div>
       ) : view === "rollup" ? (

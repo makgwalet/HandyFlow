@@ -42,7 +42,7 @@ export function KpiTile({ label, value, hint, icon: Icon, tone = "blue", onClick
       </div>
       <div style={{ fontSize: 28, fontWeight: 800, lineHeight: 1.15, marginTop: 10, letterSpacing: "-0.01em" }}>{value}</div>
       {hint && <div style={{ fontSize: 12, marginTop: 4, opacity: 0.88 }}>{hint}</div>}
-      {trend && trend.length > 1 && <Sparkline values={trend} style={{ position: "absolute", right: 12, top: 12, opacity: 0.8 }} />}
+      {trend && trend.length > 1 && <Sparkline values={trend} style={{ position: "absolute", right: 14, bottom: 12, opacity: 0.8 }} />}
     </>
   )
   return onClick

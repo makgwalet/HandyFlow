@@ -61,7 +61,7 @@ export default function PlanningTab() {
             <tbody>
               {loads.map(l => (
                 <tr key={l.deliveryId} style={{ borderTop: "1px solid var(--hf-border)" }}>
-                  <td style={td}>{time(l.scheduledAt)}</td><td style={td}>{windowText(l.windowStart, l.windowEnd) ?? "–"}</td><td style={td}>{l.customerName ?? "Walk-in"}</td><td style={td}>{l.fuelType}</td><td style={td}>{fmtL(l.litres)}</td>
+                  <td style={td}>{time(l.scheduledAt)}</td><td style={td}>{windowText(l.windowStart, l.windowEnd) ?? "–"}</td><td style={td}>{l.customerName ?? "Walk-in"}</td><td style={td}>{l.fuelType}</td><td style={{ ...td, whiteSpace: "nowrap" }}>{fmtL(l.litres)}</td>
                   <td style={td}>{l.tankerRegistration ?? "–"}</td><td style={td}>{l.driverName ?? "–"}</td>
                   <td style={td}>{l.status === "SCHEDULED" && !l.allocated ? <Chip bg="var(--hf-danger-soft)" fg="var(--hf-danger-text)">Unallocated</Chip> : l.status.toLowerCase().replace("_", " ")}{l.routeId && <> <Chip bg="var(--hf-surface-muted)" fg="var(--hf-text)">Stop {l.routeSequence}</Chip></>}{(l.failedAttempts ?? 0) > 0 && <> <Chip bg="var(--hf-warning-soft)" fg="var(--hf-warning-text)">{l.failedAttempts} failed attempt{l.failedAttempts === 1 ? "" : "s"}</Chip></>}</td>
                   <td style={td}>{canManage && l.status === "SCHEDULED" && !l.routeId && <button style={btnGhost} onClick={() => setAllocating(l)}>{l.allocated ? "Reallocate" : "Allocate"}</button>}

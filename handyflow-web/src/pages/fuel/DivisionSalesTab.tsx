@@ -14,7 +14,8 @@ const TONE: Record<string, Tone> = { DISTRIBUTION: "blue", RETAIL_FORECOURT: "gr
 
 function Change({ now, before }: { now: number | null; before: number | null }) {
   const t = changeText(now, before)
-  return t ? <span style={{ fontSize: 11.5, color: "var(--hf-text-muted)" }}>{t} on the period before</span> : null
+  if (!t) return null
+  return <span style={{ fontSize: 11.5, color: "var(--hf-text-muted)" }}>{t === "new" ? "nothing in the period before" : `${t} on the period before`}</span>
 }
 
 function Card({ r, share }: { r: DivisionRow; share: number | null }) {

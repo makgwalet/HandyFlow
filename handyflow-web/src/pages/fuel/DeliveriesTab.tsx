@@ -165,8 +165,8 @@ export default function DeliveriesTab() {
       </div>
 
       {/* Toolbar */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
-        <div style={{ display: "flex", gap: 6 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18, flexWrap: "wrap", gap: 10 }}>
+        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
           {["ALL", "SCHEDULED", "IN_TRANSIT", "DELIVERED", "CANCELLED", "REVERSED"].map(s => (
             <button key={s} onClick={() => setFilterStatus(s)} style={{ padding: "6px 12px", borderRadius: 20, border: "1px solid", borderColor: filterStatus === s ? "var(--hf-primary)" : "var(--hf-border)", background: filterStatus === s ? "var(--hf-primary)" : "var(--hf-surface)", color: filterStatus === s ? "var(--hf-text-on-solid)" : "var(--hf-text-muted)", fontSize: 12, fontWeight: 500, cursor: "pointer" }}>
               {s === "ALL" ? "All" : STATUS_CONFIG[s as keyof typeof STATUS_CONFIG]?.label}
@@ -183,7 +183,7 @@ export default function DeliveriesTab() {
         <div style={{ textAlign: "center", padding: 40, color: "var(--hf-text-faint)" }}>Loading deliveries...</div>
       ) : filtered.length === 0 ? (
         <div style={{ textAlign: "center", padding: "60px 20px", color: "var(--hf-text-faint)" }}>
-          <Truck size={40} style={{ marginBottom: 12, opacity: 0.4 }} />
+          <Truck size={40} style={{ margin: "0 auto 12px", opacity: 0.4 }} />
           <div style={{ fontWeight: 600, color: "var(--hf-text-tertiary)" }}>No deliveries found</div>
         </div>
       ) : (
@@ -192,16 +192,16 @@ export default function DeliveriesTab() {
             const cfg = STATUS_CONFIG[d.status]
             return (
               <div key={d.id} style={{ background: "var(--hf-surface)", border: "1px solid var(--hf-border)", borderRadius: 12, padding: "16px 20px" }}>
-                <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between" }}>
-                  <div style={{ display: "flex", gap: 14, alignItems: "flex-start" }}>
+                <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
+                  <div style={{ display: "flex", gap: 14, alignItems: "flex-start", flex: "1 1 320px", minWidth: 0 }}>
                     <div style={{ width: 42, height: 42, borderRadius: 10, background: cfg.bg, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
                       <Truck size={20} style={{ color: cfg.color }} />
                     </div>
                     <div>
-                      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 3 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 3, flexWrap: "wrap" }}>
                         <span style={{ fontWeight: 700, fontSize: 15, color: "var(--hf-text)" }}>{d.fuelType}</span>
                         <span style={{ color: "var(--hf-text-faint)" }}>·</span>
-                        <span style={{ fontWeight: 600, color: "var(--hf-accent-text)" }}>{d.litresOrdered.toLocaleString()} L ordered</span>
+                        <span style={{ fontWeight: 600, color: "var(--hf-accent-text)", whiteSpace: "nowrap" }}>{d.litresOrdered.toLocaleString()} L ordered</span>
                         {d.litresDelivered && d.litresDelivered !== d.litresOrdered && (
                           <span style={{ color: "var(--hf-text-muted)", fontSize: 13 }}>({d.litresDelivered.toLocaleString()} L delivered)</span>
                         )}
@@ -227,7 +227,7 @@ export default function DeliveriesTab() {
                     </div>
                   </div>
 
-                  <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", minWidth: 0 }}>
                     <div style={{ textAlign: "right" }}>
                       <div style={{ fontWeight: 700, color: "var(--hf-text)" }}>{fmtR(d.totalAmount)}</div>
                       {d.receiptNumber && <div style={{ fontSize: 11, color: "var(--hf-text-faint)" }}>{d.receiptNumber}</div>}

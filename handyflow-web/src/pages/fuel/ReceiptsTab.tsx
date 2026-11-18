@@ -94,7 +94,7 @@ export default function ReceiptsTab() {
         <div style={{ textAlign: "center", padding: 40, color: "var(--hf-text-faint)" }}>Loading receipts...</div>
       ) : filtered.length === 0 ? (
         <div style={{ textAlign: "center", padding: "60px 20px", color: "var(--hf-text-faint)" }}>
-          <ArrowDownToLine size={40} style={{ marginBottom: 12, opacity: 0.4 }} />
+          <ArrowDownToLine size={40} style={{ margin: "0 auto 12px", opacity: 0.4 }} />
           <div style={{ fontWeight: 600, color: "var(--hf-text-tertiary)" }}>No stock-in records</div>
           <div style={{ fontSize: 13, marginTop: 4 }}>Use the Tanks tab to receive fuel into a tank.</div>
         </div>
@@ -216,7 +216,7 @@ function PriceTrendChart({ receipts, tankFuelType }: { receipts: any[]; tankFuel
   if (points.length === 0) {
     return (
       <div style={{ textAlign: "center", padding: "60px 20px", color: "var(--hf-text-faint)" }}>
-        <TrendingUp size={40} style={{ marginBottom: 12, opacity: 0.4 }} />
+        <TrendingUp size={40} style={{ margin: "0 auto 12px", opacity: 0.4 }} />
         <div style={{ fontWeight: 600, color: "var(--hf-text-tertiary)" }}>No priced receipts to chart</div>
         <div style={{ fontSize: 13, marginTop: 4 }}>Receipts need a price per litre recorded to appear here.</div>
       </div>

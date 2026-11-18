@@ -13,15 +13,19 @@ const capacity = { from: "2026-11-18", bays: 8, nights: [], overstays: [] }
 const refused = (status: number) => Object.assign(new Error("refused"), { response: { status } })
 const nav = vi.fn()
 
+/** The shared client strips the {success,data} envelope, so the real shape is {data: payload}; older mocks kept the envelope. */
+let stripped = false
+const wrap = (v: unknown) => (stripped ? { data: v } : { data: { data: v } })
+
 function reply(over: Record<string, () => unknown> = {}) {
   get.mockImplementation(async (u: string) => {
-    for (const [k, f] of Object.entries(over)) if (u.includes(k)) { const v = f(); if (v instanceof Error) throw v; return { data: { data: v } } }
-    if (u.includes("dashboard-summary")) return { data: { data: summary } }
-    if (u.includes("/tanks")) return { data: { data: [] } }
-    if (u.includes("forecourt/summary")) return { data: { data: retail } }
-    if (u.includes("occupancy")) return { data: { data: occupancy } }
-    if (u.includes("capacity")) return { data: { data: capacity } }
-    return { data: { data: null } }
+    for (const [k, f] of Object.entries(over)) if (u.includes(k)) { const v = f(); if (v instanceof Error) throw v; return wrap(v) }
+    if (u.includes("dashboard-summary")) return wrap(summary)
+    if (u.includes("/tanks")) return wrap([])
+    if (u.includes("forecourt/summary")) return wrap(retail)
+    if (u.includes("occupancy")) return wrap(occupancy)
+    if (u.includes("capacity")) return wrap(capacity)
+    return wrap(null)
   })
 }
 function mount() {
@@ -29,7 +33,7 @@ function mount() {
 }
 
 describe("FuelDashboard retail and yard tiles", () => {
-  beforeEach(() => { get.mockReset(); nav.mockReset() })
+  beforeEach(() => { get.mockReset(); nav.mockReset(); stripped = false })
   afterEach(cleanup)
 
   it("shows retail takings and the yard, and each opens its tab", async () => {
@@ -40,6 +44,13 @@ describe("FuelDashboard retail and yard tiles", () => {
     expect(screen.getByText(/3 of 8 bays free/)).toBeTruthy()
     fireEvent.click(screen.getByText("Retail takings, last 7 days")); expect(nav).toHaveBeenCalledWith("forecourt")
     fireEvent.click(screen.getByText("Truck stop yard")); expect(nav).toHaveBeenCalledWith("truck-stop")
+  })
+
+  it("works with the real client, which has already removed the envelope", async () => {
+    stripped = true
+    reply(); mount()
+    expect(await screen.findByText(/90.000/)).toBeTruthy()
+    expect(screen.getByText("5 in the yard")).toBeTruthy()
   })
 
   it("leaves out a division the company does not run, without calling it an error", async () => {

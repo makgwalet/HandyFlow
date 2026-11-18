@@ -50,14 +50,14 @@ export default function VariancesTab() {
               <option value="driver">By driver</option><option value="vehicle">By vehicle</option>
             </select>
           </div>
-          <table style={{ width: "100%", fontSize: 12.5, borderCollapse: "collapse" }}>
+          <div style={{ overflowX: "auto" }}><table style={{ width: "100%", fontSize: 12.5, borderCollapse: "collapse" }}>
             <thead><tr style={{ textAlign: "left", color: "var(--hf-text-muted)" }}><th style={{ padding: "4px 6px" }}>{by === "driver" ? "Driver" : "Vehicle"}</th><th>Variances</th><th>Not closed</th><th>Short</th><th>Over</th></tr></thead>
             <tbody>{groups.map(g => (
               <tr key={g.key} style={{ borderTop: "1px solid var(--hf-border)" }}>
                 <td style={{ padding: "4px 6px" }}>{g.key}{g.repeats && <> <Chip bg="var(--hf-warning-soft)" fg="var(--hf-warning-text)">Repeats</Chip></>}</td>
                 <td>{g.count}</td><td>{g.open}</td><td>{litresText(g.shortLitres)}</td><td>{litresText(g.overLitres)}</td>
               </tr>))}</tbody>
-          </table>
+          </table></div>
           <p style={{ margin: "6px 0 0", fontSize: 11.5, color: "var(--hf-text-muted)" }}>A pattern is a reason to look at the loads, not a finding. Open a load's timeline to see what was recorded.</p>
         </div>
         <div style={{ display: "flex", gap: 8, marginBottom: 10, flexWrap: "wrap" }}>

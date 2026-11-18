@@ -70,8 +70,8 @@ export default function CustomersTab() {
                     <tr style={{ borderTop: "1px solid var(--hf-border)" }}>
                       <td style={td}><button style={{ ...btnGhost, border: "none", padding: 0, fontWeight: 600 }} onClick={() => setOpen(open === a.id ? null : a.id)}>{a.customerName}</button></td>
                       <td style={td}>{typeLabel(a.customerType)}</td>
-                      <td style={td}>{fmtR(a.creditLimit)}</td>
-                      <td style={td}>{a.paymentTermsDays} days</td>
+                      <td style={{ ...td, whiteSpace: "nowrap" }}>{fmtR(a.creditLimit)}</td>
+                      <td style={{ ...td, whiteSpace: "nowrap" }}>{a.paymentTermsDays} days</td>
                       <td style={td}>{a.siteCount}</td>
                       <td style={td}>{a.creditHold ? <Chip bg="var(--hf-danger-soft)" fg="var(--hf-danger-text)">On credit hold</Chip> : <Chip bg="var(--hf-success-soft-strong)" fg="var(--hf-success-text-strong)">Active</Chip>}</td>
                       <td style={td}>

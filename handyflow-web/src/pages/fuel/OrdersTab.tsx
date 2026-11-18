@@ -59,12 +59,12 @@ export default function OrdersTab() {
               {rows.map(o => (
                 <Fragment key={o.id}>
                   <tr style={{ borderTop: "1px solid var(--hf-border)" }}>
-                    <td style={td}><button style={{ ...btnGhost, border: "none", padding: 0, fontWeight: 600 }} onClick={() => setOpen(open === o.id ? null : o.id)}>{o.orderNumber}</button></td>
+                    <td style={{ ...td, whiteSpace: "nowrap" }}><button style={{ ...btnGhost, border: "none", padding: 0, fontWeight: 600 }} onClick={() => setOpen(open === o.id ? null : o.id)}>{o.orderNumber}</button></td>
                     <td style={td}>{o.customerName}{o.siteName ? ` · ${o.siteName}` : ""}</td>
                     <td style={td}>{o.fuelType}</td>
-                    <td style={td}>{fmtL(o.litresOrdered)}</td>
+                    <td style={{ ...td, whiteSpace: "nowrap" }}>{fmtL(o.litresOrdered)}</td>
                     <td style={td}>{fmtL(o.litresDelivered)}</td>
-                    <td style={td}>{fmtR(o.value)}</td>
+                    <td style={{ ...td, whiteSpace: "nowrap" }}>{fmtR(o.value)}</td>
                     <td style={td}><StatusPill tone={ORDER_TONE[o.status] ?? "slate"} label={statusLabel(o.status)} /></td>
                     <td style={td}>{canManage && <span style={{ display: "flex", gap: 6 }}>
                       {o.status === "QUOTE" && <><button style={btnGhost} onClick={() => setDialog({ kind: "quote", order: o })}>Edit</button>

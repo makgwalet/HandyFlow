@@ -177,21 +177,6 @@ export default function TanksTab() {
 
   return (
     <div>
-      {/* Stats */}
-      <div style={{ display: "flex", gap: 12, marginBottom: 22 }}>
-        {[
-          { label: "Tanks",          value: tanks.length,                            color: "var(--hf-primary-text)" },
-          { label: "Total capacity", value: `${totalCapacity.toLocaleString()} L`,  color: "var(--hf-accent-text)" },
-          { label: "Total stock",    value: `${totalStock.toLocaleString()} L`,      color: "var(--hf-info-text)" },
-          { label: "Low tanks",      value: lowCount,                                color: lowCount > 0 ? "var(--hf-danger-text)" : "var(--hf-text-faint)" },
-        ].map(s => (
-          <div key={s.label} style={{ flex: 1, background: "var(--hf-surface-muted)", border: "1px solid var(--hf-border)", borderRadius: 10, padding: "12px 16px" }}>
-            <div style={{ fontSize: 22, fontWeight: 700, color: s.color }}>{s.value}</div>
-            <div style={{ fontSize: 11, color: "var(--hf-text-muted)", marginTop: 2 }}>{s.label}</div>
-          </div>
-        ))}
-      </div>
-
       {/* Low stock alert */}
       {lowCount > 0 && (
         <div style={{ marginBottom: 18, padding: "12px 16px", background: "var(--hf-danger-soft)", border: "1px solid var(--hf-danger-border)", borderRadius: 10, display: "flex", alignItems: "center", gap: 10 }}>
@@ -232,7 +217,7 @@ export default function TanksTab() {
         <div style={{ textAlign: "center", padding: 40, color: "var(--hf-text-faint)" }}>Loading tanks...</div>
       ) : (tanks as Tank[]).length === 0 ? (
         <div style={{ textAlign: "center", padding: "60px 20px", color: "var(--hf-text-faint)" }}>
-          <Droplets size={40} style={{ marginBottom: 12, opacity: 0.4 }} />
+          <Droplets size={40} style={{ margin: "0 auto 12px", opacity: 0.4 }} />
           <div style={{ fontWeight: 600, color: "var(--hf-text-tertiary)" }}>No tanks registered</div>
         </div>
       ) : (

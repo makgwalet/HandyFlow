@@ -9,17 +9,20 @@ import { Receipt, Warehouse, Droplets, AlertTriangle, Fuel, Truck, TrendingDown,
 import { ActionTile, EmptyState, KpiGrid, KpiTile, Panel, PanelLink, ProgressBar, RingGauge, StatusPill, StepTracker, type Tone } from "./fuelUi"
 import { asRetail, asSummary, asYard, buildDashboard, isNotForYou, retailTile, yardTile, DELIVERY_STEPS, deliveryStep, FUEL_TONE, fmtShortDate, fmtLitres } from "./dashboardOps"
 
+/** The shared client already removes the {success,data} envelope; tests and older callers may still hand it back, so accept both. */
+const unwrapBody = (r: any) => r?.data?.data ?? r?.data
+
 export default function FuelDashboard({ onNavigate }: { onNavigate: (section: string) => void }) {
   const tanksQ = useQuery({ queryKey: ["tanks"], queryFn: async () => { const r = await apiClient.get("/api/v1/fuel/tanks"); return r.data?.data ?? r.data ?? [] } })
   const summaryQ = useQuery({ queryKey: ["fuel-dashboard-summary"], queryFn: async () => { const r = await apiClient.get("/api/v1/fuel/dashboard-summary"); return asSummary(r.data?.data ?? r.data) } })
 
   // Divisions the company does not run answer 403/404 here: those tiles are simply left out. Any other failure shows on the tile.
-  const retailQ = useQuery({ queryKey: ["fuel-dashboard-retail"], retry: false, queryFn: async () => asRetail((await apiClient.get("/api/v1/fuel/forecourt/summary?days=7")).data?.data) })
+  const retailQ = useQuery({ queryKey: ["fuel-dashboard-retail"], retry: false, queryFn: async () => asRetail(unwrapBody(await apiClient.get("/api/v1/fuel/forecourt/summary?days=7"))) })
   const yardQ = useQuery({
     queryKey: ["fuel-dashboard-yard"], retry: false,
     queryFn: async () => {
       const [occ, cap] = await Promise.all([apiClient.get("/api/v1/fuel/truck-stop/stays/occupancy"), apiClient.get("/api/v1/fuel/truck-stop/stays/capacity?days=1").catch(() => null)])
-      return asYard(occ.data?.data, cap?.data?.data)
+      return asYard(unwrapBody(occ), cap ? unwrapBody(cap) : null)
     },
   })
   const hidden = (q: { isError: boolean; error: unknown }) => q.isError && isNotForYou((q.error as any)?.response?.status)
