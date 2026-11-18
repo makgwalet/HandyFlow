@@ -4,6 +4,7 @@ import { apiClient } from '../../api/client'
 import ContractsDashboard from './ContractsDashboard'
 import ContractsTab       from './ContractsTab'
 import TemplatesTab       from './TemplatesTab'
+import ClausesTab         from './ClausesTab'
 import ObligationsTab     from './ObligationsTab'
 import RenewalsTab        from './RenewalsTab'
 import ReportsTab         from './ReportsTab'
@@ -60,6 +61,7 @@ export default function ContractingPage() {
           case 'dashboard': return <ContractsDashboard onNavigate={goTo} />
           case 'contracts': return <ContractsTab />
           case 'templates': return <TemplatesTab />
+          case 'clauses':     return <ClausesTab />
           case 'obligations': return <ObligationsTab />
           case 'renewals':    return <RenewalsTab />
           case 'reports':     return <ReportsTab />

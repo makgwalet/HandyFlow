@@ -6,6 +6,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import za.co.handyflow.platform.contracting.domain.model.*;
 import za.co.handyflow.platform.contracting.domain.repository.ContractChangeProposalRepository;
+import za.co.handyflow.platform.contracting.domain.repository.ContractClauseRepository;
+import za.co.handyflow.platform.contracting.domain.repository.ContractClauseUsageRepository;
 import za.co.handyflow.platform.contracting.domain.repository.ContractRepository;
 import za.co.handyflow.platform.contracting.domain.repository.ContractVersionRepository;
 import za.co.handyflow.platform.contracting.dto.ContractRedlineDtos.*;
@@ -27,6 +29,8 @@ public class ContractRedlineService {
     private final ContractRepository contractRepo;
     private final ContractVersionRepository versionRepo;
     private final ContractChangeProposalRepository proposalRepo;
+    private final ContractClauseRepository clauseRepo;
+    private final ContractClauseUsageRepository clauseUsageRepo;
 
     // ── Versions ─────────────────────────────────────────────────────────────
 
@@ -70,13 +74,21 @@ public class ContractRedlineService {
 
     @Transactional
     public ProposalView propose(TenantId tenantId, UUID contractId, String body, String note, UUID by) {
+        return propose(tenantId, contractId, body, note, by, null);
+    }
+
+    /** {@code clauseId} is set when the proposal inserts a library clause; applying it then records the clause as used in the contract. */
+    @Transactional
+    public ProposalView propose(TenantId tenantId, UUID contractId, String body, String note, UUID by, UUID clauseId) {
         Contract c = lock(tenantId, contractId);
         requireEditable(c);
         int base = ensureBaseline(tenantId, c);
         String clean = HtmlSanitizer.clean(body);
         if (BodyDiff.hunkCount(BodyDiff.diff(c.getBody(), clean)) == 0)
             throw new IllegalArgumentException("The proposed text is the same as the current text");
-        ContractChangeProposal p = proposalRepo.save(ContractChangeProposal.create(tenantId.getValue(), contractId, base, clean, note, by));
+        ContractChangeProposal p = proposalRepo.save(clauseId == null
+                ? ContractChangeProposal.create(tenantId.getValue(), contractId, base, clean, note, by)
+                : ContractChangeProposal.forClause(tenantId.getValue(), contractId, base, clean, note, by, clauseId));
         log.info("Change proposal {} made on contract={} (base v{})", p.getId(), c.getContractNumber(), base);
         return view(tenantId, p, c.getBody(), base);
     }
@@ -115,6 +127,9 @@ public class ContractRedlineService {
         contractRepo.save(c);
         int version = snapshot(tenantId, c, "PROPOSAL_APPLIED", "Applied " + accepted.size() + " of " + hunks + " proposed changes", by);
         p.markApplied(accepted, version, note, by);
+        if (p.getSourceClauseId() != null)
+            clauseRepo.findByTenantIdAndId(tenantId.getValue(), p.getSourceClauseId())
+                    .ifPresent(cl -> clauseUsageRepo.save(ContractClauseUsage.of(tenantId.getValue(), c.getId(), cl, p.getId(), version, by)));
         proposalRepo.save(p);
         log.info("Change proposal {} applied to contract={} as v{} ({} of {} changes)", p.getId(), c.getContractNumber(), version, accepted.size(), hunks);
         return view(tenantId, p, versionOf(tenantId, c.getId(), p.getBaseVersionNo()).getBody(), version);

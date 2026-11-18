@@ -708,6 +708,7 @@ export const CONTRACTING_SECTIONS: ModuleSections = {
       sections: [
         { id: 'contracts', label: 'Contracts', icon: FileText },
         { id: 'templates', label: 'Templates', icon: LayoutTemplate },
+        { id: 'clauses', label: 'Clause library', icon: BookOpen },
       ],
     },
     {

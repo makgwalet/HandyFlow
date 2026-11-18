@@ -6,6 +6,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { apiClient } from '../../api/client'
 import { usePermissions } from '../../hooks/usePermission'
 import { sanitizeHtml } from './sanitizeHtml'
+import type { Clause } from './ClausesTab'
 
 interface Segment { type: 'EQUAL' | 'HUNK'; hunkId: number; blocks: string[]; removed: string[]; added: string[] }
 interface VersionInfo { versionNo: number; source: string; note?: string | null; createdAt: string }
@@ -13,6 +14,9 @@ interface Proposal {
   id: string; baseVersionNo: number; status: 'OPEN' | 'APPLIED' | 'REJECTED'; note?: string | null; createdAt: string
   decisionNote?: string | null; acceptedHunks?: string | null; appliedVersionNo?: number | null; stale: boolean; hunks: number; segments: Segment[]
 }
+
+interface ClauseUse { clauseId: string; title: string; clauseVersionNo: number; state: 'CURRENT' | 'SUPERSEDED' | 'WITHDRAWN' | 'REVIEW_EXPIRED'; insertedAt: string }
+const USE_LABEL: Record<string, string> = { CURRENT: 'current', SUPERSEDED: 'a newer version exists', WITHDRAWN: 'withdrawn', REVIEW_EXPIRED: 'legal review expired' }
 
 const SOURCE_LABEL: Record<string, string> = { BASELINE: 'Baseline', CREATED: 'Created', EDITED: 'Edited', PROPOSAL_APPLIED: 'Changes applied' }
 
@@ -113,6 +117,7 @@ export function ContractRedlineSection({ contractId, status }: { contractId: str
   const [drafting, setDrafting] = useState(false)
   const [text, setText] = useState('')
   const [note, setNote] = useState('')
+  const [clauseId, setClauseId] = useState('')
 
   const { data: versions = [] } = useQuery<VersionInfo[]>({
     queryKey: ['contract-versions', contractId], enabled: open,
@@ -122,6 +127,14 @@ export function ContractRedlineSection({ contractId, status }: { contractId: str
     queryKey: ['contract-proposals', contractId], enabled: open,
     queryFn: async () => data<Proposal[]>(await apiClient.get(`/api/v1/contracts/${contractId}/change-proposals`)),
   })
+  const { data: library = [] } = useQuery<Clause[]>({
+    queryKey: ['contract-clauses', 'published'], enabled: open && editable && canWrite,
+    queryFn: async () => data<Clause[]>(await apiClient.get('/api/v1/contracts/clauses?status=PUBLISHED')),
+  })
+  const { data: uses = [] } = useQuery<ClauseUse[]>({
+    queryKey: ['contract-clause-usage', contractId], enabled: open,
+    queryFn: async () => data<ClauseUse[]>(await apiClient.get(`/api/v1/contracts/${contractId}/clauses`)),
+  })
   const { data: cmp } = useQuery<{ segments: Segment[]; hunks: number }>({
     queryKey: ['contract-compare', contractId, from, to], enabled: open && from !== '' && to !== '' && from !== to,
     queryFn: async () => data<{ segments: Segment[]; hunks: number }>(await apiClient.get(`/api/v1/contracts/${contractId}/versions/compare?from=${from}&to=${to}`)),
@@ -130,6 +143,7 @@ export function ContractRedlineSection({ contractId, status }: { contractId: str
   const refresh = () => {
     qc.invalidateQueries({ queryKey: ['contract-versions', contractId] })
     qc.invalidateQueries({ queryKey: ['contract-proposals', contractId] })
+    qc.invalidateQueries({ queryKey: ['contract-clause-usage', contractId] })
     qc.invalidateQueries({ queryKey: ['contracts'] })
     setError('')
   }
@@ -142,6 +156,11 @@ export function ContractRedlineSection({ contractId, status }: { contractId: str
       setText(v.body); setNote(''); setDrafting(true); setError('')
     } catch (e: unknown) { setError(errMsg(e, 'The current text could not be loaded')) }
   }
+  const insertClause = useMutation({
+    mutationFn: () => apiClient.post(`/api/v1/contracts/${contractId}/clauses/insert`, { clauseId, afterBlock: null, note: null }),
+    onSuccess: () => { setClauseId(''); refresh() },
+    onError: (e: unknown) => setError(errMsg(e, 'The clause could not be proposed')),
+  })
   const propose = useMutation({
     mutationFn: () => apiClient.post(`/api/v1/contracts/${contractId}/change-proposals`, { body: text, note: note || null }),
     onSuccess: () => { setDrafting(false); refresh() },
@@ -173,11 +192,33 @@ export function ContractRedlineSection({ contractId, status }: { contractId: str
             {cmp && <div style={{ marginTop: 8 }}>{cmp.hunks === 0 ? <div style={{ fontSize: 12, color: 'var(--hf-text-faint)' }}>No differences.</div> : <DiffView segments={cmp.segments} />}</div>}
           </div>
 
+          {uses.length > 0 && (
+            <div>
+              <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--hf-text-muted)', textTransform: 'uppercase', marginBottom: 6 }}>Library clauses in this contract</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 3, fontSize: 12 }}>
+                {uses.map((u, i) => (
+                  <div key={i} style={{ color: u.state === 'CURRENT' ? 'var(--hf-text-secondary)' : 'var(--hf-danger-text)' }}>
+                    {u.title} (version {u.clauseVersionNo}): {USE_LABEL[u.state]}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           <div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
               <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--hf-text-muted)', textTransform: 'uppercase' }}>Change proposals</div>
               {canWrite && editable && !drafting && versions.length > 0 && <button style={btn} onClick={startDraft}>Propose a change</button>}
             </div>
+            {canWrite && editable && !drafting && (
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8, fontSize: 12 }}>
+                <select value={clauseId} onChange={e => setClauseId(e.target.value)} style={{ maxWidth: 260 }}>
+                  <option value="">{library.length === 0 ? 'No published clauses in the library' : 'Insert a library clause…'}</option>
+                  {library.filter(c => c.usable).map(c => <option key={c.id} value={c.id}>{c.title} (v{c.versionNo})</option>)}
+                </select>
+                {clauseId && <button style={btn} disabled={insertClause.isPending} onClick={() => insertClause.mutate()}>Propose inserting at the end</button>}
+              </div>
+            )}
             {!editable && <div style={{ fontSize: 12, color: 'var(--hf-text-faint)', marginBottom: 6 }}>The text of a contract that has been sent or signed cannot be changed.</div>}
             {drafting && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 10 }}>

@@ -30,6 +30,7 @@ public class ContractChangeProposal {
     @Column(name = "decision_note") private String decisionNote;
     @Column(name = "accepted_hunks") private String acceptedHunks;
     @Column(name = "applied_version_no") private Integer appliedVersionNo;
+    @Column(name = "source_clause_id") private UUID sourceClauseId;
 
     public static ContractChangeProposal create(UUID tenantId, UUID contractId, int baseVersionNo, String proposedBody, String note, UUID by) {
         ContractChangeProposal p = new ContractChangeProposal();
@@ -42,6 +43,13 @@ public class ContractChangeProposal {
         p.status = "OPEN";
         p.proposedBy = by;
         p.createdAt = Instant.now();
+        return p;
+    }
+
+    /** A proposal that inserts a library clause; applying it records the clause as used in the contract. */
+    public static ContractChangeProposal forClause(UUID tenantId, UUID contractId, int baseVersionNo, String proposedBody, String note, UUID by, UUID clauseId) {
+        ContractChangeProposal p = create(tenantId, contractId, baseVersionNo, proposedBody, note, by);
+        p.sourceClauseId = clauseId;
         return p;
     }
 
