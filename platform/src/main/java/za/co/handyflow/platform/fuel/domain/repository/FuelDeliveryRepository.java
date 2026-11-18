@@ -163,6 +163,13 @@ public interface FuelDeliveryRepository extends JpaRepository<FuelDelivery, UUID
          + "AND NOT EXISTS (SELECT 1 FROM FuelPodException e WHERE e.tenantId = :tenantId AND e.deliveryId = d.id AND e.status = 'USED')")
     long countDeliveredWithoutReceiverSince(TenantId tenantId, java.time.Instant since);
 
+    /** Completed with a receiver name but no signature (none on the delivery, none uploaded as evidence) and no exception used: the POD policy would now refuse these. */
+    @Query("SELECT COUNT(d) FROM FuelDelivery d WHERE d.tenantId = :tenantId AND d.status = 'DELIVERED' AND d.deletedAt IS NULL AND d.deliveredAt >= :since "
+         + "AND d.receiverName IS NOT NULL AND TRIM(d.receiverName) <> '' AND (d.receiverSignatureUrl IS NULL OR TRIM(d.receiverSignatureUrl) = '') "
+         + "AND NOT EXISTS (SELECT 1 FROM FuelDeliveryEvidence v WHERE v.tenantId = :tenantId AND v.deliveryId = d.id AND v.kind = 'SIGNATURE' AND v.status = 'ACTIVE') "
+         + "AND NOT EXISTS (SELECT 1 FROM FuelPodException e WHERE e.tenantId = :tenantId AND e.deliveryId = d.id AND e.status = 'USED')")
+    long countDeliveredWithoutSignatureSince(TenantId tenantId, java.time.Instant since);
+
     /** Completed with no arrival check on record at all: what the arrival check policy would refuse. (A stale or blocked check is not counted here.) */
     @Query("SELECT COUNT(d) FROM FuelDelivery d WHERE d.tenantId = :tenantId AND d.status = 'DELIVERED' AND d.deletedAt IS NULL AND d.deliveredAt >= :since "
          + "AND NOT EXISTS (SELECT 1 FROM FuelArrivalCheck c WHERE c.tenantId = :tenantId AND c.deliveryId = d.id)")

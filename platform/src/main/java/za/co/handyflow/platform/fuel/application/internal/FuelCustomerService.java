@@ -90,6 +90,10 @@ public class FuelCustomerService {
         return toResponse(sites.save(s));
     }
 
+    /** The site's unattended or automated-receiving designation, or null when it is an ordinary attended site. */
+    @Transactional(readOnly = true)
+    public String sitePodException(TenantId tenantId, UUID siteId) { return findSite(tenantId, siteId).getPodExceptionType(); }
+
     /** Marks a site as unattended or automated-receiving (or clears it). Only those two exception types can come from a site. */
     @Transactional
     public String setSitePodException(TenantId tenantId, UUID siteId, String type) {

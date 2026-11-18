@@ -6,11 +6,12 @@ public final class EnforcementDtos {
 
     /**
      * delivered: loads completed in the window. wouldRefuseNoReceiver: completed with no receiver name and no exception used (POD policy).
+     * wouldRefuseNoSignature: completed with a receiver name but no signature and no exception used (the signature rule).
      * wouldRefuseNoArrivalCheck: completed with no arrival check on record (arrival check policy); a stale or blocked check is not counted,
      * because the check history does not say what the load's check looked like at completion.
      */
     public record Readiness(int days, boolean arrivalCheckEnforced, boolean podPolicyEnforced, long delivered,
-                            long wouldRefuseNoReceiver, long wouldRefuseNoArrivalCheck) {}
+                            long wouldRefuseNoReceiver, long wouldRefuseNoArrivalCheck, long wouldRefuseNoSignature) {}
 
     /** One control's rollout state. nextStates are the states it can move to now; observations are what it would have refused in the last 7 days while only watching. */
     public record ControlState(String control, String state, java.util.List<java.util.UUID> pilotDepotIds, String reason, java.time.Instant stateSince,

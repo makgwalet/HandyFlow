@@ -5,6 +5,7 @@ import { apiClient } from "../../api/client"
 import { usePermissions } from "../../hooks/usePermission"
 import { Modal, btnPrimary, btnGhost, card, inputStyle, labelStyle, Chip } from "../warehousing/whseUi"
 import { KpiGrid, KpiTile, EmptyState } from "./fuelUi"
+import { SitePodField, savePodDesignation } from "./SitePodField"
 import { Users, PauseCircle, MapPin, Wallet } from "lucide-react"
 import { CUSTOMER_TYPES, typeLabel, fmtR, validateAccount, validateHold, validateSite, validateDistance, validateCoordinates, type CustomerAccount, type CustomerSite } from "./customerOps"
 
@@ -222,13 +223,16 @@ function HoldDialog({ account, onDone, onClose }: { account: CustomerAccount; on
 }
 
 function SiteDialog({ account, site, onDone, onClose }: { account: CustomerAccount; site?: CustomerSite; onDone: () => void; onClose: () => void }) {
+  const canPod = usePermissions(["FUEL_CONFIGURATION_MANAGE"])
+  const [pod, setPod] = useState<{ value: string; changed: boolean }>({ value: "", changed: false })
   const [f, setF] = useState({ name: site?.name ?? "", address: site?.address ?? "", contactName: site?.contactName ?? "", contactPhone: site?.contactPhone ?? "", deliveryInstructions: site?.deliveryInstructions ?? "", operatingHours: site?.operatingHours ?? "", distanceKm: site?.distanceKm == null ? "" : String(site.distanceKm), latitude: site?.latitude == null ? "" : String(site.latitude), longitude: site?.longitude == null ? "" : String(site.longitude) })
   const [err, setErr] = useState("")
   const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement>) => setF(s => ({ ...s, [k]: e.target.value }))
   const save = useMutation({
     mutationFn: () => {
       const body = { ...f, distanceKm: f.distanceKm.trim() === "" ? null : Number(f.distanceKm), latitude: f.latitude.trim() === "" ? null : Number(f.latitude), longitude: f.longitude.trim() === "" ? null : Number(f.longitude) }
-      return site ? apiClient.put(`/api/v1/fuel/customer-sites/${site.id}`, body) : apiClient.post(`/api/v1/fuel/customer-accounts/${account.id}/sites`, body)
+      const saved = site ? apiClient.put(`/api/v1/fuel/customer-sites/${site.id}`, body) : apiClient.post(`/api/v1/fuel/customer-accounts/${account.id}/sites`, body)
+      return saved.then(async (r: any) => { if (canPod && pod.changed) await savePodDesignation(site?.id ?? r?.data?.data?.id, pod.value); return r })
     },
     onSuccess: () => { onDone(); onClose() }, onError: (e: any) => setErr(msg(e, "Could not save the site")),
   })
@@ -256,6 +260,7 @@ function SiteDialog({ account, site, onDone, onClose }: { account: CustomerAccou
           </div>
           <div style={{ fontSize: 11, color: "var(--hf-text-muted)", marginTop: 3 }}>Used only to suggest a stop order on a route. Give both or leave both blank.</div>
         </div>
+        {canPod && <SitePodField siteId={site?.id} onChange={(value, changed) => setPod({ value, changed })} />}
         {err && <Err text={err} />}
         <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
           <button style={btnGhost} onClick={onClose}>Cancel</button>

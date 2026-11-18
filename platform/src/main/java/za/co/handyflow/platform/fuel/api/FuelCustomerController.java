@@ -80,6 +80,13 @@ public class FuelCustomerController {
                 customers.updateSite(TenantContext.getTenantIdAsObject(), siteId, req)));
     }
 
+    @GetMapping("/customer-sites/{siteId}/pod-exception")
+    @PreAuthorize("hasAnyAuthority('FUEL_READ','FUEL_MANAGE','FUEL_CUSTOMERS_MANAGE','FUEL_CONFIGURATION_MANAGE')")
+    public ResponseEntity<ApiResponse<String>> sitePodException(@PathVariable UUID siteId) {
+        featureGuard.requireModule("fuel");
+        return ResponseEntity.ok(ApiResponse.success(customers.sitePodException(TenantContext.getTenantIdAsObject(), siteId)));
+    }
+
     /** Marks a delivery site as unattended or automated-receiving, so a delivery there may be recorded with no receiver. */
     @PutMapping("/customer-sites/{siteId}/pod-exception")
     @PreAuthorize("hasAuthority('FUEL_CONFIGURATION_MANAGE')")

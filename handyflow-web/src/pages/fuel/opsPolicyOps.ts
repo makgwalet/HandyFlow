@@ -2,6 +2,8 @@
 // The server checks everything again.
 
 export const unwrap = (r: any) => r?.data?.data ?? r?.data
+/** A list from a response, or an empty one when the server sent nothing usable. */
+export const asList = <T,>(x: unknown): T[] => (Array.isArray(x) ? (x as T[]) : [])
 
 export interface ArrivalPolicy { freshHours: number; defaultFreshHours: number; enforced: boolean }
 export interface PodPolicy { enforced: boolean; allowedExceptions: string[] }
@@ -77,3 +79,53 @@ export function validateApprove(type: string, reason: string): string | null {
 
 /** Whole hours or days for a long wait, so "72" reads as "3 days". */
 export function hoursText(h: number): string { return h >= 48 && h % 24 === 0 ? `${h / 24} days` : `${h} hour${h === 1 ? "" : "s"}` }
+
+
+// ── Staged rollout of the arrival check and POD policy ──────────────────────────────────────────────────────────────────────────
+export interface ControlState { control: string; state: string; pilotDepotIds: string[]; reason?: string | null; stateSince?: string | null; version: number; observationsLast7Days: number; nextStates: string[] }
+export interface Blockers { control: string; target: string; allowed: boolean; blockers: string[] }
+export interface Observation { deliveryId?: string | null; message: string; at: string }
+export interface Readiness { days: number; delivered: number; wouldRefuseNoReceiver: number; wouldRefuseNoArrivalCheck: number; wouldRefuseNoSignature: number }
+
+export const CONTROL_LABEL: Record<string, string> = { ARRIVAL_CHECK: "Arrival check", POD_POLICY: "Proof of delivery: receiver name and signature" }
+export const STATE_LABEL: Record<string, string> = { OFF: "Off", MONITOR: "Monitor", PILOT: "Pilot", ENFORCED: "Enforced" }
+export const STATE_HELP: Record<string, string> = {
+  OFF: "Nothing is asked and nothing is recorded.",
+  MONITOR: "Nothing is refused. What would have been refused is recorded for review.",
+  PILOT: "Refused at the chosen depots only; recorded everywhere else.",
+  ENFORCED: "Refused everywhere.",
+}
+const ORDER = ["OFF", "MONITOR", "PILOT", "ENFORCED"]
+export const isStepUp = (from: string, to: string) => ORDER.indexOf(to) > ORDER.indexOf(from)
+
+export function validateChange(target: string, reason: string, depots: string[]): string | null {
+  if (reason.trim().length < 5) return "Give a reason for the change (at least 5 characters)."
+  if (target === "PILOT" && depots.length === 0) return "Choose the depots the pilot covers."
+  return null
+}
+
+// ── Completing a delivery from the office ───────────────────────────────────────────────────────────────────────────────────────
+export interface CompleteForm {
+  litresDelivered: string; receiverName: string; receiverIdBadge: string; meterReadingStart: string; meterReadingEnd: string
+  signedOnBehalf: boolean; onBehalfOf: string; signature: string; podExceptionType: string; podExceptionReason: string
+}
+
+/**
+ * What the office sends to complete a delivery. With an exception there is no receiver and no signature, and the reason travels with it;
+ * without one, the receiver's name and signature go together. The server judges both again.
+ */
+export function buildCompleteBody(f: CompleteForm) {
+  const exception = f.podExceptionType.trim()
+  return {
+    litresDelivered: Number(f.litresDelivered),
+    receiverName: exception ? null : (f.receiverName.trim() || null),
+    receiverIdBadge: f.receiverIdBadge || null,
+    meterReadingStart: f.meterReadingStart ? Number(f.meterReadingStart) : null,
+    meterReadingEnd: f.meterReadingEnd ? Number(f.meterReadingEnd) : null,
+    signedOnBehalf: f.signedOnBehalf,
+    onBehalfOf: f.onBehalfOf || null,
+    receiverSignatureUrl: exception ? null : (f.signature || null),
+    podExceptionType: exception || null,
+    podExceptionReason: exception ? f.podExceptionReason.trim() : null,
+  }
+}

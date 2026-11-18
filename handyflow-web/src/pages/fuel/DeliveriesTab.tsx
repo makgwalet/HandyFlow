@@ -6,6 +6,8 @@ import ReverseModal from "./ReverseModal"
 import EvidenceModal from "./EvidenceModal"
 import ExecutionModal from "./ExecutionModal"
 import { ArrivalCheckDialog, PodExceptionDialog } from "./ArrivalPodDialogs"
+import ReceiverSignatureField from "./ReceiverSignatureField"
+import { POD_EXCEPTIONS, buildCompleteBody, unwrap as unwrapData, type PodPolicy } from "./opsPolicyOps"
 import { apiClient } from "../../api/client"
 import { Plus, Truck, CheckCircle, X, Download } from "lucide-react"
 interface Delivery {
@@ -63,7 +65,10 @@ export default function DeliveriesTab() {
     litresDelivered: "", receiverName: "", receiverIdBadge: "",
     meterReadingStart: "", meterReadingEnd: "",
     signedOnBehalf: false, onBehalfOf: "",
+    signature: "", podExceptionType: "", podExceptionReason: "",
   })
+  // Once the company enforces proof of delivery, an attended delivery needs the receiver's signature, or an allowed exception.
+  const podPolicy = useQuery<PodPolicy>({ queryKey: ["fuel-pod-policy"], retry: false, queryFn: async () => unwrapData(await apiClient.get("/api/v1/fuel/settings/pod-policy")) })
 
   const { data: deliveries = [], isLoading } = useQuery({
     queryKey: ["deliveries"],
@@ -112,7 +117,7 @@ export default function DeliveriesTab() {
       qc.invalidateQueries({ queryKey: ["deliveries"] })
       qc.invalidateQueries({ queryKey: ["tanks"] })
       setShowComplete(null)
-      setCompleteForm({ litresDelivered: "", receiverName: "", receiverIdBadge: "", meterReadingStart: "", meterReadingEnd: "", signedOnBehalf: false, onBehalfOf: "" })
+      setCompleteForm({ litresDelivered: "", receiverName: "", receiverIdBadge: "", meterReadingStart: "", meterReadingEnd: "", signedOnBehalf: false, onBehalfOf: "", signature: "", podExceptionType: "", podExceptionReason: "" })
       setError("")
     },
     onError: (e: any) => setError(e.response?.data?.message || "Failed to complete delivery"),
@@ -434,7 +439,7 @@ export default function DeliveriesTab() {
               </div>
               <div>
                 <label style={labelStyle}>Receiver Name</label>
-                <input value={completeForm.receiverName} onChange={e => setCompleteForm(f => ({ ...f, receiverName: e.target.value }))} placeholder="Johannes van Wyk" style={inputStyle} />
+                <input value={completeForm.receiverName} disabled={!!completeForm.podExceptionType} onChange={e => setCompleteForm(f => ({ ...f, receiverName: e.target.value }))} placeholder="Johannes van Wyk" style={inputStyle} />
               </div>
               <div>
                 <label style={labelStyle}>Receiver ID / Badge</label>
@@ -449,6 +454,29 @@ export default function DeliveriesTab() {
                 <label style={labelStyle}>Meter End (L)</label>
                 <input type="number" value={completeForm.meterReadingEnd} onChange={e => setCompleteForm(f => ({ ...f, meterReadingEnd: e.target.value }))} placeholder="14435" style={inputStyle} />
               </div>
+            </div>
+
+            {/* Signature, or an allowed exception when nobody can sign */}
+            <div style={{ padding: "12px 14px", background: "var(--hf-surface-muted)", border: "1px solid var(--hf-border)", borderRadius: 8 }}>
+              <label style={labelStyle}>Receiver's signature</label>
+              <ReceiverSignatureField disabled={!!completeForm.podExceptionType} onChange={sig => setCompleteForm(f => ({ ...f, signature: sig }))} />
+              <div style={{ fontSize: 11.5, color: "var(--hf-text-muted)", marginTop: 3 }}>Needed wherever the company's proof-of-delivery policy is enforced. A typed name does not replace it.</div>
+              {(podPolicy.data?.allowedExceptions ?? []).length > 0 && (
+                <div style={{ marginTop: 10 }}>
+                  <label style={labelStyle} htmlFor="pod-ex-type">Nobody can receive or sign (exception)</label>
+                  <select id="pod-ex-type" aria-label="POD exception" value={completeForm.podExceptionType} onChange={e => setCompleteForm(f => ({ ...f, podExceptionType: e.target.value, receiverName: e.target.value ? "" : f.receiverName }))} style={inputStyle}>
+                    <option value="">No exception: the receiver signs</option>
+                    {POD_EXCEPTIONS.filter(x => (podPolicy.data?.allowedExceptions ?? []).includes(x.code)).map(x => <option key={x.code} value={x.code}>{x.label}</option>)}
+                  </select>
+                  {completeForm.podExceptionType && (
+                    <>
+                      <label style={{ ...labelStyle, marginTop: 8 }} htmlFor="pod-ex-why">Why nobody could receive the fuel</label>
+                      <textarea id="pod-ex-why" aria-label="Exception reason" rows={2} value={completeForm.podExceptionReason} onChange={e => setCompleteForm(f => ({ ...f, podExceptionReason: e.target.value }))} style={inputStyle} />
+                      <div style={{ fontSize: 11.5, color: "var(--hf-text-muted)", marginTop: 3 }}>Needs a photo, location, document or signature already on the load, and the site or an approval must allow this kind of exception.</div>
+                    </>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* On behalf toggle */}
@@ -476,15 +504,7 @@ export default function DeliveriesTab() {
             <button
               onClick={() => completeDelivery.mutate({
                 id: showComplete.id,
-                body: {
-                  litresDelivered: Number(completeForm.litresDelivered),
-                  receiverName: completeForm.receiverName || null,
-                  receiverIdBadge: completeForm.receiverIdBadge || null,
-                  meterReadingStart: completeForm.meterReadingStart ? Number(completeForm.meterReadingStart) : null,
-                  meterReadingEnd: completeForm.meterReadingEnd ? Number(completeForm.meterReadingEnd) : null,
-                  signedOnBehalf: completeForm.signedOnBehalf,
-                  onBehalfOf: completeForm.onBehalfOf || null,
-                }
+                body: buildCompleteBody(completeForm),
               })}
               disabled={!completeForm.litresDelivered || completeDelivery.isPending}
               style={submitBtn}

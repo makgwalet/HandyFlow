@@ -3,6 +3,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import { usePermissions } from "../../hooks/usePermission"
 import { btnGhost, btnPrimary, card, inputStyle, labelStyle } from "../warehousing/whseUi"
+import EnforcementCard from "./EnforcementCard"
+import PushPreferencesCard from "./PushPreferencesCard"
 import {
   CONFLICT_LABEL, POD_EXCEPTIONS, PUSH_TYPES, hoursText, pushLabel, unwrap, validateArrival, validateOffline, validateOverdue,
   type ArrivalPolicy, type OfflinePolicy, type OverduePolicy, type PodPolicy,
@@ -18,14 +20,14 @@ const Panel = ({ title, children }: { title: string; children: React.ReactNode }
 /**
  * Fuel operating policy in one place: the arrival check, proof-of-delivery exceptions, overdue alerts, offline limits, and what the
  * server refused from phones that were offline. Everyone with Fuel read access sees it; changing needs the configuration permission.
- * Switching an enforcement on changes what drivers can do the moment it is saved.
+ * How firmly the arrival check and proof of delivery are applied is changed in stages under "Rollout of enforcement".
  */
 export default function OperationsPolicyTab() {
   return (
     <div className="hf-fuel">
       <h2 style={{ margin: "0 0 4px", fontSize: 18 }}>Operations policy</h2>
       <Note>How the server decides what a driver or attendant may do. These rules are enforced on the server, so a phone or a browser cannot skip them.</Note>
-      <ArrivalCard /><PodCard /><OverdueCard /><OfflineCard /><AlertLog /><ConflictsPanel />
+      <EnforcementCard /><ArrivalCard /><PodCard /><OverdueCard /><OfflineCard /><PushPreferencesCard /><AlertLog /><ConflictsPanel />
     </div>
   )
 }
@@ -35,10 +37,10 @@ function useCanConfigure() { return usePermissions(["FUEL_CONFIGURATION_MANAGE"]
 function ArrivalCard() {
   const can = useCanConfigure(); const qc = useQueryClient()
   const q = useQuery<ArrivalPolicy>({ queryKey: ["fuel-arrival-policy"], retry: false, queryFn: async () => unwrap(await apiClient.get("/api/v1/fuel/settings/arrival-check")) })
-  const [hours, setHours] = useState(""); const [on, setOn] = useState(false); const [err, setErr] = useState(""); const [saved, setSaved] = useState(false)
-  useEffect(() => { if (q.data) { setHours(String(q.data.freshHours)); setOn(!!q.data.enforced) } }, [q.data])
+  const [hours, setHours] = useState(""); const [err, setErr] = useState(""); const [saved, setSaved] = useState(false)
+  useEffect(() => { if (q.data) setHours(String(q.data.freshHours)) }, [q.data])
   const save = useMutation({
-    mutationFn: () => apiClient.put("/api/v1/fuel/settings/arrival-check", { freshHours: Number(hours), enforced: on }),
+    mutationFn: () => apiClient.put("/api/v1/fuel/settings/arrival-check", { freshHours: Number(hours), enforced: !!q.data?.enforced }),
     onSuccess: () => { setErr(""); setSaved(true); qc.invalidateQueries({ queryKey: ["fuel-arrival-policy"] }) }, onError: (e: any) => { setSaved(false); setErr(msg(e, "Could not save")) },
   })
   if (q.isError) return <Panel title="Arrival check"><Err text={msg(q.error, "Could not load the arrival check policy")} /></Panel>
@@ -48,9 +50,8 @@ function ArrivalCard() {
       <Note>Before a driver works at a customer's site, the licences, vehicle and product are checked. A check goes stale after the time below. The server judges freshness on its own clock.</Note>
       <label style={labelStyle} htmlFor="fresh-hours">Hours a check stays fresh (usually {q.data.defaultFreshHours})</label>
       <input id="fresh-hours" aria-label="Hours a check stays fresh" value={hours} disabled={!can} onChange={e => { setSaved(false); setHours(e.target.value) }} style={{ ...inputStyle, maxWidth: 120 }} inputMode="numeric" />
-      <label style={{ display: "block", fontSize: 13, margin: "10px 0 2px" }}>
-        <input type="checkbox" aria-label="Enforce the arrival check" disabled={!can} checked={on} onChange={e => { setSaved(false); setOn(e.target.checked) }} /> Refuse offloading and final proof of delivery without a clear, fresh check</label>
-      <Note>Off: the check is recorded and shown but does not stop anything. On: a load with a missing, stale or blocked check cannot be completed. Viewing the load, the route and recording arrival always stay available. A stale check can be released by someone given the arrival check override permission; a blocked one cannot.</Note>
+      <p style={{ fontSize: 13, margin: "10px 0 2px" }}>{q.data.enforced ? "Enforced: a load with a missing, stale or blocked check cannot be completed." : "Not enforced everywhere: see \"Rollout of enforcement\" above for the stage."}</p>
+      <Note>A stale check can be released by someone given the arrival check override permission; a blocked one cannot. Viewing the load, the route and recording arrival always stay available. A blocked vehicle, driver or product is never waived.</Note>
       <Err text={err} />{saved && <p role="status" style={{ fontSize: 12, color: "var(--hf-success-text)" }}>Saved.</p>}
       {can && <button style={btnPrimary} disabled={save.isPending} onClick={() => { const p = validateArrival(hours); if (p) return setErr(p); setErr(""); save.mutate() }}>Save</button>}
     </Panel>
@@ -60,10 +61,10 @@ function ArrivalCard() {
 function PodCard() {
   const can = useCanConfigure(); const qc = useQueryClient()
   const q = useQuery<PodPolicy>({ queryKey: ["fuel-pod-policy"], retry: false, queryFn: async () => unwrap(await apiClient.get("/api/v1/fuel/settings/pod-policy")) })
-  const [on, setOn] = useState(false); const [types, setTypes] = useState<string[]>([]); const [err, setErr] = useState(""); const [saved, setSaved] = useState(false)
-  useEffect(() => { if (q.data) { setOn(!!q.data.enforced); setTypes(q.data.allowedExceptions ?? []) } }, [q.data])
+  const [types, setTypes] = useState<string[]>([]); const [err, setErr] = useState(""); const [saved, setSaved] = useState(false)
+  useEffect(() => { if (q.data) setTypes(q.data.allowedExceptions ?? []) }, [q.data])
   const save = useMutation({
-    mutationFn: () => apiClient.put("/api/v1/fuel/settings/pod-policy", { enforced: on, allowedExceptions: types }),
+    mutationFn: () => apiClient.put("/api/v1/fuel/settings/pod-policy", { enforced: !!q.data?.enforced, allowedExceptions: types }),
     onSuccess: () => { setErr(""); setSaved(true); qc.invalidateQueries({ queryKey: ["fuel-pod-policy"] }) }, onError: (e: any) => { setSaved(false); setErr(msg(e, "Could not save")) },
   })
   if (q.isError) return <Panel title="Proof of delivery: who received it"><Err text={msg(q.error, "Could not load the POD policy")} /></Panel>
@@ -71,9 +72,8 @@ function PodCard() {
   const flip = (c: string) => { setSaved(false); setTypes(t => t.includes(c) ? t.filter(x => x !== c) : [...t, c]) }
   return (
     <Panel title="Proof of delivery: who received it">
-      <label style={{ display: "block", fontSize: 13, margin: "6px 0" }}>
-        <input type="checkbox" aria-label="Require the receiver's name" disabled={!can} checked={on} onChange={e => { setSaved(false); setOn(e.target.checked) }} /> Require the receiver's name to complete a delivery</label>
-      <Note>With this on, a driver cannot finish a delivery without the name of the person who received the fuel, unless one of the exceptions below applies. Every exception needs a reason, evidence on the load, and is recorded.</Note>
+      <p style={{ fontSize: 13, margin: "6px 0" }}>{q.data.enforced ? "Enforced: an attended delivery needs the receiver's name and signature." : "Not enforced everywhere: see \"Rollout of enforcement\" above for the stage."}</p>
+      <Note>Where this applies, a driver cannot finish a delivery without the name and the signature of the person who received the fuel, unless one of the exceptions below applies. A typed name is not a signature. Every exception needs a reason, evidence on the load, and is recorded.</Note>
       <fieldset style={{ border: "none", padding: 0, margin: 0 }} disabled={!can}>
         <legend style={{ fontSize: 12.5, fontWeight: 600 }}>Exceptions this company allows</legend>
         {POD_EXCEPTIONS.map(e => (
@@ -102,7 +102,7 @@ function OverdueCard() {
   if (!q.data) return null
   return (
     <Panel title="Overdue deliveries">
-      <Note>The driver is told when a load is this long past its scheduled time and still open. If it is still open after the second delay, the dispatch recipients are told. Who is told is set under Settings, "Who is told about alerts". The dashboard's own overdue count uses its own, longer threshold.</Note>
+      <Note>The driver is told when a load is this long past its scheduled time and still open. If it is still open after the second delay, the dispatch recipients are told. Who is told is set under Settings, "Who is told about alerts". The dashboard's overdue count and the daily overdue notice use the first delay too, so they agree with the alerts.</Note>
       <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
         <div><label style={labelStyle} htmlFor="grace">Tell the driver after (minutes)</label><input id="grace" aria-label="Tell the driver after" value={grace} disabled={!can} onChange={e => { setSaved(false); setGrace(e.target.value) }} style={{ ...inputStyle, maxWidth: 140 }} inputMode="numeric" /></div>
         <div><label style={labelStyle} htmlFor="esc">Then tell dispatch after a further (minutes)</label><input id="esc" aria-label="Then tell dispatch after" value={esc} disabled={!can} onChange={e => { setSaved(false); setEsc(e.target.value) }} style={{ ...inputStyle, maxWidth: 140 }} inputMode="numeric" /></div>

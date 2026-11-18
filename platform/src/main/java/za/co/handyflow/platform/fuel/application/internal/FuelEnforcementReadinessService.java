@@ -34,6 +34,7 @@ public class FuelEnforcementReadinessService {
         return new Readiness(d, s.isArrivalCheckEnforced(), s.isPodPolicyEnforced(),
                 deliveries.countDeliveredSince(tenantId, since),
                 deliveries.countDeliveredWithoutReceiverSince(tenantId, since),
-                deliveries.countDeliveredWithoutArrivalCheckSince(tenantId, since));
+                deliveries.countDeliveredWithoutArrivalCheckSince(tenantId, since),
+                deliveries.countDeliveredWithoutSignatureSince(tenantId, since));
     }
 }

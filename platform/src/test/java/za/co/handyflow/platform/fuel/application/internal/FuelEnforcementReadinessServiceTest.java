@@ -34,8 +34,9 @@ class FuelEnforcementReadinessServiceTest {
         when(deliveries.countDeliveredSince(eq(T), any())).thenReturn(120L);
         when(deliveries.countDeliveredWithoutReceiverSince(eq(T), any())).thenReturn(7L);
         when(deliveries.countDeliveredWithoutArrivalCheckSince(eq(T), any())).thenReturn(95L);
+        when(deliveries.countDeliveredWithoutSignatureSince(eq(T), any())).thenReturn(11L);
         Readiness r = service.readiness(T, null, NOW);
-        assertEquals(new Readiness(30, false, true, 120, 7, 95), r);
+        assertEquals(new Readiness(30, false, true, 120, 7, 95, 11), r);
         ArgumentCaptor<Instant> since = ArgumentCaptor.forClass(Instant.class);
         verify(deliveries).countDeliveredSince(eq(T), since.capture());
         assertEquals(NOW.minusSeconds(30L * 86400), since.getValue());
