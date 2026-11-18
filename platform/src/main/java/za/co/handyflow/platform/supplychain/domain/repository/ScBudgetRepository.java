@@ -31,6 +31,11 @@ public interface ScBudgetRepository extends JpaRepository<ScBudget, UUID> {
     @Query("SELECT b FROM ScBudget b WHERE b.tenantId = :tenantId AND b.status = 'ACTIVE' AND b.periodStart <= :date AND b.periodEnd >= :date ORDER BY b.id")
     List<ScBudget> lockActiveCovering(@Param("tenantId") UUID tenantId, @Param("date") LocalDate date);
 
+    /** Row lock on one budget, used to serialise allocation changes and ancestor checks under a shared parent. */
+    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT b FROM ScBudget b WHERE b.tenantId = :tenantId AND b.id = :id")
+    Optional<ScBudget> lockByTenantAndId(@Param("tenantId") UUID tenantId, @Param("id") UUID id);
+
     /** Active budgets for the same scope whose period overlaps [start, end] — a second one would double-count. */
     @Query("""
             SELECT b FROM ScBudget b

@@ -34,6 +34,7 @@ public class ScBudget {
     @Column(name = "control_mode", nullable = false, length = 10) BudgetControlMode controlMode;
     @Column(nullable = false, length = 10) String status = ACTIVE;
     @Column(nullable = false, length = 3) String currency = "ZAR";
+    @Column(name = "parent_budget_id") UUID parentBudgetId;
     @Column(name = "created_by") UUID createdBy;
     @Column(name = "created_at", nullable = false) Instant createdAt;
     @Column(name = "updated_at", nullable = false) Instant updatedAt;
@@ -63,6 +64,12 @@ public class ScBudget {
         if (name != null) this.name = name;
         if (amount != null) this.amount = amount;
         if (mode != null) this.controlMode = mode;
+        this.updatedAt = Instant.now();
+    }
+
+    /** Allocate this budget out of a parent (null makes it top level again). Validated by BudgetService. */
+    public void setParent(UUID parentId) {
+        this.parentBudgetId = parentId;
         this.updatedAt = Instant.now();
     }
 

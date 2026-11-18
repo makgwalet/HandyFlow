@@ -79,10 +79,18 @@ public class BudgetService {
             throw new HandyFlowException("An active budget for this " + scope + " already covers part of that period — close or shorten it first",
                     HttpStatus.CONFLICT, "BUDGET_OVERLAP");
 
-        ScBudget b = budgetRepo.save(ScBudget.create(tid, req.name().trim(), scope, req.scopeValue().trim(),
-                req.periodStart(), req.periodEnd(), req.amount(), mode, req.currency(), userId));
-        event(tid, b.getId(), "BUDGET_CREATED", b.getName() + " R " + b.getAmount() + " " + mode, userId, userName);
-        return toResponse(b, usage(tid, b, null));
+        ScBudget b = ScBudget.create(tid, req.name().trim(), scope, req.scopeValue().trim(),
+                req.periodStart(), req.periodEnd(), req.amount(), mode, req.currency(), userId);
+        if (req.parentBudgetId() != null) {
+            ScBudget parent = budgetRepo.lockByTenantAndId(tid, req.parentBudgetId())
+                    .orElseThrow(() -> new HandyFlowException("Parent budget not found", HttpStatus.NOT_FOUND, "NOT_FOUND"));
+            requireAttachable(tid, parent, b);
+            b.setParent(parent.getId());
+        }
+        b = budgetRepo.save(b);
+        event(tid, b.getId(), "BUDGET_CREATED", b.getName() + " R " + b.getAmount() + " " + mode
+                + (b.getParentBudgetId() != null ? " (allocated from budget " + b.getParentBudgetId() + ")" : ""), userId, userName);
+        return respond(tid, b);
     }
 
     @Transactional
@@ -97,24 +105,150 @@ public class BudgetService {
         if (mode != null && mode != b.getControlMode()) changes.add("mode " + b.getControlMode() + " -> " + mode);
         if (req.name() != null && !req.name().equals(b.getName())) changes.add("name");
 
+        if (b.isActive() && req.amount() != null && req.amount().compareTo(b.getAmount()) != 0) {
+            // Serialise with other allocation changes under the same parent, and with this budget's own children.
+            if (b.getParentBudgetId() != null) budgetRepo.lockByTenantAndId(tid, b.getParentBudgetId());
+            budgetRepo.lockByTenantAndId(tid, b.getId());
+            List<ScBudget> all = budgetRepo.findAllForTenant(tid);
+            String reduce = BudgetHierarchyRules.reduceProblem(req.amount(), activeChildrenTotal(all, b.getId(), null));
+            if (reduce != null) throw new HandyFlowException(reduce, HttpStatus.CONFLICT, "BUDGET_ALLOCATED");
+            if (b.getParentBudgetId() != null) {
+                ScBudget parent = all.stream().filter(x -> x.getId().equals(b.getParentBudgetId())).findFirst().orElse(null);
+                if (parent != null) {
+                    String over = BudgetHierarchyRules.allocationProblem(parent.getAmount(),
+                            activeChildrenTotal(all, parent.getId(), b.getId()), req.amount());
+                    if (over != null) throw new HandyFlowException(over, HttpStatus.CONFLICT, "BUDGET_OVER_ALLOCATED");
+                }
+            }
+        }
+        if ("CLOSED".equalsIgnoreCase(req.status()) && b.isActive()
+                && activeChildrenTotal(budgetRepo.findAllForTenant(tid), b.getId(), null).signum() > 0)
+            throw new HandyFlowException("Close or detach this budget's sub-budgets first", HttpStatus.CONFLICT, "BUDGET_HAS_CHILDREN");
         if (b.isActive()) b.update(req.name(), req.amount(), mode);
         else if (!changes.isEmpty()) throw new HandyFlowException("A closed budget cannot be changed", HttpStatus.CONFLICT, "BUDGET_CLOSED");
         if ("CLOSED".equalsIgnoreCase(req.status()) && b.isActive()) { b.close(); changes.add("closed"); }
         budgetRepo.save(b);
         if (!changes.isEmpty()) event(tid, id, "BUDGET_CHANGED", String.join("; ", changes), userId, userName);
-        return toResponse(b, usage(tid, b, null));
+        return respond(tid, b);
     }
 
     @Transactional(readOnly = true)
     public List<BudgetResponse> list(TenantId tenantId) {
         UUID tid = tenantId.getValue();
-        return budgetRepo.findAllForTenant(tid).stream().map(b -> toResponse(b, usage(tid, b, null))).toList();
+        List<ScBudget> all = budgetRepo.findAllForTenant(tid);
+        return all.stream().map(b -> toResponse(b, usage(tid, b, null, all), all)).toList();
     }
 
     @Transactional(readOnly = true)
     public BudgetResponse get(TenantId tenantId, UUID id) {
         ScBudget b = requireBudget(tenantId.getValue(), id);
-        return toResponse(b, usage(tenantId.getValue(), b, null));
+        return respond(tenantId.getValue(), b);
+    }
+
+    // ── Allocation (parent / child) ────────────────────────────────────────────
+
+    /** Allocate a budget out of a parent, or detach it (parentBudgetId null). Audited on both budgets. */
+    @Transactional
+    public BudgetResponse setParent(TenantId tenantId, UUID id, UUID userId, String userName, BudgetAllocationRequest req) {
+        UUID tid = tenantId.getValue();
+        UUID newParent = req != null ? req.parentBudgetId() : null;
+        requireBudget(tid, id);
+        // Lock in id order, like the PO paths, so two allocation changes cannot deadlock each other.
+        List<UUID> order = new ArrayList<>(newParent != null ? List.of(id, newParent) : List.of(id));
+        Collections.sort(order);
+        for (UUID u : order) budgetRepo.lockByTenantAndId(tid, u);
+        ScBudget b = requireBudget(tid, id);
+        UUID oldParent = b.getParentBudgetId();
+        if (Objects.equals(oldParent, newParent)) return respond(tid, b);
+        if (newParent != null) {
+            ScBudget parent = requireBudget(tid, newParent);
+            requireAttachable(tid, parent, b);
+            b.setParent(newParent);
+            event(tid, id, "BUDGET_ALLOCATED", b.getName() + " allocated from '" + parent.getName() + "' R " + b.getAmount(), userId, userName);
+            event(tid, newParent, "BUDGET_CHILD_ADDED", "'" + b.getName() + "' R " + b.getAmount(), userId, userName);
+        } else {
+            b.setParent(null);
+            event(tid, id, "BUDGET_DETACHED", b.getName() + " is now a top-level budget", userId, userName);
+            if (oldParent != null) event(tid, oldParent, "BUDGET_CHILD_REMOVED", "'" + b.getName() + "'", userId, userName);
+        }
+        budgetRepo.save(b);
+        return respond(tid, b);
+    }
+
+    /** Every budget as a tree, parents first, with rolled-up usage and what is still unallocated. */
+    @Transactional(readOnly = true)
+    public List<BudgetTreeNode> tree(TenantId tenantId) {
+        UUID tid = tenantId.getValue();
+        List<ScBudget> all = budgetRepo.findAllForTenant(tid);
+        Set<UUID> ids = new HashSet<>();
+        for (ScBudget b : all) ids.add(b.getId());
+        Map<UUID, List<ScBudget>> byParent = new HashMap<>();
+        List<ScBudget> roots = new ArrayList<>();
+        for (ScBudget b : all) {
+            if (b.getParentBudgetId() != null && ids.contains(b.getParentBudgetId()))
+                byParent.computeIfAbsent(b.getParentBudgetId(), k -> new ArrayList<>()).add(b);
+            else roots.add(b);
+        }
+        return roots.stream().map(r -> node(tid, r, byParent, all, 0)).toList();
+    }
+
+    private BudgetTreeNode node(UUID tid, ScBudget b, Map<UUID, List<ScBudget>> byParent, List<ScBudget> all, int depth) {
+        List<BudgetTreeNode> kids = depth >= BudgetHierarchyRules.MAX_DEPTH ? List.of()
+                : byParent.getOrDefault(b.getId(), List.of()).stream()
+                        .sorted(Comparator.comparing(ScBudget::getName, String.CASE_INSENSITIVE_ORDER))
+                        .map(c -> node(tid, c, byParent, all, depth + 1)).toList();
+        return new BudgetTreeNode(toResponse(b, usage(tid, b, null, all), all), kids);
+    }
+
+    /** Throws 409 unless {@code child} may be allocated out of {@code parent} (rules in BudgetHierarchyRules). */
+    private void requireAttachable(UUID tid, ScBudget parent, ScBudget child) {
+        List<ScBudget> all = budgetRepo.findAllForTenant(tid);
+        Map<UUID, UUID> parentOf = new HashMap<>();
+        Map<UUID, List<UUID>> childrenOf = new HashMap<>();
+        for (ScBudget x : all) if (x.getParentBudgetId() != null) {
+            parentOf.put(x.getId(), x.getParentBudgetId());
+            childrenOf.computeIfAbsent(x.getParentBudgetId(), k -> new ArrayList<>()).add(x.getId());
+        }
+        if (BudgetHierarchyRules.wouldCycle(child.getId(), parent.getId(), parentOf))
+            throw new HandyFlowException("That would make the budget its own ancestor", HttpStatus.CONFLICT, "BUDGET_CYCLE");
+        int depth = BudgetHierarchyRules.depthOf(parent.getId(), parentOf) + BudgetHierarchyRules.heightOf(child.getId(), childrenOf);
+        if (depth > BudgetHierarchyRules.MAX_DEPTH)
+            throw new HandyFlowException("Budgets can be nested at most " + BudgetHierarchyRules.MAX_DEPTH + " levels deep",
+                    HttpStatus.CONFLICT, "BUDGET_TOO_DEEP");
+        String problem = BudgetHierarchyRules.attachProblem(node(parent), node(child),
+                activeChildrenTotal(all, parent.getId(), child.getId()));
+        if (problem != null) throw new HandyFlowException(problem, HttpStatus.CONFLICT, "BUDGET_ALLOCATION");
+    }
+
+    private static BudgetHierarchyRules.Node node(ScBudget b) {
+        return new BudgetHierarchyRules.Node(b.getId(), b.getScopeType(), b.getScopeValue(), b.getPeriodStart(), b.getPeriodEnd(),
+                b.getAmount(), b.getCurrency(), b.isActive());
+    }
+
+    /** Sum of the active direct children of {@code parentId}, leaving out {@code except} (the budget being changed). */
+    private static BigDecimal activeChildrenTotal(List<ScBudget> all, UUID parentId, UUID except) {
+        BigDecimal total = BigDecimal.ZERO;
+        for (ScBudget x : all)
+            if (parentId.equals(x.getParentBudgetId()) && x.isActive() && !x.getId().equals(except)) total = total.add(x.getAmount());
+        return total;
+    }
+
+    /** The budget and everything allocated beneath it, at any depth and in any status (closed sub-budgets still carry history). */
+    private static List<ScBudget> subtree(List<ScBudget> all, ScBudget root) {
+        Map<UUID, List<ScBudget>> byParent = new HashMap<>();
+        for (ScBudget x : all) if (x.getParentBudgetId() != null) byParent.computeIfAbsent(x.getParentBudgetId(), k -> new ArrayList<>()).add(x);
+        List<ScBudget> out = new ArrayList<>(List.of(root));
+        Set<UUID> seen = new HashSet<>(List.of(root.getId()));
+        Deque<ScBudget> queue = new ArrayDeque<>(List.of(root));
+        while (!queue.isEmpty())
+            for (ScBudget c : byParent.getOrDefault(queue.poll().getId(), List.of()))
+                if (seen.add(c.getId())) { out.add(c); queue.add(c); }
+        return out;
+    }
+
+    private BudgetResponse respond(UUID tid, ScBudget b) {
+        List<ScBudget> all = budgetRepo.findAllForTenant(tid);
+        return toResponse(b, usage(tid, b, null, all), all);
     }
 
     /** The POs that make up a budget's usage. */
@@ -122,13 +256,13 @@ public class BudgetService {
     public List<BudgetCommitmentResponse> commitments(TenantId tenantId, UUID budgetId) {
         UUID tid = tenantId.getValue();
         ScBudget b = requireBudget(tid, budgetId);
-        String col = column(b.getScopeType());
+        List<Object> args = new ArrayList<>(List.of(tid, tid));
+        String scope = poScopeClause(subtree(budgetRepo.findAllForTenant(tid), b), args);
         List<BudgetCommitmentResponse> out = new ArrayList<>();
         jdbc.query("SELECT c.purchase_order_id, po.order_number, po.supplier_name, po.status, c.amount, "
                         + "COALESCE(inv.actual, 0) AS actual, c.spend_date "
                         + "FROM sc_budget_commitments c JOIN sc_purchase_orders po ON po.id = c.purchase_order_id AND po.status <> 'CANCELLED' "
-                        + invoiceJoin(tid) + " WHERE c.tenant_id = ? AND " + col + " IS NOT NULL AND lower(" + col + ") = lower(?) "
-                        + "AND c.spend_date BETWEEN ? AND ? ORDER BY c.spend_date, po.order_number",
+                        + invoiceJoin(tid) + " WHERE c.tenant_id = ? AND " + scope + " ORDER BY c.spend_date, po.order_number",
                 rs -> {
                     BigDecimal amount = rs.getBigDecimal("amount");
                     BigDecimal actual = rs.getBigDecimal("actual");
@@ -136,7 +270,7 @@ public class BudgetService {
                             rs.getString("supplier_name"), rs.getString("status"), amount, actual,
                             amount.max(actual), rs.getDate("spend_date").toLocalDate()));
                 },
-                tid, tid, b.getScopeValue(), java.sql.Date.valueOf(b.getPeriodStart()), java.sql.Date.valueOf(b.getPeriodEnd()));
+                args.toArray());
         return out;
     }
 
@@ -239,13 +373,30 @@ public class BudgetService {
 
     /** lock=true (PO commit paths) serialises on the budget rows; read-only checks never lock. */
     private BudgetRules.Result evaluate(UUID tid, Dims d, BigDecimal requested, UUID excludePoId, boolean lock) {
-        List<View> views = new ArrayList<>();
-        for (ScBudget b : lock ? budgetRepo.lockActiveCovering(tid, d.spendDate())
-                               : budgetRepo.findActiveCovering(tid, d.spendDate())) {
+        List<ScBudget> covering = lock ? budgetRepo.lockActiveCovering(tid, d.spendDate())
+                                       : budgetRepo.findActiveCovering(tid, d.spendDate());
+        List<ScBudget> all = budgetRepo.findAllForTenant(tid);
+        Map<UUID, ScBudget> allById = new HashMap<>(), coveringById = new HashMap<>();
+        for (ScBudget x : all) allById.put(x.getId(), x);
+        for (ScBudget x : covering) coveringById.put(x.getId(), x);
+        // Budgets the spend is coded to, then every ancestor of those: spend against a sub-budget also counts against the budget it came out of.
+        // (In lock mode every active covering budget is already locked, in id order, so the ancestors are held too.)
+        Map<UUID, ScBudget> applicable = new LinkedHashMap<>();
+        for (ScBudget b : covering) {
             if (!BudgetRules.matches(b.getScopeType(), b.getScopeValue(), d.department(), d.costCentre(), d.project())) continue;
-            views.add(new View(b.getId(), b.getName(), b.getScopeType(), b.getScopeValue(), b.getAmount(),
-                    b.getControlMode(), usage(tid, b, excludePoId).used()));
+            applicable.putIfAbsent(b.getId(), b);
+            UUID up = b.getParentBudgetId();
+            for (int guard = 0; up != null && guard < BudgetHierarchyRules.MAX_DEPTH + 1; guard++) {
+                ScBudget p = coveringById.get(up);
+                if (p != null) applicable.putIfAbsent(p.getId(), p);
+                ScBudget raw = allById.get(up);
+                up = raw != null ? raw.getParentBudgetId() : null;
+            }
         }
+        List<View> views = new ArrayList<>();
+        for (ScBudget b : applicable.values())
+            views.add(new View(b.getId(), b.getName(), b.getScopeType(), b.getScopeValue(), b.getAmount(),
+                    b.getControlMode(), usage(tid, b, excludePoId, all).used()));
         return BudgetRules.evaluate(views, requested, nearLimitPct);
     }
 
@@ -316,20 +467,39 @@ public class BudgetService {
         return total;
     }
 
-    private Usage usage(UUID tid, ScBudget b, UUID excludePoId) {
-        String col = column(b.getScopeType());
+    /**
+     * What a budget carries. For a budget with sub-budgets this is the union of its own scope and every descendant's scope,
+     * counted once per purchase order / invoice (an OR over the scopes, never a sum of the budgets), so a spend coded to both
+     * a department and one of its projects is not counted twice.
+     */
+    private Usage usage(UUID tid, ScBudget b, UUID excludePoId, List<ScBudget> all) {
+        List<ScBudget> scopes = subtree(all, b);
+        List<Object> args = new ArrayList<>(List.of(tid, tid));
+        String scope = poScopeClause(scopes, args);
+        args.add(excludePoId != null ? excludePoId : UUID.randomUUID());
         Usage[] box = new Usage[1];
         jdbc.query("SELECT COALESCE(SUM(c.amount), 0) AS committed, COALESCE(SUM(COALESCE(inv.actual, 0)), 0) AS actual, "
                         + "COALESCE(SUM(GREATEST(c.amount, COALESCE(inv.actual, 0))), 0) AS used "
                         + "FROM sc_budget_commitments c JOIN sc_purchase_orders po ON po.id = c.purchase_order_id AND po.status <> 'CANCELLED' "
-                        + invoiceJoin(tid) + " WHERE c.tenant_id = ? AND " + col + " IS NOT NULL AND lower(" + col + ") = lower(?) "
-                        + "AND c.spend_date BETWEEN ? AND ? AND c.purchase_order_id <> ?",
+                        + invoiceJoin(tid) + " WHERE c.tenant_id = ? AND " + scope + " AND c.purchase_order_id <> ?",
                 rs -> { box[0] = new Usage(rs.getBigDecimal("committed"), rs.getBigDecimal("actual"), rs.getBigDecimal("used")); },
-                tid, tid, b.getScopeValue(), java.sql.Date.valueOf(b.getPeriodStart()), java.sql.Date.valueOf(b.getPeriodEnd()),
-                excludePoId != null ? excludePoId : UUID.randomUUID());
+                args.toArray());
         Usage poUsage = box[0] != null ? box[0] : new Usage(BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO);
-        BigDecimal noPo = noPoInvoiceActuals(tid, b);
+        BigDecimal noPo = noPoInvoiceActuals(tid, scopes);
         return new Usage(poUsage.committed(), poUsage.actual().add(noPo), poUsage.used().add(noPo));
+    }
+
+    /** "(col matches AND date in period) OR ..." over the given budgets, on the commitment row; appends its bind values to args. */
+    private static String poScopeClause(List<ScBudget> scopes, List<Object> args) {
+        List<String> parts = new ArrayList<>();
+        for (ScBudget s : scopes) {
+            String col = column(s.getScopeType());
+            parts.add("(" + col + " IS NOT NULL AND lower(" + col + ") = lower(?) AND c.spend_date BETWEEN ? AND ?)");
+            args.add(s.getScopeValue());
+            args.add(java.sql.Date.valueOf(s.getPeriodStart()));
+            args.add(java.sql.Date.valueOf(s.getPeriodEnd()));
+        }
+        return "(" + String.join(" OR ", parts) + ")";
     }
 
     /** True when the tenant has any active budget: only then does an uncoded no-PO invoice escape something. */
@@ -339,13 +509,21 @@ public class BudgetService {
         return n != null && n > 0;
     }
 
-    /** Approved/paid invoices with no PO, coded to this budget's scope value and dated inside its period. */
-    private BigDecimal noPoInvoiceActuals(UUID tid, ScBudget b) {
+    /** Approved/paid invoices with no PO, coded to any of these budgets' scope values and dated inside that budget's period. */
+    private BigDecimal noPoInvoiceActuals(UUID tid, List<ScBudget> scopes) {
+        List<Object> args = new ArrayList<>(List.of(tid));
+        List<String> parts = new ArrayList<>();
+        for (ScBudget s : scopes) {
+            String col = invoiceColumn(s.getScopeType());
+            parts.add("(" + col + " IS NOT NULL AND lower(" + col + ") = lower(?) AND invoice_date BETWEEN ? AND ?)");
+            args.add(s.getScopeValue());
+            args.add(java.sql.Date.valueOf(s.getPeriodStart()));
+            args.add(java.sql.Date.valueOf(s.getPeriodEnd()));
+        }
         BigDecimal v = jdbc.queryForObject("SELECT COALESCE(SUM(" + amountSql(tid) + "), 0) "
                         + "FROM sc_supplier_invoices WHERE tenant_id = ? AND purchase_order_id IS NULL AND status IN ('APPROVED','PAID') "
-                        + "AND " + invoiceColumn(b.getScopeType()) + " IS NOT NULL AND lower(" + invoiceColumn(b.getScopeType()) + ") = lower(?) "
-                        + "AND invoice_date BETWEEN ? AND ?",
-                BigDecimal.class, tid, b.getScopeValue(), java.sql.Date.valueOf(b.getPeriodStart()), java.sql.Date.valueOf(b.getPeriodEnd()));
+                        + "AND (" + String.join(" OR ", parts) + ")",
+                BigDecimal.class, args.toArray());
         return v != null ? v : BigDecimal.ZERO;
     }
 
@@ -373,14 +551,17 @@ public class BudgetService {
         };
     }
 
-    private BudgetResponse toResponse(ScBudget b, Usage u) {
+    private BudgetResponse toResponse(ScBudget b, Usage u, List<ScBudget> all) {
+        BigDecimal allocated = activeChildrenTotal(all, b.getId(), null);
+        int children = (int) all.stream().filter(x -> b.getId().equals(x.getParentBudgetId())).count();
         BigDecimal available = b.getAmount().subtract(u.used());
         double pct = b.getAmount().signum() == 0 ? 0
                 : u.used().multiply(BigDecimal.valueOf(100)).divide(b.getAmount(), 1, RoundingMode.HALF_UP).doubleValue();
         String state = available.signum() < 0 ? "EXCEEDED" : pct >= nearLimitPct.doubleValue() ? "NEAR_LIMIT" : "OK";
         return new BudgetResponse(b.getId(), b.getName(), b.getScopeType().name(), b.getScopeValue(), b.getPeriodStart(),
                 b.getPeriodEnd(), b.getAmount(), b.getControlMode().name(), b.getStatus(), b.getCurrency(),
-                u.committed(), u.actual(), u.used(), available, pct, state);
+                u.committed(), u.actual(), u.used(), available, pct, state,
+                b.getParentBudgetId(), allocated, b.getAmount().subtract(allocated), children);
     }
 
     private BudgetCheckResponse toCheckResponse(BudgetRules.Result r) {

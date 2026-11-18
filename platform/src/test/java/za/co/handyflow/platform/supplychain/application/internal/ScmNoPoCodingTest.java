@@ -37,6 +37,7 @@ class ScmNoPoCodingTest {
     @Mock ScSupplierInvoiceRepository invoiceRepo;
     @Mock InvoiceMatchingService matchingService;
     @Mock BudgetService budgetService;
+    @Mock ApprovalLimitService approvalLimits;
     @InjectMocks ScmService service;
 
     private ScSupplierInvoice noPo;

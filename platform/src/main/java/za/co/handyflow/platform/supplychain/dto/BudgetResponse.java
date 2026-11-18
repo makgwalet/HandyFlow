@@ -8,6 +8,8 @@ import java.util.UUID;
  * committed = sum of non-cancelled approved POs; actual = approved/paid invoices against them;
  * used = per PO the larger of the two (so an invoice above its PO counts at the invoiced amount);
  * available = amount - used. state: OK | NEAR_LIMIT | EXCEEDED.
+ * For a budget with sub-budgets, committed/actual/used roll up the sub-budgets (each purchase order counted once);
+ * allocated = the active children's amounts, unallocated = amount - allocated.
  */
 public record BudgetResponse(
         UUID id,
@@ -25,5 +27,9 @@ public record BudgetResponse(
         BigDecimal used,
         BigDecimal available,
         double utilisationPct,
-        String state
+        String state,
+        UUID parentBudgetId,
+        BigDecimal allocated,
+        BigDecimal unallocated,
+        int childCount
 ) {}

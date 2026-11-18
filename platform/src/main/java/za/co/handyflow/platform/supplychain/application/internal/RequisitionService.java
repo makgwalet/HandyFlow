@@ -54,6 +54,7 @@ public class RequisitionService {
     private static final Set<String> SEE_ALL = Set.of("SCM_READ", "SCM_ORDER", "SCM_ADMIN", "SCM_REQUISITION_APPROVE");
 
     private final ScmSeparationOfDuties sod;
+    private final ApprovalLimitService approvalLimits;
     private final ScRequisitionRepository reqRepo;
     private final ScRequisitionLineRepository lineRepo;
     private final ScRequisitionConversionRepository convRepo;
@@ -150,6 +151,7 @@ public class RequisitionService {
         budgetService.checkRequisition(tenantId, r, lineRepo.findByRequisition(tenantId.getValue(), id), false);
         sod.require(tenantId, "SCM_REQUISITION_APPROVE", r.getRequestedBy(), approverId,
                 "You cannot approve a requisition you raised yourself", "ScRequisition", id, "Requisition approval");
+        approvalLimits.enforceRequisition(tenantId, approverId, id);
 
         var existing = approvalFacade.getLatestRequestForEntity(tenantId, APPROVALS_MODULE, APPROVALS_ENTITY_TYPE, id);
         ApprovalRequestResponse result;

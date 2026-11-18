@@ -54,6 +54,7 @@ public class RfqService {
     private static final DateTimeFormatter WHEN = DateTimeFormatter.ofPattern("dd MMM yyyy HH:mm").withZone(ZoneId.of("Africa/Johannesburg"));
 
     private final ScmSeparationOfDuties sod;
+    private final ApprovalLimitService approvalLimits;
     private final ScRfqRepository rfqRepo;
     private final ScRfqLineRepository lineRepo;
     private final ScRfqInvitationRepository inviteRepo;
@@ -223,6 +224,8 @@ public class RfqService {
         if (overrides && reason.trim().length() < 15)
             throw new HandyFlowException("This is not both the highest-scoring and the lowest-priced quotation — explain the selection "
                     + "(at least 15 characters)", HttpStatus.BAD_REQUEST, "AWARD_JUSTIFICATION_REQUIRED");
+
+        approvalLimits.enforce(tenantId, userId, ApprovalLimitRules.RFQ_AWARD, q.getLandedCost());
 
         rfq.award(quotationId, reason.trim(), overrides, userId, userName);
         rfqRepo.save(rfq);

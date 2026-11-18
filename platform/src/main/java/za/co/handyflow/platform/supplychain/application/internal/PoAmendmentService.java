@@ -57,6 +57,7 @@ public class PoAmendmentService {
             PoStatus.APPROVED, PoStatus.SENT, PoStatus.ACKNOWLEDGED, PoStatus.PARTIALLY_RECEIVED);
 
     private final ScmSeparationOfDuties sod;
+    private final ApprovalLimitService approvalLimits;
     private final ScPurchaseOrderRepository poRepo;
     private final ScPoLineRepository poLineRepo;
     private final ScPoAmendmentRepository amendmentRepo;
@@ -200,6 +201,7 @@ public class PoAmendmentService {
         ScPoAmendment a = requirePending(tenantId, amendmentId);
         sod.require(tenantId, "SCM_ADMIN", a.getRequestedBy(), approverId,
                 "You cannot approve an amendment you raised yourself", "ScPoAmendment", amendmentId, "PO amendment approval");
+        approvalLimits.enforce(tenantId, approverId, ApprovalLimitRules.PO_AMENDMENT, a.getProposedTotal());
 
         ScPurchaseOrder po = poRepo.lockByTenantIdAndId(tid, a.getPurchaseOrderId())
                 .orElseThrow(() -> new HandyFlowException("Purchase order not found", HttpStatus.NOT_FOUND, "NOT_FOUND"));

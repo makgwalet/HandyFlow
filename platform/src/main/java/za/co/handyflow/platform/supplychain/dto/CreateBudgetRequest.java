@@ -7,6 +7,7 @@ import java.time.LocalDate;
  * scopeType: DEPARTMENT | COST_CENTRE | PROJECT — scopeValue is matched (case-insensitively) against the
  * department / costCentre / projectRef on requisitions and POs.
  * controlMode: NONE (track only) | WARN | HARD_STOP.
+ * parentBudgetId: optional — allocate this budget out of a parent (see BudgetHierarchyRules).
  */
 public record CreateBudgetRequest(
         String name,
@@ -16,5 +17,6 @@ public record CreateBudgetRequest(
         LocalDate periodEnd,
         BigDecimal amount,
         String controlMode,
-        String currency
+        String currency,
+        java.util.UUID parentBudgetId
 ) {}

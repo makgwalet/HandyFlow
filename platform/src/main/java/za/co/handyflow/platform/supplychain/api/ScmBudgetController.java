@@ -63,6 +63,20 @@ public class ScmBudgetController {
         return ok("Success", service.list(tenant()));
     }
 
+    @GetMapping("/budgets/tree")
+    @PreAuthorize(CAN_READ)
+    @Operation(summary = "Budgets as a tree: each parent with its sub-budgets, rolled-up usage and what is still unallocated")
+    public ResponseEntity<ApiResponse<List<BudgetTreeNode>>> tree() {
+        return ok("Success", service.tree(tenant()));
+    }
+
+    @PutMapping("/budgets/{id}/allocation")
+    @PreAuthorize(CAN_MANAGE)
+    @Operation(summary = "Allocate a budget out of a parent budget, or detach it (parentBudgetId null) — audited, 409 when the rules are broken")
+    public ResponseEntity<ApiResponse<BudgetResponse>> allocate(@PathVariable UUID id, @RequestBody BudgetAllocationRequest req) {
+        return ok("Budget allocation updated", service.setParent(tenant(), id, uid(), uname(), req));
+    }
+
     @GetMapping("/budgets/{id}")
     @PreAuthorize(CAN_READ)
     public ResponseEntity<ApiResponse<BudgetResponse>> get(@PathVariable UUID id) {

@@ -39,6 +39,7 @@ public class ScmService {
 
     private final ScmSeparationOfDuties sod;
     private final PriceOverrideGate priceOverrideGate;
+    private final ApprovalLimitService approvalLimits;
     private final ContractService contractService;
     private final ScSupplierRepository        supplierRepo;
     private final ScStockLocationRepository   locationRepo;
@@ -345,6 +346,7 @@ public class ScmService {
                                                 UUID approverId, String approverName) {
         ScPurchaseOrder po = getPurchaseOrder(tenantId, id);
         enforceSegregation(tenantId, "SCM_ORDER", "ScPurchaseOrder", id, po.getCreatedBy(), approverId, "purchase order");
+        approvalLimits.enforce(tenantId, approverId, ApprovalLimitRules.PURCHASE_ORDER, po.getTotalAmount());
         priceOverrideGate.requireNonePending(tenantId, id);
 
         var existing = approvalFacade.getLatestRequestForEntity(tenantId, PO_APPROVALS_MODULE, PO_APPROVALS_ENTITY_TYPE, id);
@@ -633,6 +635,7 @@ public class ScmService {
         requireMatchClearedForApproval(inv);
         requireCodingForBudgets(tenantId, inv);
         enforceSegregation(tenantId, "SCM_INVOICE", "ScSupplierInvoice", inv.getId(), inv.getCapturedBy(), approverId, "supplier invoice");
+        approvalLimits.enforce(tenantId, approverId, ApprovalLimitRules.SUPPLIER_INVOICE, inv.getTotalAmount());
 
         inv.approve(approverId, approverName);
         log.info("[SCM] Supplier invoice {} approved by {}", inv.getInvoiceNumber(), approverName);
