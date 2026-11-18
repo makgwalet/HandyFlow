@@ -55,6 +55,7 @@ class ScmInvoicePaymentGuardTest {
     @Mock ControlExceptionFacade controlExceptionFacade;
     @Mock ApFacade apFacade;
     @Mock ScSupplierRepository supplierRepo;
+    @Mock ScmSeparationOfDuties sod;
     @InjectMocks ScmService service;
 
     private ScSupplierInvoice invoice;
@@ -81,7 +82,9 @@ class ScmInvoicePaymentGuardTest {
     @EnumSource(MatchExceptionType.class)
     void everyCriticalTypeIsBlocking_andNoOtherTypeIs(MatchExceptionType t) {
         assertThat(t.blocksPayment()).isEqualTo(t.resultingStatus() == MatchStatus.DISPUTE);
-        assertThat(MatchExceptionType.blocking()).contains(t).hasSize(
+        if (t.resultingStatus() == MatchStatus.DISPUTE) assertThat(MatchExceptionType.blocking()).contains(t);
+        else assertThat(MatchExceptionType.blocking()).doesNotContain(t);
+        assertThat(MatchExceptionType.blocking()).hasSize(
                 (int) Stream.of(MatchExceptionType.values()).filter(x -> x.resultingStatus() == MatchStatus.DISPUTE).count());
     }
 
@@ -158,7 +161,8 @@ class ScmInvoicePaymentGuardTest {
         assertThatThrownBy(() -> invoice.applyMatchOutcome(MatchStatus.MATCHED, "again")).isInstanceOf(IllegalStateException.class);
         assertThatThrownBy(() -> invoice.dispute("x")).isInstanceOf(IllegalStateException.class);  // would strand a payable AP bill
         assertThat(invoice.getStatus()).isEqualTo(InvoiceStatus.APPROVED);
-        assertThatThrownBy(() -> invoice.markPaid("P")).isInstanceOf(IllegalStateException.class);
+        invoice.recordApBillHandOff(UUID.randomUUID());
+        assertThatThrownBy(() -> invoice.markPaid("P")).isInstanceOf(IllegalStateException.class);   // payable only through AP now
     }
 
     /** The only code allowed to call the three transitions towards payment is ScmService (guarded) and the entity itself. */
