@@ -142,6 +142,8 @@ public class SecurityConfig {
                                 // /portal/auth/** scoping convention as
                                 // every other portal above.
                                 "/api/v1/warehousing/portal/auth/**",
+                                // Supplier portal (RFQ quotations): only /auth/** is public; /api/v1/supplier/portal/** needs the portal token.
+                                "/api/v1/supplier/portal/auth/**",
                                 "/api/v1/fuel/portal/auth/**",
                                 "/api/v1/training-provider/portal/auth/**",
                                 "/api/v1/facilitiesmanagement/portal/auth/**",

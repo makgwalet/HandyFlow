@@ -7,6 +7,7 @@ import { usePermissions } from "../../hooks/usePermission"
 import { TH, TD, ErrBox, Spinner, EmptyState, Banner, filterPill } from "./scm.shared"
 import { asList, errorText, scmPermissionGroups, effectivePermissions, permissionIds, realEdits, revokeWarning, SECOND_PERSON_PERMISSIONS, SECOND_PERSON_NOTE } from "./scmOps"
 import { Panel, Pill } from "./scmUi"
+import { ApprovalLimitsPanel } from "./ApprovalLimitsPanel"
 
 interface Role { id: string; name: string; description: string; permissions: string[]; userCount: number }
 interface Perm { id: string; name: string; description: string }
@@ -37,7 +38,8 @@ export function AccessTab() {
 
   return (
     <div style={{ padding: 20, display: "grid", gap: 14 }}>
-      <Banner variant="info">Approval today is by permission plus a second-person rule on sensitive steps. Spend approval limits by amount are not configurable yet.</Banner>
+      <Banner variant="info">Approval is by permission, a second-person rule on sensitive steps, and (once switched on below) a limit by amount.</Banner>
+      <ApprovalLimitsPanel />
       {err && <ErrBox msg={err} />}{saved && <Banner variant="info">{saved}</Banner>}
 
       <Panel title="Approvals that need a second person">

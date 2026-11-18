@@ -8,6 +8,8 @@ import { inp, TH, TD, Modal, ModalFooter, Field, ErrBox, Spinner, EmptyState, Ba
 import { asList, asOne, errorText, SCOPES, MODES, MODE_HELP, emptyBudget, budgetProblem, utilisationTone, budgetTotals, allocationBy, budgetVariance, budgetBar,
   budgetCheckProblem, budgetCheckParams, type BudgetForm, type BudgetCheckForm } from "./scmOps"
 import { StatCard, Panel, Pill, grid } from "./scmUi"
+import { BudgetHierarchy } from "./BudgetHierarchy"
+import { parentChoices } from "./scmLimits"
 
 interface Budget { id: string; name: string; scopeType: string; scopeValue: string; periodStart: string; periodEnd: string; amount: number; committed: number; actual: number; used: number; available: number; utilisationPct: number; state: string; controlMode: string; status: string; currency?: string }
 interface Commitment { purchaseOrderId: string; orderNumber: string; supplierName: string; poStatus: string; committed: number; actual: number; used: number; spendDate: string | null }
@@ -23,10 +25,11 @@ export function BudgetsTab() {
   const [creating, setCreating] = useState(false)
   const [form, setForm] = useState<BudgetForm>(emptyBudget())
   const [err, setErr] = useState("")
+  const [parentId, setParentId] = useState("")
   const [open, setOpen] = useState<Budget | null>(null)
   const [edit, setEdit] = useState<{ b: Budget; amount: string; controlMode: string; close: boolean } | null>(null)
   const [editErr, setEditErr] = useState("")
-  const [view, setView] = useState<"variance" | "allocation" | "check">("variance")
+  const [view, setView] = useState<"variance" | "allocation" | "hierarchy" | "check">("variance")
   const [check, setCheck] = useState<BudgetCheckForm>({ department: "", costCentre: "", projectRef: "", amount: "" })
   const [checkErr, setCheckErr] = useState("")
 
@@ -35,8 +38,8 @@ export function BudgetsTab() {
   const refresh = () => qc.invalidateQueries({ queryKey: ["scm-budgets"] })
 
   const create = useMutation({
-    mutationFn: () => apiClient.post(BASE, { name: form.name.trim(), scopeType: form.scopeType, scopeValue: form.scopeValue.trim(), periodStart: form.periodStart, periodEnd: form.periodEnd, amount: Number(form.amount), controlMode: form.controlMode, currency: "ZAR" }),
-    onSuccess: () => { setCreating(false); setForm(emptyBudget()); setErr(""); refresh() },
+    mutationFn: () => apiClient.post(BASE, { parentBudgetId: parentId || undefined, name: form.name.trim(), scopeType: form.scopeType, scopeValue: form.scopeValue.trim(), periodStart: form.periodStart, periodEnd: form.periodEnd, amount: Number(form.amount), controlMode: form.controlMode, currency: "ZAR" }),
+    onSuccess: () => { setCreating(false); setForm(emptyBudget()); setParentId(""); setErr(""); refresh(); qc.invalidateQueries({ queryKey: ["scm-budget-tree"] }) },
     // An overlapping budget for the same scope comes back as a 409 with a plain message; show it as is.
     onError: (e) => setErr(errorText(e)),
   })
@@ -64,7 +67,7 @@ export function BudgetsTab() {
       </div>
 
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-        {([["variance", "Variance"], ["allocation", "Allocation"], ["check", "What-if check"]] as const).map(([v, l]) => <button key={v} style={filterPill(view === v)} onClick={() => setView(v)}>{l}</button>)}
+        {([["variance", "Variance"], ["allocation", "Allocation"], ["hierarchy", "Sub-budgets"], ["check", "What-if check"]] as const).map(([v, l]) => <button key={v} style={filterPill(view === v)} onClick={() => setView(v)}>{l}</button>)}
         <div style={{ flex: 1 }} />
         {canManage && <button onClick={() => setCreating(true)} style={{ ...filterPill(true), display: "flex", gap: 6, alignItems: "center" }}><Plus size={14} /> New budget</button>}
       </div>
@@ -95,6 +98,8 @@ export function BudgetsTab() {
             <span><i style={{ display: "inline-block", width: 9, height: 9, background: BAR.actual, marginRight: 5 }} />Invoiced</span><span><i style={{ display: "inline-block", width: 9, height: 9, background: BAR.committed, marginRight: 5 }} />Committed, not yet invoiced</span><span><i style={{ display: "inline-block", width: 9, height: 9, background: BAR.over, marginRight: 5 }} />Over budget</span>
           </div>
         </div>
+      ) : view === "hierarchy" ? (
+        <BudgetHierarchy />
       ) : view === "allocation" ? (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 14 }}>
           {groups.map(g => (
@@ -135,6 +140,12 @@ export function BudgetsTab() {
             <Field label="Amount (R)"><input style={inp} aria-label="Amount" value={form.amount} onChange={e => setForm({ ...form, amount: e.target.value })} /></Field>
             <Field label="When it runs out"><select style={inp} value={form.controlMode} onChange={e => setForm({ ...form, controlMode: e.target.value })}>{MODES.map(m => <option key={m} value={m}>{m.replace("_", " ")}</option>)}</select></Field>
           </div>
+          <Field label="Allocated out of (optional)">
+            <select style={inp} aria-label="Parent budget" value={parentId} onChange={e => setParentId(e.target.value)}>
+              <option value="">Top-level budget</option>
+              {parentChoices(rows as any[], form).map((p: any) => <option key={p.id} value={p.id}>{p.name} ({fmtR(p.unallocated)} unallocated)</option>)}
+            </select>
+          </Field>
           <p style={{ fontSize: 12, opacity: 0.8 }}>{MODE_HELP[form.controlMode]}</p>
           <ModalFooter onCancel={() => setCreating(false)} onConfirm={submit} label="Create budget" loading={create.isPending} />
         </Modal>

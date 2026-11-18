@@ -22,6 +22,7 @@ za/co/handyflow/platform/security/api/GuardCpController.java
 za/co/handyflow/platform/shared/GlobalExceptionHandler.java
 za/co/handyflow/platform/trainingprovider/api/TrainProvPortalAuthController.java
 za/co/handyflow/platform/warehousing/api/WhsePortalAuthController.java
+
 # Fuel import ingest: called by pump/POS/gauge systems, not by a signed-in user. Each request is authenticated by the company's
 # X-Fuel-Import-Key (resolved in the service, which refuses a missing or wrong key); there is no tenant context before that, so no module check here.
 za/co/handyflow/platform/fuel/api/FuelGaugeIngestController.java
@@ -30,3 +31,7 @@ za/co/handyflow/platform/fuel/api/FuelTransactionIngestController.java
 # Events payment webhook: called by the payment provider's servers, not a signed-in user. It proves the caller itself (adapter signature and
 # server-side confirmation), only serves providers that declare notifications, and is rate limited. See PaymentWebhookController.
 za/co/handyflow/platform/events/api/PaymentWebhookController.java
+
+# Supplier portal register/login: public by design; the invite token or password is the proof of identity (permitAll under /auth/**, rate limited).
+za/co/handyflow/platform/supplychain/api/SupplierPortalAuthController.java
+feat(scm-web): approval limits, budget sub-budgets, supplier portal access and supplier portal pages

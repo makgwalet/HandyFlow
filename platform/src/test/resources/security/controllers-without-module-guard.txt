@@ -242,7 +242,13 @@ za/co/handyflow/platform/trainingprovider/api/TrainProvPortalDataController.java
 za/co/handyflow/platform/warehousing/api/WhsePortalAuthController.java
 za/co/handyflow/platform/warehousing/api/WhsePortalDataController.java
 za/co/handyflow/platform/usage/api/UsageController.java
+
 # Fuel import ingest (key-authenticated, no tenant context until the key is resolved) - see controllers-without-preauthorize.txt.
 za/co/handyflow/platform/fuel/api/FuelGaugeIngestController.java
 za/co/handyflow/platform/fuel/api/FuelImportIngestController.java
 za/co/handyflow/platform/fuel/api/FuelTransactionIngestController.java
+
+# Supplier portal: authenticated by the portal token, with no staff tenant on the request. The buyer's supply_chain entitlement is checked per grant in SupplierPortalService.
+za/co/handyflow/platform/supplychain/api/SupplierPortalAuthController.java
+za/co/handyflow/platform/supplychain/api/SupplierPortalController.java
+feat(scm-web): approval limits, budget sub-budgets, supplier portal access and supplier portal pages

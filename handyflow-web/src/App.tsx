@@ -154,6 +154,7 @@ import { WhsePortalLoginPage } from "./pages/warehousing-portal/WhsePortalLoginP
 import { FuelPortalLoginPage } from "./pages/fuel-portal/FuelPortalLoginPage"
 import { FuelPortalAcceptInvitePage } from "./pages/fuel-portal/FuelPortalAcceptInvitePage"
 import { FuelPortalHomePage } from "./pages/fuel-portal/FuelPortalHomePage"
+import { SupplierPortalLoginPage, SupplierPortalRegisterPage, SupplierPortalHomePage, SupplierPortalRfqPage } from "./pages/supplier-portal/SupplierPortalPages"
 import { PropPortalLoginPage } from "./pages/property-portal/PropPortalLoginPage"
 import { PropPortalAcceptInvitePage } from "./pages/property-portal/PropPortalAcceptInvitePage"
 import { PropPortalHomePage } from "./pages/property-portal/PropPortalHomePage"
@@ -232,6 +233,12 @@ function CollAgencyPortalProtectedRoute({ children }: { children: React.ReactNod
 function WhsePortalProtectedRoute({ children }: { children: React.ReactNode }) {
   const token = usePortalAuthStore(s => s.token)
   if (!token) return <Navigate to="/warehousing/portal/login" replace />
+  return <>{children}</>
+}
+
+function SupplierPortalProtectedRoute({ children }: { children: React.ReactNode }) {
+  const token = usePortalAuthStore(s => s.token)
+  if (!token) return <Navigate to="/supplier-portal/login" replace />
   return <>{children}</>
 }
 
@@ -334,6 +341,10 @@ export default function App() {
             <WhsePortalProtectedRoute><WhsePortalClientDetailPage /></WhsePortalProtectedRoute>
           } />
 
+          <Route path="/supplier-portal/login" element={<SupplierPortalLoginPage />} />
+          <Route path="/supplier-portal/register" element={<SupplierPortalRegisterPage />} />
+          <Route path="/supplier-portal" element={<SupplierPortalProtectedRoute><SupplierPortalHomePage /></SupplierPortalProtectedRoute>} />
+          <Route path="/supplier-portal/rfqs/:rfqId" element={<SupplierPortalProtectedRoute><SupplierPortalRfqPage /></SupplierPortalProtectedRoute>} />
           <Route path="/fuel/portal/login" element={<FuelPortalLoginPage />} />
           <Route path="/fuel/portal/auth/accept-invite" element={<FuelPortalAcceptInvitePage />} />
           <Route path="/fuel/portal" element={
