@@ -59,4 +59,23 @@ class PublicSigningRateLimiterTest {
         limiter.checkReissue(user, contract);
         verify(shared).tryConsume("contracting:reissue:" + user + ":" + contract, 3, 15 * 60_000L);
     }
+
+    @Test
+    void differentIpOrTokenUsesADifferentCounter() {
+        when(shared.tryConsume(anyString(), anyInt(), anyLong())).thenReturn(true);
+        limiter.checkSubmit("9.9.9.9", "token-a");
+        limiter.checkSubmit("9.9.9.9", "token-b");
+        limiter.checkSubmit("8.8.8.8", "token-a");
+        ArgumentCaptor<String> keys = ArgumentCaptor.forClass(String.class);
+        verify(shared, times(3)).tryConsume(keys.capture(), eq(10), eq(60_000L));
+        assertEquals(3, keys.getAllValues().stream().distinct().count());
+    }
+
+    @Test
+    void otpVerifyIsPerSignerNotPerIp() {
+        when(shared.tryConsume(anyString(), anyInt(), anyLong())).thenReturn(true);
+        UUID party = UUID.randomUUID();
+        limiter.checkOtpVerify(party);
+        verify(shared).tryConsume("contracting:otp-verify:" + party, 10, 10 * 60_000L);
+    }
 }
