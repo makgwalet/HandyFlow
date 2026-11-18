@@ -24,6 +24,7 @@ public class FuelSettingsController {
     private final FuelSettingsService settings;
     private final FeatureGuard featureGuard;
     private final za.co.handyflow.platform.fuel.application.internal.FuelPodPolicyService pod;
+    private final za.co.handyflow.platform.fuel.application.internal.FuelEnforcementReadinessService readiness;
 
     @GetMapping
     @PreAuthorize("hasAuthority('FUEL_READ')")
@@ -58,6 +59,14 @@ public class FuelSettingsController {
     public ResponseEntity<ApiResponse<za.co.handyflow.platform.fuel.dto.ArrivalCheckDtos.ArrivalPolicy>> updateArrivalPolicy(@Valid @RequestBody za.co.handyflow.platform.fuel.dto.ArrivalCheckDtos.ArrivalPolicyRequest req) {
         featureGuard.requireModule("fuel");
         return ResponseEntity.ok(ApiResponse.success("Saved", settings.updateArrivalPolicy(TenantContext.getTenantIdAsObject(), req)));
+    }
+
+    /** Before switching a policy on: how many deliveries of the last N days (default 30) it would have refused. Read only. */
+    @GetMapping("/enforcement-readiness")
+    @PreAuthorize("hasAuthority('FUEL_CONFIGURATION_MANAGE')")
+    public ResponseEntity<ApiResponse<za.co.handyflow.platform.fuel.dto.EnforcementDtos.Readiness>> enforcementReadiness(@RequestParam(required = false) Integer days) {
+        featureGuard.requireModule("fuel");
+        return ResponseEntity.ok(ApiResponse.success(readiness.readiness(TenantContext.getTenantIdAsObject(), days)));
     }
 
     @GetMapping("/pod-policy")

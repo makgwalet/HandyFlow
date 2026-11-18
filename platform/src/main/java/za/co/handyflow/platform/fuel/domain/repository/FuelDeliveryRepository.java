@@ -150,4 +150,21 @@ public interface FuelDeliveryRepository extends JpaRepository<FuelDelivery, UUID
     /** Deliveries not yet finished (scheduled or on the road), soonest first. Open work is a small set, so it is read whole. */
     @Query("SELECT d FROM FuelDelivery d WHERE d.tenantId = :tenantId AND d.status IN ('SCHEDULED','IN_TRANSIT') AND d.deletedAt IS NULL ORDER BY d.scheduledAt ASC")
     List<FuelDelivery> findOpen(TenantId tenantId);
+
+    // ── enforcement readiness: what switching a policy on would have refused over a past window ──
+
+    /** Deliveries completed since the given time (not deleted). */
+    @Query("SELECT COUNT(d) FROM FuelDelivery d WHERE d.tenantId = :tenantId AND d.status = 'DELIVERED' AND d.deletedAt IS NULL AND d.deliveredAt >= :since")
+    long countDeliveredSince(TenantId tenantId, java.time.Instant since);
+
+    /** Completed with no receiver name and no exception recorded as used: what the POD policy would refuse. */
+    @Query("SELECT COUNT(d) FROM FuelDelivery d WHERE d.tenantId = :tenantId AND d.status = 'DELIVERED' AND d.deletedAt IS NULL AND d.deliveredAt >= :since "
+         + "AND (d.receiverName IS NULL OR TRIM(d.receiverName) = '') "
+         + "AND NOT EXISTS (SELECT 1 FROM FuelPodException e WHERE e.tenantId = :tenantId AND e.deliveryId = d.id AND e.status = 'USED')")
+    long countDeliveredWithoutReceiverSince(TenantId tenantId, java.time.Instant since);
+
+    /** Completed with no arrival check on record at all: what the arrival check policy would refuse. (A stale or blocked check is not counted here.) */
+    @Query("SELECT COUNT(d) FROM FuelDelivery d WHERE d.tenantId = :tenantId AND d.status = 'DELIVERED' AND d.deletedAt IS NULL AND d.deliveredAt >= :since "
+         + "AND NOT EXISTS (SELECT 1 FROM FuelArrivalCheck c WHERE c.tenantId = :tenantId AND c.deliveryId = d.id)")
+    long countDeliveredWithoutArrivalCheckSince(TenantId tenantId, java.time.Instant since);
 }
