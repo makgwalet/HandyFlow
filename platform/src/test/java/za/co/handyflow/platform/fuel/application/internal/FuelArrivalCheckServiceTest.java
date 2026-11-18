@@ -346,6 +346,7 @@ class FuelArrivalCheckServiceTest {
     void monitorRecordsInsteadOfRefusing() {
         when(enforcement.mode(eq(T), eq("ARRIVAL_CHECK"), any())).thenReturn(FuelEnforcementService.Mode.MONITOR);
         when(checks.latest(eq(T), eq(load.getId()), any())).thenReturn(List.of());
+        result(); // the live rules still pass; only the missing stored check is waived
         assertDoesNotThrow(() -> service.requireClear(T, load.getId(), NOW));
         verify(enforcement).observe(eq(T), eq("ARRIVAL_CHECK"), eq(load.getId()), contains("No check"), eq(NOW));
     }
