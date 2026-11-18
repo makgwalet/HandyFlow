@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { Plus, ClipboardList } from "lucide-react"
 import { apiClient } from "../../api/client"
 import { usePermissions } from "../../hooks/usePermission"
+import { ConvertRequisitionDialog } from "./ConvertRequisitionDialog"
 import { Badge, inp, TH, TD, Modal, ModalFooter, Field, ErrBox, Spinner, EmptyState, Banner, filterPill, fmtR, fmtDate } from "./scm.shared"
 import {
   asList, asOne, errorText, REQ_TYPES, emptyReqLine, requisitionProblem, requisitionBody, requisitionTotal, requisitionActions, REASON_REQUIRED,
@@ -29,6 +30,7 @@ export function RequisitionsTab() {
   const [acting, setActing] = useState<{ r: Requisition; action: ReqAction } | null>(null)
   const [note, setNote] = useState("")
   const [actErr, setActErr] = useState("")
+  const [converting, setConverting] = useState<Requisition | null>(null)
 
   const list = useQuery({
     queryKey: ["scm-requisitions", status, mine],
@@ -101,7 +103,7 @@ export function RequisitionsTab() {
                   <td style={TD}><Badge status={r.status} /></td>
                   <td style={TD}>
                     {actions.map(a => (
-                      <button key={a} style={{ ...filterPill(false), marginRight: 6 }} onClick={() => { setActing({ r, action: a }); setNote(""); setActErr("") }}>{LABEL[a]}</button>
+                      <button key={a} style={{ ...filterPill(false), marginRight: 6 }} onClick={() => { if (a === "convert") { setConverting(r); return } setActing({ r, action: a }); setNote(""); setActErr("") }}>{LABEL[a]}</button>
                     ))}
                   </td>
                 </tr>
@@ -140,6 +142,11 @@ export function RequisitionsTab() {
           {check.data?.message && <Banner variant={check.data.state === "EXCEEDED" ? "error" : check.data.state === "NEAR_LIMIT" ? "warning" : "info"}>{check.data.message}</Banner>}
           <ModalFooter onCancel={() => setCreating(false)} onConfirm={submitCreate} label="Save draft" loading={create.isPending} />
         </Modal>
+      )}
+
+      {converting && (
+        <ConvertRequisitionDialog requisitionId={converting.id} number={converting.number} onClose={() => setConverting(null)}
+          onDone={() => { setConverting(null); qc.invalidateQueries({ queryKey: ["scm-requisitions"] }) }} />
       )}
 
       {acting && (

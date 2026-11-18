@@ -618,6 +618,7 @@ export const SUPPLY_CHAIN_SECTIONS: ModuleSections = {
         { id: 'requisitions', label: 'Requisitions', icon: ClipboardList, anyPermission: ['SCM_REQUISITION_CREATE', 'SCM_REQUISITION_APPROVE', 'SCM_ADMIN'] },
         { id: 'rfqs', label: 'RFQs', icon: Scale, anyPermission: ['SCM_RFQ_MANAGE', 'SCM_ORDER', 'SCM_READ', 'SCM_ADMIN'] },
         { id: 'budgets', label: 'Budgets', icon: Wallet, anyPermission: ['SCM_BUDGET_READ', 'SCM_BUDGET_MANAGE', 'SCM_ADMIN'] },
+        { id: 'policy', label: 'Policy & price approvals', icon: Scale, anyPermission: ['SCM_READ', 'SCM_PRICE_OVERRIDE_APPROVE', 'SCM_ADMIN'] },
       ],
     },
     { label: 'Stock', sections: [{ id: 'inventory', label: 'Inventory', icon: Package }] },

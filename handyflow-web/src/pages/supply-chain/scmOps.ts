@@ -207,3 +207,81 @@ export function rangeProblem(from: string, to: string): string | null {
   if (to < from) return "The period cannot end before it starts"
   return null
 }
+
+// ── Buying at a price different from the requisition estimate ───────────────────────────────────────────────────────────────────
+export const PRICE_REASONS: { value: string; label: string }[] = [
+  { value: "SUPPLIER_QUOTATION", label: "Supplier quotation" },
+  { value: "NEGOTIATED_DISCOUNT", label: "Negotiated discount" },
+  { value: "MARKET_PRICE_CHANGE", label: "Market price change" },
+  { value: "CONTRACT_PRICE", label: "Contract price" },
+  { value: "SPECIFICATION_CHANGE", label: "Specification change" },
+  { value: "OTHER", label: "Other (explain)" },
+]
+
+export type PriceKind = "unchanged" | "decrease" | "within" | "beyond"
+export interface PriceView { kind: PriceKind; pct: number | null; saving: number; text: string }
+
+/** What the buyer is about to do, in words. The server decides again using the company's own tolerance. */
+export function priceView(estimate: number, price: number, qty: number, tolerancePct: number): PriceView {
+  if (!Number.isFinite(price) || price === estimate) return { kind: "unchanged", pct: 0, saving: 0, text: "" }
+  const pct = estimate === 0 ? null : ((price - estimate) / estimate) * 100
+  if (price < estimate) {
+    const saving = Math.round((estimate - price) * qty * 100) / 100
+    return { kind: "decrease", pct, saving, text: `Below the estimate — recorded as a saving of R ${saving.toFixed(2)}` }
+  }
+  const within = pct != null && pct <= tolerancePct
+  return within
+    ? { kind: "within", pct, saving: 0, text: `Above the estimate by ${pct!.toFixed(1)}% — within the ${tolerancePct}% tolerance` }
+    : { kind: "beyond", pct, saving: 0, text: `Above the estimate${pct == null ? "" : ` by ${pct.toFixed(1)}%`} — beyond the ${tolerancePct}% tolerance, so a second person must approve it before the order can be approved` }
+}
+
+export interface ConvertLineForm { requisitionLineId: string; itemName: string; selected: boolean; quantity: string; unitCost: string; estimate: number; reason: string; note: string; quotationRef: string }
+export interface ConvertForm { supplierId: string; notes: string; lines: ConvertLineForm[] }
+
+export function convertProblem(f: ConvertForm): string | null {
+  if (!f.supplierId) return "Choose the supplier"
+  const picked = f.lines.filter(l => l.selected)
+  if (picked.length === 0) return "Choose at least one line to order"
+  for (const l of picked) {
+    if (!(Number(l.quantity) > 0)) return `${l.itemName}: quantity must be above zero`
+    if (l.unitCost.trim() === "" || !(Number(l.unitCost) >= 0)) return `${l.itemName}: enter the unit price`
+    if (Number(l.unitCost) !== l.estimate) {
+      if (!l.reason) return `${l.itemName}: say why the price differs from the estimate`
+      if (l.reason === "OTHER" && !l.note.trim()) return `${l.itemName}: explain the price change`
+    }
+  }
+  return null
+}
+
+export function convertBody(f: ConvertForm) {
+  return {
+    supplierId: f.supplierId, notes: f.notes.trim() || null,
+    lines: f.lines.filter(l => l.selected).map(l => ({
+      requisitionLineId: l.requisitionLineId, quantity: Number(l.quantity), unitCost: Number(l.unitCost), vatRate: null,
+      priceChangeReason: Number(l.unitCost) !== l.estimate ? l.reason : null,
+      priceChangeNote: Number(l.unitCost) !== l.estimate ? l.note.trim() || null : null,
+      quotationRef: l.quotationRef.trim() || null,
+    })),
+  }
+}
+
+// ── Procurement policy ──────────────────────────────────────────────────────────────────────────────────────────────────────────
+export const BUDGET_BASES: { value: string; label: string; help: string }[] = [
+  { value: "EX_VAT", label: "Excluding VAT (recommended)", help: "Budgets count the net cost. Tick the box below to add any VAT the business cannot claim back." },
+  { value: "INC_VAT", label: "Including VAT", help: "Budgets count the full invoice total." },
+  { value: "NET_OF_RECOVERABLE", label: "Net of recoverable VAT", help: "Budgets count the net cost plus only the VAT the business cannot claim back." },
+]
+
+export interface PolicyForm { budgetBasis: string; vatRecoverablePct: string; includeNonRecoverableVat: boolean; priceIncreaseTolerancePct: string }
+
+export function policyProblem(f: PolicyForm): string | null {
+  const r = Number(f.vatRecoverablePct), t = Number(f.priceIncreaseTolerancePct)
+  if (f.vatRecoverablePct.trim() === "" || !(r >= 0 && r <= 100)) return "Recoverable VAT must be between 0 and 100"
+  if (f.priceIncreaseTolerancePct.trim() === "" || !(t >= 0 && t <= 100)) return "The price increase tolerance must be between 0 and 100"
+  return null
+}
+
+export const policyBody = (f: PolicyForm) => ({
+  budgetBasis: f.budgetBasis, vatRecoverablePct: Number(f.vatRecoverablePct),
+  includeNonRecoverableVat: f.includeNonRecoverableVat, priceIncreaseTolerancePct: Number(f.priceIncreaseTolerancePct),
+})
