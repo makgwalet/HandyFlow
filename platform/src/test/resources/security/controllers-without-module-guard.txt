@@ -88,6 +88,7 @@ za/co/handyflow/platform/clinic/api/ClinicWorkingHoursController.java
 za/co/handyflow/platform/clinic/config/ClinicRestrictedListAdvice.java
 za/co/handyflow/platform/collectionsagency/api/CollAgencyPortalAuthController.java
 za/co/handyflow/platform/collectionsagency/api/CollAgencyPortalDataController.java
+za/co/handyflow/platform/contracting/api/ContractObligationController.java
 za/co/handyflow/platform/contracting/api/ContractSharingController.java
 za/co/handyflow/platform/contracting/api/ContractingController.java
 za/co/handyflow/platform/contracting/api/OtpDevController.java

@@ -4,6 +4,8 @@ import { apiClient } from '../../api/client'
 import ContractsDashboard from './ContractsDashboard'
 import ContractsTab       from './ContractsTab'
 import TemplatesTab       from './TemplatesTab'
+import ObligationsTab     from './ObligationsTab'
+import RenewalsTab        from './RenewalsTab'
 import { SectionedModulePage } from '../../components/shell/SectionedModulePage'
 import { CONTRACTING_SECTIONS } from '../../navigation/moduleSections'
 
@@ -57,6 +59,8 @@ export default function ContractingPage() {
           case 'dashboard': return <ContractsDashboard onNavigate={goTo} />
           case 'contracts': return <ContractsTab />
           case 'templates': return <TemplatesTab />
+          case 'obligations': return <ObligationsTab />
+          case 'renewals':    return <RenewalsTab />
           default:          return null
         }
       }} />

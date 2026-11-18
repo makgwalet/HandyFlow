@@ -710,6 +710,13 @@ export const CONTRACTING_SECTIONS: ModuleSections = {
         { id: 'templates', label: 'Templates', icon: LayoutTemplate },
       ],
     },
+    {
+      label: 'Lifecycle',
+      sections: [
+        { id: 'obligations', label: 'Obligations', icon: ListChecks },
+        { id: 'renewals', label: 'Renewals', icon: CalendarClock },
+      ],
+    },
   ],
 }
 

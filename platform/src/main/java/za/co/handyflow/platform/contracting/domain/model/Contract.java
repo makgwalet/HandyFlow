@@ -62,6 +62,7 @@ public class Contract {
     String    currency = "ZAR";
     @Column(name = "start_date")      LocalDate startDate;
     @Column(name = "end_date")        LocalDate endDate;
+    @Column(name = "renewed_from_contract_id") UUID renewedFromContractId;
     @Column(name = "auto_renew")      boolean   autoRenew;
     @Column(name = "renewal_notice_days") int   renewalNoticeDays = 30;
     String    notes;
@@ -286,6 +287,12 @@ public class Contract {
     public boolean allPartiesSigned() {
         return !parties.isEmpty() &&
                 parties.stream().allMatch(p -> "SIGNED".equals(p.getSigningStatus()));
+    }
+
+    /** Marks this draft as the successor of an earlier contract. Set once, when the renewal decision creates it. */
+    public void markRenewalOf(UUID earlierContractId) {
+        this.renewedFromContractId = earlierContractId;
+        this.updatedAt = Instant.now();
     }
 
     // ── Renewal reminder tracking ────────────────────────────────────────────
