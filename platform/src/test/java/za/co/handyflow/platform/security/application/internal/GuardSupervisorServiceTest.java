@@ -94,8 +94,10 @@ class GuardSupervisorServiceTest {
         PatrolRound later = mock(PatrolRound.class);
         when(later.getStatus()).thenReturn(PatrolRound.RoundStatus.EXPECTED);
         when(rounds.findByShift(shiftId)).thenReturn(List.of(done, missed, later));
-        when(incidents.findBySiteInRange(any(), any(), any(), any()))
-                .thenReturn(List.of(incident("OPEN", "Gate forced"), incident("RESOLVED", "Old alarm")));
+        // Build the mocks before stubbing: creating a mock (and stubbing it) inside thenReturn(...) leaves the outer when() unfinished.
+        Incident open = incident("OPEN", "Gate forced");
+        Incident resolved = incident("RESOLVED", "Old alarm");
+        when(incidents.findBySiteInRange(any(), any(), any(), any())).thenReturn(List.of(open, resolved));
         Site site = mock(Site.class);
         when(site.getName()).thenReturn("Pilot Site");
         when(sites.findActiveById(TENANT, siteId)).thenReturn(Optional.of(site));

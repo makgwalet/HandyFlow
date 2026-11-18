@@ -169,8 +169,11 @@ class EventsSchemaAndSecurityGuardTest {
         try (Stream<Path> files = Files.list(EVENTS.resolve("api"))) {
             for (Path f : files.filter(p -> p.getFileName().toString().endsWith("Controller.java")).sorted().toList()) {
                 if (f.getFileName().toString().equals("PaymentWebhookController.java")) continue;
-                String[] lines = Files.readString(f).split("\n");
-                boolean classGuard = Files.readString(f).matches("(?s).*@PreAuthorize[^\n]*\n(?:@[^\n]*\n)*\\s*public class.*");
+                // Normalise line endings: a Windows checkout (CRLF) leaves a trailing \r that '.' does not match,
+                // which made the scan see only the files that happened to be committed with LF.
+                String source = Files.readString(f).replace("\r\n", "\n");
+                String[] lines = source.split("\n");
+                boolean classGuard = source.matches("(?s).*@PreAuthorize[^\n]*\n(?:@[^\n]*\n)*\\s*public class.*");
                 for (int i = 0; i < lines.length; i++) {
                     if (!lines[i].matches("\\s*@(Get|Post|Put|Delete|Patch)Mapping.*")) continue;
                     endpoints++;

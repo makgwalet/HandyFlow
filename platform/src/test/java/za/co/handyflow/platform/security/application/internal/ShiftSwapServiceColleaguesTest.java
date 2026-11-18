@@ -53,9 +53,11 @@ class ShiftSwapServiceColleaguesTest {
     @Test
     void listsOnlySchedulableGuardsFromMySitesSortedAndNotMe() {
         UUID zed = UUID.randomUUID(), amy = UUID.randomUUID(), suspended = UUID.randomUUID();
-        when(shifts.findByGuardInRange(any(), any(), any(), any())).thenReturn(List.of(shift(me)));
+        // Build the mocks before stubbing: creating a mock (and stubbing it) inside thenReturn(...) leaves the outer when() unfinished.
+        Shift myShift = shift(me), zedShift = shift(zed), amyShift = shift(amy), amySecondShift = shift(amy), suspendedShift = shift(suspended);
+        when(shifts.findByGuardInRange(any(), any(), any(), any())).thenReturn(List.of(myShift));
         when(shifts.findBySiteInRange(any(), any(), any(), any()))
-                .thenReturn(List.of(shift(me), shift(zed), shift(amy), shift(amy), shift(suspended)));
+                .thenReturn(List.of(myShift, zedShift, amyShift, amySecondShift, suspendedShift));
         guard(zed, "Zed Zulu", true);
         guard(amy, "amy Adams", true);
         guard(suspended, "Sam Suspended", false);
@@ -104,8 +106,9 @@ class ShiftSwapServiceColleaguesTest {
         when(shifts.findByTenantAndId(TENANT, shiftId)).thenReturn(Optional.of(mine));
         when(swaps.findOpenByShift(shiftId)).thenReturn(List.of());
         guard(stranger, "Someone Elsewhere", true);
-        when(shifts.findByGuardInRange(any(), any(), any(), any())).thenReturn(List.of(shift(me)));
-        when(shifts.findBySiteInRange(any(), any(), any(), any())).thenReturn(List.of(shift(me)));
+        Shift myRosterShift = shift(me);
+        when(shifts.findByGuardInRange(any(), any(), any(), any())).thenReturn(List.of(myRosterShift));
+        when(shifts.findBySiteInRange(any(), any(), any(), any())).thenReturn(List.of(myRosterShift));
 
         assertThatThrownBy(() -> service.createSwapRequest(TENANT, me, new CreateSwapRequest(shiftId, stranger, null)))
                 .isInstanceOf(HandyFlowException.class)

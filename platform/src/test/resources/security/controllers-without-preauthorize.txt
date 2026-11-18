@@ -27,3 +27,6 @@ za/co/handyflow/platform/warehousing/api/WhsePortalAuthController.java
 za/co/handyflow/platform/fuel/api/FuelGaugeIngestController.java
 za/co/handyflow/platform/fuel/api/FuelImportIngestController.java
 za/co/handyflow/platform/fuel/api/FuelTransactionIngestController.java
+# Events payment webhook: called by the payment provider's servers, not a signed-in user. It proves the caller itself (adapter signature and
+# server-side confirmation), only serves providers that declare notifications, and is rate limited. See PaymentWebhookController.
+za/co/handyflow/platform/events/api/PaymentWebhookController.java

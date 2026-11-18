@@ -87,7 +87,8 @@ class WhseFefoTest {
     }
 
     private static List<String> order(List<Candidate> cs) {
-        return WhseFefo.plan(cs, new BigDecimal("1000"), TODAY, null).stream().map(p -> p.source().lotNumber()).toList();
+        // planUpTo, not plan: these tests are about the ORDER of the picks, and plan() refuses a request larger than the stock on hand.
+        return WhseFefo.planUpTo(cs, new BigDecimal("1000"), TODAY, null).stream().map(p -> p.source().lotNumber()).toList();
     }
 
     @Test @DisplayName("stock with no expiry date goes oldest receipt first, whatever its lot number says")
