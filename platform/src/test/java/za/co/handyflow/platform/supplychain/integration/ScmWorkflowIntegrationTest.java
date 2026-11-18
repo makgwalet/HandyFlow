@@ -90,11 +90,13 @@ class ScmWorkflowIntegrationTest {
     }
 
     /** Runs both tasks at the same instant and returns what each threw (null for success). */
-    static List<Throwable> race(Callable<?> a, Callable<?> b) throws Exception {
+    interface Task { void run() throws Exception; }
+
+    static List<Throwable> race(Task a, Task b) throws Exception {
         var pool = Executors.newFixedThreadPool(2);
         var gate = new CyclicBarrier(2);
         List<Future<Throwable>> fs = new ArrayList<>();
-        for (Callable<?> c : List.of(a, b)) fs.add(pool.submit(() -> { gate.await(); try { c.call(); return null; } catch (Throwable t) { return t; } }));
+        for (Task c : List.of(a, b)) fs.add(pool.submit(() -> { gate.await(); try { c.run(); return (Throwable) null; } catch (Throwable t) { return t; } }));
         List<Throwable> out = new ArrayList<>();
         for (var f : fs) out.add(f.get(60, TimeUnit.SECONDS));
         pool.shutdownNow();
