@@ -11,4 +11,15 @@ public final class EnforcementDtos {
      */
     public record Readiness(int days, boolean arrivalCheckEnforced, boolean podPolicyEnforced, long delivered,
                             long wouldRefuseNoReceiver, long wouldRefuseNoArrivalCheck) {}
+
+    /** One control's rollout state. nextStates are the states it can move to now; observations are what it would have refused in the last 7 days while only watching. */
+    public record ControlState(String control, String state, java.util.List<java.util.UUID> pilotDepotIds, String reason, java.time.Instant stateSince,
+                               int version, java.util.UUID changedBy, long observationsLast7Days, java.util.List<String> nextStates) {}
+
+    public record ChangeRequest(@jakarta.validation.constraints.NotBlank String state, java.util.List<java.util.UUID> pilotDepotIds,
+                                @jakarta.validation.constraints.NotBlank @jakarta.validation.constraints.Size(min = 5, max = 500) String reason) {}
+
+    public record Blockers(String control, String target, boolean allowed, java.util.List<String> blockers) {}
+
+    public record Observation(java.util.UUID deliveryId, String message, java.time.Instant at) {}
 }

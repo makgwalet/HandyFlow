@@ -39,6 +39,7 @@ class FuelPodPolicyServiceTest {
     @Mock FuelSettingsService settings;
     @Mock FuelService fuelService;
     @Mock FuelArrivalCheckService arrivalChecks;
+    @Mock FuelEnforcementService enforcement;
     @Mock AuditTrailFacade audit;
 
     static final TenantId T = TenantId.of(UUID.randomUUID());
@@ -53,13 +54,14 @@ class FuelPodPolicyServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new FuelPodPolicyService(deliveries, sites, evidence, exceptions, settings, fuelService, arrivalChecks, audit);
+        service = new FuelPodPolicyService(deliveries, sites, evidence, exceptions, settings, fuelService, arrivalChecks, enforcement, audit);
         site = FuelCustomerSite.create(T, UUID.randomUUID(), "Mine gate 3", null, null, null, null, null);
         load = FuelDelivery.create(T, UUID.randomUUID(), UUID.randomUUID(), Map.of(), "DIESEL", new BigDecimal("1000"), new BigDecimal("20"), Instant.now(), null, null);
         load.assignSite(site.getId());
         cfg = FuelSettings.forTenant(T);
         cfg.updatePodPolicy(true, List.of("UNATTENDED_SITE", "AFTER_HOURS_APPROVED", "AUTOMATED_RECEIVING", "CONTACTLESS_AUTHORISED"));
         when(settings.current(T)).thenReturn(cfg);
+        when(enforcement.mode(eq(T), eq("POD_POLICY"), any())).thenAnswer(i -> cfg.isPodPolicyEnforced() ? FuelEnforcementService.Mode.ENFORCE : FuelEnforcementService.Mode.OFF);
         when(deliveries.findActiveById(eq(T), any())).thenReturn(Optional.of(load));
         when(sites.findActiveById(eq(T), any())).thenReturn(Optional.of(site));
         when(exceptions.save(any())).thenAnswer(i -> i.getArgument(0));
@@ -238,5 +240,21 @@ class FuelPodPolicyServiceTest {
     @Test @DisplayName("the company cannot allow an unknown exception type")
     void policyTypes() {
         assertThrows(IllegalArgumentException.class, () -> cfg.updatePodPolicy(true, List.of("ANYTHING")));
+    }
+
+    @Test @DisplayName("watching only: an unsigned delivery is completed as asked and what would have been refused is recorded")
+    void monitorRecordsInsteadOfRefusing() {
+        when(enforcement.mode(eq(T), eq("POD_POLICY"), any())).thenReturn(FuelEnforcementService.Mode.MONITOR);
+        service.complete(T, DRIVER, load.getId(), unsigned("Johannes van Wyk"), NOW);
+        verify(fuelService).completeDelivery(eq(T), eq(load.getId()), any());
+        verify(enforcement).observe(eq(T), eq("POD_POLICY"), eq(load.getId()), contains("signature"), eq(NOW));
+        verify(exceptions, never()).save(any());
+    }
+
+    @Test @DisplayName("watching only: a properly signed delivery records nothing")
+    void monitorQuietWhenFine() {
+        when(enforcement.mode(eq(T), eq("POD_POLICY"), any())).thenReturn(FuelEnforcementService.Mode.MONITOR);
+        service.complete(T, DRIVER, load.getId(), req("Johannes van Wyk", null, null), NOW);
+        verify(enforcement, never()).observe(any(), any(), any(), any(), any());
     }
 }

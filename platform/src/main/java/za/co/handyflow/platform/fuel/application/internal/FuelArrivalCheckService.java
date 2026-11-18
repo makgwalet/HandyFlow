@@ -58,6 +58,7 @@ public class FuelArrivalCheckService {
     private final AuditTrailFacade audit;
     private final FuelPushEventService pushEvents;
     private final FuelAlertRecipientService alertRecipients;
+    private final FuelEnforcementService enforcement;
 
     @Transactional
     public ArrivalCheckView check(TenantId tenantId, UUID userId, UUID deliveryId) {
@@ -141,16 +142,22 @@ public class FuelArrivalCheckService {
     public void requireClear(TenantId tenantId, UUID deliveryId) { requireClear(tenantId, deliveryId, Instant.now()); }
 
     void requireClear(TenantId tenantId, UUID deliveryId, Instant now) {
-        FuelSettings s = settings.current(tenantId);
-        if (!s.isArrivalCheckEnforced()) return;
+        FuelDelivery d = deliveries.findActiveById(tenantId, deliveryId).orElseThrow(() -> new ResourceNotFoundException("Delivery", deliveryId.toString()));
+        FuelEnforcementService.Mode mode = enforcement.mode(tenantId, za.co.handyflow.platform.fuel.domain.model.FuelEnforcement.ARRIVAL_CHECK, d.getTankId());
+        if (mode == FuelEnforcementService.Mode.OFF) return;
         ArrivalCheckView v = status(tenantId, deliveryId, now);
         Status st = Status.valueOf(v.status());
-        if (!st.clear()) throw new IllegalStateException(switch (st) {
-            case MISSING -> "Do the arrival check at the site before offloading. No check has been made on this load.";
-            case BLOCKED -> "The arrival check found something that blocks this delivery. Ask the office; it cannot be released.";
-            default -> "The arrival check is out of date (older than " + v.freshHours() + " hours). Check again, or ask a supervisor to release it.";
-        });
-        FuelDelivery d = deliveries.findActiveById(tenantId, deliveryId).orElseThrow(() -> new ResourceNotFoundException("Delivery", deliveryId.toString()));
+        if (!st.clear()) {
+            String message = switch (st) {
+                case MISSING -> "Do the arrival check at the site before offloading. No check has been made on this load.";
+                case BLOCKED -> "The arrival check found something that blocks this delivery. Ask the office; it cannot be released.";
+                default -> "The arrival check is out of date (older than " + v.freshHours() + " hours). Check again, or ask a supervisor to release it.";
+            };
+            if (mode == FuelEnforcementService.Mode.ENFORCE) throw new IllegalStateException(message);
+            // Watching only: record what would have been refused, and carry on.
+            enforcement.observe(tenantId, za.co.handyflow.platform.fuel.domain.model.FuelEnforcement.ARRIVAL_CHECK, deliveryId, message, now);
+        }
+        // A safety-critical failure is never waived, whatever stage the rollout is at.
         requireLiveClear(tenantId, d);
     }
 

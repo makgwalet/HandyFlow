@@ -56,6 +56,7 @@ class FuelArrivalCheckServiceTest {
     @Mock AuditTrailFacade audit;
     @Mock FuelPushEventService pushEvents;
     @Mock FuelAlertRecipientService alertRecipients;
+    @Mock FuelEnforcementService enforcement;
 
     static final TenantId T = TenantId.of(UUID.randomUUID());
     static final UUID USER = UUID.randomUUID();
@@ -67,7 +68,7 @@ class FuelArrivalCheckServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new FuelArrivalCheckService(deliveries, tankers, compartments, loadSplits, checks, eligibility, hr, new ObjectMapper(), releases, settings, compliance, audit, pushEvents, alertRecipients);
+        service = new FuelArrivalCheckService(deliveries, tankers, compartments, loadSplits, checks, eligibility, hr, new ObjectMapper(), releases, settings, compliance, audit, pushEvents, alertRecipients, enforcement);
         me = new EmployeeSummary(UUID.randomUUID(), "E1", "Moses", "Sithole", "Moses Sithole", null, null, "Driver", null, "ACTIVE");
         tanker = FuelTanker.create(T, "CA 123-456", "Tanker 1");
         load = FuelDelivery.create(T, UUID.randomUUID(), UUID.randomUUID(), Map.of(), "DIESEL", new BigDecimal("1000"), new BigDecimal("20"), Instant.now(), null, null);
@@ -86,6 +87,7 @@ class FuelArrivalCheckServiceTest {
         FuelSettings s = FuelSettings.forTenant(T);
         s.updateArrivalCheckPolicy(hours, enforced);
         when(settings.current(T)).thenReturn(s);
+        when(enforcement.mode(eq(T), eq("ARRIVAL_CHECK"), any())).thenReturn(enforced ? FuelEnforcementService.Mode.ENFORCE : FuelEnforcementService.Mode.OFF);
         return s;
     }
 
@@ -338,5 +340,28 @@ class FuelArrivalCheckServiceTest {
         when(alertRecipients.recipientsFor(eq(T), any())).thenThrow(new RuntimeException("down"));
         result(new Finding("X", Severity.BLOCK, "x"));
         assertFalse(service.check(T, USER, load.getId()).allowed());
+    }
+
+    @Test @DisplayName("watching only (monitor, or a pilot outside its depots): a missing check is recorded, not refused")
+    void monitorRecordsInsteadOfRefusing() {
+        when(enforcement.mode(eq(T), eq("ARRIVAL_CHECK"), any())).thenReturn(FuelEnforcementService.Mode.MONITOR);
+        when(checks.latest(eq(T), eq(load.getId()), any())).thenReturn(List.of());
+        assertDoesNotThrow(() -> service.requireClear(T, load.getId(), NOW));
+        verify(enforcement).observe(eq(T), eq("ARRIVAL_CHECK"), eq(load.getId()), contains("No check"), eq(NOW));
+    }
+
+    @Test @DisplayName("a safety-critical failure is never waived by a watch-only stage")
+    void monitorStillStopsSafetyCritical() {
+        when(enforcement.mode(eq(T), eq("ARRIVAL_CHECK"), any())).thenReturn(FuelEnforcementService.Mode.MONITOR);
+        storedCheck(true, 30, UUID.randomUUID());
+        result(new Finding("SITE_DRIVER_SUSPENDED", Severity.BLOCK, "The driver is suspended at this site."));
+        assertTrue(assertThrows(IllegalStateException.class, () -> service.requireClear(T, load.getId(), NOW)).getMessage().contains("no longer passes"));
+    }
+
+    @Test @DisplayName("off: nothing is asked and nothing recorded")
+    void offAsksNothing() {
+        when(enforcement.mode(eq(T), eq("ARRIVAL_CHECK"), any())).thenReturn(FuelEnforcementService.Mode.OFF);
+        assertDoesNotThrow(() -> service.requireClear(T, load.getId(), NOW));
+        verify(enforcement, never()).observe(any(), any(), any(), any(), any());
     }
 }

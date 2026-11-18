@@ -51,6 +51,7 @@ public class FuelPodPolicyService {
     private final FuelSettingsService settings;
     private final FuelService fuelService;
     private final FuelArrivalCheckService arrivalChecks;
+    private final FuelEnforcementService enforcement;
     private final AuditTrailFacade audit;
 
     @Transactional
@@ -65,9 +66,18 @@ public class FuelPodPolicyService {
         // Offloading is final, so the arrival check is asked for here, on the one path both the driver and the office use.
         if (!replay) arrivalChecks.requireClear(tenantId, deliveryId);
         FuelSettings s = settings.current(tenantId);
-        if (replay || !s.isPodPolicyEnforced()) return fuelService.completeDelivery(tenantId, deliveryId, req);
+        FuelEnforcementService.Mode mode = replay ? FuelEnforcementService.Mode.OFF : enforcement.mode(tenantId, za.co.handyflow.platform.fuel.domain.model.FuelEnforcement.POD_POLICY, d.getTankId());
+        if (mode == FuelEnforcementService.Mode.OFF) return fuelService.completeDelivery(tenantId, deliveryId, req);
 
-        FuelPodException toRecord = decide(tenantId, d, req, s, userId, now);
+        FuelPodException toRecord = null;
+        try {
+            toRecord = decide(tenantId, d, req, s, userId, now);
+        } catch (IllegalStateException refused) {
+            if (mode == FuelEnforcementService.Mode.ENFORCE) throw refused;
+            // Watching only: record what would have been refused, and complete the delivery as asked.
+            enforcement.observe(tenantId, za.co.handyflow.platform.fuel.domain.model.FuelEnforcement.POD_POLICY, deliveryId, refused.getMessage(), now);
+            return fuelService.completeDelivery(tenantId, deliveryId, req);
+        }
         var out = fuelService.completeDelivery(tenantId, deliveryId, req);
         if (toRecord != null) {
             exceptions.save(toRecord);

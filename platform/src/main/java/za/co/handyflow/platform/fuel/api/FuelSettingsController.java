@@ -25,6 +25,7 @@ public class FuelSettingsController {
     private final FeatureGuard featureGuard;
     private final za.co.handyflow.platform.fuel.application.internal.FuelPodPolicyService pod;
     private final za.co.handyflow.platform.fuel.application.internal.FuelEnforcementReadinessService readiness;
+    private final za.co.handyflow.platform.fuel.application.internal.FuelEnforcementService enforcement;
 
     @GetMapping
     @PreAuthorize("hasAuthority('FUEL_READ')")
@@ -58,6 +59,8 @@ public class FuelSettingsController {
     @PreAuthorize("hasAuthority('FUEL_CONFIGURATION_MANAGE')")
     public ResponseEntity<ApiResponse<za.co.handyflow.platform.fuel.dto.ArrivalCheckDtos.ArrivalPolicy>> updateArrivalPolicy(@Valid @RequestBody za.co.handyflow.platform.fuel.dto.ArrivalCheckDtos.ArrivalPolicyRequest req) {
         featureGuard.requireModule("fuel");
+        if (req.enforced() != settings.arrivalPolicy(TenantContext.getTenantIdAsObject()).enforced())
+            throw new IllegalStateException("The arrival check is rolled out in stages. Change it with the enforcement controls: Monitor, then Pilot, then Enforced.");
         return ResponseEntity.ok(ApiResponse.success("Saved", settings.updateArrivalPolicy(TenantContext.getTenantIdAsObject(), req)));
     }
 
@@ -67,6 +70,40 @@ public class FuelSettingsController {
     public ResponseEntity<ApiResponse<za.co.handyflow.platform.fuel.dto.EnforcementDtos.Readiness>> enforcementReadiness(@RequestParam(required = false) Integer days) {
         featureGuard.requireModule("fuel");
         return ResponseEntity.ok(ApiResponse.success(readiness.readiness(TenantContext.getTenantIdAsObject(), days)));
+    }
+
+    /** The rollout state of each control. */
+    @GetMapping("/enforcement")
+    @PreAuthorize("hasAuthority('FUEL_CONFIGURATION_MANAGE')")
+    public ResponseEntity<ApiResponse<java.util.List<za.co.handyflow.platform.fuel.dto.EnforcementDtos.ControlState>>> enforcementStates() {
+        featureGuard.requireModule("fuel");
+        return ResponseEntity.ok(ApiResponse.success(enforcement.list(TenantContext.getTenantIdAsObject())));
+    }
+
+    /** What stands in the way of moving a control to a state, as a plain list. Changes nothing. */
+    @GetMapping("/enforcement/{control}/blockers")
+    @PreAuthorize("hasAuthority('FUEL_CONFIGURATION_MANAGE')")
+    public ResponseEntity<ApiResponse<za.co.handyflow.platform.fuel.dto.EnforcementDtos.Blockers>> enforcementBlockers(
+            @PathVariable String control, @RequestParam String target, @RequestParam(required = false) java.util.List<java.util.UUID> depots, @RequestParam(required = false) String reason) {
+        featureGuard.requireModule("fuel");
+        return ResponseEntity.ok(ApiResponse.success(enforcement.blockers(TenantContext.getTenantIdAsObject(), control, target, depots, reason)));
+    }
+
+    @PutMapping("/enforcement/{control}")
+    @PreAuthorize("hasAuthority('FUEL_CONFIGURATION_MANAGE')")
+    public ResponseEntity<ApiResponse<za.co.handyflow.platform.fuel.dto.EnforcementDtos.ControlState>> changeEnforcement(
+            @PathVariable String control, @Valid @RequestBody za.co.handyflow.platform.fuel.dto.EnforcementDtos.ChangeRequest req) {
+        featureGuard.requireModule("fuel");
+        return ResponseEntity.ok(ApiResponse.success("Saved", enforcement.change(TenantContext.getTenantIdAsObject(), TenantContext.getCurrentUserId(), control, req)));
+    }
+
+    /** What the control would have refused while it was only watching. */
+    @GetMapping("/enforcement/{control}/observations")
+    @PreAuthorize("hasAuthority('FUEL_CONFIGURATION_MANAGE')")
+    public ResponseEntity<ApiResponse<java.util.List<za.co.handyflow.platform.fuel.dto.EnforcementDtos.Observation>>> enforcementObservations(
+            @PathVariable String control, @RequestParam(required = false) Integer days) {
+        featureGuard.requireModule("fuel");
+        return ResponseEntity.ok(ApiResponse.success(enforcement.recentObservations(TenantContext.getTenantIdAsObject(), control, days)));
     }
 
     @GetMapping("/pod-policy")
@@ -80,6 +117,8 @@ public class FuelSettingsController {
     @PreAuthorize("hasAuthority('FUEL_CONFIGURATION_MANAGE')")
     public ResponseEntity<ApiResponse<za.co.handyflow.platform.fuel.dto.PodDtos.PodPolicy>> updatePodPolicy(@RequestBody za.co.handyflow.platform.fuel.dto.PodDtos.PodPolicyRequest req) {
         featureGuard.requireModule("fuel");
+        if (req.enforced() != pod.policy(TenantContext.getTenantIdAsObject()).enforced())
+            throw new IllegalStateException("The POD policy is rolled out in stages. Change it with the enforcement controls: Monitor, then Pilot, then Enforced.");
         return ResponseEntity.ok(ApiResponse.success("Saved", pod.updatePolicy(TenantContext.getTenantIdAsObject(), req)));
     }
 
