@@ -51,6 +51,7 @@ class FuelTransportServiceTest {
     @Mock FuelEligibilityService eligibility;
     @Mock ObjectProvider<FleetVehicleLookup> fleetProvider;
     @Mock FleetVehicleLookup fleetLookup;
+    @Mock FuelPushService push;
     @InjectMocks FuelTransportService service;
 
     static final TenantId T = TenantId.of(UUID.randomUUID());
@@ -170,6 +171,21 @@ class FuelTransportServiceTest {
         assertEquals("Moses Sithole", load.getDriverName());
         verify(loadSplits).deleteByDelivery(T, load.getId());
         verify(loadSplits).saveAll(any());
+    }
+
+    @Test @DisplayName("allocating alerts the driver's phone when they have a login, and says only the fuel and the day")
+    void driverPushed() {
+        UUID login = UUID.randomUUID();
+        driver = new EmployeeSummary(driver.id(), "E1", "Moses", "Sithole", "Moses Sithole", null, null, "Driver", null, "ACTIVE", null, login);
+        when(hr.findEmployeeById(T, driver.id())).thenReturn(Optional.of(driver));
+        service.allocate(T, load.getId(), alloc("10000", "2000"));
+        verify(push).notifyUser(eq(T), eq(login), eq("New load"), argThat(b -> b.contains("DIESEL") && !b.contains("12000")), eq(Map.of("screen", "LoadDetail", "loadId", String.valueOf(load.getId()))));
+    }
+
+    @Test @DisplayName("a driver with no login is simply not alerted")
+    void driverWithoutLogin() {
+        service.allocate(T, load.getId(), alloc("10000", "2000"));
+        verify(push).notifyUser(eq(T), isNull(), any(), any(), any());
     }
 
     @Test @DisplayName("compartments must add up to the load and never exceed their capacity")

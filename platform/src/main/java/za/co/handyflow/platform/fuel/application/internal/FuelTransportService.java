@@ -46,6 +46,7 @@ public class FuelTransportService {
     private final FuelComplianceService compliance;
     private final FuelEligibilityService eligibility;
     private final ObjectProvider<FleetVehicleLookup> fleet;
+    private final FuelPushService push;
 
     // ── Tankers ──────────────────────────────────────────────────────────────
 
@@ -208,6 +209,9 @@ public class FuelTransportService {
         deliveries.save(d);
         loadSplits.deleteByDelivery(tenantId, d.getId());
         loadSplits.saveAll(req.loads().stream().map(l -> FuelDeliveryCompartment.create(tenantId, d.getId(), l.compartmentId(), l.litres())).toList());
+        // The driver's phone, if they use the app. After commit, and a failure here never undoes the allocation.
+        push.notifyUser(tenantId, driver.userId(), "New load", "You have a " + d.getFuelType() + " load for " + d.getScheduledAt().atZone(java.time.ZoneId.of("Africa/Johannesburg")).toLocalDate() + ".",
+                Map.of("screen", "LoadDetail", "loadId", String.valueOf(d.getId())));
         return fuelService.deliveriesForOrderOrSelf(tenantId, d.getId());
     }
 

@@ -60,6 +60,7 @@ public class FuelStayRequestService {
     private final PortalUserRepository portalUsers;
     private final NotificationService notifications;
     private final TenantAdminRecipients adminRecipients;
+    private final FuelPushService push;
 
     static LocalDate today() { return LocalDate.now(SA); }
 
@@ -204,6 +205,8 @@ public class FuelStayRequestService {
         try {
             List<Recipient> recipients = adminRecipients.resolveTenantAdmins(tenant);
             if (recipients.isEmpty()) return;
+            push.notifyUsers(tenant, recipients.stream().map(Recipient::userId).filter(java.util.Objects::nonNull).toList(), "Stay request",
+                    r.getVehicleRegistration() + " needs a bay from " + r.getArrivalDate() + ".", java.util.Map.of("screen", "StayRequests"));
             notifications.send(NotificationRequest.builder()
                     .tenantId(tenant)
                     .type(NotificationType.FUEL_PORTAL_REQUEST)

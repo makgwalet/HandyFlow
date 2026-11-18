@@ -19,6 +19,7 @@ import za.co.handyflow.platform.fuel.domain.repository.FuelTruckStopStayReposito
 import za.co.handyflow.platform.fuel.domain.repository.FuelTruckStopStayRequestRepository;
 import za.co.handyflow.platform.fuel.dto.StayDtos.*;
 import za.co.handyflow.platform.fuel.dto.StayRequestDtos.*;
+import za.co.handyflow.platform.notifications.application.Recipient;
 import za.co.handyflow.platform.notifications.application.TenantAdminRecipients;
 import za.co.handyflow.platform.notifications.application.internal.NotificationService;
 import za.co.handyflow.platform.shared.HandyFlowException;
@@ -54,13 +55,14 @@ class FuelStayRequestServiceTest {
     @Mock PortalUserRepository portalUsers;
     @Mock NotificationService notifications;
     @Mock TenantAdminRecipients adminRecipients;
+    @Mock FuelPushService push;
 
     FuelStayRequestService svc;
     LocalDate today, arrive, leave;
     List<FuelTruckStopStayRequest> store;
 
     @BeforeEach void setUp() {
-        svc = new FuelStayRequestService(portal, requests, stays, stayService, divisions, accounts, crm, portalUsers, notifications, adminRecipients);
+        svc = new FuelStayRequestService(portal, requests, stays, stayService, divisions, accounts, crm, portalUsers, notifications, adminRecipients, push);
         today = FuelStayRequestService.today();
         arrive = today.plusDays(3); leave = today.plusDays(5);
         FuelPortalAccessGrant g = FuelPortalAccessGrant.createInvite(TENANT, ACCOUNT, "d@fleet.co.za", null);
@@ -99,6 +101,22 @@ class FuelStayRequestServiceTest {
         doThrow(new HandyFlowException("needs division", org.springframework.http.HttpStatus.FORBIDDEN, "FUEL_DIVISION_NOT_ACTIVE")).when(divisions).require(eq(T), any());
         HandyFlowException e = assertThrows(HandyFlowException.class, () -> svc.request(USER, ACCOUNT, body("GP 55 TS GP")));
         assertEquals("NOT_FOUND", e.getErrorCode());
+    }
+
+    @Test @DisplayName("staff phones are alerted to a new request, with only the registration and date on the lock screen")
+    void staffPushed() {
+        UUID boss = UUID.randomUUID();
+        when(adminRecipients.resolveTenantAdmins(T)).thenReturn(List.of(new Recipient(boss, "Boss", "b@x.co.za", null), new Recipient(null, "External", "e@x.co.za", null)));
+        svc.request(USER, ACCOUNT, body("GP 55 TS GP"));
+        verify(push).notifyUsers(eq(T), eq(List.of(boss)), eq("Stay request"), argThat(b -> b.contains("GP 55 TS GP")), eq(java.util.Map.of("screen", "StayRequests")));
+    }
+
+    @Test @DisplayName("a push that cannot be queued never fails the request")
+    void pushFailureHarmless() {
+        when(adminRecipients.resolveTenantAdmins(T)).thenReturn(List.of(new Recipient(UUID.randomUUID(), "Boss", "b@x.co.za", null)));
+        doThrow(new RuntimeException("boom")).when(push).notifyUsers(any(), any(), any(), any(), any());
+        assertEquals("PENDING", svc.request(USER, ACCOUNT, body("GP 55 TS GP")).status());
+        assertEquals(1, store.size());
     }
 
     @Test @DisplayName("a request is saved pending, with the registration tidied, and books nothing")
