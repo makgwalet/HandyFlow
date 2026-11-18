@@ -92,3 +92,13 @@ describe("ConvertRequisitionDialog", () => {
     await waitFor(() => expect(onDone).toHaveBeenCalled())
   })
 })
+
+describe("PolicyTab when the server cannot answer", () => {
+  it("shows the failure instead of loading forever", async () => {
+    perms = ["SCM_ADMIN"]
+    get.mockImplementation(() => Promise.reject(Object.assign(new Error("x"), { response: { data: { message: "Internal Server Error" } } })))
+    wrap(<PolicyTab />)
+    expect(await screen.findByText(/Internal Server Error/)).toBeTruthy()
+    expect(screen.queryByText("Loading…")).toBeNull()
+  })
+})

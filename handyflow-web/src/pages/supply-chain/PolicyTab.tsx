@@ -57,7 +57,7 @@ export function PolicyTab() {
   return (
     <div style={{ padding: 20, maxWidth: 900 }}>
       <h3 style={{ marginTop: 0 }}>Procurement policy</h3>
-      {policy.isLoading || !form ? <Spinner /> : policy.isError ? <ErrBox msg={errorText(policy.error, "Could not load the policy")} /> : (
+      {policy.isError ? <ErrBox msg={errorText(policy.error, "Could not load the policy. The server may need restarting after an update.")} /> : policy.isLoading || !form ? <Spinner /> : (
         <>
           {err && <ErrBox msg={err} />}
           {saved && <Banner variant="info">Saved. New purchase orders use it from now on; existing commitments are not restated, so choose before go-live rather than mid-year.</Banner>}
