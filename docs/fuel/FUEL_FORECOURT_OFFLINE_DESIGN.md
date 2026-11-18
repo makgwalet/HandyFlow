@@ -54,10 +54,14 @@ The server's `opened_at` / `closed_at` are the sync time. The phone's time is st
 
 A refused queued write is parked FAILED in the app (visible in the Sync centre with the server's message) and recorded in `fuel_offline_conflicts` (own transaction, one row per request id) with an audit event `FUEL_OFFLINE_CONFLICT`. Supervisors read it at `GET /api/v1/fuel/offline/conflicts` and mark it resolved with `POST …/{id}/resolve`. Resolving changes the list only. Accepted syncs write `FUEL_SHIFT_OPENED_OFFLINE_SYNC` / `FUEL_SHIFT_CLOSED_OFFLINE_SYNC`.
 
+## Since Batch F
+
+- The capture limits are company settings (V729): `offline_max_age_hours` (default 72) and `offline_clock_skew_minutes` (default 5), edited under Operations policy on the web (`GET/PUT /fuel/offline/conflicts/policy`).
+- A shift opened on the phone is listed as "opened on this phone, waiting to send" and can be closed from the app. The close is queued under the id of the open and sent after it, through `/shifts/by-request/{id}/close`. If the open is refused, the close is refused with it and both are kept as conflicts.
+- The server's conflict list is shown in the app (Refused offline writes, managers and supervisors) and on the web (Operations policy).
+
 ## Known gaps (not hidden)
 
-1. A shift opened offline does not exist in the app until it syncs, so the attendant cannot start the close screen for it before then. The server endpoint for it (`by-request`) exists and is unit tested; the app does not use it yet.
-2. No app screen lists the server's conflict list; the Sync centre shows the phone's own failures only. API only.
-3. The `capturedAt` age limit (72 h) and clock skew (5 min) are constants, not tenant settings.
-4. The close's expected takings use the pump prices and tank cost at sync time, not at capture time.
-5. Mid-shift pump readings do not exist in the product, so none were added.
+1. The close's expected takings use the pump prices, tolerance and tank cost at sync time, not at capture time. Judging at capture time would need prices snapshotted when the shift opens. This is a design choice to confirm, not an oversight.
+2. Mid-shift pump readings do not exist in the product, so none were added.
+3. None of this has run against a database or a device.

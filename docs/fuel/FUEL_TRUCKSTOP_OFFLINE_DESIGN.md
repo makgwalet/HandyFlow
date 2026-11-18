@@ -55,4 +55,4 @@ Same conflict log as the forecourt (`fuel_offline_conflicts`, kinds `STAY_BOOK`,
 1. Offline booking is for dates the phone's stale list may disagree with; the server decides. A desk that books offline can disappoint a driver at sync. The screen warns, it does not prevent.
 2. The phone's list of stays is the last saved copy; a check-in queued from stale data is judged against the server's current state at sync.
 3. Customer-submitted stay requests are not offline (staff decide them online).
-4. No app screen for the server conflict list (API only).
+4. The server conflict list is in the app and on the web (Operations policy); the capture limits are company settings (V729).
