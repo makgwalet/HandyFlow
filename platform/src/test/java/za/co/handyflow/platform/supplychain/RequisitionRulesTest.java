@@ -50,8 +50,8 @@ class RequisitionRulesTest {
 
     @Test
     void fulfilment_isDerivedFromOrderedQuantities() {
-        assertThat(RequisitionRules.fulfilment(List.of(new BigDecimal[]{bd("10"), bd("0")}))).isEqualTo(Fulfilment.NOT_ORDERED);
-        assertThat(RequisitionRules.fulfilment(List.of(new BigDecimal[]{bd("10"), bd("4")}))).isEqualTo(Fulfilment.PARTIALLY_ORDERED);
+        assertThat(RequisitionRules.fulfilment(List.<BigDecimal[]>of(new BigDecimal[]{bd("10"), bd("0")}))).isEqualTo(Fulfilment.NOT_ORDERED);
+        assertThat(RequisitionRules.fulfilment(List.<BigDecimal[]>of(new BigDecimal[]{bd("10"), bd("4")}))).isEqualTo(Fulfilment.PARTIALLY_ORDERED);
         assertThat(RequisitionRules.fulfilment(List.of(new BigDecimal[]{bd("10"), bd("10")}, new BigDecimal[]{bd("5"), bd("5")})))
                 .isEqualTo(Fulfilment.ORDERED);
         assertThat(RequisitionRules.fulfilment(List.of(new BigDecimal[]{bd("10"), bd("10")}, new BigDecimal[]{bd("5"), bd("1")})))
