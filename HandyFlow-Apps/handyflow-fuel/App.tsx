@@ -8,7 +8,7 @@ import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { ArrivalCheckScreen, SignatureScreen, CompleteScreen, FailedAttemptScreen, LoadDetailScreen, MyLoadsScreen } from "@driver/index";
 import { ReceiveFuelScreen, TankDetailScreen, TanksScreen } from "@depot/index";
 import { OverviewScreen, ReleaseCheckScreen } from "@overview/index";
-import { StayDetailScreen, StayRequestsScreen, YardScreen } from "@truckstop/index";
+import { StayDetailScreen, StayRequestsScreen, YardScreen, BookStayScreen, TabsScreen, TabDetailScreen } from "@truckstop/index";
 import { AdjustmentScreen, CloseShiftScreen, OpenShiftScreen, ShiftDetailScreen, ShiftsScreen } from "@forecourt/index";
 import { AuthProvider, useAuth } from "@/auth/AuthContext";
 import { PushBridge, navigationRef } from "@/PushBridge";
@@ -50,6 +50,9 @@ function SignedIn() {
           <Stack.Screen name="Adjustment" component={AdjustmentScreen} options={{ title: "Refund, void or discount" }} />
           <Stack.Screen name="TruckStopYard" component={YardScreen} options={{ title: "Truck stop" }} />
           <Stack.Screen name="StayDetail" component={StayDetailScreen} options={{ title: "Stay" }} />
+          <Stack.Screen name="BookStay" component={BookStayScreen} options={{ title: "Book a stay" }} />
+          <Stack.Screen name="Tabs" component={TabsScreen} options={{ title: "Driver tabs" }} />
+          <Stack.Screen name="TabDetail" component={TabDetailScreen} options={{ title: "Tab" }} />
           <Stack.Screen name="StayRequests" component={StayRequestsScreen} options={{ title: "Stay requests" }} />
           <Stack.Screen name="Overview" component={OverviewScreen} options={{ title: "Overview" }} />
           <Stack.Screen name="ReleaseCheck" component={ReleaseCheckScreen} options={{ title: "Release arrival check" }} />

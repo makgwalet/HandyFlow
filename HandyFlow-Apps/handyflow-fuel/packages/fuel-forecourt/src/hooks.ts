@@ -63,3 +63,6 @@ export function useRefreshShifts() {
     }
   };
 }
+
+/** Supervisor decisions are online only: a decision about money is never queued on a phone to be replayed later. */
+export const SUPERVISOR_BASE = "/api/v1/fuel/forecourt";

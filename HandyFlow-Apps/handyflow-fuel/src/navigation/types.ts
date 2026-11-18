@@ -17,6 +17,9 @@ export type RootStackParamList = {
   TruckStopYard: undefined;
   StayDetail: { stayId: string };
   StayRequests: undefined;
+  BookStay: undefined;
+  Tabs: undefined;
+  TabDetail: { tabId: string };
   ForecourtShifts: undefined;
   OpenShift: undefined;
   ShiftDetail: { shiftId: string };

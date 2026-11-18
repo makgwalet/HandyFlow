@@ -38,6 +38,19 @@ export const lit = (n: number | null | undefined): string => `${(n ?? 0).toLocal
 export const sortShifts = (s: Shift[]): Shift[] =>
   [...s].sort((a, b) => Number(b.status === "OPEN") - Number(a.status === "OPEN") || b.openedAt.localeCompare(a.openedAt));
 
+/** Supervisors approve or reject refunds, voids and discounts and review shifts that closed outside tolerance. The server checks again. */
+export const canSupervise = (p: readonly string[]): boolean => p.includes("FUEL_SHIFT_SUPERVISE");
+/** Reversing a closed shift is a manager's decision. */
+export const canReverse = (p: readonly string[]): boolean => ["FUEL_MANAGE", "FUEL_FORECOURT_MANAGE"].some((x) => p.includes(x));
+export const MIN_REASON = 5;
+/** Null when the reason is good enough to send; the server limits are 5 to 300 characters (review, reject) and 5 to 500 (reverse). */
+export function reasonProblem(reason: string, max = 300): string | null {
+  const t = reason.trim();
+  if (t.length < MIN_REASON) return `Give a reason of at least ${MIN_REASON} characters.`;
+  if (t.length > max) return `Keep the reason to ${max} characters or fewer.`;
+  return null;
+}
+
 export const canRunShifts = (p: readonly string[]): boolean => ["FUEL_FORECOURT", "FUEL_MANAGE", "FUEL_FORECOURT_MANAGE"].some((x) => p.includes(x));
 
 const toNum = (t: string): number => Number(t.trim().replace(",", "."));

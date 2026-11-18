@@ -9,6 +9,7 @@ import { Button } from "@/ui/Button";
 import { Card, Screen } from "@/ui/Screen";
 import { colors } from "@/ui/theme";
 import { useAdjustments, useShift } from "./hooks";
+import { SupervisorActions } from "./SupervisorActions";
 import { canRunShifts, lit, rand, varianceLabel } from "./shifts";
 
 type Props = NativeStackScreenProps<RootStackParamList, "ShiftDetail">;
@@ -55,6 +56,7 @@ export function ShiftDetailScreen({ route }: Props) {
           <Button label="Close this shift" onPress={() => nav.navigate("CloseShift", { shiftId })} />
         </>
       ) : null}
+      <SupervisorActions shift={s} adjustments={adjustments} permissions={session?.permissions ?? []} />
     </Screen>
   );
 }

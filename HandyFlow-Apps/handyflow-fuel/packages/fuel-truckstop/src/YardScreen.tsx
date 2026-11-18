@@ -24,7 +24,13 @@ export function YardScreen() {
       <ScrollView contentContainerStyle={ui.body}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={async () => { setRefreshing(true); await refetch(); setRefreshing(false); }} tintColor={colors.text} />}>
         <Text accessibilityRole="header" style={ui.title}>Truck stop</Text>
-        {canRunTruckStop(session?.permissions ?? []) ? <Button label="Stay requests" tone="plain" onPress={() => nav.navigate("StayRequests")} /> : null}
+        {canRunTruckStop(session?.permissions ?? []) ? (
+          <>
+            <Button label="Book a stay" onPress={() => nav.navigate("BookStay")} />
+            <Button label="Driver tabs" tone="plain" onPress={() => nav.navigate("Tabs")} />
+            <Button label="Stay requests" tone="plain" onPress={() => nav.navigate("StayRequests")} />
+          </>
+        ) : null}
         {savedAt ? <Text style={{ color: "#FCD34D" }}>No signal. Showing the yard saved at {new Date(savedAt).toLocaleTimeString()}. Check-in and check-out need signal.</Text> : null}
         {error && stays.length === 0 ? <Card><Text accessibilityRole="alert" style={{ color: "#FCA5A5", fontSize: 16 }}>{error}</Text></Card> : null}
         {isLoading ? <Text style={{ color: colors.muted }}>Loading…</Text> : null}

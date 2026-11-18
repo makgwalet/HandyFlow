@@ -9,6 +9,8 @@ import { Card, Screen } from "@/ui/Screen";
 import { colors } from "@/ui/theme";
 import { failText, useBays, useRefreshYard, useYard } from "./hooks";
 import { ACTION_LABEL, ACTION_PATH, actionsFor, activeBays, canRunTruckStop, dayText, todayZA, type Stay, type StayAction } from "./stays";
+import { Field } from "@/ui/Field";
+import { canCancelStay, validateCancel } from "./tabs";
 
 type Props = NativeStackScreenProps<RootStackParamList, "StayDetail">;
 const base = "/api/v1/fuel/truck-stop/stays";
@@ -23,6 +25,8 @@ export function StayDetailScreen({ route }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [override, setOverride] = useState<Stay | null>(null);
+  const [cancelling, setCancelling] = useState(false);
+  const [cancelReason, setCancelReason] = useState("");
   const s = override && override.id === stayId ? override : stays.find((x) => x.id === stayId);
   if (!s) return <Screen title="Stay"><Text style={{ color: colors.muted }}>This stay is not on the list.</Text></Screen>;
   const may = canRunTruckStop(session?.permissions ?? []);
@@ -36,6 +40,12 @@ export function StayDetailScreen({ route }: Props) {
   }
   const act = (a: StayAction) => run(a, () => api<Stay>(`${base}/${stayId}/${ACTION_PATH[a]}`, { method: "POST" }));
   const setBay = (bayId: string | null) => run("bay", () => api<Stay>(`${base}/${stayId}/bay`, { method: "PUT", body: { bayId } }));
+
+  function confirmCancel() {
+    const problem = validateCancel(cancelReason);
+    if (problem) { setError(problem); return; }
+    void run("cancel", () => api<Stay>(`${base}/${stayId}/cancel`, { method: "POST", body: { reason: cancelReason.trim() } })).then(() => setCancelling(false));
+  }
 
   return (
     <Screen title={s.vehicleRegistration}>
@@ -52,6 +62,15 @@ export function StayDetailScreen({ route }: Props) {
       {error ? <Text accessibilityRole="alert" style={{ color: "#FCA5A5", fontSize: 15 }}>{error}</Text> : null}
       {message ? <Text accessibilityRole="alert" style={{ color: "#86EFAC", fontSize: 15 }}>{message}</Text> : null}
       {actions.map((a) => <Button key={a} label={ACTION_LABEL[a]} tone={a === "noShow" ? "plain" : "primary"} loading={busy === a} disabled={!!busy} onPress={() => void act(a)} />)}
+      {may && canCancelStay(s.status) && !cancelling ? <Button label="Cancel this stay" tone="danger" disabled={!!busy} onPress={() => { setCancelling(true); setError(null); }} /> : null}
+      {cancelling ? (
+        <Card>
+          <Text style={{ color: colors.text, fontWeight: "700" }}>Why is this stay being cancelled?</Text>
+          <Field label="Reason" value={cancelReason} onChangeText={setCancelReason} multiline maxLength={300} />
+          <Button label="Confirm cancellation" tone="danger" onPress={confirmCancel} loading={busy === "cancel"} />
+          <Button label="Keep the stay" tone="plain" onPress={() => { setCancelling(false); setError(null); }} />
+        </Card>
+      ) : null}
       {may && (s.status === "BOOKED" || s.status === "CHECKED_IN") ? (
         <>
           <Text accessibilityRole="header" style={{ color: colors.text, fontSize: 18, fontWeight: "700" }}>Bay{bayName ? `: ${bayName}` : ": none"}</Text>
