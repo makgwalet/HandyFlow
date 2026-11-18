@@ -28,9 +28,26 @@ public class ContractingController {
 
     // ── Templates ─────────────────────────────────────────────────────────────
 
+    @PutMapping("/templates/{id}")
+    @PreAuthorize("hasAnyAuthority('USER_UPDATE','CONTRACTS_MANAGE')")
+    @Operation(summary = "Edit a custom template. Raises its version; existing contracts keep their text")
+    public ResponseEntity<ApiResponse<TemplateResponse>> updateTemplate(
+            @PathVariable UUID id, @Valid @RequestBody CreateTemplateRequest req) {
+        return ResponseEntity.ok(ApiResponse.success("Template updated",
+                contractingService.updateTemplate(TenantContext.getTenantIdAsObject(), id, req)));
+    }
+
+    @PostMapping("/templates/{id}/archive")
+    @PreAuthorize("hasAnyAuthority('USER_UPDATE','CONTRACTS_MANAGE')")
+    @Operation(summary = "Archive a custom template so it no longer appears in the picker")
+    public ResponseEntity<ApiResponse<Void>> archiveTemplate(@PathVariable UUID id) {
+        contractingService.archiveTemplate(TenantContext.getTenantIdAsObject(), id);
+        return ResponseEntity.ok(ApiResponse.success("Template archived", null));
+    }
+
     @GetMapping("/templates")
     @PreAuthorize("hasAnyAuthority('USER_READ','USER_UPDATE')")
-    @Operation(summary = "List contract templates — seeds 5 SA system templates on first call")
+    @Operation(summary = "List contract templates — seeds the SA system templates on first call")
     public ResponseEntity<ApiResponse<List<TemplateResponse>>> getTemplates() {
         return ResponseEntity.ok(ApiResponse.success("Success",
                 contractingService.getTemplates(TenantContext.getTenantIdAsObject())));

@@ -35,6 +35,9 @@ public class ContractTemplate {
     @Column(name = "deleted_at") Instant deletedAt;
     @Version long version;
 
+    /** Business version of the wording: starts at 1 and goes up each time an admin edits the template. */
+    @Column(name = "template_version") int templateVersion = 1;
+
     public static ContractTemplate create(TenantId tenantId, String name,
                                           String contractType, String description,
                                           String bodyTemplate, Map<String, String> variables,
@@ -52,6 +55,25 @@ public class ContractTemplate {
         t.createdAt    = Instant.now();
         t.updatedAt    = Instant.now();
         return t;
+    }
+
+    /** Edits a custom template. System templates are fixed; copy one to change it. Existing contracts keep the text they were made with. */
+    public void edit(String name, String contractType, String description, String bodyTemplate, Map<String, String> variables) {
+        if (isSystem) throw new IllegalStateException("System templates cannot be edited. Create a copy instead.");
+        this.name = name;
+        this.contractType = contractType;
+        this.description = description;
+        this.bodyTemplate = HtmlSanitizer.clean(bodyTemplate);
+        this.variables = variables;
+        this.templateVersion++;
+        this.updatedAt = Instant.now();
+    }
+
+    /** Takes a custom template out of the picker. Contracts already made from it are unaffected. */
+    public void archive() {
+        if (isSystem) throw new IllegalStateException("System templates cannot be archived.");
+        this.active = false;
+        this.updatedAt = Instant.now();
     }
 
     public void softDelete() {

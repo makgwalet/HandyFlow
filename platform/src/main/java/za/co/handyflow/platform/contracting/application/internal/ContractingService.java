@@ -172,6 +172,23 @@ public class ContractingService {
     // Contracts
     // ═══════════════════════════════════════════════════════════════════════════
 
+    @Transactional
+    public TemplateResponse updateTemplate(TenantId tenantId, UUID id, CreateTemplateRequest req) {
+        ContractTemplate t = templateRepo.findActiveById(tenantId, id)
+                .orElseThrow(() -> new ResourceNotFoundException("Template", id.toString()));
+        t.edit(req.name(), req.contractType(), req.description(), req.bodyTemplate(), req.variables());
+        templateRepo.save(t);
+        return toTemplateResponse(t);
+    }
+
+    @Transactional
+    public void archiveTemplate(TenantId tenantId, UUID id) {
+        ContractTemplate t = templateRepo.findActiveById(tenantId, id)
+                .orElseThrow(() -> new ResourceNotFoundException("Template", id.toString()));
+        t.archive();
+        templateRepo.save(t);
+    }
+
     @Transactional(readOnly = true)
     public Page<ContractSummaryResponse> getContracts(TenantId tenantId, String status,
                                                       String type, Pageable pageable) {
@@ -1101,7 +1118,7 @@ public class ContractingService {
     private TemplateResponse toTemplateResponse(ContractTemplate t) {
         return new TemplateResponse(t.getId(), t.getName(), t.getContractType(),
                 t.getDescription(), t.getBodyTemplate(), t.getVariables(),
-                t.isSystem(), t.getCreatedAt());
+                t.isSystem(), t.getCreatedAt(), t.getTemplateVersion());
     }
 
     private CommentView toCommentViewWithParties(ContractComment comm, List<ContractParty> parties) {

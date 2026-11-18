@@ -12,5 +12,6 @@ public record TemplateResponse(
         String bodyTemplate,
         Map<String, String> variables,
         boolean isSystem,
-        Instant createdAt
+        Instant createdAt,
+        int templateVersion
 ) {}
