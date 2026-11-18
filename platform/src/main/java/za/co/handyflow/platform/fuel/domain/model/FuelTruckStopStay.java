@@ -92,6 +92,9 @@ public class FuelTruckStopStay {
     @Column(name = "invoice_error", length = 500, insertable = false, updatable = false)
     private String invoiceError;
 
+    @Column(name = "invoice_claimed_at", insertable = false, updatable = false)
+    private Instant invoiceClaimedAt;
+
     @Column(name = "created_by", updatable = false)
     private UUID createdBy;
 
