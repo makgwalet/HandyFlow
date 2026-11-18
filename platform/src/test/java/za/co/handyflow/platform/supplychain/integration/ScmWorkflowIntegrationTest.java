@@ -17,6 +17,7 @@ import za.co.handyflow.platform.shared.TenantId;
 import za.co.handyflow.platform.supplychain.application.internal.BudgetService;
 import za.co.handyflow.platform.supplychain.application.internal.GoodsReceivingService;
 import za.co.handyflow.platform.supplychain.application.internal.PoAmendmentService;
+import za.co.handyflow.platform.supplychain.application.internal.QuarantineService;
 import za.co.handyflow.platform.supplychain.application.internal.RequisitionService;
 import za.co.handyflow.platform.supplychain.domain.repository.ScPurchaseOrderRepository;
 
@@ -35,7 +36,7 @@ import static za.co.handyflow.platform.supplychain.integration.ScmIntegrationSup
 import static za.co.handyflow.platform.supplychain.integration.ScmIntegrationSupport.row;
 
 /**
- * The four races and refusals the SCM audit asked to see proven against a real database:
+ * The races and refusals the SCM audit asked to see proven against a real database:
  * concurrent PO approval vs a hard-stop budget, amendment withdrawal when the approval engine is unavailable, goods-receipt
  * reversal after a partial invoice, and a requisition submitted twice at once. Needs Docker; skipped, not failed, without it.
  * The approval engine is a mock, so only this module's own locking and rules are under test.
@@ -65,6 +66,7 @@ class ScmWorkflowIntegrationTest {
     @Autowired PoAmendmentService amendments;
     @Autowired GoodsReceivingService receiving;
     @Autowired ScPurchaseOrderRepository poRepo;
+    @Autowired QuarantineService quarantine;
 
     final UUID tenantId = UUID.randomUUID();
     final TenantId tenant = TenantId.of(tenantId);
@@ -193,5 +195,39 @@ class ScmWorkflowIntegrationTest {
         assertThat(results.stream().filter(Objects::nonNull).count()).as("the other is refused, not silently repeated").isEqualTo(1);
         verify(approvalFacade, times(1)).submit(any(), anyString(), anyString(), eq(req), any(), any());
         assertThat(jdbc.queryForObject("SELECT status FROM sc_requisitions WHERE id = ?", String.class, req)).isEqualTo("PENDING_APPROVAL");
+    }
+
+    // ── 5. Stock that fails inspection leaves available stock, and every way out is accounted for ──
+
+    @Test
+    void failedStockIsQuarantinedThenReleasedWrittenOffAndReturned() {
+        UUID location = UUID.randomUUID(), item = UUID.randomUUID(), receipt = UUID.randomUUID(), inspection = UUID.randomUUID();
+        insert(jdbc, "sc_stock_locations", row("id", location, "tenant_id", tenantId, "name", "Main store"));
+        insert(jdbc, "sc_inventory", row("id", UUID.randomUUID(), "tenant_id", tenantId, "location_id", location, "catalogue_item_id", item, "qty_on_hand", BigDecimal.TEN));
+        insert(jdbc, "sc_goods_receipts", row("id", receipt, "tenant_id", tenantId, "receipt_number", "GR-Q1", "purchase_order_id", UUID.randomUUID(), "supplier_id", supplier,
+                "received_to", location, "received_date", Date.valueOf("2026-11-18"), "status", "POSTED"));
+
+        int held = quarantine.hold(tenant, user, "Inspector", inspection, receipt,
+                List.of(new QuarantineService.Failed(item, "Tyre", BigDecimal.valueOf(5), BigDecimal.valueOf(100), "CRACKED")));
+        assertThat(held).isEqualTo(1);
+        assertThat(onHand(location, item)).as("5 left in the main store").isEqualByComparingTo("5");
+        UUID quarantineLocation = jdbc.queryForObject("SELECT id FROM sc_stock_locations WHERE tenant_id = ? AND is_quarantine", UUID.class, tenantId);
+        assertThat(onHand(quarantineLocation, item)).isEqualByComparingTo("5");
+        UUID hold = jdbc.queryForObject("SELECT id FROM sc_quarantine_holds WHERE tenant_id = ? AND inspection_id = ?", UUID.class, tenantId, inspection);
+
+        quarantine.release(tenant, hold, BigDecimal.ONE, user, "Inspector", "Re-checked, within tolerance");
+        quarantine.writeOff(tenant, hold, BigDecimal.ONE, user, "Inspector", "Crushed");
+        BigDecimal taken = quarantine.takeForReturn(tenantId, inspection, item, BigDecimal.valueOf(10), UUID.randomUUID(), "RET-1", user, "Inspector");
+
+        assertThat(taken).as("only the 3 still held can go back to the supplier").isEqualByComparingTo("3");
+        assertThat(onHand(location, item)).as("the released unit is back").isEqualByComparingTo("6");
+        assertThat(onHand(quarantineLocation, item)).isEqualByComparingTo("0");
+        assertThat(jdbc.queryForObject("SELECT status FROM sc_quarantine_holds WHERE id = ?", String.class, hold)).isEqualTo("CLOSED");
+        assertThatThrownBy(() -> quarantine.release(tenant, hold, BigDecimal.ONE, user, "Inspector", "again"))
+                .isInstanceOf(HandyFlowException.class).extracting(e -> ((HandyFlowException) e).getErrorCode()).isEqualTo("MORE_THAN_HELD");
+    }
+
+    private BigDecimal onHand(UUID location, UUID item) {
+        return jdbc.queryForObject("SELECT qty_on_hand FROM sc_inventory WHERE tenant_id = ? AND location_id = ? AND catalogue_item_id = ?", BigDecimal.class, tenantId, location, item);
     }
 }
