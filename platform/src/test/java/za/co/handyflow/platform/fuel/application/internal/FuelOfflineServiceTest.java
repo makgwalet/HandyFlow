@@ -118,6 +118,40 @@ class FuelOfflineServiceTest {
         verify(conflicts).record(eq(T), eq(FuelOfflineConflictService.SHIFT_OPEN), eq(rid), any(), eq(USER), anyString(), any());
     }
 
+    private FuelPump pumpPricedAt(String price) {
+        FuelPump p = mock(FuelPump.class);
+        when(p.getId()).thenReturn(pumpId); when(p.getName()).thenReturn("Pump 1");
+        when(p.getPricePerLitre()).thenReturn(new BigDecimal(price));
+        when(pumps.findActiveByIds(eq(T), any())).thenReturn(List.of(p));
+        return p;
+    }
+    private OpenShiftRequest openAtPrice(String price) {
+        return new OpenShiftRequest("Thandi", null, List.of(new OpenReading(pumpId, new BigDecimal("1000"), new BigDecimal(price))), rid, NOW.minusSeconds(3600));
+    }
+
+    @Test void anOfflineOpenAtAPriceThePumpNoLongerHasIsRefusedAndKept() {
+        pumpPricedAt("23.10");
+        IllegalStateException e = assertThrows(IllegalStateException.class, () -> service.openShift(T, openAtPrice("22.50"), USER, NOW));
+        assertTrue(e.getMessage().contains("R 23.10") && e.getMessage().contains("R 22.50"));
+        verify(forecourt, never()).openShift(any(), any(), any());
+        verify(conflicts).record(eq(T), eq(FuelOfflineConflictService.SHIFT_OPEN), eq(rid), any(), eq(USER), anyString(), any());
+    }
+
+    @Test void anOfflineOpenAtTheCurrentPriceGoesThrough() {
+        pumpPricedAt("22.50");
+        when(forecourt.openShift(eq(T), any(), eq(USER))).thenReturn(shiftOut);
+        service.openShift(T, openAtPrice("22.50000"), USER, NOW); // 22.5 equals 22.50000: compared by value, not by scale
+        verify(forecourt).openShift(eq(T), any(), eq(USER));
+        verifyNoInteractions(conflicts);
+    }
+
+    @Test void anOpenWithNoPriceFromAnOlderPhoneIsNotChecked() {
+        pumpPricedAt("99.00");
+        when(forecourt.openShift(eq(T), any(), eq(USER))).thenReturn(shiftOut);
+        service.openShift(T, open(rid, NOW.minusSeconds(60), "1000"), USER, NOW);
+        verify(forecourt).openShift(eq(T), any(), eq(USER));
+    }
+
     @Test void anOpenCapturedTooLongAgoIsRefusedAndKept() {
         assertThrows(IllegalStateException.class, () -> service.openShift(T, open(rid, NOW.minusSeconds(73 * 3600), "1000"), USER, NOW));
         verify(forecourt, never()).openShift(any(), any(), any());

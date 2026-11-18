@@ -41,7 +41,7 @@ describe("OpenShiftScreen", () => {
     expect(screen.getByDisplayValue("1000")).toBeTruthy();
     await fireEvent.press(screen.getByLabelText("Open shift"));
     await waitFor(() => expect(mockGoBack).toHaveBeenCalled());
-    expect(mockEnqueue).toHaveBeenCalledWith("SHIFT_OPEN", { body: { attendantName: "Thandi M", readings: [{ pumpId: "P1", openingMeter: 1000 }] } });
+    expect(mockEnqueue).toHaveBeenCalledWith("SHIFT_OPEN", { body: { attendantName: "Thandi M", readings: [{ pumpId: "P1", openingMeter: 1000, expectedPrice: 20 }] } });
     expect(mockApi).not.toHaveBeenCalled(); // nothing goes to the server from the screen: the outbox sends it with its own id
   });
   it("says plainly that the shift is not open until the server accepts it", async () => {

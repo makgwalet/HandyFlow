@@ -27,7 +27,10 @@ public final class ForecourtDtos {
         }
     }
 
-    public record OpenReading(@NotNull UUID pumpId, @NotNull @PositiveOrZero BigDecimal openingMeter) {}
+    /** expectedPrice is the pump price the phone showed when it captured the open. Only a phone that may have been offline sends it. */
+    public record OpenReading(@NotNull UUID pumpId, @NotNull @PositiveOrZero BigDecimal openingMeter, @PositiveOrZero BigDecimal expectedPrice) {
+        public OpenReading(UUID pumpId, BigDecimal openingMeter) { this(pumpId, openingMeter, null); }
+    }
 
     /** clientRequestId and capturedAt are set by a phone that may have been offline; without them this is an ordinary online open. */
     public record OpenShiftRequest(@NotBlank @Size(max = 120) String attendantName, @Size(max = 500) String notes,

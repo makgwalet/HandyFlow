@@ -15,6 +15,15 @@ describe("open shift", () => {
     expect(validateOpen("T", [{ pumpId: "P1", meter: "-1" }])).toMatch(/opening meter/);
     expect(validateOpen("T", [{ pumpId: "P1", meter: "0" }])).toBeNull();
   });
+  it("keeps the price the phone showed for each pump, and sends it so the server can refuse an open at a changed price", () => {
+    const rows = openRows([pump({ pricePerLitre: 22.5 })]);
+    expect(rows).toEqual([{ pumpId: "P1", meter: "1000.5", price: 22.5 }]);
+    expect(openBody("T", rows, "").readings).toEqual([{ pumpId: "P1", openingMeter: 1000.5, expectedPrice: 22.5 }]);
+  });
+  it("sends no price when the phone has none (or zero), so the check is skipped rather than failing", () => {
+    expect(openBody("T", [{ pumpId: "P1", meter: "1" }], "").readings).toEqual([{ pumpId: "P1", openingMeter: 1 }]);
+    expect(openBody("T", [{ pumpId: "P1", meter: "1", price: 0 }], "").readings).toEqual([{ pumpId: "P1", openingMeter: 1 }]);
+  });
   it("builds the request", () => expect(openBody(" Thandi ", [{ pumpId: "P1", meter: "10,5" }], " ")).toEqual({ attendantName: "Thandi", readings: [{ pumpId: "P1", openingMeter: 10.5 }] }));
 });
 

@@ -55,6 +55,7 @@ public class FuelOfflineService {
         return guard(tenant, FuelOfflineConflictService.SHIFT_OPEN, rid, null, userId, req.capturedAt(), () -> {
             checkCaptured(tenant, req.capturedAt(), now);
             requireMetersNotBackwards(tenant, req.readings());
+            requirePricesUnchanged(tenant, req.readings());
             ShiftResponse out = forecourt.openShift(tenant, req, userId);
             FuelShift s = shifts.findByTenantAndId(tenant, out.id()).orElseThrow(() -> new ResourceNotFoundException("Shift", out.id().toString()));
             s.stampOpen(rid, req.capturedAt());
@@ -106,6 +107,24 @@ public class FuelOfflineService {
             if (p != null && p.getLastMeter() != null && r.openingMeter().compareTo(p.getLastMeter()) < 0)
                 throw new IllegalStateException("The opening meter for " + p.getName() + " (" + r.openingMeter().toPlainString() + ") is below the last meter on record ("
                         + p.getLastMeter().toPlainString() + "). A meter does not run backwards. Check the reading, or ask a supervisor.");
+        }
+    }
+
+    /**
+     * A shift sells at the pump price copied when it opens. For a shift opened offline that is the price on the server when the open syncs,
+     * which may not be the price the attendant sold at. The phone sends the price it showed; if the pump has a different price now the open is
+     * refused (and kept in the conflict log) so a supervisor settles it, rather than the takings being quietly judged at another price.
+     */
+    private void requirePricesUnchanged(TenantId tenant, List<OpenReading> readings) {
+        List<OpenReading> priced = readings.stream().filter(r -> r.expectedPrice() != null).toList();
+        if (priced.isEmpty()) return;
+        Set<UUID> ids = priced.stream().map(OpenReading::pumpId).collect(Collectors.toCollection(LinkedHashSet::new));
+        Map<UUID, FuelPump> map = pumps.findActiveByIds(tenant, ids).stream().collect(Collectors.toMap(FuelPump::getId, p -> p));
+        for (OpenReading r : priced) {
+            FuelPump p = map.get(r.pumpId());
+            if (p != null && p.getPricePerLitre() != null && r.expectedPrice().compareTo(p.getPricePerLitre()) != 0)
+                throw new IllegalStateException("The price of " + p.getName() + " is R " + p.getPricePerLitre().toPlainString() + " per litre now, but the phone opened the shift at R "
+                        + r.expectedPrice().toPlainString() + ". The takings would not agree. Ask a supervisor to settle it before the shift is opened.");
         }
     }
 

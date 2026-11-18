@@ -57,9 +57,10 @@ const toNum = (t: string): number => Number(t.trim().replace(",", "."));
 const isMoney = (t: string) => { const n = toNum(t); return t.trim() !== "" && Number.isFinite(n) && n >= 0; };
 
 // ---- open ----
-export interface OpenRow { pumpId: string; meter: string }
+/** price is what this phone showed for the pump when the shift was opened; the server refuses the open if the pump price has changed since. */
+export interface OpenRow { pumpId: string; meter: string; price?: number | null }
 export function openRows(pumps: Pump[]): OpenRow[] {
-  return pumps.filter((p) => p.active && !p.onShift).map((p) => ({ pumpId: p.id, meter: p.lastMeter != null ? String(p.lastMeter) : "" }));
+  return pumps.filter((p) => p.active && !p.onShift).map((p) => ({ pumpId: p.id, meter: p.lastMeter != null ? String(p.lastMeter) : "", ...(p.pricePerLitre != null ? { price: p.pricePerLitre } : {}) }));
 }
 export function validateOpen(attendant: string, rows: OpenRow[]): string | null {
   if (!attendant.trim()) return "Enter the attendant's name.";
@@ -69,7 +70,7 @@ export function validateOpen(attendant: string, rows: OpenRow[]): string | null 
 }
 export const openBody = (attendant: string, rows: OpenRow[], notes: string) => ({
   attendantName: attendant.trim(), ...(notes.trim() ? { notes: notes.trim() } : {}),
-  readings: rows.map((r) => ({ pumpId: r.pumpId, openingMeter: toNum(r.meter) })),
+  readings: rows.map((r) => ({ pumpId: r.pumpId, openingMeter: toNum(r.meter), ...(r.price != null && r.price > 0 ? { expectedPrice: r.price } : {}) })),
 });
 
 // ---- close ----
