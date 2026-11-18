@@ -116,7 +116,7 @@ class FuelGaugeImportServiceTest {
         assertEquals("ACCEPTED", v.status());
         assertEquals(dipId, v.dipReadingId());
         ArgumentCaptor<DipReadingRequest> cap = ArgumentCaptor.forClass(DipReadingRequest.class);
-        verify(fuel).recordDipReading(eq(T), eq(tank.getId()), cap.capture());
+        verify(fuel).recordDipReading(eq(T), eq(tankIdForDip), cap.capture());
         assertEquals(0, d("8200").compareTo(cap.getValue().actualLitres()));
         assertEquals(Instant.parse("2026-11-17T08:00:00Z"), cap.getValue().readAt());
     }

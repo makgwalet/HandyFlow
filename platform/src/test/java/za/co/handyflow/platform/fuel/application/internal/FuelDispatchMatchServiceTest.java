@@ -109,8 +109,9 @@ class FuelDispatchMatchServiceTest {
     @Test @DisplayName("a depot limit hides forecourts the user may not see")
     void limited() {
         FuelDispatch d = dispatch("100", fc.getId());
-        when(dispatches.findToDepotsBetween(eq(T), eq(Set.of(terminal.getId())), any(), any())).thenReturn(List.of());
-        assertTrue(svc.report(T, 30, Set.of(terminal.getId())).forecourts().isEmpty());
+        Set<UUID> terminalOnly = Set.of(terminal.getId());
+        when(dispatches.findToDepotsBetween(eq(T), eq(terminalOnly), any(), any())).thenReturn(List.of());
+        assertTrue(svc.report(T, 30, terminalOnly).forecourts().isEmpty());
         assertTrue(svc.report(T, 30, Set.of()).forecourts().isEmpty());
     }
 
