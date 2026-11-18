@@ -33,7 +33,8 @@ import java.util.*;
  * <p>
  * Amount basis is EX-VAT by default (VAT is normally recoverable); app.scm.budget.include-vat=true
  * switches everything to VAT-inclusive — pick one before go-live, don't flip it mid-year.
- * Not covered: invoices with no PO (direct AP bills) aren't counted as actuals yet.
+ * Invoices with no PO count as actuals too once approved, against the department / cost centre / project they were coded to
+ * when captured (an uncoded no-PO invoice belongs to no budget, so the capture screen should ask for the coding).
  * Config: app.scm.budget.near-limit-pct (default 90), app.scm.budget.include-vat (default false).
  */
 @Slf4j
@@ -317,7 +318,27 @@ public class BudgetService {
                 rs -> { box[0] = new Usage(rs.getBigDecimal("committed"), rs.getBigDecimal("actual"), rs.getBigDecimal("used")); },
                 tid, tid, b.getScopeValue(), java.sql.Date.valueOf(b.getPeriodStart()), java.sql.Date.valueOf(b.getPeriodEnd()),
                 excludePoId != null ? excludePoId : UUID.randomUUID());
-        return box[0] != null ? box[0] : new Usage(BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO);
+        Usage poUsage = box[0] != null ? box[0] : new Usage(BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO);
+        BigDecimal noPo = noPoInvoiceActuals(tid, b);
+        return new Usage(poUsage.committed(), poUsage.actual().add(noPo), poUsage.used().add(noPo));
+    }
+
+    /** Approved/paid invoices with no PO, coded to this budget's scope value and dated inside its period. */
+    private BigDecimal noPoInvoiceActuals(UUID tid, ScBudget b) {
+        BigDecimal v = jdbc.queryForObject("SELECT COALESCE(SUM(" + (includeVat ? "total_amount" : "subtotal") + "), 0) "
+                        + "FROM sc_supplier_invoices WHERE tenant_id = ? AND purchase_order_id IS NULL AND status IN ('APPROVED','PAID') "
+                        + "AND " + invoiceColumn(b.getScopeType()) + " IS NOT NULL AND lower(" + invoiceColumn(b.getScopeType()) + ") = lower(?) "
+                        + "AND invoice_date BETWEEN ? AND ?",
+                BigDecimal.class, tid, b.getScopeValue(), java.sql.Date.valueOf(b.getPeriodStart()), java.sql.Date.valueOf(b.getPeriodEnd()));
+        return v != null ? v : BigDecimal.ZERO;
+    }
+
+    private static String invoiceColumn(BudgetScopeType t) {
+        return switch (t) {
+            case DEPARTMENT -> "department";
+            case COST_CENTRE -> "cost_centre";
+            case PROJECT -> "project_ref";
+        };
     }
 
     /** Approved/paid invoices per PO (ex-VAT or inc-VAT to match the commitment basis). First JDBC arg is the tenant id. */

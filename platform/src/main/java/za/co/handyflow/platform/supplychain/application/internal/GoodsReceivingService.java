@@ -33,7 +33,8 @@ import java.util.*;
  *  - Every line must resolve to a PO line (no silent "unordered" receipts).
  *  - A posted GR is never edited or deleted — it is reversed (offsetting stock movements,
  *    PO quantities rolled back, reason + actor recorded).
- * Lock order (avoid deadlocks): goods receipt row, then purchase order row.
+ * Lock order (avoid deadlocks): goods receipt row, then purchase order row, then inventory rows in (location, catalogue item)
+ * order. Post and reverse both follow it, so two receipts touching the same items in a different line order cannot wait on each other.
  */
 @Slf4j
 @Service
@@ -119,7 +120,7 @@ public class GoodsReceivingService {
         int processed = 0;
         List<String> rejections = new ArrayList<>();
 
-        for (PostGrLineRequest line : lines) {
+        for (PostGrLineRequest line : sortedForLocking(lines, poLines)) {
             BigDecimal received = line.qtyReceived();
             if (received == null || received.compareTo(BigDecimal.ZERO) == 0) continue;
             if (received.compareTo(BigDecimal.ZERO) < 0) throw bad("qtyReceived cannot be negative");
@@ -266,8 +267,7 @@ public class GoodsReceivingService {
         }
 
         // Offsetting stock movements (history preserved — nothing is deleted).
-        for (ScStockMovement m : movementRepo.findByReference("GOODS_RECEIPT", grId)) {
-            if (!tid.equals(m.getTenantId()) || m.getQtyChange().signum() <= 0) continue;
+        for (ScStockMovement m : movementsInLockOrder(tid, movementRepo.findByReference("GOODS_RECEIPT", grId))) {
             ScInventory inv = inventoryRepo.lockByTenantIdAndId(tid, m.getInventoryId())
                     .orElseThrow(() -> new HandyFlowException("Inventory record not found", HttpStatus.NOT_FOUND, "NOT_FOUND"));
             BigDecimal delta = m.getQtyChange().negate();
@@ -317,6 +317,42 @@ public class GoodsReceivingService {
     }
 
     // ── internals ─────────────────────────────────────────────────────────────
+
+    /** Same total order as {@link #movementsInLockOrder}: (location, catalogue item). Lines that cannot be resolved sort last. */
+    static final Comparator<UUID> UUID_ORDER = Comparator.nullsLast(Comparator.naturalOrder());
+
+    /**
+     * Receipt lines in the order their inventory rows will be locked. A receipt posts to a single location, so the order is by
+     * catalogue item. A line that cannot be resolved is left to fail in its normal place with its normal message.
+     */
+    List<PostGrLineRequest> sortedForLocking(List<PostGrLineRequest> lines, List<ScPoLine> poLines) {
+        Map<PostGrLineRequest, UUID> key = new IdentityHashMap<>();
+        for (PostGrLineRequest l : lines) {
+            UUID item = null;
+            try {
+                ScPoLine pl = resolvePoLine(poLines, l);
+                item = pl.getCatalogueItemId() != null ? pl.getCatalogueItemId() : l.catalogueItemId();
+            } catch (RuntimeException ignored) { /* reported by the main loop */ }
+            key.put(l, item);
+        }
+        List<PostGrLineRequest> sorted = new ArrayList<>(lines);
+        sorted.sort(Comparator.comparing(key::get, UUID_ORDER));   // List.sort is stable: equal items keep request order
+        return sorted;
+    }
+
+    /** This receipt's stock-in movements, ordered by their inventory row's (location, catalogue item) before any row is locked. */
+    List<ScStockMovement> movementsInLockOrder(UUID tid, List<ScStockMovement> movements) {
+        List<ScStockMovement> mine = movements.stream()
+                .filter(m -> tid.equals(m.getTenantId()) && m.getQtyChange().signum() > 0).toList();
+        Map<UUID, ScInventory> rows = new HashMap<>();
+        inventoryRepo.findAllById(mine.stream().map(ScStockMovement::getInventoryId).distinct().toList())
+                .forEach(i -> rows.put(i.getId(), i));
+        List<ScStockMovement> sorted = new ArrayList<>(mine);
+        sorted.sort(Comparator
+                .comparing((ScStockMovement m) -> rows.containsKey(m.getInventoryId()) ? rows.get(m.getInventoryId()).getLocationId() : null, UUID_ORDER)
+                .thenComparing(m -> rows.containsKey(m.getInventoryId()) ? rows.get(m.getInventoryId()).getCatalogueItemId() : null, UUID_ORDER));
+        return sorted;
+    }
 
     private ScPoLine resolvePoLine(List<ScPoLine> poLines, PostGrLineRequest line) {
         if (line.poLineId() != null) {

@@ -17,6 +17,10 @@ public record CreateSupplierInvoiceRequest(
         BigDecimal vatAmount,
         BigDecimal totalAmount,
         String notes,
+        /** Only for an invoice with no PO: the budget it should count against once approved. */
+        String department,
+        String costCentre,
+        String projectRef,
         /** Optional line detail; totals are computed server-side, never taken from the client. */
         List<InvoiceLineRequest> lines
 ) {

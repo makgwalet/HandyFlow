@@ -594,6 +594,7 @@ public class ScmService {
                 req.currency(), req.subtotal(), vat, req.totalAmount(),
                 req.notes(), currentUserIdOrNull());
 
+        if (req.purchaseOrderId() == null) inv.codeTo(req.department(), req.costCentre(), req.projectRef());
         List<ScSupplierInvoiceLine> lines = buildInvoiceLines(tid, inv.getId(), req.lines());
 
         ScSupplierInvoice saved;

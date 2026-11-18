@@ -56,6 +56,10 @@ public class ScSupplierInvoice {
     // Set the moment this invoice is handed to AP — see ApFacade.createBillFromSupplyChainInvoice().
     @Column(name = "ap_bill_id") UUID apBillId;
     String notes;
+    /** Coding for an invoice with no PO, so it can count against a budget (a PO invoice takes its coding from the PO commitment). */
+    @Column(length = 100) String department;
+    @Column(name = "cost_centre", length = 100) String costCentre;
+    @Column(name = "project_ref", length = 100) String projectRef;
     @Column(name = "created_at", nullable = false) Instant createdAt;
     @Column(name = "updated_at", nullable = false) Instant updatedAt;
 
@@ -91,6 +95,17 @@ public class ScSupplierInvoice {
         inv.updatedAt          = Instant.now();
         return inv;
     }
+
+    /** Coding for an invoice with no PO; blank values are stored as null. Ignored once the invoice is approved or paid. */
+    public void codeTo(String department, String costCentre, String projectRef) {
+        if (status == InvoiceStatus.APPROVED || status == InvoiceStatus.PAID) return;
+        this.department = blankToNull(department);
+        this.costCentre = blankToNull(costCentre);
+        this.projectRef = blankToNull(projectRef);
+        touch();
+    }
+
+    private static String blankToNull(String v) { return v == null || v.isBlank() ? null : v.trim(); }
 
     // ── Lifecycle transitions ─────────────────────────────────────────────────
 
