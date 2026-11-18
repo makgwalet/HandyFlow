@@ -333,6 +333,15 @@ public class ContractingService {
      * Legal status of this exact template version: NOT_REVIEWED, APPROVED, CONDITIONAL, REJECTED, EXPIRED (next review date
      * passed) or WITHDRAWN. A template whose approval has expired or been withdrawn is no longer shown as approved.
      */
+    /** For reporting: how many published templates sit in each legal-review state. */
+    @Transactional(readOnly = true)
+    public Map<String, Long> publishedTemplateLegalStatusCounts(TenantId tenantId) {
+        Map<String, Long> counts = new LinkedHashMap<>();
+        for (ContractTemplate t : templateRepo.findAllActive(tenantId))
+            if (t.statusEnum() == TemplateStatus.PUBLISHED) counts.merge(legalStatus(t), 1L, Long::sum);
+        return counts;
+    }
+
     private String legalStatus(ContractTemplate t) {
         return templateReviewRepo.findFirstByTenantIdAndTemplateIdAndTemplateVersionOrderByCreatedAtDesc(
                         t.getTenantId(), t.getId(), t.getTemplateVersion())

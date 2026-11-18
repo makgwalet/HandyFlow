@@ -715,6 +715,7 @@ export const CONTRACTING_SECTIONS: ModuleSections = {
       sections: [
         { id: 'obligations', label: 'Obligations', icon: ListChecks },
         { id: 'renewals', label: 'Renewals', icon: CalendarClock },
+        { id: 'reports', label: 'Reports', icon: BarChart2 },
       ],
     },
   ],

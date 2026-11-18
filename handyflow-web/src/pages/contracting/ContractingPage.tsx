@@ -6,6 +6,7 @@ import ContractsTab       from './ContractsTab'
 import TemplatesTab       from './TemplatesTab'
 import ObligationsTab     from './ObligationsTab'
 import RenewalsTab        from './RenewalsTab'
+import ReportsTab         from './ReportsTab'
 import { SectionedModulePage } from '../../components/shell/SectionedModulePage'
 import { CONTRACTING_SECTIONS } from '../../navigation/moduleSections'
 
@@ -61,6 +62,7 @@ export default function ContractingPage() {
           case 'templates': return <TemplatesTab />
           case 'obligations': return <ObligationsTab />
           case 'renewals':    return <RenewalsTab />
+          case 'reports':     return <ReportsTab />
           default:          return null
         }
       }} />

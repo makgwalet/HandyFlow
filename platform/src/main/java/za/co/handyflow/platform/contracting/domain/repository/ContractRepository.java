@@ -104,4 +104,21 @@ public interface ContractRepository extends JpaRepository<Contract, UUID> {
     @Query("SELECT c FROM Contract c WHERE c.tenantId = :#{#tenantId.value} AND c.status = 'SIGNED' AND c.endDate IS NOT NULL "
             + "AND c.endDate >= :today AND c.endDate <= :cutoff AND c.deletedAt IS NULL ORDER BY c.endDate")
     List<Contract> findSignedEndingBetween(TenantId tenantId, LocalDate today, LocalDate cutoff);
+
+    // ── Reporting (projections, so contract bodies are never loaded) ───────────
+
+    /** Contract number, title, sent and signed times for contracts signed in the window. */
+    @Query("SELECT c.contractNumber, c.title, c.sentAt, c.signedAt FROM Contract c WHERE c.tenantId = :#{#tenantId.value} "
+            + "AND c.status = 'SIGNED' AND c.sentAt IS NOT NULL AND c.signedAt >= :from AND c.signedAt < :to AND c.deletedAt IS NULL")
+    List<Object[]> signingTimes(TenantId tenantId, java.time.Instant from, java.time.Instant to);
+
+    /** Type, value and end date of every signed contract. */
+    @Query("SELECT c.contractType, c.valueAmount, c.endDate FROM Contract c WHERE c.tenantId = :#{#tenantId.value} "
+            + "AND c.status = 'SIGNED' AND c.deletedAt IS NULL")
+    List<Object[]> signedPortfolio(TenantId tenantId);
+
+    /** The contract register, for export. */
+    @Query("SELECT c.contractNumber, c.title, c.contractType, c.status, c.valueAmount, c.currency, c.startDate, c.endDate, c.autoRenew, "
+            + "c.renewalNoticeDays, c.sentAt, c.signedAt FROM Contract c WHERE c.tenantId = :#{#tenantId.value} AND c.deletedAt IS NULL ORDER BY c.createdAt DESC")
+    List<Object[]> register(TenantId tenantId, org.springframework.data.domain.Pageable page);
 }

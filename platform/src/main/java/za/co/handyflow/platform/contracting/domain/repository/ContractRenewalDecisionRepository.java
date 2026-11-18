@@ -14,4 +14,7 @@ public interface ContractRenewalDecisionRepository extends JpaRepository<Contrac
 
     @Query("SELECT d FROM ContractRenewalDecision d WHERE d.tenantId = :tenantId AND d.contractId IN :contractIds ORDER BY d.decidedAt DESC")
     List<ContractRenewalDecision> findByContracts(UUID tenantId, Collection<UUID> contractIds);
+
+    @Query("SELECT d FROM ContractRenewalDecision d WHERE d.tenantId = :tenantId AND d.decidedAt >= :from AND d.decidedAt < :to")
+    List<ContractRenewalDecision> findDecidedBetween(UUID tenantId, java.time.Instant from, java.time.Instant to);
 }
