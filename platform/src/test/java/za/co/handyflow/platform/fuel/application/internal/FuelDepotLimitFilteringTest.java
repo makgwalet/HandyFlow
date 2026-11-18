@@ -77,9 +77,9 @@ class FuelDepotLimitFilteringTest {
     void listsUseTheLimit() {
         var pageable = PageRequest.of(0, 50);
         Set<UUID> ids = Set.of(mine.getId());
-        var hoisted1 = new PageImpl<>(List.of()); when(movements.findByTanks(T, ids, pageable)).thenReturn(hoisted1);
-        var hoisted2 = new PageImpl<>(List.of()); when(transfers.findInvolving(T, ids, pageable)).thenReturn(hoisted2);
-        var hoisted3 = new PageImpl<>(List.of()); when(reservations.findForTanks(T, ids, pageable)).thenReturn(hoisted3);
+        var hoisted1 = new PageImpl<FuelStockMovement>(List.of()); when(movements.findByTanks(T, ids, pageable)).thenReturn(hoisted1);
+        var hoisted2 = new PageImpl<FuelTransfer>(List.of()); when(transfers.findInvolving(T, ids, pageable)).thenReturn(hoisted2);
+        var hoisted3 = new PageImpl<FuelReservation>(List.of()); when(reservations.findForTanks(T, ids, pageable)).thenReturn(hoisted3);
         stock.getLedger(T, null, ids, pageable); stock.getTransfers(T, ids, pageable); stock.getReservations(T, ids, pageable);
         verify(movements).findByTanks(T, ids, pageable); verify(transfers).findInvolving(T, ids, pageable); verify(reservations).findForTanks(T, ids, pageable);
         verify(movements, never()).findAllForTenant(any(), any()); verify(transfers, never()).findAllForTenant(any(), any()); verify(reservations, never()).findAllForTenant(any(), any());
@@ -92,9 +92,9 @@ class FuelDepotLimitFilteringTest {
     @Test @DisplayName("with no limit the lists are the whole company's, as before")
     void noLimit() {
         var pageable = PageRequest.of(0, 50);
-        var hoisted4 = new PageImpl<>(List.of()); when(movements.findAllForTenant(T, pageable)).thenReturn(hoisted4);
-        var hoisted5 = new PageImpl<>(List.of()); when(transfers.findAllForTenant(T, pageable)).thenReturn(hoisted5);
-        var hoisted6 = new PageImpl<>(List.of()); when(reservations.findAllForTenant(T, pageable)).thenReturn(hoisted6);
+        var hoisted4 = new PageImpl<FuelStockMovement>(List.of()); when(movements.findAllForTenant(T, pageable)).thenReturn(hoisted4);
+        var hoisted5 = new PageImpl<FuelTransfer>(List.of()); when(transfers.findAllForTenant(T, pageable)).thenReturn(hoisted5);
+        var hoisted6 = new PageImpl<FuelReservation>(List.of()); when(reservations.findAllForTenant(T, pageable)).thenReturn(hoisted6);
         stock.getLedger(T, null, pageable); stock.getTransfers(T, pageable); stock.getReservations(T, pageable);
         verify(movements).findAllForTenant(T, pageable); verify(transfers).findAllForTenant(T, pageable); verify(reservations).findAllForTenant(T, pageable);
     }
