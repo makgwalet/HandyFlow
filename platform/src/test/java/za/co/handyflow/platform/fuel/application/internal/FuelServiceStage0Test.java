@@ -22,6 +22,7 @@ import za.co.handyflow.platform.shared.TenantId;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
@@ -48,6 +49,9 @@ class FuelServiceStage0Test {
     @Mock FuelCustomerSiteRepository siteRepository;
     @Mock FuelOrderFulfilment orderFulfilment;
     @Mock FuelPurchasingService purchasing;
+    @Mock FuelPushEventService pushEvents;
+    @Mock FuelAlertRecipientService alertRecipients;
+    @Mock za.co.handyflow.platform.notifications.application.TenantAdminRecipients tenantAdminRecipients;
     @InjectMocks FuelService service;
 
     static final TenantId TENANT = TenantId.of(UUID.randomUUID());
@@ -262,5 +266,53 @@ class FuelServiceStage0Test {
         DipReadingResponse again = service.recordDipReading(TENANT, tankId, req);
         assertEquals(0, bd("4900").compareTo(again.actualLitres()));
         verify(dipRepository, times(1)).save(any());
+    }
+
+    // ── push: dip variance ────────────────────────────────────────────────────
+
+    private za.co.handyflow.platform.notifications.application.Recipient manager(UUID id) {
+        return za.co.handyflow.platform.notifications.application.Recipient.user(id, "Mgr", "m@x.co", null);
+    }
+
+    @Test @DisplayName("push: a dip below the book level pushes once to the people chosen for variance alerts, pointing at the tank")
+    @SuppressWarnings("unchecked")
+    void dipShortfallPushes() {
+        UUID tankId = UUID.randomUUID(), m1 = UUID.randomUUID(), m2 = UUID.randomUUID();
+        when(alertRecipients.recipientsFor(TENANT, "VARIANCE")).thenReturn(List.of(manager(m1), manager(m2)));
+        service.recordDipReading(TENANT, tankId, new DipReadingRequest(bd("4900"), Instant.now(), "Sipho", null, null));
+        ArgumentCaptor<java.util.Collection<UUID>> to = ArgumentCaptor.forClass(java.util.Collection.class);
+        ArgumentCaptor<String> key = ArgumentCaptor.forClass(String.class);
+        ArgumentCaptor<java.util.Map<String, String>> data = ArgumentCaptor.forClass(java.util.Map.class);
+        verify(pushEvents, times(1)).publish(eq(TENANT), eq("DIP_VARIANCE"), key.capture(), to.capture(), anyString(), anyString(), data.capture());
+        assertTrue(key.getValue().startsWith("DIP:"));
+        assertTrue(to.getValue().containsAll(List.of(m1, m2)));
+        assertEquals("TankDetail", data.getValue().get("screen"));
+        assertFalse(data.getValue().values().stream().anyMatch(v -> v.contains("4900")), "the push carries no litres");
+    }
+
+    @Test @DisplayName("push: a dip at or above the book level pushes nothing")
+    void dipWithoutShortfallIsQuiet() {
+        service.recordDipReading(TENANT, UUID.randomUUID(), new DipReadingRequest(bd("5000"), Instant.now(), "Sipho", null, null));
+        service.recordDipReading(TENANT, UUID.randomUUID(), new DipReadingRequest(bd("5100"), Instant.now(), "Sipho", null, null));
+        verify(pushEvents, never()).publish(any(), any(), any(), any(), any(), any(), any());
+    }
+
+    @Test @DisplayName("push: a push that fails never fails the dip reading, and the reading is still saved")
+    void dipPushFailureIsSwallowed() {
+        when(alertRecipients.recipientsFor(any(), any())).thenThrow(new RuntimeException("recipients down"));
+        assertDoesNotThrow(() -> service.recordDipReading(TENANT, UUID.randomUUID(), new DipReadingRequest(bd("4900"), Instant.now(), "Sipho", null, null)));
+        verify(dipRepository).save(any());
+    }
+
+    @Test @DisplayName("push: a replayed dip request never pushes again")
+    void dipReplayDoesNotPushAgain() {
+        UUID tankId = UUID.randomUUID(), key = UUID.randomUUID();
+        DipReadingRequest req = new DipReadingRequest(bd("4900"), Instant.now(), "Sipho", null, key);
+        service.recordDipReading(TENANT, tankId, req);
+        ArgumentCaptor<za.co.handyflow.platform.fuel.domain.model.DipReading> saved = ArgumentCaptor.forClass(za.co.handyflow.platform.fuel.domain.model.DipReading.class);
+        verify(dipRepository).save(saved.capture());
+        when(dipRepository.findByClientRequest(TENANT, tankId, key)).thenReturn(Optional.of(saved.getValue()));
+        service.recordDipReading(TENANT, tankId, req);
+        verify(pushEvents, times(1)).publish(any(), eq("DIP_VARIANCE"), any(), any(), any(), any(), any());
     }
 }

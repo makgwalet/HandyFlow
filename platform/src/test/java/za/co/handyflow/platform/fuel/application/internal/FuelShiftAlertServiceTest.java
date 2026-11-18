@@ -40,6 +40,7 @@ class FuelShiftAlertServiceTest {
     @Mock NotificationService notifications;
     @Mock FuelToleranceService tolerances;
     @Mock FuelShiftRepository shifts;
+    @Mock FuelPushEventService pushEvents;
     @InjectMocks FuelShiftAlertService service;
 
     final Recipient supervisor = Recipient.user(UUID.randomUUID(), "Sup", "s@x.co", null);
@@ -120,5 +121,42 @@ class FuelShiftAlertServiceTest {
         doThrow(new RuntimeException("mail down")).when(notifications).send(any());
         assertDoesNotThrow(() -> service.afterClose(T, closed("5000")));
         assertDoesNotThrow(() -> service.autoAccepted(T, closed("6000")));
+    }
+
+    // ── push ──
+
+    @Test @DisplayName("push: a shift outside tolerance pushes once to the shift-exception recipients, pointing at the shift")
+    @SuppressWarnings("unchecked")
+    void outsideTolerancePushes() {
+        when(recipients.recipientsFor(T, "SHIFT_EXCEPTION")).thenReturn(List.of(supervisor));
+        FuelShift s = closed("5000");
+        service.afterClose(T, s);
+        ArgumentCaptor<java.util.Collection<UUID>> to = ArgumentCaptor.forClass(java.util.Collection.class);
+        ArgumentCaptor<java.util.Map<String, String>> data = ArgumentCaptor.forClass(java.util.Map.class);
+        verify(pushEvents, times(1)).publish(eq(T), eq("SHIFT_OUTSIDE_TOLERANCE"), eq("SHIFT:" + s.getId()), to.capture(), anyString(), anyString(), data.capture());
+        assertEquals(List.of(supervisor.userId()), List.copyOf(to.getValue()));
+        assertEquals("ShiftDetail", data.getValue().get("screen"));
+    }
+
+    @Test @DisplayName("push: a shift within tolerance pushes nothing")
+    void withinToleranceNoPush() {
+        when(recipients.recipientsFor(any(), any())).thenReturn(List.of(supervisor));
+        service.afterClose(T, closed("5998"));
+        verify(pushEvents, never()).publish(any(), any(), any(), any(), any(), any(), any());
+    }
+
+    @Test @DisplayName("push: a failing push neither throws nor stops the notice")
+    void pushFailureKeepsTheNotice() {
+        when(recipients.recipientsFor(T, "SHIFT_EXCEPTION")).thenReturn(List.of(supervisor));
+        when(pushEvents.publish(any(), any(), any(), any(), any(), any(), any())).thenThrow(new RuntimeException("expo down"));
+        assertDoesNotThrow(() -> service.afterClose(T, closed("5000")));
+        assertEquals(NotificationType.FUEL_SHIFT_NEEDS_REVIEW, sent().get(0).type());
+    }
+
+    @Test @DisplayName("push: people with no login get no push, and an empty list is still handed over cleanly")
+    void recipientsWithoutALoginAreLeftOut() {
+        when(recipients.recipientsFor(T, "SHIFT_EXCEPTION")).thenReturn(List.of(Recipient.external("NoLogin", "n@x.co", null)));
+        service.afterClose(T, closed("5000"));
+        verify(pushEvents).publish(eq(T), eq("SHIFT_OUTSIDE_TOLERANCE"), anyString(), eq(List.of()), anyString(), anyString(), any());
     }
 }
