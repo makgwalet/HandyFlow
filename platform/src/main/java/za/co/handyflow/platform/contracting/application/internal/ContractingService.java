@@ -175,21 +175,20 @@ public class ContractingService {
     @Transactional(readOnly = true)
     public Page<ContractSummaryResponse> getContracts(TenantId tenantId, String status,
                                                       String type, Pageable pageable) {
-        return contractRepo.findAllActive(tenantId, status, type, pageable)
-                .map(c -> {
-                    List<ContractParty> parties = partyRepo.findByContract(c.getId());
-                    long signed = parties.stream()
-                            .filter(p -> "SIGNED".equals(p.getSigningStatus())).count();
-                    // NEW: was previously computed on the frontend from a
-                    // `comments` field this response never actually had —
-                    // see ContractSummaryResponse.unresolvedAmendmentCount's
-                    // comment. Matches this method's existing per-row query
-                    // style (parties are already fetched the same way, one
-                    // query per row) rather than introducing a differently-
-                    // shaped batch query for just this one field.
-                    int unresolved = commentRepo.findUnresolvedAmendments(c.getId()).size();
-                    return toContractSummary(c, parties.size(), (int) signed, unresolved);
-                });
+        Page<Contract> page = contractRepo.findAllActive(tenantId, status, type, pageable);
+        // Two queries for the whole page instead of two per contract.
+        List<UUID> ids = page.getContent().stream().map(Contract::getId).toList();
+        Map<UUID, List<ContractParty>> partiesByContract = ids.isEmpty() ? Map.of()
+                : partyRepo.findByContractIds(ids).stream().collect(Collectors.groupingBy(ContractParty::getContractId));
+        Map<UUID, Long> unresolvedByContract = ids.isEmpty() ? Map.of()
+                : commentRepo.findUnresolvedAmendmentsForContracts(ids).stream()
+                        .collect(Collectors.groupingBy(ContractComment::getContractId, Collectors.counting()));
+        return page.map(c -> {
+            List<ContractParty> parties = partiesByContract.getOrDefault(c.getId(), List.of());
+            long signed = parties.stream().filter(p -> "SIGNED".equals(p.getSigningStatus())).count();
+            int unresolved = unresolvedByContract.getOrDefault(c.getId(), 0L).intValue();
+            return toContractSummary(c, parties.size(), (int) signed, unresolved);
+        });
     }
 
     @Transactional(readOnly = true)
@@ -837,7 +836,7 @@ public class ContractingService {
         List<ContractParty> parties = partyRepo.findByContract(contractId);
         contract.setParties(parties);
         List<ContractSignature> signatures = signatureRepo.findByContract(contractId);
-        return pdfGenerator.generate(contract, signatures, "HandyFlow Tenant", null);
+        return pdfGenerator.generate(contract, signatures, tenantId);
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -967,7 +966,7 @@ public class ContractingService {
     private byte[] tryGenerateContractPdf(Contract c) {
         try {
             List<ContractSignature> signatures = signatureRepo.findByContract(c.getId());
-            return pdfGenerator.generate(c, signatures, "HandyFlow Tenant", null);
+            return pdfGenerator.generate(c, signatures, TenantId.of(c.getTenantId()));
         } catch (Exception e) {
             log.error("Failed to generate PDF for contract={} — notification will be sent without attachment: {}",
                     c.getContractNumber(), e.getMessage(), e);

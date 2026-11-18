@@ -36,4 +36,13 @@ public interface ContractCommentRepository extends JpaRepository<ContractComment
         ORDER BY c.createdAt ASC
     """)
     List<ContractComment> findUnresolvedAmendments(@Param("contractId") UUID contractId);
+
+    /** Unresolved amendment requests for many contracts in one query (list screens). */
+    @Query("""
+        SELECT c FROM ContractComment c
+        WHERE c.contractId IN :contractIds
+          AND c.amendmentRequest = true
+          AND c.resolved = false
+    """)
+    List<ContractComment> findUnresolvedAmendmentsForContracts(@Param("contractIds") java.util.Collection<UUID> contractIds);
 }

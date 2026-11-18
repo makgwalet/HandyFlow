@@ -2,7 +2,9 @@ package za.co.handyflow.platform.contracting.application.internal;
 
 import com.lowagie.text.*;
 import com.lowagie.text.pdf.ColumnText;
+import com.lowagie.text.pdf.PdfContentByte;
 import com.lowagie.text.pdf.PdfPCell;
+import com.lowagie.text.pdf.PdfTemplate;
 import com.lowagie.text.pdf.PdfPTable;
 import com.lowagie.text.pdf.PdfPageEventHelper;
 import com.lowagie.text.pdf.PdfWriter;
@@ -11,6 +13,9 @@ import org.springframework.stereotype.Component;
 import za.co.handyflow.platform.contracting.domain.model.Contract;
 import za.co.handyflow.platform.contracting.domain.model.ContractParty;
 import za.co.handyflow.platform.contracting.domain.model.ContractSignature;
+import za.co.handyflow.platform.identity.TenantDetails;
+import za.co.handyflow.platform.identity.TenantFacade;
+import za.co.handyflow.platform.shared.TenantId;
 
 import java.awt.Color;
 import java.io.ByteArrayOutputStream;
@@ -36,21 +41,23 @@ import java.util.List;
  * IPv6 loopback address, and correct <ul>/<li> handling in the contract
  * body so bullet lists don't run together into one sentence.
  * <p>
- * ONE DELIBERATE SIMPLIFICATION vs. the iText7 version: the page footer now
- * reads "Page X" instead of "Page X of Y". Getting the total page count
- * requires OpenPDF's PdfTemplate placeholder trick (write a blank
- * reservation on each page, fill in the real total once the document
- * closes and the page count is finally known) combined with precise
- * text-width measurement to position it correctly after variable-length
- * text. That's exactly the kind of subtle, easy-to-get-wrong detail that's
- * hard to verify without actually rendering and inspecting the output — not
- * something to ship unverified in a licensing-driven rewrite. If the total
- * page count matters enough to be worth the added complexity, it's a
- * contained follow-up, not something folded in here.
+ * The footer reads "Page X of Y" (total filled in when the document closes).
  */
 @Slf4j
 @Component
 public class ContractPdfGenerator {
+
+    private final TenantFacade tenants;
+
+    public ContractPdfGenerator(TenantFacade tenants) { this.tenants = tenants; }
+
+    /** Renders the contract with the tenant's own company name and VAT number in the header. */
+    public byte[] generate(Contract contract, List<ContractSignature> signatures, TenantId tenantId) {
+        TenantDetails t = tenants.findTenantDetails(tenantId).orElse(null);
+        String name = t != null && t.companyName() != null && !t.companyName().isBlank() ? t.companyName() : "HandyFlow";
+        String vat = t != null && t.vatNumber() != null && !t.vatNumber().isBlank() ? t.vatNumber() : null;
+        return generate(contract, signatures, name, vat);
+    }
 
     private static final Color BRAND_DARK  = new Color(27, 58, 107);
     private static final Color BRAND_TEAL  = new Color(13, 148, 136);
@@ -445,33 +452,38 @@ public class ContractPdfGenerator {
 
     private static class FooterHandler extends PdfPageEventHelper {
         private final String contractNumber;
+        private PdfTemplate total;
         FooterHandler(String contractNumber) { this.contractNumber = contractNumber; }
 
-        // FIX: was calling cb.beginText()/cb.setFontAndSize()/cb.showText()/
-        // cb.endText() directly — a manually-paired begin/end that, on any
-        // contract long enough to span more than one page, left the
-        // PdfContentByte's internal text-object state unbalanced by the
-        // time the next page's initPage()/resetContent() ran its sanity
-        // check, throwing IllegalPdfSyntaxException("Unbalanced begin/end
-        // text operators") and failing PDF generation entirely — confirmed
-        // via a real two-page contract (CTR-2026-00007). ColumnText.
-        // showTextAligned(...) is the standard, well-documented OpenPDF
-        // pattern for exactly this footer use case: it manages its own
-        // beginText/endText pairing internally and safely, rather than
-        // hand-rolling it.
+        @Override
+        public void onOpenDocument(PdfWriter writer, Document document) {
+            // Reserve space for the page total; it is filled in when the document closes.
+            total = writer.getDirectContent().createTemplate(30, 12);
+        }
+
         @Override
         public void onEndPage(PdfWriter writer, Document document) {
             try {
-                com.lowagie.text.pdf.PdfContentByte cb = writer.getDirectContent();
-                Phrase footer = new Phrase(
-                        "HandyFlow \u00b7 " + contractNumber +
-                                " \u00b7 ECTA compliant \u00b7 Page " + writer.getPageNumber(),
-                        FOOTER_FONT);
-                ColumnText.showTextAligned(cb, Element.ALIGN_LEFT, footer,
-                        document.leftMargin(), document.bottomMargin() - 20, 0);
+                PdfContentByte cb = writer.getDirectContent();
+                String left = "HandyFlow \u00b7 " + contractNumber + " \u00b7 Page " + writer.getPageNumber() + " of ";
+                float y = document.bottomMargin() - 20;
+                ColumnText.showTextAligned(cb, Element.ALIGN_LEFT, new Phrase(left, FOOTER_FONT),
+                        document.leftMargin(), y, 0);
+                float w = FOOTER_FONT.getCalculatedBaseFont(false).getWidthPoint(left, FOOTER_FONT.getCalculatedSize());
+                cb.addTemplate(total, document.leftMargin() + w, y);
             } catch (Exception ignored) {
                 // A broken footer must never take down PDF generation for a
                 // document that otherwise generated correctly.
+            }
+        }
+
+        @Override
+        public void onCloseDocument(PdfWriter writer, Document document) {
+            try {
+                ColumnText.showTextAligned(total, Element.ALIGN_LEFT,
+                        new Phrase(String.valueOf(writer.getPageNumber() - 1), FOOTER_FONT), 0, 0, 0);
+            } catch (Exception ignored) {
+                // See onEndPage.
             }
         }
     }

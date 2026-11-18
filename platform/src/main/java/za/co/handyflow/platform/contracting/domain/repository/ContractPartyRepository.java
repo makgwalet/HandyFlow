@@ -16,4 +16,8 @@ public interface ContractPartyRepository extends JpaRepository<ContractParty, UU
 
     @Query("SELECT p FROM ContractParty p WHERE p.tenantId = :#{#tenantId.value} AND p.id = :id")
     Optional<ContractParty> findByTenantAndId(TenantId tenantId, UUID id);
+
+    /** Parties for many contracts in one query (list screens). */
+    @Query("SELECT p FROM ContractParty p WHERE p.contractId IN :contractIds ORDER BY p.contractId, p.signingOrder")
+    List<ContractParty> findByContractIds(java.util.Collection<UUID> contractIds);
 }

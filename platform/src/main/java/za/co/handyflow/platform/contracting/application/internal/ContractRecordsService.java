@@ -135,7 +135,7 @@ public class ContractRecordsService {
     private void storeExecutedCopy(TenantId tenantId, Contract c) {
         c.setParties(parties.findByContract(c.getId()));
         List<ContractSignature> sigs = signatures.findByContract(c.getId());
-        byte[] rendered = pdf.generate(c, sigs, "HandyFlow Tenant", null);
+        byte[] rendered = pdf.generate(c, sigs, tenantId);
         if (rendered == null || rendered.length == 0) throw new IllegalStateException("The contract PDF could not be rendered");
         String key;
         try {
