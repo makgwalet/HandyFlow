@@ -158,6 +158,7 @@ public class FuelStayRequestService {
         r.approve(by, stay.id(), note);
         requests.save(r);
         log.info("Truck stop stay request approved id={} stay={} by={}", id, stay.id(), by);
+        notifyCustomer(tenantId, r);
         return staffView(r, customerName(tenantId, r.getAccountId()));
     }
 
@@ -167,6 +168,7 @@ public class FuelStayRequestService {
         FuelTruckStopStayRequest r = requests.findForUpdate(tenantId, id).orElseThrow(() -> new ResourceNotFoundException("Stay request", id.toString()));
         r.decline(by, reason);
         requests.save(r);
+        notifyCustomer(tenantId, r);
         return staffView(r, customerName(tenantId, r.getAccountId()));
     }
 
@@ -198,6 +200,34 @@ public class FuelStayRequestService {
     static StaffStayRequestView staffView(FuelTruckStopStayRequest r, String customerName) {
         return new StaffStayRequestView(r.getId(), r.getAccountId(), customerName, r.getRequestedByEmail(), r.getVehicleRegistration(), r.getDriverName(), r.getDriverPhone(),
                 r.getArrivalDate(), r.getDepartureDate(), r.nights(), r.getStatus(), r.getNote(), r.getDecisionNote(), r.getStayId(), r.getCreatedAt(), r.getDecidedAt());
+    }
+
+    /**
+     * Tells the customer who asked, by email, what staff decided. Goes to the address the request was made with, never to anyone else. Never fails the
+     * decision: it is already saved, and the portal shows the same answer. Sent only when the notification service is there to send it.
+     */
+    private void notifyCustomer(TenantId tenant, FuelTruckStopStayRequest r) {
+        try {
+            String email = r.getRequestedByEmail();
+            if (email == null || email.isBlank() || !email.contains("@")) return;
+            boolean approved = "APPROVED".equals(r.getStatus());
+            String what = r.getVehicleRegistration() + " from " + r.getArrivalDate() + " to " + r.getDepartureDate();
+            String note = r.getDecisionNote() == null || r.getDecisionNote().isBlank() ? "" : " " + r.getDecisionNote().trim();
+            notifications.send(NotificationRequest.builder()
+                    .tenantId(tenant)
+                    .type(NotificationType.FUEL_STAY_DECIDED)
+                    .title(approved ? "Your overnight stay is confirmed" : "Your overnight stay request was declined")
+                    .message(approved
+                            ? "We have booked " + what + " for you." + note
+                            : "We could not book " + what + "." + note + " Please call us if you would like other dates.")
+                    .actionUrl("/fuel/portal")
+                    .sourceModule("fuel")
+                    .sourceEntityId(String.valueOf(r.getId()))
+                    .recipients(List.of(Recipient.external(email, email, null)))
+                    .build());
+        } catch (RuntimeException ex) {
+            log.warn("Could not tell the customer about stay request {}: {}", r.getId(), ex.getMessage());
+        }
     }
 
     /** Never fails the request: it is already saved. */

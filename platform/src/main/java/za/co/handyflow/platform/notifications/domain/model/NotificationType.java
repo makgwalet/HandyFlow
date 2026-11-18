@@ -185,6 +185,8 @@ public enum NotificationType {
     FUEL_SHIFT_NEEDS_REVIEW(WARNING, Set.of(IN_APP, EMAIL)),
     FUEL_SHIFT_VARIANCE_REPEATED(WARNING, Set.of(IN_APP, EMAIL)),
     FUEL_PORTAL_REQUEST(INFO, Set.of(IN_APP, EMAIL)),
+    /** Sent to the customer (an email-only portal user) when staff approve or decline their overnight stay request. */
+    FUEL_STAY_DECIDED(INFO, Set.of(EMAIL)),
     FUEL_REORDER_DRAFTED(INFO, Set.of(IN_APP, EMAIL)),
     FUEL_PO_OVERDUE(WARNING, Set.of(IN_APP, EMAIL)),
 

@@ -217,6 +217,69 @@ class FuelStayRequestServiceTest {
         assertEquals(stayId, v.stayId());
     }
 
+    private void asPortalUser(String email) {
+        za.co.handyflow.platform.shared.PortalUser u = mock(za.co.handyflow.platform.shared.PortalUser.class);
+        when(u.getEmail()).thenReturn(email);
+        when(portalUsers.findById(USER)).thenReturn(Optional.of(u));
+    }
+
+    private za.co.handyflow.platform.notifications.application.NotificationRequest sentToCustomer() {
+        ArgumentCaptor<za.co.handyflow.platform.notifications.application.NotificationRequest> c = ArgumentCaptor.forClass(za.co.handyflow.platform.notifications.application.NotificationRequest.class);
+        verify(notifications, atLeastOnce()).send(c.capture());
+        return c.getAllValues().stream().filter(n -> n.type() == za.co.handyflow.platform.notifications.domain.model.NotificationType.FUEL_STAY_DECIDED).findFirst().orElse(null);
+    }
+
+    @Test @DisplayName("approving tells the customer who asked, by email, and only them")
+    void approveTellsCustomer() {
+        asPortalUser("driver@fleet.co.za");
+        svc.request(USER, ACCOUNT, body("GP 55 TS GP"));
+        when(stayService.book(eq(T), any(BookRequest.class), eq(STAFF), any(LocalDate.class))).thenReturn(booked(UUID.randomUUID()));
+        svc.approve(T, store.get(0).getId(), "See you then", STAFF);
+        var n = sentToCustomer();
+        assertNotNull(n);
+        assertEquals(1, n.recipients().size());
+        assertNull(n.recipients().get(0).userId());
+        assertEquals("driver@fleet.co.za", n.recipients().get(0).email());
+        assertTrue(n.title().contains("confirmed"));
+        assertTrue(n.message().contains("GP 55 TS GP") && n.message().contains("See you then"));
+    }
+
+    @Test @DisplayName("declining tells the customer why")
+    void declineTellsCustomer() {
+        asPortalUser("driver@fleet.co.za");
+        svc.request(USER, ACCOUNT, body("GP 55 TS GP"));
+        svc.decline(T, store.get(0).getId(), "We are closed that week", STAFF);
+        var n = sentToCustomer();
+        assertNotNull(n);
+        assertTrue(n.title().contains("declined"));
+        assertTrue(n.message().contains("We are closed that week"));
+    }
+
+    @Test @DisplayName("a refused approval tells the customer nothing, because nothing was decided")
+    void refusedApprovalSilent() {
+        asPortalUser("driver@fleet.co.za");
+        svc.request(USER, ACCOUNT, body("GP 55 TS GP"));
+        when(stayService.book(any(), any(), any(), any())).thenThrow(new IllegalStateException("No bay."));
+        assertThrows(IllegalStateException.class, () -> svc.approve(T, store.get(0).getId(), null, STAFF));
+        verify(notifications, never()).send(argThat(n -> n.type() == za.co.handyflow.platform.notifications.domain.model.NotificationType.FUEL_STAY_DECIDED));
+    }
+
+    @Test @DisplayName("no usable email on the request means no message, and the decision still stands")
+    void noEmailNoMessage() {
+        svc.request(USER, ACCOUNT, body("GP 55 TS GP"));   // the portal user cannot be found, so the stored address is not an email
+        assertEquals("DECLINED", svc.decline(T, store.get(0).getId(), "Not available", STAFF).status());
+        verify(notifications, never()).send(argThat(n -> n.type() == za.co.handyflow.platform.notifications.domain.model.NotificationType.FUEL_STAY_DECIDED));
+    }
+
+    @Test @DisplayName("a failing mail service never undoes the decision")
+    void mailFailureHarmless() {
+        asPortalUser("driver@fleet.co.za");
+        svc.request(USER, ACCOUNT, body("GP 55 TS GP"));
+        doThrow(new RuntimeException("smtp down")).when(notifications).send(argThat(n -> n.type() == za.co.handyflow.platform.notifications.domain.model.NotificationType.FUEL_STAY_DECIDED));
+        assertEquals("DECLINED", svc.decline(T, store.get(0).getId(), "Not available", STAFF).status());
+        assertFalse(store.get(0).isPending());
+    }
+
     @Test @DisplayName("when the booking is refused (no bay, credit hold) the request stays pending")
     void approveRefused() {
         svc.request(USER, ACCOUNT, body("GP 55 TS GP"));
