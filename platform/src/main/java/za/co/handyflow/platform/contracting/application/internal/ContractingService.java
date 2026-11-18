@@ -52,6 +52,7 @@ public class ContractingService {
     private final SigningPolicy                   signingPolicy;
     private final ContractRedlineService         redline;      // body version history
     private final DocumentsFacade                documents;   // legal review evidence
+    private final ContractRiskService            riskService;   // risk rules that block sending
     private final ContractRecordsService         records;   // executed copy + records retention (V581)
 
     @Value("${contracting.signing.base-url:http://localhost:5173}")
@@ -560,6 +561,9 @@ public class ContractingService {
         if (!unresolved.isEmpty())
             throw new IllegalStateException(
                     "Contract has unresolved variables: " + String.join(", ", unresolved));
+
+        // Published risk rules marked "blocks sending" (none exist unless the legal reviewer publishes some)
+        riskService.assertNoBlockingFindings(tenantId, c);
 
         // Lock body — SHA-256 hash prevents tamper after sending
         String bodyHash = signingTokenService.sha256(c.getBody() != null ? c.getBody() : "");

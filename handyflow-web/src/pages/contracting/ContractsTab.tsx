@@ -28,6 +28,7 @@ import {
 import { unwrap, fmtR } from './ContractingPage'
 import { ContractSharingSection } from './ContractSharingSection'
 import { ContractRedlineSection } from './ContractRedlineSection'
+import { ContractRiskSection } from './ContractRiskSection'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -546,6 +547,7 @@ export default function ContractsTab() {
                     </div>
 
                     <ContractRedlineSection contractId={c.id} status={c.status} />
+                    <ContractRiskSection contractId={c.id} />
 
                     {/* Secure sharing of the signed contract (executed copy) */}
                     {['SIGNED', 'EXPIRED', 'TERMINATED', 'ARCHIVED'].includes(c.status) && <ContractSharingSection contractId={c.id} />}
