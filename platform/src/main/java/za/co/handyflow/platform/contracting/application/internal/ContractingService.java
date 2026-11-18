@@ -315,19 +315,43 @@ public class ContractingService {
     public Page<ContractSummaryResponse> getContracts(TenantId tenantId, String status,
                                                       String type, Pageable pageable) {
         Page<Contract> page = contractRepo.findAllActive(tenantId, status, type, pageable);
-        // Two queries for the whole page instead of two per contract.
-        List<UUID> ids = page.getContent().stream().map(Contract::getId).toList();
+        Map<UUID, ContractSummaryResponse> byId = new HashMap<>();
+        toSummaries(page.getContent()).forEach(s -> byId.put(s.id(), s));
+        return page.map(c -> byId.get(c.getId()));
+    }
+
+    /** Summaries for a set of contracts with two queries in total (parties and unresolved amendments), not two per contract. */
+    private List<ContractSummaryResponse> toSummaries(List<Contract> contracts) {
+        List<UUID> ids = contracts.stream().map(Contract::getId).toList();
         Map<UUID, List<ContractParty>> partiesByContract = ids.isEmpty() ? Map.of()
                 : partyRepo.findByContractIds(ids).stream().collect(Collectors.groupingBy(ContractParty::getContractId));
         Map<UUID, Long> unresolvedByContract = ids.isEmpty() ? Map.of()
                 : commentRepo.findUnresolvedAmendmentsForContracts(ids).stream()
                         .collect(Collectors.groupingBy(ContractComment::getContractId, Collectors.counting()));
-        return page.map(c -> {
+        return contracts.stream().map(c -> {
             List<ContractParty> parties = partiesByContract.getOrDefault(c.getId(), List.of());
             long signed = parties.stream().filter(p -> "SIGNED".equals(p.getSigningStatus())).count();
             int unresolved = unresolvedByContract.getOrDefault(c.getId(), 0L).intValue();
             return toContractSummary(c, parties.size(), (int) signed, unresolved);
-        });
+        }).toList();
+    }
+
+    @Transactional(readOnly = true)
+    public ContractDashboardResponse getDashboard(TenantId tenantId) {
+        Map<String, Long> statusCounts = new LinkedHashMap<>();
+        contractRepo.countByStatus(tenantId).forEach(r -> statusCounts.put((String) r[0], ((Number) r[1]).longValue()));
+        Map<String, Long> typeCounts = new LinkedHashMap<>();
+        contractRepo.countByType(tenantId).forEach(r -> typeCounts.put((String) r[0], ((Number) r[1]).longValue()));
+        long total = statusCounts.values().stream().mapToLong(Long::longValue).sum();
+
+        LocalDate today = LocalDate.now();
+        List<Contract> expiring = contractRepo.findSignedEndingBetween(tenantId, today, today.plusDays(30))
+                .stream().limit(20).toList();
+        List<Contract> awaiting = contractRepo.findAllActive(tenantId, "SENT", null, org.springframework.data.domain.PageRequest.of(0, 10)).getContent();
+
+        return new ContractDashboardResponse(statusCounts, typeCounts, total,
+                contractRepo.sumValueByStatus(tenantId, "SIGNED"), contractRepo.sumValueByStatus(tenantId, "SENT"),
+                toSummaries(expiring), toSummaries(awaiting));
     }
 
     @Transactional(readOnly = true)

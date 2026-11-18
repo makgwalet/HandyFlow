@@ -103,6 +103,14 @@ public class ContractingController {
                 contractingService.newTemplateVersion(TenantContext.getTenantIdAsObject(), id)));
     }
 
+    @GetMapping("/dashboard")
+    @PreAuthorize("hasAnyAuthority('CONTRACTS_READ','CONTRACTS_MANAGE','CONTRACTS_ADMIN','USER_READ','USER_UPDATE')")
+    @Operation(summary = "Dashboard figures: counts by status and type, active and pending value, expiring soon, awaiting signature")
+    public ResponseEntity<ApiResponse<ContractDashboardResponse>> getDashboard() {
+        return ResponseEntity.ok(ApiResponse.success("Dashboard",
+                contractingService.getDashboard(TenantContext.getTenantIdAsObject())));
+    }
+
     @GetMapping("/templates")
     @PreAuthorize("hasAnyAuthority('CONTRACTS_READ','CONTRACTS_MANAGE','CONTRACTS_ADMIN','USER_READ','USER_UPDATE')")
     @Operation(summary = "List contract templates — seeds the SA system templates on first call")

@@ -88,4 +88,20 @@ public interface ContractRepository extends JpaRepository<Contract, UUID> {
             ORDER BY c.signedAt
             """)
     List<Contract> findExecutedWithoutCopy(org.springframework.data.domain.Pageable page);
+
+    // ── Dashboard aggregates ──────────────────────────────────────────────────
+
+    @Query("SELECT c.status, COUNT(c) FROM Contract c WHERE c.tenantId = :#{#tenantId.value} AND c.deletedAt IS NULL GROUP BY c.status")
+    List<Object[]> countByStatus(TenantId tenantId);
+
+    @Query("SELECT c.contractType, COUNT(c) FROM Contract c WHERE c.tenantId = :#{#tenantId.value} AND c.deletedAt IS NULL GROUP BY c.contractType")
+    List<Object[]> countByType(TenantId tenantId);
+
+    @Query("SELECT COALESCE(SUM(c.valueAmount), 0) FROM Contract c WHERE c.tenantId = :#{#tenantId.value} AND c.status = :status AND c.deletedAt IS NULL")
+    java.math.BigDecimal sumValueByStatus(TenantId tenantId, String status);
+
+    /** Signed contracts ending from today up to and including the cutoff, soonest first. */
+    @Query("SELECT c FROM Contract c WHERE c.tenantId = :#{#tenantId.value} AND c.status = 'SIGNED' AND c.endDate IS NOT NULL "
+            + "AND c.endDate >= :today AND c.endDate <= :cutoff AND c.deletedAt IS NULL ORDER BY c.endDate")
+    List<Contract> findSignedEndingBetween(TenantId tenantId, LocalDate today, LocalDate cutoff);
 }

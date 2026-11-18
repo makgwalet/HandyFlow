@@ -28,37 +28,37 @@ const TYPE_LABEL: Record<string, string> = {
 }
 
 export default function ContractsDashboard({ onNavigate }: { onNavigate: (t: any) => void }) {
-  const { data: contracts = [] } = useQuery<any[]>({
-    queryKey: ['contracts', 'all'],
-    queryFn: async () => unwrap(await apiClient.get('/api/v1/contracts?size=200')),
+  // The figures are calculated on the server, so the page no longer loads and counts every contract in the browser.
+  const { data: dash } = useQuery<any>({
+    queryKey: ['contracts', 'dashboard'],
+    queryFn: async () => unwrap(await apiClient.get('/api/v1/contracts/dashboard')),
   })
 
-  const cs         = contracts as any[]
-  const signed     = cs.filter(c => c.status === 'SIGNED')
-  const pending    = cs.filter(c => c.status === 'SENT')
-  const draft      = cs.filter(c => c.status === 'DRAFT')
-  const review     = cs.filter(c => c.status === 'UNDER_REVIEW')
-  const terminated = cs.filter(c => c.status === 'TERMINATED')
-  const expired    = cs.filter(c => c.status === 'EXPIRED')
+  const statusCounts: Record<string, number> = dash?.statusCounts ?? {}
+  const count = (status: string) => statusCounts[status] ?? 0
+  const signed     = { length: count('SIGNED') }
+  const pending    = (dash?.awaitingSignature ?? []) as any[]
+  const pendingCount = count('SENT')
+  const draft      = { length: count('DRAFT') }
+  const review     = { length: count('UNDER_REVIEW') }
+  const terminated = { length: count('TERMINATED') }
+  const expired    = { length: count('EXPIRED') }
+  const totalContracts: number = dash?.totalContracts ?? 0
 
-  const totalActiveVal = signed.reduce((s, c) => s + (Number(c.valueAmount) || 0), 0)
-  const pendingVal     = pending.reduce((s, c) => s + (Number(c.valueAmount) || 0), 0)
+  const totalActiveVal = Number(dash?.activeValue) || 0
+  const pendingVal     = Number(dash?.pendingValue) || 0
 
-  // Expiring in 30 days
-  const expiringSoon = signed
-    .filter(c => c.endDate && daysUntil(c.endDate) >= 0 && daysUntil(c.endDate) <= 30)
-    .sort((a, b) => daysUntil(a.endDate) - daysUntil(b.endDate))
+  // Expiring in 30 days (soonest first, from the server)
+  const expiringSoon = (dash?.expiringSoon ?? []) as any[]
 
   // Type breakdown
-  const typeMap: Record<string, number> = {}
-  cs.forEach(c => { typeMap[c.contractType] = (typeMap[c.contractType] || 0) + 1 })
-  const typeEntries = Object.entries(typeMap).sort((a, b) => b[1] - a[1])
+  const typeEntries = Object.entries((dash?.typeCounts ?? {}) as Record<string, number>).sort((a, b) => b[1] - a[1])
 
   // Pipeline stages
   const STAGES = [
     { label: 'Draft',        count: draft.length,      color: 'var(--hf-text-muted)', Icon: FileText     },
     { label: 'Under Review', count: review.length,     color: 'var(--hf-warning-text)', Icon: Clock        },
-    { label: 'Pending Sign', count: pending.length,    color: 'var(--hf-info-text)', Icon: Clock        },
+    { label: 'Pending Sign', count: pendingCount,    color: 'var(--hf-info-text)', Icon: Clock        },
     { label: 'Signed',       count: signed.length,     color: 'var(--hf-success-text-strong)', Icon: CheckCircle  },
     { label: 'Terminated',   count: terminated.length, color: 'var(--hf-danger-text)', Icon: XCircle      },
     { label: 'Expired',      count: expired.length,    color: 'var(--hf-text-faint)', Icon: AlertTriangle },
@@ -72,7 +72,7 @@ export default function ContractsDashboard({ onNavigate }: { onNavigate: (t: any
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 28 }}>
         {[
           { label: 'Active contracts',      value: signed.length,     color: 'var(--hf-success-text-strong)', bg: 'var(--hf-success-soft-strong)' },
-          { label: 'Awaiting signature',    value: pending.length,    color: 'var(--hf-info-text)', bg: 'var(--hf-info-soft)' },
+          { label: 'Awaiting signature',    value: pendingCount,    color: 'var(--hf-info-text)', bg: 'var(--hf-info-soft)' },
           { label: 'Active contract value', value: fmtR(totalActiveVal), color: 'var(--hf-primary-text)', bg: 'var(--hf-indigo-soft)' },
           { label: 'Pending value',         value: fmtR(pendingVal),  color: 'var(--hf-warning-text)', bg: 'var(--hf-warning-soft)' },
         ].map(k => (
@@ -169,7 +169,7 @@ export default function ContractsDashboard({ onNavigate }: { onNavigate: (t: any
           </div>
 
           {/* Awaiting signature */}
-          {pending.length > 0 && (
+          {pendingCount > 0 && (
             <div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
@@ -182,8 +182,8 @@ export default function ContractsDashboard({ onNavigate }: { onNavigate: (t: any
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
                 {pending.slice(0, 4).map(c => {
-                  const unsigned = (c.parties ?? []).filter((p: any) => p.signingStatus !== 'SIGNED').length
-                  const total    = (c.parties ?? []).length
+                  const unsigned = (c.totalPartyCount ?? 0) - (c.signedPartyCount ?? 0)
+                  const total    = c.totalPartyCount ?? 0
                   return (
                     <div key={c.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '11px 16px', border: '1px solid var(--hf-info-border)', borderLeft: '3px solid var(--hf-info)', borderRadius: 8, background: 'var(--hf-surface-muted)' }}>
                       <div>
@@ -219,7 +219,7 @@ export default function ContractsDashboard({ onNavigate }: { onNavigate: (t: any
               <div style={{ fontSize: 13, color: 'var(--hf-text-faint)' }}>No contracts yet</div>
             ) : typeEntries.map(([type, count]) => {
               const color = TYPE_COLOR[type] ?? 'var(--hf-text-muted)'
-              const pct   = Math.round((count / Math.max(cs.length, 1)) * 100)
+              const pct   = Math.round((count / Math.max(totalContracts, 1)) * 100)
               return (
                 <div key={type} style={{ marginBottom: 10 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4, fontSize: 12 }}>
