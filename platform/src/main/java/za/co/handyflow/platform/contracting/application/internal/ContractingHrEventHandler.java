@@ -7,6 +7,8 @@ import org.springframework.stereotype.Component;
 import za.co.handyflow.platform.contracting.dto.CreateContractRequest;
 import za.co.handyflow.platform.contracting.dto.TemplateResponse;
 import za.co.handyflow.platform.hr.EmployeeCreatedEvent;
+import za.co.handyflow.platform.identity.TenantDetails;
+import za.co.handyflow.platform.identity.TenantFacade;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -53,6 +55,7 @@ class ContractingHrEventHandler {
     private static final String EMPLOYMENT_CONTRACT_TYPE = "EMPLOYMENT";
 
     private final ContractingService contractingService;
+    private final TenantFacade tenants;
 
     @ApplicationModuleListener
     void onEmployeeCreated(EmployeeCreatedEvent event) {
@@ -60,7 +63,7 @@ class ContractingHrEventHandler {
             TemplateResponse employmentTemplate = contractingService
                     .getTemplates(event.tenantId())
                     .stream()
-                    .filter(t -> EMPLOYMENT_CONTRACT_TYPE.equals(t.contractType()) && t.isSystem())
+                    .filter(t -> EMPLOYMENT_CONTRACT_TYPE.equals(t.contractType()) && t.isSystem() && "PUBLISHED".equals(t.status()))
                     .findFirst()
                     .orElse(null);
 
@@ -70,14 +73,8 @@ class ContractingHrEventHandler {
                 return;
             }
 
-            Map<String, String> variables = new HashMap<>();
-            String fullName = ((event.firstName() != null ? event.firstName() : "") + " "
-                    + (event.lastName() != null ? event.lastName() : "")).strip();
-            if (!fullName.isBlank()) variables.put("employee_name", fullName);
-            if (event.idNumber() != null) variables.put("employee_id_number", event.idNumber());
-            if (event.jobTitle() != null) variables.put("job_title", event.jobTitle());
-            if (event.startDate() != null) variables.put("start_date", event.startDate().toString());
-            if (event.grossSalary() != null) variables.put("basic_salary", event.grossSalary().toPlainString());
+            String fullName = fullName(event);
+            Map<String, String> variables = buildVariables(event, tenants.findTenantDetails(event.tenantId()).orElse(null));
 
             var req = new CreateContractRequest(
                     "Employment Contract — " + (fullName.isBlank() ? "New Employee" : fullName),
@@ -105,5 +102,38 @@ class ContractingHrEventHandler {
             log.error("[Contracting] Failed to auto-create employment contract for employee={} tenant={}: {}",
                     event.employeeId(), event.tenantId(), e.getMessage(), e);
         }
+    }
+
+    private static String fullName(EmployeeCreatedEvent event) {
+        return ((event.firstName() != null ? event.firstName() : "") + " "
+                + (event.lastName() != null ? event.lastName() : "")).strip();
+    }
+
+    /**
+     * Variables the employment template can fill without asking anyone. From HR: name, ID number, job title, start date and
+     * salary. From the tenant's profile: employer name, employer address and city. Everything else (employee address, job
+     * duties, probation, working hours, pay day, leave days, notice period, employer registration number) is left for staff to
+     * complete: HR does not hold it, and the system does not assume legal defaults for it.
+     */
+    static Map<String, String> buildVariables(EmployeeCreatedEvent event, TenantDetails tenant) {
+        Map<String, String> variables = new HashMap<>();
+        String fullName = fullName(event);
+        if (!fullName.isBlank()) variables.put("employee_name", fullName);
+        if (event.idNumber() != null) variables.put("employee_id_number", event.idNumber());
+        if (event.jobTitle() != null) variables.put("job_title", event.jobTitle());
+        if (event.startDate() != null) variables.put("start_date", event.startDate().toString());
+        if (event.grossSalary() != null) variables.put("basic_salary", event.grossSalary().toPlainString());
+        if (tenant != null) {
+            if (tenant.companyName() != null && !tenant.companyName().isBlank()) variables.put("employer_name", tenant.companyName());
+            Map<String, String> address = tenant.address();
+            if (address != null) {
+                String line = java.util.stream.Stream.of("street", "suburb", "city", "postalCode")
+                        .map(address::get).filter(v -> v != null && !v.isBlank()).collect(java.util.stream.Collectors.joining(", "));
+                if (!line.isBlank()) variables.put("employer_address", line);
+                String city = address.get("city");
+                if (city != null && !city.isBlank()) variables.put("city_name", city);
+            }
+        }
+        return variables;
     }
 }
