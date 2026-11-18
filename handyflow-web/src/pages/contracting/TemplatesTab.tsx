@@ -11,7 +11,7 @@
 //  • "Used in N contracts" count surfaced where available
 
 import { sanitizeHtml } from './sanitizeHtml'
-import { useState } from 'react'
+import { useState, type CSSProperties, type ChangeEvent } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { apiClient } from '../../api/client'
 import { Plus, X, Lock, Eye, EyeOff, Copy, Check } from 'lucide-react'
@@ -50,20 +50,143 @@ interface Template {
   bodyTemplate: string
   variables: Record<string, string>
   isSystem: boolean
+  templateVersion?: number
+  status?: string        // DRAFT, INTERNAL_REVIEW, LEGAL_REVIEW, APPROVED, PUBLISHED, SUPERSEDED
+  legalStatus?: string   // NOT_REVIEWED, APPROVED, CONDITIONAL, REJECTED, EXPIRED, WITHDRAWN
+  legalArea?: string
+  requiredSigningMethod?: string
+}
+
+const STATUS_LABEL: Record<string, string> = {
+  DRAFT: 'Draft', INTERNAL_REVIEW: 'Internal review', LEGAL_REVIEW: 'Legal review',
+  APPROVED: 'Approved', PUBLISHED: 'Published', SUPERSEDED: 'Superseded',
+}
+const LEGAL_LABEL: Record<string, string> = {
+  NOT_REVIEWED: 'Not legally reviewed', APPROVED: 'Legal review recorded', CONDITIONAL: 'Conditional legal review',
+  REJECTED: 'Legal review rejected', EXPIRED: 'Legal review expired', WITHDRAWN: 'Legal review withdrawn',
+}
+const LEGAL_COLOR: Record<string, string> = {
+  APPROVED: 'var(--hf-success-text-strong)', CONDITIONAL: 'var(--hf-warning-text)', NOT_REVIEWED: 'var(--hf-text-muted)',
+  REJECTED: 'var(--hf-danger-text)', EXPIRED: 'var(--hf-danger-text)', WITHDRAWN: 'var(--hf-danger-text)',
+}
+const SIGNING_METHODS = [
+  { value: '',                    label: 'Not classified' },
+  { value: 'SIMPLE_ELECTRONIC',   label: 'Simple electronic (OTP and drawn signature)' },
+  { value: 'ADVANCED_ELECTRONIC', label: 'Advanced electronic (not supported yet)' },
+  { value: 'WET_INK',             label: 'Wet ink (not supported yet)' },
+  { value: 'IN_PERSON',           label: 'In person (not supported yet)' },
+]
+
+interface LegalReview {
+  id: string; templateVersion: number; outcome: string; withdrawnAt?: string | null; expired?: boolean
+  reviewerName: string; reviewerProfessionalDetails: string; reviewerOrganisation?: string | null
+  reviewDate: string; legalArea: string; jurisdiction: string; nextReviewDate?: string | null
+  outstandingIssues?: string | null; withdrawnReason?: string | null
+}
+
+const errMsg = (e: unknown, fallback: string): string =>
+  (e as { response?: { data?: { message?: string } } })?.response?.data?.message ?? fallback
+
+const smallBtn: CSSProperties = {
+  padding: '5px 11px', border: '1px solid var(--hf-border)', borderRadius: 7, background: 'var(--hf-surface)',
+  fontSize: 12, fontWeight: 600, cursor: 'pointer', color: 'var(--hf-primary-text)',
+}
+
+// ─── Legal review: record a reviewer's outcome, and show the history ───────────
+
+function LegalReviewModal({ template, onClose, onSubmit, error, busy }: {
+  template: Template; onClose: () => void; onSubmit: (body: Record<string, unknown>) => void; error: string; busy: boolean
+}) {
+  const [f, setF] = useState({
+    reviewerName: '', reviewerProfessionalDetails: '', reviewerOrganisation: '', reviewDate: new Date().toISOString().slice(0, 10),
+    legalArea: template.legalArea ?? '', jurisdiction: 'South Africa', scopeAssumptions: '', outstandingIssues: '',
+    outcome: 'APPROVED', nextReviewDate: '', evidenceDocumentId: '',
+  })
+  const set = (k: string) => (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setF(p => ({ ...p, [k]: e.target.value }))
+  const ok = f.reviewerName && f.reviewerProfessionalDetails && f.reviewDate && f.legalArea
+    && (f.outcome !== 'CONDITIONAL' || f.outstandingIssues.trim())
+  return (
+    <div style={MODAL}>
+      <div style={{ background: 'var(--hf-surface)', borderRadius: 16, padding: 28, width: 640, maxHeight: '92vh', overflowY: 'auto' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+          <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: 'var(--hf-text)' }}>Record legal review: {template.name}</h3>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer' }}><X size={20} /></button>
+        </div>
+        <div style={{ fontSize: 12, color: 'var(--hf-text-muted)', marginBottom: 14, lineHeight: 1.5 }}>
+          Record the review by a South African attorney or other qualified legal practitioner, for version {template.templateVersion ?? 1}.
+          This is evidence that a review took place on the date given. It is not a guarantee that every contract made from this template is lawful
+          or suitable for every transaction.
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+          <div><label style={lbl}>Reviewer name *</label><input style={inp} value={f.reviewerName} onChange={set('reviewerName')} /></div>
+          <div><label style={lbl}>Professional details *</label><input style={inp} value={f.reviewerProfessionalDetails} onChange={set('reviewerProfessionalDetails')} placeholder="e.g. admitted attorney, Law Society no." /></div>
+          <div><label style={lbl}>Firm or organisation</label><input style={inp} value={f.reviewerOrganisation} onChange={set('reviewerOrganisation')} /></div>
+          <div><label style={lbl}>Review date *</label><input type="date" style={inp} value={f.reviewDate} onChange={set('reviewDate')} /></div>
+          <div><label style={lbl}>Legal area *</label><input style={inp} value={f.legalArea} onChange={set('legalArea')} placeholder="e.g. Employment, Contract law" /></div>
+          <div><label style={lbl}>Jurisdiction</label><input style={inp} value={f.jurisdiction} onChange={set('jurisdiction')} /></div>
+          <div style={{ gridColumn: '1/-1' }}><label style={lbl}>Scope and assumptions</label><textarea rows={2} style={inp} value={f.scopeAssumptions} onChange={set('scopeAssumptions')} /></div>
+          <div style={{ gridColumn: '1/-1' }}><label style={lbl}>Outstanding issues {f.outcome === 'CONDITIONAL' ? '*' : ''}</label><textarea rows={2} style={inp} value={f.outstandingIssues} onChange={set('outstandingIssues')} /></div>
+          <div>
+            <label style={lbl}>Outcome *</label>
+            <select style={inp} value={f.outcome} onChange={set('outcome')}>
+              <option value="APPROVED">Approved</option><option value="CONDITIONAL">Conditionally approved</option><option value="REJECTED">Rejected</option>
+            </select>
+          </div>
+          <div><label style={lbl}>Next review date</label><input type="date" style={inp} value={f.nextReviewDate} onChange={set('nextReviewDate')} /></div>
+          <div style={{ gridColumn: '1/-1' }}><label style={lbl}>Evidence document id (signed-off review in Documents)</label><input style={inp} value={f.evidenceDocumentId} onChange={set('evidenceDocumentId')} /></div>
+        </div>
+        {error && <div style={{ marginTop: 12, fontSize: 13, color: 'var(--hf-danger-text)' }}>{error}</div>}
+        <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 18 }}>
+          <button onClick={onClose} style={smallBtn}>Cancel</button>
+          <button disabled={!ok || busy} onClick={() => onSubmit({
+            ...f, nextReviewDate: f.nextReviewDate || null, evidenceDocumentId: f.evidenceDocumentId || null,
+          })} style={{ ...smallBtn, background: ok ? 'var(--hf-primary)' : 'var(--hf-text-faint)', color: 'var(--hf-text-on-solid)', border: 'none' }}>
+            {busy ? 'Saving…' : 'Record review'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function LegalHistory({ templateId, onWithdraw }: { templateId: string; onWithdraw: (reviewId: string) => void }) {
+  const { data: reviews = [] } = useQuery<LegalReview[]>({
+    queryKey: ['contract-template-reviews', templateId],
+    queryFn: async () => unwrap(await apiClient.get(`/api/v1/contracts/templates/${templateId}/legal-reviews`)),
+  })
+  if (reviews.length === 0) return <div style={{ fontSize: 12, color: 'var(--hf-text-faint)' }}>No legal review recorded yet.</div>
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      {reviews.map(r => (
+        <div key={r.id} style={{ fontSize: 12, border: '1px solid var(--hf-border)', borderRadius: 8, padding: '8px 10px', background: 'var(--hf-surface)' }}>
+          <div style={{ fontWeight: 700, color: 'var(--hf-text)' }}>
+            v{r.templateVersion} · {r.outcome}{r.withdrawnAt ? ' (withdrawn)' : r.expired ? ' (expired)' : ''}
+          </div>
+          <div style={{ color: 'var(--hf-text-muted)' }}>
+            {r.reviewerName}, {r.reviewerProfessionalDetails}{r.reviewerOrganisation ? `, ${r.reviewerOrganisation}` : ''} · {r.reviewDate} · {r.legalArea}, {r.jurisdiction}
+            {r.nextReviewDate ? ` · next review ${r.nextReviewDate}` : ''}
+          </div>
+          {r.outstandingIssues && <div style={{ color: 'var(--hf-warning-text)' }}>Outstanding: {r.outstandingIssues}</div>}
+          {r.withdrawnReason && <div style={{ color: 'var(--hf-danger-text)' }}>Withdrawn: {r.withdrawnReason}</div>}
+          {!r.withdrawnAt && <button style={{ ...smallBtn, marginTop: 6 }} onClick={() => onWithdraw(r.id)}>Withdraw review</button>}
+        </div>
+      ))}
+    </div>
+  )
 }
 
 // ─── Shared styles ────────────────────────────────────────────────────────────
 
-const inp: React.CSSProperties = {
+const inp: CSSProperties = {
   width: '100%', padding: '9px 12px',
   border: '1.5px solid var(--hf-border)', borderRadius: 8,
   fontSize: 14, boxSizing: 'border-box', background: 'var(--hf-surface)', outline: 'none',
 }
-const lbl: React.CSSProperties = {
+const lbl: CSSProperties = {
   display: 'block', fontSize: 12,
   fontWeight: 600, color: 'var(--hf-text-secondary)', marginBottom: 4,
 }
-const MODAL: React.CSSProperties = {
+const MODAL: CSSProperties = {
   position: 'fixed', inset: 0,
   background: 'rgba(15,23,42,0.5)',
   display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -88,12 +211,21 @@ function HtmlPreview({ html, maxHeight = 280 }: { html: string; maxHeight?: numb
 
 // ─── TemplateCard ─────────────────────────────────────────────────────────────
 
-function TemplateCard({ template, onCopyVar, copied }: {
+function TemplateCard({ template, onCopyVar, copied, onAction, onEdit, onRecordReview, onWithdraw, busy }: {
   template: Template
   onCopyVar: (v: string) => void
   copied: string | null
+  onAction: (id: string, action: string) => void
+  onEdit: (t: Template) => void
+  onRecordReview: (t: Template) => void
+  onWithdraw: (templateId: string, reviewId: string) => void
+  busy: boolean
 }) {
   const [expanded, setExpanded] = useState(false)
+  const [showLegal, setShowLegal] = useState(false)
+  const status = template.status ?? 'PUBLISHED'
+  const legal = template.legalStatus ?? 'NOT_REVIEWED'
+  const signing = SIGNING_METHODS.find(m => m.value === (template.requiredSigningMethod ?? ''))?.label
   const [mode,     setMode]     = useState<'rendered' | 'source'>('rendered')
 
   const color    = TYPE_COLOR[template.contractType] ?? 'var(--hf-text-muted)'
@@ -120,6 +252,20 @@ function TemplateCard({ template, onCopyVar, copied }: {
             </div>
           )}
         </div>
+
+        {/* Lifecycle and legal status. Legal review is evidence at a point in time, not a guarantee of compliance. */}
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center', marginBottom: 8, fontSize: 11 }}>
+          <span style={{ fontWeight: 700, padding: '2px 8px', borderRadius: 20, background: 'var(--hf-surface-sunken)', color: 'var(--hf-text-secondary)' }}>
+            {STATUS_LABEL[status] ?? status} · v{template.templateVersion ?? 1}
+          </span>
+          <span style={{ fontWeight: 600, color: LEGAL_COLOR[legal] ?? 'var(--hf-text-muted)' }}>{LEGAL_LABEL[legal] ?? legal}</span>
+          {template.requiredSigningMethod && <span style={{ color: 'var(--hf-text-muted)' }}>· Signing: {signing}</span>}
+        </div>
+        {(legal === 'EXPIRED' || legal === 'WITHDRAWN' || legal === 'REJECTED') && status === 'PUBLISHED' && (
+          <div style={{ fontSize: 12, color: 'var(--hf-danger-text)', marginBottom: 8 }}>
+            This template cannot be used for new contracts until it has a new legal review.
+          </div>
+        )}
 
         {template.description && (
           <div style={{ fontSize: 12, color: 'var(--hf-text-muted)', lineHeight: 1.5, marginBottom: 10 }}>
@@ -149,6 +295,19 @@ function TemplateCard({ template, onCopyVar, copied }: {
             ))}
           </div>
         )}
+
+        {/* Lifecycle actions */}
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 10 }}>
+          {(status === 'DRAFT' || status === 'INTERNAL_REVIEW') && <button style={smallBtn} disabled={busy} onClick={() => onEdit(template)}>Edit</button>}
+          {status === 'DRAFT' && <button style={smallBtn} disabled={busy} onClick={() => onAction(template.id, 'submit-internal-review')}>Submit for internal review</button>}
+          {status === 'INTERNAL_REVIEW' && <button style={smallBtn} disabled={busy} onClick={() => onAction(template.id, 'submit-legal-review')}>Submit for legal review</button>}
+          {status === 'LEGAL_REVIEW' && <button style={smallBtn} disabled={busy} onClick={() => onRecordReview(template)}>Record legal review</button>}
+          {status === 'APPROVED' && <button style={smallBtn} disabled={busy} onClick={() => onAction(template.id, 'publish')}>Publish</button>}
+          {status === 'PUBLISHED' && <button style={smallBtn} disabled={busy} onClick={() => onAction(template.id, 'new-version')}>New version</button>}
+          {status === 'PUBLISHED' && !template.isSystem && <button style={smallBtn} disabled={busy} onClick={() => onAction(template.id, 'archive')}>Archive</button>}
+          <button style={smallBtn} onClick={() => setShowLegal(!showLegal)}>{showLegal ? 'Hide legal reviews' : 'Legal reviews'}</button>
+        </div>
+        {showLegal && <div style={{ marginBottom: 10 }}><LegalHistory templateId={template.id} onWithdraw={rid => onWithdraw(template.id, rid)} /></div>}
 
         {/* Preview toggle */}
         {template.bodyTemplate && (
@@ -204,9 +363,11 @@ export default function TemplatesTab() {
   const [showCreate, setShowCreate] = useState(false)
   const [copied,     setCopied]     = useState<string | null>(null)
   const [error,      setError]      = useState('')
-  const [form, setForm] = useState({
-    name: '', contractType: 'SERVICE_AGREEMENT', description: '', bodyTemplate: '',
-  })
+  const EMPTY_FORM = { name: '', contractType: 'SERVICE_AGREEMENT', description: '', bodyTemplate: '', legalArea: '', requiredSigningMethod: '' }
+  const [form, setForm] = useState(EMPTY_FORM)
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [reviewFor, setReviewFor] = useState<Template | null>(null)
+  const [reviewError, setReviewError] = useState('')
 
   // ── Queries ──────────────────────────────────────────────────────────────────
 
@@ -218,15 +379,55 @@ export default function TemplatesTab() {
   // ── Mutations ────────────────────────────────────────────────────────────────
 
   const createTemplate = useMutation({
-    mutationFn: (body: any) => apiClient.post('/api/v1/contracts/templates', body),
+    mutationFn: (body: Record<string, unknown>) => editingId
+      ? apiClient.put(`/api/v1/contracts/templates/${editingId}`, body)
+      : apiClient.post('/api/v1/contracts/templates', body),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['contract-templates'] })
       setShowCreate(false)
-      setForm({ name: '', contractType: 'SERVICE_AGREEMENT', description: '', bodyTemplate: '' })
+      setForm(EMPTY_FORM)
+      setEditingId(null)
       setError('')
     },
-    onError: (e: any) => setError(e.response?.data?.message ?? 'Failed to create template'),
+    onError: (e: unknown) => setError(errMsg(e, 'Failed to save template')),
   })
+
+  // Lifecycle steps: submit-internal-review, submit-legal-review, publish, new-version, archive.
+  const act = useMutation({
+    mutationFn: ({ id, action }: { id: string; action: string }) => apiClient.post(`/api/v1/contracts/templates/${id}/${action}`),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['contract-templates'] }); setError('') },
+    onError: (e: unknown) => setError(errMsg(e, 'That step could not be completed')),
+  })
+
+  const recordReview = useMutation({
+    mutationFn: ({ id, body }: { id: string; body: Record<string, unknown> }) => apiClient.post(`/api/v1/contracts/templates/${id}/legal-reviews`, body),
+    onSuccess: (_d, v) => {
+      qc.invalidateQueries({ queryKey: ['contract-templates'] })
+      qc.invalidateQueries({ queryKey: ['contract-template-reviews', v.id] })
+      setReviewFor(null); setReviewError('')
+    },
+    onError: (e: unknown) => setReviewError(errMsg(e, 'Failed to record the review')),
+  })
+
+  const withdrawReview = useMutation({
+    mutationFn: ({ id, reviewId, reason }: { id: string; reviewId: string; reason: string }) =>
+      apiClient.post(`/api/v1/contracts/templates/${id}/legal-reviews/${reviewId}/withdraw`, { reason }),
+    onSuccess: (_d, v) => {
+      qc.invalidateQueries({ queryKey: ['contract-templates'] })
+      qc.invalidateQueries({ queryKey: ['contract-template-reviews', v.id] })
+    },
+    onError: (e: unknown) => setError(errMsg(e, 'Failed to withdraw the review')),
+  })
+
+  const startEdit = (t: Template) => {
+    setForm({ name: t.name, contractType: t.contractType, description: t.description ?? '', bodyTemplate: t.bodyTemplate,
+              legalArea: t.legalArea ?? '', requiredSigningMethod: t.requiredSigningMethod ?? '' })
+    setEditingId(t.id); setShowCreate(true); setError('')
+  }
+  const askWithdraw = (templateId: string, reviewId: string) => {
+    const reason = window.prompt('Why is this legal review being withdrawn?')
+    if (reason && reason.trim()) withdrawReview.mutate({ id: templateId, reviewId, reason: reason.trim() })
+  }
 
   const copyVariable = (varName: string) => {
     navigator.clipboard.writeText(`{{${varName}}}`).then(() => {
@@ -235,10 +436,17 @@ export default function TemplatesTab() {
     })
   }
 
+  const cardProps = {
+    onCopyVar: copyVariable, copied,
+    onAction: (id: string, action: string) => act.mutate({ id, action }),
+    onEdit: startEdit, onRecordReview: (t: Template) => { setReviewFor(t); setReviewError('') },
+    onWithdraw: askWithdraw, busy: act.isPending,
+  }
+
   const systemTemplates = templates.filter(t => t.isSystem)
   const customTemplates  = templates.filter(t => !t.isSystem)
 
-  const inp2: React.CSSProperties = { ...inp, fontSize: 13 }
+  const inp2: CSSProperties = { ...inp, fontSize: 13 }
 
   // ─── Render ──────────────────────────────────────────────────────────────────
 
@@ -254,11 +462,15 @@ export default function TemplatesTab() {
           <span style={{ fontWeight: 700, color: 'var(--hf-text)' }}>{systemTemplates.length}</span> system templates ·{' '}
           <span style={{ fontWeight: 700, color: 'var(--hf-text)' }}>{customTemplates.length}</span> custom templates
         </div>
-        <button onClick={() => { setShowCreate(true); setError('') }}
+        <button onClick={() => { setEditingId(null); setForm(EMPTY_FORM); setShowCreate(true); setError('') }}
           style={{ display: 'flex', alignItems: 'center', gap: 7, background: 'var(--hf-primary)', color: 'var(--hf-text-on-solid)', border: 'none', borderRadius: 8, padding: '9px 18px', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
           <Plus size={15} /> New Template
         </button>
       </div>
+
+      {error && !showCreate && (
+        <div style={{ marginBottom: 14, padding: '10px 12px', background: 'var(--hf-danger-soft)', border: '1px solid var(--hf-danger-border)', borderRadius: 8, fontSize: 13, color: 'var(--hf-danger-text)' }}>{error}</div>
+      )}
 
       {/* System templates */}
       {systemTemplates.length > 0 && (
@@ -271,7 +483,7 @@ export default function TemplatesTab() {
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 14 }}>
             {systemTemplates.map(t => (
-              <TemplateCard key={t.id} template={t} onCopyVar={copyVariable} copied={copied} />
+              <TemplateCard key={t.id} template={t} {...cardProps} />
             ))}
           </div>
         </div>
@@ -285,7 +497,7 @@ export default function TemplatesTab() {
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 14 }}>
             {customTemplates.map(t => (
-              <TemplateCard key={t.id} template={t} onCopyVar={copyVariable} copied={copied} />
+              <TemplateCard key={t.id} template={t} {...cardProps} />
             ))}
           </div>
         </div>
@@ -299,12 +511,17 @@ export default function TemplatesTab() {
         </div>
       )}
 
+      {reviewFor && (
+        <LegalReviewModal template={reviewFor} onClose={() => setReviewFor(null)} error={reviewError} busy={recordReview.isPending}
+          onSubmit={body => recordReview.mutate({ id: reviewFor.id, body })} />
+      )}
+
       {/* ── Create template modal ── */}
       {showCreate && (
         <div style={MODAL}>
           <div style={{ background: 'var(--hf-surface)', borderRadius: 16, padding: 28, width: 720, maxHeight: '92vh', overflowY: 'auto', boxShadow: '0 20px 60px rgba(0,0,0,0.18)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 22 }}>
-              <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: 'var(--hf-text)' }}>New Contract Template</h3>
+              <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: 'var(--hf-text)' }}>{editingId ? 'Edit Draft Template' : 'New Contract Template'}</h3>
               <button onClick={() => setShowCreate(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex' }}>
                 <X size={20} style={{ color: 'var(--hf-text-faint)' }} />
               </button>
@@ -324,6 +541,16 @@ export default function TemplatesTab() {
               <div>
                 <label style={lbl}>Description</label>
                 <input value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} placeholder="When to use this template" style={inp2} />
+              </div>
+              <div>
+                <label style={lbl}>Legal area</label>
+                <input value={form.legalArea} onChange={e => setForm(f => ({ ...f, legalArea: e.target.value }))} placeholder="e.g. Employment, Contract law" style={inp2} />
+              </div>
+              <div>
+                <label style={lbl}>Required signing method (set with your legal reviewer)</label>
+                <select value={form.requiredSigningMethod} onChange={e => setForm(f => ({ ...f, requiredSigningMethod: e.target.value }))} style={{ ...inp2, background: 'var(--hf-surface)' }}>
+                  {SIGNING_METHODS.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
+                </select>
               </div>
             </div>
 
@@ -375,7 +602,7 @@ export default function TemplatesTab() {
                 onClick={() => createTemplate.mutate(form)}
                 disabled={!form.name || !form.bodyTemplate || createTemplate.isPending}
                 style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '9px 22px', background: !form.name || !form.bodyTemplate ? 'var(--hf-text-faint)' : 'var(--hf-primary)', color: 'var(--hf-text-on-solid)', border: 'none', borderRadius: 9, fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
-                {createTemplate.isPending ? 'Creating…' : 'Create Template'}
+                {createTemplate.isPending ? 'Saving…' : editingId ? 'Save Draft' : 'Create Template'}
               </button>
             </div>
           </div>
