@@ -12,6 +12,7 @@ import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import za.co.handyflow.platform.crm.CrmFacade;
 import za.co.handyflow.platform.fuel.domain.model.FuelDelivery;
+import za.co.handyflow.platform.fuel.domain.model.FuelDispatch;
 import za.co.handyflow.platform.fuel.domain.model.FuelReceipt;
 import za.co.handyflow.platform.fuel.domain.model.FuelTank;
 import za.co.handyflow.platform.fuel.domain.repository.*;

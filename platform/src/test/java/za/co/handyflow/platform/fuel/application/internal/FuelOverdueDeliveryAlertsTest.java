@@ -61,7 +61,7 @@ class FuelOverdueDeliveryAlertsTest {
         when(settings.current(T)).thenReturn(cfg);
         when(featureGuard.hasModuleFor(T, "fuel")).thenReturn(true);
         when(deliveries.findOpenScheduledBeforeAnyTenant(any())).thenReturn(List.of(load));
-        when(hr.findEmployeeById(eq(T), any())).thenReturn(Optional.of(new EmployeeSummary(employee, "E1", "A", "B", "A B", null, null, "Driver", null, "ACTIVE", DRIVER_USER)));
+        when(hr.findEmployeeById(eq(T), any())).thenReturn(Optional.of(new EmployeeSummary(employee, "E1", "A", "B", "A B", null, null, "Driver", null, "ACTIVE", null, DRIVER_USER)));
         when(alertRecipients.recipientsFor(T, FuelAlertRecipientService.DELIVERY_OVERDUE)).thenReturn(List.of(new Recipient(DISPATCH, "d@x.co.za", "Dispatch", null), new Recipient(DRIVER_USER, "x@x.co.za", "Driver", null)));
         when(pushEvents.publish(any(), any(), any(), any(), any(), any(), any())).thenReturn(1);
     }

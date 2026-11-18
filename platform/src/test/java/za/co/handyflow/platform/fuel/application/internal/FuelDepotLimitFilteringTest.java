@@ -103,7 +103,7 @@ class FuelDepotLimitFilteringTest {
 
     @Test @DisplayName("the supply report counts only the user's forecourts, so totals match what they may see")
     void supplyReport() {
-        var svc = new FuelForecourtSupplyReportService(shifts, readings, tanks, depots, mock(FuelDepotSupplyShareRepository.class));
+        var svc = new FuelForecourtSupplyReportService(shifts, readings, tanks, depots, mock(FuelDepotSupplyShareRepository.class), new FuelShiftReportClock(mock(FuelSettingsRepository.class), mock(FuelPosImportRepository.class)));
         FuelDepot terminal = depot(UUID.randomUUID(), "Terminal", null), fcMine = depot(DEPOT_MINE, "Mine FC", terminal.getId()), fcOther = depot(DEPOT_OTHER, "Other FC", terminal.getId());
         when(depots.findAllActive(T)).thenReturn(List.of(terminal, fcMine, fcOther));
         FuelShift s = shift(UUID.randomUUID());
