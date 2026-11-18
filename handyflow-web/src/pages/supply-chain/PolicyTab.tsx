@@ -6,7 +6,7 @@ import { apiClient } from "../../api/client"
 import { usePermissions } from "../../hooks/usePermission"
 import { inp, TH, TD, Field, ErrBox, Spinner, EmptyState, Banner, filterPill, fmtR, fmtDate } from "./scm.shared"
 import { Scale } from "lucide-react"
-import { PolicyRefinements, ContractSavings } from "./PolicyRefinements"
+import { PolicyRefinements } from "./PolicyRefinements"
 import { asList, asOne, errorText, BUDGET_BASES, policyProblem, policyBody, type PolicyForm } from "./scmOps"
 
 interface PolicyView { effective: { budgetBasis: string; vatRecoverablePct: number; includeNonRecoverableVat: boolean; priceIncreaseTolerancePct: number; baseCurrency?: string }; customised: boolean }
@@ -87,7 +87,6 @@ export function PolicyTab() {
       )}
 
       <PolicyRefinements isAdmin={isAdmin} />
-      <ContractSavings />
 
       {canDecide && (
         <>

@@ -9,6 +9,7 @@ import { FileSignature } from "lucide-react"
 import { TH, TD, Modal, ModalFooter, ErrBox, Spinner, EmptyState, filterPill, fmtR, fmtDate } from "./scm.shared"
 import { asList, errorText, contractBucket, contractCounts, daysUntil, dueText, type ContractBucket } from "./scmOps"
 import { StatCard, Panel, Pill, grid, type Tone } from "./scmUi"
+import { ContractSavings } from "./PolicyRefinements"
 
 export interface Contract { id: string; contractNumber: string; supplierName: string; title: string; status: string; startDate: string; endDate: string; valueCap: number | null; autoRenew: boolean; renewalNoticeDays: number; renewalNoticeDue: boolean; lines: unknown[] }
 const BASE = "/api/v1/supply-chain/contracts"
@@ -105,6 +106,8 @@ export function ContractsTab() {
             onConfirm={() => { if (!reason.trim()) { setErr("Give a reason."); return } terminate.mutate() }} />
         </Modal>
       )}
+
+      <ContractSavings />
     </div>
   )
 }
