@@ -20,6 +20,7 @@ import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /** Runs the negotiation service against in-memory repositories so the whole lifecycle can be exercised without a database. */
@@ -36,6 +37,7 @@ class ContractNegotiationServiceTest {
     final List<ContractNegotiationComment> comments = new ArrayList<>();
     final List<ContractNegotiationEvent> events = new ArrayList<>();
     final AtomicInteger version = new AtomicInteger(1);
+    ContractNegotiationLinkRepository linkRepo;
     final SigningTokenService hashing = new SigningTokenService(mock(ContractSigningTokenRepository.class));
     ContractNegotiationService service;
 
@@ -79,7 +81,8 @@ class ContractNegotiationServiceTest {
         when(redline.versions(tenant, cid)).thenAnswer(i -> List.of(new VersionInfo(version.get(), "X", null, null, Instant.now())));
         when(redline.snapshot(any(), any(), anyString(), any(), any())).thenAnswer(i -> version.incrementAndGet());
 
-        service = new ContractNegotiationService(contractRepo, partyRepo, nRepo, pRepo, cRepo, eRepo, redline, hashing);
+        linkRepo = mock(ContractNegotiationLinkRepository.class);
+        service = new ContractNegotiationService(contractRepo, partyRepo, nRepo, pRepo, cRepo, eRepo, linkRepo, redline, hashing);
     }
 
     UUID cid() { return contract.getId(); }
@@ -270,6 +273,7 @@ class ContractNegotiationServiceTest {
         open();
         service.markReady(tenant, cid(), staff);
         service.freezeOnSend(tenant, contract, staff);
+        verify(linkRepo).revokeAllActive(eq(tenant.getValue()), eq(cid()), anyString(), any());
         assertEquals("CLOSED", negotiations.get(0).getStatus());
         assertEquals("Contract sent for signature", negotiations.get(0).getCloseReason());
         contract.send();
@@ -287,5 +291,14 @@ class ContractNegotiationServiceTest {
         assertEquals(List.of("OPENED", "PROPOSAL_SUBMITTED", "PROPOSAL_ACCEPTED"), types);
         assertEquals("1.2.3.4", events.get(1).getIpAddress());
         assertEquals("COUNTERPARTY", events.get(1).getActorType());
+    }
+
+    @Test
+    void closingOrMarkingReadyRevokesCounterpartyLinks() {
+        open();
+        service.markReady(tenant, cid(), staff);
+        verify(linkRepo).revokeAllActive(eq(tenant.getValue()), eq(cid()), eq("Negotiation marked ready for signature"), any());
+        service.close(tenant, cid(), "done", staff);
+        verify(linkRepo).revokeAllActive(eq(tenant.getValue()), eq(cid()), eq("Negotiation closed"), any());
     }
 }

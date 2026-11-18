@@ -7,11 +7,14 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import za.co.handyflow.platform.contracting.application.internal.ContractNegotiationAccessService;
 import za.co.handyflow.platform.contracting.application.internal.ContractNegotiationService;
+import za.co.handyflow.platform.contracting.application.internal.PublicSigningRateLimiter;
 import za.co.handyflow.platform.contracting.dto.ContractNegotiationDtos.*;
 import za.co.handyflow.platform.shared.ApiResponse;
 import za.co.handyflow.platform.shared.TenantContext;
 
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -28,6 +31,8 @@ public class ContractNegotiationController {
     private static final String WRITE = "hasAnyAuthority('CONTRACTS_MANAGE','CONTRACTS_ADMIN')";
 
     private final ContractNegotiationService service;
+    private final ContractNegotiationAccessService access;
+    private final PublicSigningRateLimiter rateLimiter;
 
     @GetMapping
     @PreAuthorize(READ)
@@ -104,5 +109,28 @@ public class ContractNegotiationController {
     public ResponseEntity<ApiResponse<NegotiationView>> reopen(@PathVariable UUID contractId, @RequestBody(required = false) OpenRequest q) {
         return ResponseEntity.ok(ApiResponse.success("Negotiation reopened", service.reopen(TenantContext.getTenantIdAsObject(), contractId,
                 q == null ? null : q.responseDeadline(), TenantContext.getCurrentUserId())));
+    }
+
+    @GetMapping("/links")
+    @PreAuthorize(READ)
+    @Operation(summary = "Counterparty links for this contract: who, until when, whether still valid. Never the link itself")
+    public ResponseEntity<ApiResponse<List<LinkView>>> links(@PathVariable UUID contractId) {
+        return ResponseEntity.ok(ApiResponse.success("Links", access.links(TenantContext.getTenantIdAsObject(), contractId)));
+    }
+
+    @PostMapping("/links")
+    @PreAuthorize(WRITE)
+    @Operation(summary = "Issue a negotiation link for one party (replaces their earlier link). The link is shown once, here")
+    public ResponseEntity<ApiResponse<IssuedLinkView>> issueLink(@PathVariable UUID contractId, @Valid @RequestBody IssueLinkRequest q) {
+        rateLimiter.checkReissue(TenantContext.getCurrentUserId(), contractId);
+        return ResponseEntity.ok(ApiResponse.success("Link issued", access.issueLink(TenantContext.getTenantIdAsObject(), contractId, q.partyId(), TenantContext.getCurrentUserId())));
+    }
+
+    @PostMapping("/links/{linkId}/revoke")
+    @PreAuthorize(WRITE)
+    @Operation(summary = "Revoke a negotiation link")
+    public ResponseEntity<ApiResponse<Void>> revokeLink(@PathVariable UUID contractId, @PathVariable UUID linkId) {
+        access.revokeLink(TenantContext.getTenantIdAsObject(), contractId, linkId, TenantContext.getCurrentUserId());
+        return ResponseEntity.ok(ApiResponse.success("Link revoked", null));
     }
 }

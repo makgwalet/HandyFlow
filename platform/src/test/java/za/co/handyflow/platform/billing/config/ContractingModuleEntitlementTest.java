@@ -23,6 +23,11 @@ class ContractingModuleEntitlementTest {
     }
 
     @Test
+    void publicNegotiationLinksAreNotGatedByTheModule() {
+        assertTrue(ModuleEntitlementPaths.moduleFor("/api/v1/negotiate/some-token/negotiation").isEmpty());
+    }
+
+    @Test
     void similarlyNamedPathsAreNotCaught() {
         assertTrue(ModuleEntitlementPaths.moduleFor("/api/v1/contractsx").isEmpty());
     }

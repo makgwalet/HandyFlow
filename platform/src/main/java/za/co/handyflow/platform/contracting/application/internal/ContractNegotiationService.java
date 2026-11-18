@@ -10,6 +10,7 @@ import za.co.handyflow.platform.contracting.dto.ContractNegotiationDtos.*;
 import za.co.handyflow.platform.shared.ResourceNotFoundException;
 import za.co.handyflow.platform.shared.TenantId;
 
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.*;
@@ -36,6 +37,7 @@ public class ContractNegotiationService {
     private final ContractNegotiationProposalRepository proposalRepo;
     private final ContractNegotiationCommentRepository commentRepo;
     private final ContractNegotiationEventRepository eventRepo;
+    private final ContractNegotiationLinkRepository linkRepo;
     private final ContractRedlineService redline;
     private final SigningTokenService hashing;
 
@@ -74,6 +76,7 @@ public class ContractNegotiationService {
         n.markReady(count(all, ContractNegotiationProposal::isUnresolved), count(all, p -> ContractNegotiationProposal.ACCEPTED.equals(p.getStatus())),
                 version, hashOf(c), by);
         negotiationRepo.save(n);
+        revokeLinks(n, "Negotiation marked ready for signature");
         event(n, "STAFF", by, null, "READY_FOR_SIGNATURE", "Final wording pinned at revision " + version, null);
         return view(n, all);
     }
@@ -89,6 +92,7 @@ public class ContractNegotiationService {
         if (accepted > 0) throw new IllegalStateException(accepted + " accepted proposal(s) have not been applied. Apply them before closing.");
         n.close(reason == null || reason.isBlank() ? "Closed by staff" : reason.trim(), by);
         negotiationRepo.save(n);
+        revokeLinks(n, "Negotiation closed");
         event(n, "STAFF", by, null, "CLOSED", n.getCloseReason(), null);
         return view(n, all);
     }
@@ -291,6 +295,7 @@ public class ContractNegotiationService {
             if (ContractNegotiation.CLOSED.equals(n.getStatus())) return;
             n.close("Contract sent for signature", by);
             negotiationRepo.save(n);
+            revokeLinks(n, "Contract sent for signature");
             event(n, "SYSTEM", by, null, "FROZEN_ON_SEND", "Negotiation closed because the contract was sent for signature", null);
         });
     }
@@ -337,6 +342,11 @@ public class ContractNegotiationService {
 
     private static EventView eventView(ContractNegotiationEvent e) {
         return new EventView(e.getId(), e.getActorType(), e.getActorUserId(), e.getPartyId(), e.getEventType(), e.getDetail(), e.getCreatedAt());
+    }
+
+    /** Counterparty links stop working the moment the negotiation stops taking input. A reopened negotiation needs fresh links. */
+    private void revokeLinks(ContractNegotiation n, String reason) {
+        linkRepo.revokeAllActive(n.getTenantId(), n.getContractId(), reason, Instant.now());
     }
 
     private void event(ContractNegotiation n, String actor, UUID userId, UUID partyId, String type, String detail, String ip) {

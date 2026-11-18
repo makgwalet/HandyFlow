@@ -34,11 +34,25 @@ public class PublicSigningRateLimiter {
     @Value("${contracting.rate-limit.submit-per-minute:10}")      private int submitPerMinute;
     @Value("${contracting.rate-limit.otp-verify-per-10-min:10}")  private int otpVerifyPer10Min;
     @Value("${contracting.rate-limit.reissue-per-15-min:3}")      private int reissuePer15Min;
+    @Value("${contracting.rate-limit.negotiate-ip-per-minute:60}")        private int negotiateIpPerMinute;
+    @Value("${contracting.rate-limit.negotiate-act-per-minute:20}")       private int negotiateActPerMinute;
+    @Value("${contracting.rate-limit.negotiate-otp-request-per-10-min:3}") private int negotiateOtpRequestPer10Min;
 
     public void checkView(String ip, String token)    { check("view", ip, token, viewPerMinute, MINUTE); }
     public void checkComment(String ip, String token) { check("comment", ip, token, commentPerMinute, MINUTE); }
     public void checkDecline(String ip, String token) { check("decline", ip, token, declinePerMinute, MINUTE); }
     public void checkSubmit(String ip, String token)  { check("submit", ip, token, submitPerMinute, MINUTE); }
+
+    /** Every public negotiation request, per caller IP, so guessing links across many tokens is capped too. */
+    public void checkNegotiateIp(String ip) { consume("contracting:negotiate:ip:" + ip, negotiateIpPerMinute, MINUTE); }
+
+    public void checkNegotiateView(String ip, String token) { check("negotiate-view", ip, token, viewPerMinute, MINUTE); }
+
+    /** Proposals, comments and withdrawals. */
+    public void checkNegotiateAct(String ip, String token) { check("negotiate-act", ip, token, negotiateActPerMinute, MINUTE); }
+
+    /** Code requests, per link whatever the IP, because each one sends an SMS or an email. */
+    public void checkNegotiateOtpRequest(UUID linkId) { consume("contracting:negotiate:otp-request:" + linkId, negotiateOtpRequestPer10Min, 10 * MINUTE); }
 
     /** Per signer, whatever the IP, so guesses cannot be spread across addresses. */
     public void checkOtpVerify(UUID partyId) {

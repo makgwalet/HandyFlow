@@ -218,7 +218,14 @@ public class SecurityConfig {
                                 // an emailed link with no login. The link token is the credential but never enough alone: every call
                                 // except the code request needs the session from confirming an emailed one-time code, and every document
                                 // request is re-checked with the owning module. Rate limited per IP and per link inside the services.
-                                "/api/public/access/**"
+                                "/api/public/access/**",
+                                // Contract signing links (PublicSigningController): opened by an external signer with no login. The HMAC token is
+                                // checked against its stored hash on every request; rate limited per IP and token in PublicSigningRateLimiter.
+                                "/api/v1/sign/**",
+                                // Contract negotiation links (PublicNegotiationController): opened by a counterparty with no login. The link token is
+                                // checked against its stored hash and every data request also needs the session from confirming a one-time code;
+                                // rate limited per IP and per link in PublicSigningRateLimiter.
+                                "/api/v1/negotiate/**"
                         ).permitAll()
                         // Everything else requires authentication
                         .anyRequest().authenticated()

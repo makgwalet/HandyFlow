@@ -24,6 +24,9 @@ class PublicSigningRateLimiterTest {
         ReflectionTestUtils.setField(limiter, "submitPerMinute", 10);
         ReflectionTestUtils.setField(limiter, "otpVerifyPer10Min", 10);
         ReflectionTestUtils.setField(limiter, "reissuePer15Min", 3);
+        ReflectionTestUtils.setField(limiter, "negotiateIpPerMinute", 60);
+        ReflectionTestUtils.setField(limiter, "negotiateActPerMinute", 20);
+        ReflectionTestUtils.setField(limiter, "negotiateOtpRequestPer10Min", 3);
     }
 
     @Test
@@ -77,5 +80,37 @@ class PublicSigningRateLimiterTest {
         UUID party = UUID.randomUUID();
         limiter.checkOtpVerify(party);
         verify(shared).tryConsume("contracting:otp-verify:" + party, 10, 10 * 60_000L);
+    }
+
+    @Test
+    void negotiationCodeRequestsAreLimitedPerLinkWhateverTheIp() {
+        when(shared.tryConsume(anyString(), anyInt(), anyLong())).thenReturn(true);
+        UUID link = UUID.randomUUID();
+        limiter.checkNegotiateOtpRequest(link);
+        verify(shared).tryConsume("contracting:negotiate:otp-request:" + link, 3, 10 * 60_000L);
+    }
+
+    @Test
+    void negotiationIpLimitCapsGuessingAcrossManyTokens() {
+        when(shared.tryConsume(anyString(), anyInt(), anyLong())).thenReturn(true);
+        limiter.checkNegotiateIp("9.9.9.9");
+        verify(shared).tryConsume("contracting:negotiate:ip:9.9.9.9", 60, 60_000L);
+    }
+
+    @Test
+    void negotiationActionsUseTheirOwnCounterAndNeverTheRawToken() {
+        when(shared.tryConsume(anyString(), anyInt(), anyLong())).thenReturn(true);
+        limiter.checkNegotiateAct("9.9.9.9", "NEGOTIATION-SECRET");
+        limiter.checkNegotiateView("9.9.9.9", "NEGOTIATION-SECRET");
+        ArgumentCaptor<String> keys = ArgumentCaptor.forClass(String.class);
+        verify(shared, times(2)).tryConsume(keys.capture(), anyInt(), eq(60_000L));
+        assertEquals(2, keys.getAllValues().stream().distinct().count());
+        keys.getAllValues().forEach(k -> assertFalse(k.contains("NEGOTIATION-SECRET")));
+    }
+
+    @Test
+    void negotiationRefusalIsA429() {
+        when(shared.tryConsume(anyString(), anyInt(), anyLong())).thenReturn(false);
+        assertEquals("RATE_LIMITED", assertThrows(HandyFlowException.class, () -> limiter.checkNegotiateIp("1.1.1.1")).getErrorCode());
     }
 }

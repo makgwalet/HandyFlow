@@ -49,4 +49,23 @@ public final class ContractNegotiationDtos {
     /** What one counterparty sees: the current text, their own proposals and the comments addressed to them. */
     public record CounterpartyView(String status, LocalDate responseDeadline, boolean canPropose, int currentVersionNo, String body, List<ProposalView> proposals,
                                    List<CommentView> comments) {}
+
+    // ── access ───────────────────────────────────────────────────────────────
+
+    public record IssueLinkRequest(@jakarta.validation.constraints.NotNull UUID partyId) {}
+
+    /** The raw link is returned once, here, and never again. */
+    public record IssuedLinkView(UUID linkId, UUID partyId, String url, Instant expiresAt, String deliveryStatus) {}
+
+    public record LinkView(UUID id, UUID partyId, String partyName, Instant expiresAt, Instant revokedAt, String revokedReason, String deliveryStatus,
+                           Instant lastAccessedAt, Instant createdAt, boolean active) {}
+
+    /** All a stranger holding the link learns before confirming a code. */
+    public record LinkInfo(String contractTitle, String channel, String maskedDestination, Instant expiresAt) {}
+
+    public record OtpSentView(String channel, String maskedDestination) {}
+
+    public record VerifyRequest(@jakarta.validation.constraints.NotBlank @jakarta.validation.constraints.Pattern(regexp = "\\d{6}", message = "The code is 6 digits") String code) {}
+
+    public record SessionView(String sessionToken, Instant expiresAt) {}
 }

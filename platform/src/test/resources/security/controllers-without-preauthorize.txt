@@ -6,6 +6,7 @@ za/co/handyflow/platform/clinic/api/ClinicDocumentVerificationController.java
 za/co/handyflow/platform/clinic/config/ClinicRestrictedListAdvice.java
 za/co/handyflow/platform/collectionsagency/api/CollAgencyPortalAuthController.java
 za/co/handyflow/platform/contracting/api/OtpDevController.java
+za/co/handyflow/platform/contracting/api/PublicNegotiationController.java
 za/co/handyflow/platform/contracting/api/PublicSigningController.java
 za/co/handyflow/platform/facilitiesmanagement/api/FmPortalAuthController.java
 za/co/handyflow/platform/fuel/api/FuelPortalAuthController.java

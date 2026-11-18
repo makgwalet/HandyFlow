@@ -97,6 +97,7 @@ za/co/handyflow/platform/contracting/api/ContractRiskController.java
 za/co/handyflow/platform/contracting/api/ContractSharingController.java
 za/co/handyflow/platform/contracting/api/ContractingController.java
 za/co/handyflow/platform/contracting/api/OtpDevController.java
+za/co/handyflow/platform/contracting/api/PublicNegotiationController.java
 za/co/handyflow/platform/contracting/api/PublicSigningController.java
 za/co/handyflow/platform/creative/api/CreativeController.java
 za/co/handyflow/platform/crm/api/CampaignController.java
