@@ -311,6 +311,7 @@ public class FuelTransportService {
     @Transactional
     public DeliveryResponse myDispatch(TenantId tenantId, UUID userId, UUID deliveryId) {
         FuelDelivery d = ownLoad(tenantId, userId, deliveryId);
+        arrivalChecks.requireEligibleToDispatch(tenantId, d.getId());
         return fuelService.dispatchDelivery(tenantId, d.getId(), new DispatchDeliveryRequest(
                 d.getDriverName() == null ? "Driver" : d.getDriverName(), d.getVehicleReg() == null ? "-" : d.getVehicleReg()));
     }

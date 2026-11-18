@@ -63,6 +63,7 @@ public class FuelTankController {
     private final FuelSupplierApprovalService supplierApproval;
     private final FeatureGuard             featureGuard;
     private final za.co.handyflow.platform.fuel.application.internal.FuelPodPolicyService podPolicy;
+    private final za.co.handyflow.platform.fuel.application.internal.FuelArrivalCheckService arrivalChecks;
     private final DeliveryReceiptPdfService receiptPdfService;
     private final za.co.handyflow.platform.fuel.application.internal.FuelScopeService scopeService;
 
@@ -376,6 +377,7 @@ public class FuelTankController {
     public ResponseEntity<ApiResponse<DeliveryResponse>> dispatchDelivery(
             @PathVariable UUID id, @Valid @RequestBody DispatchDeliveryRequest request) {
         featureGuard.requireModule("fuel");
+        arrivalChecks.requireEligibleToDispatch(TenantContext.getTenantIdAsObject(), id);
         return ResponseEntity.ok(ApiResponse.success("Delivery on its way",
                 fuelService.dispatchDelivery(TenantContext.getTenantIdAsObject(), id, request)));
     }

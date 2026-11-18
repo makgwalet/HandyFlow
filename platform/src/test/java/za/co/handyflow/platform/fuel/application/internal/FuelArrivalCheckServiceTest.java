@@ -364,4 +364,30 @@ class FuelArrivalCheckServiceTest {
         assertDoesNotThrow(() -> service.requireClear(T, load.getId(), NOW));
         verify(enforcement, never()).observe(any(), any(), any(), any(), any());
     }
+
+    @Test @DisplayName("dispatch: a load whose live rules block cannot leave once the rollout has started")
+    void dispatchBlockedByLiveRules() {
+        when(enforcement.mode(eq(T), eq("ARRIVAL_CHECK"), any())).thenReturn(FuelEnforcementService.Mode.MONITOR);
+        result(new Finding("SITE_DRIVER_SUSPENDED", Severity.BLOCK, "The driver is suspended at this site."));
+        assertTrue(assertThrows(IllegalStateException.class, () -> service.requireEligibleToDispatch(T, load.getId())).getMessage().contains("cannot leave"));
+    }
+
+    @Test @DisplayName("dispatch: nothing is asked while the control is OFF, and a load with no tanker is left alone")
+    void dispatchOffOrNoTanker() {
+        when(enforcement.mode(eq(T), eq("ARRIVAL_CHECK"), any())).thenReturn(FuelEnforcementService.Mode.OFF);
+        result(new Finding("SITE_DRIVER_SUSPENDED", Severity.BLOCK, "The driver is suspended at this site."));
+        assertDoesNotThrow(() -> service.requireEligibleToDispatch(T, load.getId()));
+        FuelDelivery untankered = FuelDelivery.create(T, UUID.randomUUID(), UUID.randomUUID(), Map.of(), "DIESEL", new BigDecimal("1000"), new BigDecimal("20"), Instant.now(), null, null);
+        when(deliveries.findActiveById(eq(T), eq(untankered.getId()))).thenReturn(Optional.of(untankered));
+        when(enforcement.mode(eq(T), eq("ARRIVAL_CHECK"), any())).thenReturn(FuelEnforcementService.Mode.ENFORCE);
+        assertDoesNotThrow(() -> service.requireEligibleToDispatch(T, untankered.getId()));
+    }
+
+    @Test @DisplayName("dispatch: an eligible load leaves")
+    void dispatchEligible() {
+        when(enforcement.mode(eq(T), eq("ARRIVAL_CHECK"), any())).thenReturn(FuelEnforcementService.Mode.ENFORCE);
+        result();
+        assertDoesNotThrow(() -> service.requireEligibleToDispatch(T, load.getId()));
+        verify(compliance).requireCompliantForAllocation(eq(T), any(), any(), any(), any());
+    }
 }

@@ -252,10 +252,13 @@ class FuelTransportServiceTest {
                 new CompleteDeliveryRequest(bd("100"), "R", null, null, null, false, null, null, UUID.randomUUID())));
         verify(podPolicy, never()).complete(any(), any(), any(), any());
         verify(arrivalChecks, never()).requireClear(any(), any());
+        verify(arrivalChecks, never()).requireEligibleToDispatch(any(), any());
         // allocated to me
         FuelDelivery mine = FuelDelivery.create(T, UUID.randomUUID(), null, Map.of(), "DIESEL", bd("100"), bd("22"), Instant.now(), null, null);
         mine.allocate(tanker.getId(), "GP 12 AB", driver.id(), driver.fullName());
         when(deliveries.findActiveById(eq(T), eq(mine.getId()))).thenReturn(Optional.of(mine));
+        service.myDispatch(T, me, mine.getId());
+        verify(arrivalChecks).requireEligibleToDispatch(T, mine.getId());
         service.myComplete(T, me, mine.getId(), new CompleteDeliveryRequest(bd("100"), "R", null, null, null, false, null, null, UUID.randomUUID()));
         verify(podPolicy).complete(eq(T), eq(me), eq(mine.getId()), any());
     }

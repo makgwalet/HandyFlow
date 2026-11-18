@@ -161,6 +161,20 @@ public class FuelArrivalCheckService {
         requireLiveClear(tenantId, d);
     }
 
+    /**
+     * Before a load leaves: the live eligibility rules must still pass for its tanker, driver and product split, and the statutory
+     * certificates must be valid. A load with no tanker yet is not a tanker load and is left alone (allocation checks it). Off until the
+     * company starts rolling out the arrival check (any state but OFF), so existing companies see no change.
+     */
+    public void requireEligibleToDispatch(TenantId tenantId, UUID deliveryId) {
+        FuelDelivery d = deliveries.findActiveById(tenantId, deliveryId).orElseThrow(() -> new ResourceNotFoundException("Delivery", deliveryId.toString()));
+        if (d.getTankerId() == null) return;
+        if (enforcement.mode(tenantId, za.co.handyflow.platform.fuel.domain.model.FuelEnforcement.ARRIVAL_CHECK, d.getTankId()) == FuelEnforcementService.Mode.OFF) return;
+        EligibilityResult live = evaluateLive(tenantId, d);
+        if (!live.allowed()) throw new IllegalStateException("This load cannot leave: " + live.blocks().get(0).message());
+        compliance.requireCompliantForAllocation(tenantId, d.getTankerId(), d.getVehicleReg(), d.getDriverEmployeeId(), d.getDriverName());
+    }
+
     /** Safety-critical failures: any blocking finding, or an expired statutory certificate, stops the step now whatever the stored check says. */
     private void requireLiveClear(TenantId tenantId, FuelDelivery d) {
         EligibilityResult live = evaluateLive(tenantId, d);
