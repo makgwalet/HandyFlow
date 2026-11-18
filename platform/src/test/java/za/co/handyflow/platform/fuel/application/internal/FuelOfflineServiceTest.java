@@ -48,6 +48,7 @@ class FuelOfflineServiceTest {
     @Mock FuelTruckStopStayRepository stays;
     @Mock FuelPumpRepository pumps;
     @Mock FuelOfflineConflictService conflicts;
+    @Mock FuelSettingsService settings;
     @Mock AuditTrailFacade audit;
     @InjectMocks FuelOfflineService service;
 
@@ -58,6 +59,7 @@ class FuelOfflineServiceTest {
     FuelTruckStopStay stay = mock(FuelTruckStopStay.class);
 
     @BeforeEach void setUp() {
+        when(settings.offlinePolicy(any())).thenReturn(new za.co.handyflow.platform.fuel.dto.PushDtos.OfflinePolicy(72, 5));
         when(shiftOut.id()).thenReturn(shiftId);
         when(stayOut.id()).thenReturn(stayId);
         when(shift.getId()).thenReturn(shiftId);
@@ -127,6 +129,18 @@ class FuelOfflineServiceTest {
         assertThrows(IllegalStateException.class, () -> service.openShift(T, open(rid, NOW, "1000"), USER, NOW));
         verify(conflicts).record(eq(T), eq(FuelOfflineConflictService.SHIFT_OPEN), eq(rid), any(), eq(USER), eq("Already on an open shift: Pump 1. Close that shift first."), any());
         verify(shift, never()).stampOpen(any(), any());
+    }
+
+    @Test void aCompanyThatShortenedTheLimitRefusesAWriteTheDefaultWouldAccept() {
+        when(settings.offlinePolicy(T)).thenReturn(new za.co.handyflow.platform.fuel.dto.PushDtos.OfflinePolicy(12, 5));
+        assertThrows(IllegalStateException.class, () -> service.openShift(T, open(rid, NOW.minusSeconds(13 * 3600), "1000"), USER, NOW));
+        verify(forecourt, never()).openShift(any(), any(), any());
+    }
+
+    @Test void aCompanyThatWidenedTheLimitAcceptsALongerWait() {
+        when(settings.offlinePolicy(T)).thenReturn(new za.co.handyflow.platform.fuel.dto.PushDtos.OfflinePolicy(168, 5));
+        when(forecourt.openShift(eq(T), any(), eq(USER))).thenReturn(shiftOut);
+        assertDoesNotThrow(() -> service.openShift(T, open(rid, NOW.minusSeconds(100 * 3600), "1000"), USER, NOW));
     }
 
     // ── shift close ───────────────────────────────────────────────────────────

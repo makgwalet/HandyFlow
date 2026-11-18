@@ -5,6 +5,8 @@ export type RootStackParamList = {
   /** A mode whose screens are not built yet. */
   ModePlanned: { mode: ModeId };
   SyncCentre: undefined;
+  PushPreferences: undefined;
+  OfflineConflicts: undefined;
   Access: undefined;
   DriverLoads: undefined;
   LoadDetail: { loadId: string };
@@ -23,7 +25,8 @@ export type RootStackParamList = {
   ForecourtShifts: undefined;
   OpenShift: undefined;
   ShiftDetail: { shiftId: string };
-  CloseShift: { shiftId: string };
+  /** A shift the server knows has a shiftId. One opened on this phone and not yet sent has only the id its open was queued under. */
+  CloseShift: { shiftId?: string; openRequestId?: string };
   Adjustment: { shiftId: string };
   DepotTanks: undefined;
   TankDetail: { tankId: string };

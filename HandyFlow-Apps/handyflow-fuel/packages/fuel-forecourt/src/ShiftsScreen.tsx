@@ -9,13 +9,16 @@ import { Button } from "@/ui/Button";
 import { Card, styles as ui } from "@/ui/Screen";
 import { SyncBanner } from "@/ui/SyncBanner";
 import { colors } from "@/ui/theme";
+import { useOutbox } from "@/offline/OutboxProvider";
 import { useShifts } from "./hooks";
-import { canRunShifts, rand, sortShifts, varianceLabel } from "./shifts";
+import { canRunShifts, queuedOpens, rand, sortShifts, varianceLabel } from "./shifts";
 
 export function ShiftsScreen() {
   const nav = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { session } = useAuth();
   const { shifts, isLoading, error, savedAt, refetch } = useShifts();
+  const { pending } = useOutbox();
+  const opens = queuedOpens(pending);
   const [refreshing, setRefreshing] = React.useState(false);
   const may = canRunShifts(session?.permissions ?? []);
   return (
@@ -29,6 +32,19 @@ export function ShiftsScreen() {
         {error && shifts.length === 0 ? <Card><Text accessibilityRole="alert" style={{ color: "#FCA5A5", fontSize: 16 }}>{error}</Text></Card> : null}
         {isLoading ? <Text style={{ color: colors.muted }}>Loading shifts…</Text> : null}
         {!isLoading && !error && shifts.length === 0 ? <Card><Text style={{ color: colors.text, fontSize: 17 }}>No shifts yet.</Text></Card> : null}
+        {opens.map((o) => {
+          const who = (o.payload.body as { attendantName?: string } | undefined)?.attendantName ?? "Shift";
+          const closing = pending.some((i) => i.kind === "SHIFT_CLOSE" && i.payload.openRequestId === o.id);
+          return (
+            <Pressable key={o.id} accessibilityRole="button" accessibilityLabel={`Shift opened on this phone by ${who}, waiting to send`} disabled={closing} onPress={() => nav.navigate("CloseShift", { openRequestId: o.id })}>
+              <Card>
+                <Text style={{ color: colors.text, fontSize: 18, fontWeight: "700" }}>{who}</Text>
+                <Text style={{ color: "#FCD34D" }}>Opened on this phone at {new Date(o.recordedAt).toLocaleTimeString()} · waiting to send · not on the server yet</Text>
+                <Text style={{ color: colors.muted }}>{closing ? "Close saved, waiting to send." : "Tap to close it."}</Text>
+              </Card>
+            </Pressable>
+          );
+        })}
         {sortShifts(shifts).map((s) => {
           const v = varianceLabel(s);
           return (

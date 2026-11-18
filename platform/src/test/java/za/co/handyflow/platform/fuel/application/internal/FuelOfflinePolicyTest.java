@@ -17,4 +17,11 @@ class FuelOfflinePolicyTest {
     }
     @Test void aPhoneClockFiveMinutesAheadIsAccepted() { assertDoesNotThrow(() -> FuelOfflinePolicy.checkCaptured(NOW.plus(FuelOfflinePolicy.FUTURE_SKEW), NOW)); }
     @Test void furtherAheadIsRefused() { assertThrows(IllegalArgumentException.class, () -> FuelOfflinePolicy.checkCaptured(NOW.plus(FuelOfflinePolicy.FUTURE_SKEW).plusSeconds(1), NOW)); }
+
+    @Test void theCompanysOwnLimitsApply() {
+        java.time.Duration day = java.time.Duration.ofHours(24), none = java.time.Duration.ZERO;
+        assertDoesNotThrow(() -> FuelOfflinePolicy.checkCaptured(NOW.minus(day), NOW, day, none));
+        assertThrows(IllegalStateException.class, () -> FuelOfflinePolicy.checkCaptured(NOW.minus(day).minusSeconds(1), NOW, day, none));
+        assertThrows(IllegalArgumentException.class, () -> FuelOfflinePolicy.checkCaptured(NOW.plusSeconds(1), NOW, day, none));
+    }
 }

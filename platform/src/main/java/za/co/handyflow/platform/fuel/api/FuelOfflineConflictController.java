@@ -22,9 +22,25 @@ import java.util.UUID;
 public class FuelOfflineConflictController {
     private static final String WHO = "hasAnyAuthority('FUEL_MANAGE','FUEL_FORECOURT_MANAGE','FUEL_TRUCKSTOP_MANAGE','FUEL_SHIFT_SUPERVISE')";
     private final FuelOfflineConflictService conflicts;
+    private final za.co.handyflow.platform.fuel.application.internal.FuelSettingsService settings;
     private final FeatureGuard featureGuard;
 
     public record ResolveRequest(@jakarta.validation.constraints.Size(max = 300) String note) {}
+
+    /** How long a queued write may wait, and how far ahead a phone's clock may be. */
+    @GetMapping("/policy")
+    @PreAuthorize("hasAnyAuthority('FUEL_READ','FUEL_DRIVER')")
+    public ResponseEntity<ApiResponse<za.co.handyflow.platform.fuel.dto.PushDtos.OfflinePolicy>> policy() {
+        featureGuard.requireModule("fuel");
+        return ResponseEntity.ok(ApiResponse.success(settings.offlinePolicy(TenantContext.getTenantIdAsObject())));
+    }
+
+    @PutMapping("/policy")
+    @PreAuthorize("hasAuthority('FUEL_CONFIGURATION_MANAGE')")
+    public ResponseEntity<ApiResponse<za.co.handyflow.platform.fuel.dto.PushDtos.OfflinePolicy>> updatePolicy(@jakarta.validation.Valid @RequestBody za.co.handyflow.platform.fuel.dto.PushDtos.OfflinePolicy req) {
+        featureGuard.requireModule("fuel");
+        return ResponseEntity.ok(ApiResponse.success("Saved", settings.updateOfflinePolicy(TenantContext.getTenantIdAsObject(), req)));
+    }
 
     @GetMapping
     @PreAuthorize(WHO)

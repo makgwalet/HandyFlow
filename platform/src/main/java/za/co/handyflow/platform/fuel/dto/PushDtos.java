@@ -13,4 +13,7 @@ public final class PushDtos {
 
     /** A person's own switches, by event type. A type that is not listed stays as it was (on by default). */
     public record Preferences(Map<String, Boolean> enabled) {}
+
+    /** How long a write queued on a phone may wait before the server refuses it, and how far ahead a phone's clock may be. */
+    public record OfflinePolicy(@Min(1) @Max(336) int maxAgeHours, @Min(0) @Max(60) int clockSkewMinutes) {}
 }

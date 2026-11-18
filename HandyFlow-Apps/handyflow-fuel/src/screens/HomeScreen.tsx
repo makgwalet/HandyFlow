@@ -8,6 +8,7 @@ import { useAccess } from "@/access/useAccess";
 import { useAuth } from "@/auth/AuthContext";
 import type { RootStackParamList } from "@/navigation/types";
 import { Button } from "@/ui/Button";
+import { canSeeConflicts } from "@/screens/OfflineConflictsScreen";
 import { Card, Screen } from "@/ui/Screen";
 import { colors } from "@/ui/theme";
 
@@ -52,6 +53,8 @@ export function HomeScreen() {
       )}
       <Button label="My access" tone="plain" onPress={() => nav.navigate("Access")} />
       <Button label="Sync centre" tone="plain" onPress={() => nav.navigate("SyncCentre")} />
+      {hasFuelAccess(perms) ? <Button label="Alerts I get" tone="plain" onPress={() => nav.navigate("PushPreferences")} /> : null}
+      {canSeeConflicts(perms) ? <Button label="Refused offline writes" tone="plain" onPress={() => nav.navigate("OfflineConflicts")} /> : null}
       <Button label="Sign out" tone="plain" onPress={() => void signOut()} />
     </Screen>
   );

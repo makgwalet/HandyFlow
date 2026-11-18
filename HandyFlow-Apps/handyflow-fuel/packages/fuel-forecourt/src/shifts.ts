@@ -130,3 +130,20 @@ export function varianceLabel(s: Pick<Shift, "variance" | "tolerance">): { text:
   if (Math.abs(v) <= tol || Math.abs(v) < 0.005) return { text: "Balanced", bad: false };
   return { text: `${v < 0 ? "Short" : "Over"} by ${rand(Math.abs(v))}`, bad: true };
 }
+
+// ---- a shift opened on this phone that has not reached the server yet ----
+
+/** A SHIFT_OPEN still in the outbox. Its item id is the id the server will know the open by. */
+export interface QueuedOpenLike { id: string; kind: string; recordedAt: string; payload: Record<string, unknown> }
+
+export const queuedOpens = <T extends QueuedOpenLike>(pending: T[]): T[] => pending.filter((i) => i.kind === "SHIFT_OPEN");
+
+/** What the Close screen needs, built from the saved open: the attendant, and each pump's opening meter. Not a server shift: no number, never final. */
+export function shiftFromQueuedOpen(item: QueuedOpenLike, pumps: { id: string; name?: string | null; fuelType?: string | null }[]): Shift | null {
+  const body = item.payload.body as { attendantName?: string; readings?: { pumpId: string; openingMeter: number }[] } | undefined;
+  if (!body || !Array.isArray(body.readings)) return null;
+  return shiftSchema.parse({
+    id: item.id, shiftNumber: null, attendantName: body.attendantName ?? "", status: "OPEN", openedAt: item.recordedAt,
+    readings: body.readings.map((r) => ({ pumpId: r.pumpId, pumpName: pumps.find((p) => p.id === r.pumpId)?.name ?? null, fuelType: pumps.find((p) => p.id === r.pumpId)?.fuelType ?? null, openingMeter: r.openingMeter })),
+  });
+}

@@ -120,6 +120,20 @@ public class FuelSettingsService {
     }
 
     @Transactional(readOnly = true)
+    public za.co.handyflow.platform.fuel.dto.PushDtos.OfflinePolicy offlinePolicy(TenantId tenantId) {
+        FuelSettings s = current(tenantId);
+        return new za.co.handyflow.platform.fuel.dto.PushDtos.OfflinePolicy(s.getOfflineMaxAgeHours(), s.getOfflineClockSkewMinutes());
+    }
+
+    @Transactional
+    public za.co.handyflow.platform.fuel.dto.PushDtos.OfflinePolicy updateOfflinePolicy(TenantId tenantId, za.co.handyflow.platform.fuel.dto.PushDtos.OfflinePolicy req) {
+        FuelSettings s = settings.findByTenant(tenantId).orElseGet(() -> FuelSettings.forTenant(tenantId));
+        s.updateOfflinePolicy(req.maxAgeHours(), req.clockSkewMinutes());
+        FuelSettings saved = settings.save(s);
+        return new za.co.handyflow.platform.fuel.dto.PushDtos.OfflinePolicy(saved.getOfflineMaxAgeHours(), saved.getOfflineClockSkewMinutes());
+    }
+
+    @Transactional(readOnly = true)
     public ControlsResponse controls(TenantId tenantId) {
         FuelSettings s = current(tenantId);
         return toControls(s);

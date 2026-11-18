@@ -124,6 +124,12 @@ public class FuelSettings {
     private String podExceptionTypes = "";
 
     /** Minutes past its scheduled time before an open delivery counts as overdue for push alerts. */
+    @Column(name = "offline_max_age_hours", nullable = false)
+    private int offlineMaxAgeHours = 72;
+
+    @Column(name = "offline_clock_skew_minutes", nullable = false)
+    private int offlineClockSkewMinutes = 5;
+
     @Column(name = "overdue_grace_minutes", nullable = false)
     private int overdueGraceMinutes = 120;
 
@@ -254,6 +260,12 @@ public class FuelSettings {
 
     public java.util.Set<String> allowedPodExceptions() {
         return podExceptionTypes == null || podExceptionTypes.isBlank() ? java.util.Set.of() : java.util.Set.of(podExceptionTypes.split(","));
+    }
+
+    public void updateOfflinePolicy(int maxAgeHours, int clockSkewMinutes) {
+        if (maxAgeHours < 1 || maxAgeHours > 336) throw new IllegalArgumentException("The longest a queued write may wait must be between 1 and 336 hours.");
+        if (clockSkewMinutes < 0 || clockSkewMinutes > 60) throw new IllegalArgumentException("The clock allowance must be between 0 and 60 minutes.");
+        this.offlineMaxAgeHours = maxAgeHours; this.offlineClockSkewMinutes = clockSkewMinutes; this.updatedAt = Instant.now();
     }
 
     public void updateOverduePolicy(int graceMinutes, int escalationMinutes) {

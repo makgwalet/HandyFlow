@@ -41,6 +41,7 @@ public class FuelOfflineService {
     private final FuelTruckStopStayRepository stays;
     private final FuelPumpRepository pumps;
     private final FuelOfflineConflictService conflicts;
+    private final FuelSettingsService settings;
     private final AuditTrailFacade audit;
 
     // ── Forecourt ─────────────────────────────────────────────────────────────
@@ -52,7 +53,7 @@ public class FuelOfflineService {
         Optional<FuelShift> done = shifts.findByOpenRequest(tenant, rid);
         if (done.isPresent()) return forecourt.getShift(tenant, done.get().getId());
         return guard(tenant, FuelOfflineConflictService.SHIFT_OPEN, rid, null, userId, req.capturedAt(), () -> {
-            FuelOfflinePolicy.checkCaptured(req.capturedAt(), now);
+            checkCaptured(tenant, req.capturedAt(), now);
             requireMetersNotBackwards(tenant, req.readings());
             ShiftResponse out = forecourt.openShift(tenant, req, userId);
             FuelShift s = shifts.findByTenantAndId(tenant, out.id()).orElseThrow(() -> new ResourceNotFoundException("Shift", out.id().toString()));
@@ -86,7 +87,7 @@ public class FuelOfflineService {
             return forecourt.getShift(tenant, shiftId);
         }
         return guard(tenant, FuelOfflineConflictService.SHIFT_CLOSE, rid, shiftId, userId, req.capturedAt(), () -> {
-            FuelOfflinePolicy.checkCaptured(req.capturedAt(), now);
+            checkCaptured(tenant, req.capturedAt(), now);
             ShiftResponse out = forecourt.closeShift(tenant, shiftId, req, userId);
             FuelShift s = shifts.findByTenantAndId(tenant, shiftId).orElseThrow(() -> new ResourceNotFoundException("Shift", shiftId.toString()));
             s.stampClose(rid, req.capturedAt());
@@ -117,7 +118,7 @@ public class FuelOfflineService {
         Optional<FuelTruckStopStay> done = stays.findByBookRequest(tenant, rid);
         if (done.isPresent()) return stayService.get(tenant, done.get().getId(), today);
         return guard(tenant, FuelOfflineConflictService.STAY_BOOK, rid, null, userId, req.capturedAt(), () -> {
-            FuelOfflinePolicy.checkCaptured(req.capturedAt(), now);
+            checkCaptured(tenant, req.capturedAt(), now);
             // The phone never claimed a bay was free; the server decides now, on the bays it has now. A full yard refuses it here.
             StayView out = stayService.book(tenant, req, userId, today);
             FuelTruckStopStay s = stays.findOwned(tenant, out.id()).orElseThrow(() -> new ResourceNotFoundException("Stay", out.id().toString()));
@@ -138,7 +139,7 @@ public class FuelOfflineService {
             return stayService.get(tenant, stayId, today);
         }
         return guard(tenant, FuelOfflineConflictService.STAY_CHECK_IN, rid, stayId, userId, req.capturedAt(), () -> {
-            FuelOfflinePolicy.checkCaptured(req.capturedAt(), now);
+            checkCaptured(tenant, req.capturedAt(), now);
             StayView out = stayService.checkIn(tenant, stayId, today);
             FuelTruckStopStay s = stays.findOwned(tenant, stayId).orElseThrow(() -> new ResourceNotFoundException("Stay", stayId.toString()));
             s.stampCheckIn(rid, req.capturedAt());
@@ -158,7 +159,7 @@ public class FuelOfflineService {
             return stayService.get(tenant, stayId, today);
         }
         return guard(tenant, FuelOfflineConflictService.STAY_CHECK_OUT, rid, stayId, userId, req.capturedAt(), () -> {
-            FuelOfflinePolicy.checkCaptured(req.capturedAt(), now);
+            checkCaptured(tenant, req.capturedAt(), now);
             // Pricing is the server's: nights and amount come from the stay's own rate and the departure date, never from the phone.
             // The phone fixes the date the truck left when it was captured; one in the future is wrong, and a late sync must not add nights.
             if (req.date() != null && req.date().isAfter(today)) throw new IllegalArgumentException("The departure date is in the future.");
@@ -171,7 +172,14 @@ public class FuelOfflineService {
         });
     }
 
-    // ── shared ────────────────────────────────────────────────────────────────
+    // ── shared ────
+
+    /** The company's own limits from Fuel settings; the defaults when none are set. */
+    private void checkCaptured(TenantId tenant, Instant capturedAt, Instant now) {
+        if (capturedAt == null) return;
+        var p = settings.offlinePolicy(tenant);
+        FuelOfflinePolicy.checkCaptured(capturedAt, now, java.time.Duration.ofHours(p.maxAgeHours()), java.time.Duration.ofMinutes(p.clockSkewMinutes()));
+    }
 
     /** Runs the write; if the server refuses it, keeps a conflict row (own transaction) and passes the refusal on unchanged. */
     private <T> T guard(TenantId tenant, String kind, UUID rid, UUID entityId, UUID userId, Instant capturedAt, Supplier<T> work) {

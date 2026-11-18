@@ -100,3 +100,28 @@ describe("CloseShiftScreen", () => {
     expect(screen.getByText(/already closed/)).toBeTruthy();
   });
 });
+
+describe("CloseShiftScreen for a shift opened on this phone", () => {
+  const open = { id: "OPEN-1", kind: "SHIFT_OPEN", recordedAt: "2026-11-18T06:00:00.000Z", payload: { body: { attendantName: "Thandi", readings: [{ pumpId: "P1", openingMeter: 1000 }] } } };
+  const props = { route: { params: { openRequestId: "OPEN-1" } } } as any;
+  it("queues the close under the id of the open, and says it follows the open", async () => {
+    mockPending = [open];
+    await render(<CloseShiftScreen {...props} />);
+    expect(screen.getByText(/has not reached the server yet/)).toBeTruthy();
+    await fireEvent.changeText(screen.getByLabelText(/Closing meter: Pump 1/), "1100");
+    await fireEvent.press(screen.getByLabelText("Close shift"));
+    await waitFor(() => expect(mockEnqueue).toHaveBeenCalledWith("SHIFT_CLOSE", { openRequestId: "OPEN-1", body: expect.objectContaining({ readings: [{ pumpId: "P1", closingMeter: 1100 }] }) }));
+    expect(mockApi).not.toHaveBeenCalled();
+  });
+  it("points to the shift list once the open has been sent", async () => {
+    mockPending = [];
+    await render(<CloseShiftScreen {...props} />);
+    expect(screen.getByText(/has been sent to the server/)).toBeTruthy();
+  });
+  it("shows the waiting state when the close is already queued", async () => {
+    mockPending = [open, { kind: "SHIFT_CLOSE", payload: { openRequestId: "OPEN-1" } }];
+    await render(<CloseShiftScreen {...props} />);
+    expect(screen.getByText(/waiting to send/)).toBeTruthy();
+    expect(screen.queryByLabelText("Close shift")).toBeNull();
+  });
+});

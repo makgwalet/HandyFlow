@@ -18,6 +18,8 @@ import { LoginScreen } from "@/screens/LoginScreen";
 import { ModePlannedScreen } from "@/screens/ModePlannedScreen";
 import { AccessScreen } from "@/screens/AccessScreen";
 import { SyncCentreScreen } from "@/screens/SyncCentreScreen";
+import { PushPreferencesScreen } from "@/screens/PushPreferencesScreen";
+import { OfflineConflictsScreen } from "@/screens/OfflineConflictsScreen";
 import type { RootStackParamList } from "@/navigation/types";
 import { colors } from "@/ui/theme";
 
@@ -34,6 +36,8 @@ function SignedIn() {
           <Stack.Screen name="Home" component={HomeScreen} options={{ title: "HandyFlow Fuel", headerBackVisible: false }} />
           <Stack.Screen name="ModePlanned" component={ModePlannedScreen} options={{ title: "Coming soon" }} />
           <Stack.Screen name="Access" component={AccessScreen} options={{ title: "My access" }} />
+          <Stack.Screen name="PushPreferences" component={PushPreferencesScreen} options={{ title: "Alerts I get" }} />
+          <Stack.Screen name="OfflineConflicts" component={OfflineConflictsScreen} options={{ title: "Refused offline writes" }} />
           <Stack.Screen name="SyncCentre" component={SyncCentreScreen} options={{ title: "Sync centre" }} />
           <Stack.Screen name="DriverLoads" component={MyLoadsScreen} options={{ title: "My loads" }} />
           <Stack.Screen name="LoadDetail" component={LoadDetailScreen} options={{ title: "Load" }} />

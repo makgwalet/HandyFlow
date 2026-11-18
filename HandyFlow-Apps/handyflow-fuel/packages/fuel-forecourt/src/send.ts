@@ -26,5 +26,5 @@ export async function sendForecourtItem(item: OutboxItem): Promise<void> {
 }
 
 /** A close for this shift is already waiting to send. */
-export const closeWaiting = (pending: OutboxItem[], shiftId: string): boolean =>
-  pending.some((i) => i.kind === "SHIFT_CLOSE" && i.payload.shiftId === shiftId);
+export const closeWaiting = (pending: OutboxItem[], target: { shiftId?: string; openRequestId?: string }): boolean =>
+  pending.some((i) => i.kind === "SHIFT_CLOSE" && ((target.shiftId && i.payload.shiftId === target.shiftId) || (target.openRequestId && i.payload.openRequestId === target.openRequestId)));
