@@ -1,0 +1,119 @@
+import { z } from "zod";
+
+const num = z.coerce.number();
+const nnum = z.coerce.number().nullish();
+
+export const pumpSchema = z.object({
+  id: z.string(), name: z.string(), fuelType: z.string().nullish(), tankName: z.string().nullish(),
+  lastMeter: nnum, pricePerLitre: nnum, active: z.boolean().default(true), onShift: z.boolean().default(false),
+});
+export type Pump = z.infer<typeof pumpSchema>;
+export const pumpListSchema = z.array(pumpSchema);
+
+export const readingSchema = z.object({
+  pumpId: z.string(), pumpName: z.string().nullish(), fuelType: z.string().nullish(),
+  openingMeter: nnum, closingMeter: nnum, testLitres: nnum, litresSold: nnum, salesValue: nnum,
+});
+export type Reading = z.infer<typeof readingSchema>;
+
+export const shiftSchema = z.object({
+  id: z.string(), shiftNumber: z.string().nullish(), attendantName: z.string(),
+  status: z.string(), openedAt: z.string(), closedAt: z.string().nullish(),
+  cash: nnum, card: nnum, account: nnum, other: nnum, fleetCard: nnum,
+  expected: nnum, litresSold: nnum, variance: nnum, varianceReason: z.string().nullish(),
+  adjustments: nnum, tolerance: nnum, reviewStatus: z.string().nullish(), reviewNote: z.string().nullish(),
+  readings: z.array(readingSchema).default([]),
+});
+export type Shift = z.infer<typeof shiftSchema>;
+export const shiftListSchema = z.array(shiftSchema);
+
+export const adjustmentSchema = z.object({ id: z.string(), kind: z.string(), amount: num, reason: z.string(), status: z.string() });
+export type Adjustment = z.infer<typeof adjustmentSchema>;
+export const adjustmentListSchema = z.array(adjustmentSchema);
+
+export const rand = (n: number | null | undefined): string => `R ${(n ?? 0).toLocaleString("en-ZA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+export const lit = (n: number | null | undefined): string => `${(n ?? 0).toLocaleString("en-ZA", { maximumFractionDigits: 1 })} L`;
+
+/** Open shifts first, then newest. */
+export const sortShifts = (s: Shift[]): Shift[] =>
+  [...s].sort((a, b) => Number(b.status === "OPEN") - Number(a.status === "OPEN") || b.openedAt.localeCompare(a.openedAt));
+
+export const canRunShifts = (p: readonly string[]): boolean => ["FUEL_FORECOURT", "FUEL_MANAGE", "FUEL_FORECOURT_MANAGE"].some((x) => p.includes(x));
+
+const toNum = (t: string): number => Number(t.trim().replace(",", "."));
+const isMoney = (t: string) => { const n = toNum(t); return t.trim() !== "" && Number.isFinite(n) && n >= 0; };
+
+// ---- open ----
+export interface OpenRow { pumpId: string; meter: string }
+export function openRows(pumps: Pump[]): OpenRow[] {
+  return pumps.filter((p) => p.active && !p.onShift).map((p) => ({ pumpId: p.id, meter: p.lastMeter != null ? String(p.lastMeter) : "" }));
+}
+export function validateOpen(attendant: string, rows: OpenRow[]): string | null {
+  if (!attendant.trim()) return "Enter the attendant's name.";
+  if (rows.length === 0) return "No pumps are free to open a shift on.";
+  if (rows.some((r) => !isMoney(r.meter))) return "Enter the opening meter for every pump, zero or more.";
+  return null;
+}
+export const openBody = (attendant: string, rows: OpenRow[], notes: string) => ({
+  attendantName: attendant.trim(), ...(notes.trim() ? { notes: notes.trim() } : {}),
+  readings: rows.map((r) => ({ pumpId: r.pumpId, openingMeter: toNum(r.meter) })),
+});
+
+// ---- close ----
+export interface CloseRow { pumpId: string; closing: string; test: string }
+export interface Takings { cash: string; card: string; account: string; fleetCard: string; other: string }
+export const emptyTakings: Takings = { cash: "", card: "", account: "", fleetCard: "", other: "" };
+
+export const closeRows = (s: Shift): CloseRow[] => s.readings.map((r) => ({ pumpId: r.pumpId, closing: "", test: "" }));
+
+export function validateClose(s: Shift, rows: CloseRow[], t: Takings): string | null {
+  for (const r of rows) {
+    const name = s.readings.find((x) => x.pumpId === r.pumpId)?.pumpName ?? "a pump";
+    if (!isMoney(r.closing)) return `Enter the closing meter for ${name}.`;
+    const opening = s.readings.find((x) => x.pumpId === r.pumpId)?.openingMeter;
+    if (opening != null && toNum(r.closing) < opening) return `The closing meter for ${name} is below its opening meter of ${opening}. Check the reading.`;
+    if (r.test.trim() && !isMoney(r.test)) return `Test litres for ${name} must be a number, zero or more.`;
+  }
+  for (const [k, label] of [["cash", "cash"], ["card", "card"], ["account", "account"], ["fleetCard", "fleet card"], ["other", "other"]] as const) {
+    if (t[k].trim() && !isMoney(t[k])) return `Takings for ${label} must be a number, zero or more.`;
+  }
+  return null;
+}
+
+/** An empty takings box means nothing was taken that way, so it goes as 0. */
+const orZero = (t: string) => (t.trim() === "" ? 0 : toNum(t));
+export const closeBody = (rows: CloseRow[], t: Takings, varianceReason: string) => ({
+  cash: orZero(t.cash), card: orZero(t.card), account: orZero(t.account), other: orZero(t.other), fleetCard: orZero(t.fleetCard),
+  ...(varianceReason.trim() ? { varianceReason: varianceReason.trim() } : {}),
+  readings: rows.map((r) => ({ pumpId: r.pumpId, closingMeter: toNum(r.closing), ...(r.test.trim() ? { testLitres: toNum(r.test) } : {}) })),
+});
+
+/** Litres and value the shift should have taken in, worked out on the phone from the meters so the attendant can see a gap before closing. */
+export function expectedPreview(s: Shift, rows: CloseRow[], prices: Record<string, number>): { litres: number; value: number } {
+  let litres = 0, value = 0;
+  for (const r of rows) {
+    const open = s.readings.find((x) => x.pumpId === r.pumpId)?.openingMeter ?? 0;
+    const l = Math.max(0, toNum(r.closing || "0") - open - (r.test.trim() ? toNum(r.test) : 0));
+    litres += l; value += l * (prices[r.pumpId] ?? 0);
+  }
+  return { litres, value };
+}
+
+// ---- adjustments ----
+export const ADJUSTMENT_KINDS = ["REFUND", "VOID", "DISCOUNT"] as const;
+export type AdjustmentKind = (typeof ADJUSTMENT_KINDS)[number];
+export function validateAdjustment(amount: string, reason: string): string | null {
+  const n = toNum(amount);
+  if (!amount.trim() || !Number.isFinite(n) || n <= 0) return "Enter the amount, more than zero.";
+  if (reason.trim().length < 5) return "Give a reason of at least 5 characters.";
+  if (reason.trim().length > 300) return "The reason is too long (300 characters at most).";
+  return null;
+}
+export const adjustmentBody = (kind: AdjustmentKind, amount: string, reason: string) => ({ kind, amount: toNum(amount), reason: reason.trim() });
+
+/** How the shift's variance reads: over, short, or within tolerance. */
+export function varianceLabel(s: Pick<Shift, "variance" | "tolerance">): { text: string; bad: boolean } {
+  const v = s.variance ?? 0; const tol = s.tolerance ?? 0;
+  if (Math.abs(v) <= tol || Math.abs(v) < 0.005) return { text: "Balanced", bad: false };
+  return { text: `${v < 0 ? "Short" : "Over"} by ${rand(Math.abs(v))}`, bad: true };
+}

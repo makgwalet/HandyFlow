@@ -23,6 +23,8 @@ export function HomeScreen() {
   function open(m: Mode) {
     if (m.id === "driver") nav.navigate("DriverLoads");
     else if (m.id === "depot") nav.navigate("DepotTanks");
+    else if (m.id === "forecourt") nav.navigate("ForecourtShifts");
+    else if (m.id === "truckstop") nav.navigate("TruckStopYard");
     else if (m.id === "manager") nav.navigate("Overview");
     else nav.navigate("ModePlanned", { mode: m.id });
   }

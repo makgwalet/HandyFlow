@@ -1,3 +1,4 @@
+import { ordersFor, usableSuppliers } from "@depot/supply";
 import { canReceiveFuel, canRecordDip, dipBody, emptyReceive, fillText, receiveBody, sortTanks, tankSchema, validateDip, validateReceive, varianceText, type ReceiveForm, type Tank } from "@depot/tanks";
 
 const tank = (o: Partial<Tank> = {}): Tank => ({ id: "t", name: "Tank 1", fuelType: "DIESEL_50", capacityLitres: 30000, currentLitres: 12000, low: false, ...o });
@@ -59,5 +60,17 @@ describe("dip reading", () => {
   it("lets the same people receive as record dips", () => {
     expect(canReceiveFuel(["FUEL_OPERATIONS_MANAGE"])).toBe(true);
     expect(canReceiveFuel(["FUEL_READ"])).toBe(false);
+  });
+  it("needs a supplier before an order", () => expect(validateReceive(f({ purchaseOrderId: "P1" }), tank)).toMatch(/supplier/i));
+  it("sends the supplier and order when chosen", () => expect(receiveBody(f({ supplierId: "S1", purchaseOrderId: "P1" }), "t")).toMatchObject({ supplierId: "S1", purchaseOrderId: "P1" }));
+  it("offers only approved suppliers, by name", () => {
+    const l = usableSuppliers([{ id: "b", name: "Zed", approvalStatus: "APPROVED" }, { id: "c", name: "Mid", approvalStatus: "SUSPENDED" }, { id: "a", name: "Alpha" }]);
+    expect(l.map((s) => s.id)).toEqual(["a", "b"]);
+  });
+  it("offers only placed orders for this supplier and this tank's fuel", () => {
+    const o = (id: string, supplierId: string, fuelType: string, status: string) => ({ id, poNumber: id, supplierId, fuelType, status });
+    const list = [o("ok", "S1", "DIESEL_50", "ORDERED"), o("part", "S1", "diesel_50", "PART_RECEIVED"), o("draft", "S1", "DIESEL_50", "DRAFT"), o("other", "S2", "DIESEL_50", "ORDERED"), o("ulp", "S1", "ULP95", "ORDERED"), o("done", "S1", "DIESEL_50", "RECEIVED")];
+    expect(ordersFor(list, "S1", "DIESEL_50").map((x) => x.id)).toEqual(["ok", "part"]);
+    expect(ordersFor(list, null, "DIESEL_50")).toEqual([]);
   });
 });

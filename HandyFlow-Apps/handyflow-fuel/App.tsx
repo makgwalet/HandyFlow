@@ -8,6 +8,8 @@ import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { ArrivalCheckScreen, SignatureScreen, CompleteScreen, FailedAttemptScreen, LoadDetailScreen, MyLoadsScreen } from "@driver/index";
 import { ReceiveFuelScreen, TankDetailScreen, TanksScreen } from "@depot/index";
 import { OverviewScreen } from "@overview/index";
+import { StayDetailScreen, StayRequestsScreen, YardScreen } from "@truckstop/index";
+import { AdjustmentScreen, CloseShiftScreen, OpenShiftScreen, ShiftDetailScreen, ShiftsScreen } from "@forecourt/index";
 import { AuthProvider, useAuth } from "@/auth/AuthContext";
 import { OutboxProvider } from "@/offline/OutboxProvider";
 import { HomeScreen } from "@/screens/HomeScreen";
@@ -39,6 +41,14 @@ function SignedIn() {
           <Stack.Screen name="FailedAttempt" component={FailedAttemptScreen} options={{ title: "Could not deliver" }} />
           <Stack.Screen name="DepotTanks" component={TanksScreen} options={{ title: "Tanks" }} />
           <Stack.Screen name="ReceiveFuel" component={ReceiveFuelScreen} options={{ title: "Receive fuel" }} />
+          <Stack.Screen name="ForecourtShifts" component={ShiftsScreen} options={{ title: "Shifts" }} />
+          <Stack.Screen name="OpenShift" component={OpenShiftScreen} options={{ title: "Open a shift" }} />
+          <Stack.Screen name="ShiftDetail" component={ShiftDetailScreen} options={{ title: "Shift" }} />
+          <Stack.Screen name="CloseShift" component={CloseShiftScreen} options={{ title: "Close shift" }} />
+          <Stack.Screen name="Adjustment" component={AdjustmentScreen} options={{ title: "Refund, void or discount" }} />
+          <Stack.Screen name="TruckStopYard" component={YardScreen} options={{ title: "Truck stop" }} />
+          <Stack.Screen name="StayDetail" component={StayDetailScreen} options={{ title: "Stay" }} />
+          <Stack.Screen name="StayRequests" component={StayRequestsScreen} options={{ title: "Stay requests" }} />
           <Stack.Screen name="Overview" component={OverviewScreen} options={{ title: "Overview" }} />
           <Stack.Screen name="TankDetail" component={TankDetailScreen} options={{ title: "Tank" }} />
         </Stack.Navigator>

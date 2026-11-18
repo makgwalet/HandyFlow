@@ -15,6 +15,7 @@ jest.mock("@/api/client", () => ({ api: (...a: unknown[]) => mockApi(...a) }));
 jest.mock("@react-navigation/native", () => ({ useNavigation: () => ({ navigate: mockNavigate, goBack: mockGoBack }) }));
 jest.mock("@/offline/OutboxProvider", () => ({ useOutbox: () => ({ enqueue: mockEnqueue, pending: mockPending }) }));
 jest.mock("@/auth/AuthContext", () => ({ useAuth: () => ({ session: { firstName: "Sipho", lastName: "D", email: "s@x", permissions: mockPermissions } }) }));
+jest.mock("@depot/useSupply", () => ({ useSupply: () => ({ suppliers: [{ id: "S1", name: "Engen Wholesale", approvalStatus: "APPROVED" }], orders: [{ id: "P1", poNumber: "PO-7", supplierId: "S1", fuelType: "DIESEL_50", litresOutstanding: 8000, status: "ORDERED" }], isLoading: false, unavailable: false }) }));
 jest.mock("@depot/useTanks", () => ({ useTanks: () => ({ tanks: [{ id: "T1", name: "Tank 1", fuelType: "DIESEL_50", capacityLitres: 30000, currentLitres: 12000, low: false }] }) }));
 jest.mock("@/ui/Screen", () => {
   const { View, Text } = require("react-native");
@@ -76,6 +77,21 @@ describe("ReceiveFuelScreen", () => {
     await fireEvent.press(screen.getByLabelText("Save receipt"));
     await waitFor(() => expect(mockGoBack).toHaveBeenCalled());
     expect(mockEnqueue).toHaveBeenCalledWith("RECEIVE_FUEL", { tankId: "T1", body: expect.objectContaining({ litresReceived: 10000, pricePerLitre: 21.5, deliveryNote: "DN7" }) });
+  });
+  it("books against a supplier and order, and clears the order when the supplier changes", async () => {
+    await wrap(<ReceiveFuelScreen {...props} />);
+    await fill("5000", "21.5");
+    await fireEvent.press(screen.getByLabelText("Supplier: Engen Wholesale"));
+    await fireEvent.press(screen.getByLabelText(/Order: PO-7/));
+    await fireEvent.press(screen.getByLabelText("Save receipt"));
+    await waitFor(() => expect(mockEnqueue).toHaveBeenCalled());
+    expect(mockEnqueue).toHaveBeenCalledWith("RECEIVE_FUEL", { tankId: "T1", body: expect.objectContaining({ supplierId: "S1", purchaseOrderId: "P1" }) });
+  });
+  it("shows no orders until a supplier is chosen", async () => {
+    await wrap(<ReceiveFuelScreen {...props} />);
+    expect(screen.queryByLabelText(/Order: PO-7/)).toBeNull();
+    await fireEvent.press(screen.getByLabelText("Supplier: Engen Wholesale"));
+    expect(screen.getByLabelText(/Order: PO-7/)).toBeTruthy();
   });
   it("does nothing for someone without permission", async () => {
     mockPermissions = ["FUEL_READ"];

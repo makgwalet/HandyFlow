@@ -23,9 +23,9 @@ interface Rule extends Mode {
 const RULES: Rule[] = [
   { id: "driver", title: "My loads", blurb: "Start a trip, check in, record the delivery, report a failed delivery, add photos.", available: true,
     anyOf: ["FUEL_DRIVER", "FUEL_MANAGE", "FUEL_TRANSPORT_MANAGE"], divisions: ["DISTRIBUTION"] },
-  { id: "forecourt", title: "Forecourt", blurb: "Shift, pump readings and takings.", available: false,
+  { id: "forecourt", title: "Forecourt", blurb: "Open and close shifts, pump meters and takings, refunds and voids.", available: true,
     anyOf: ["FUEL_FORECOURT", "FUEL_FORECOURT_MANAGE", "FUEL_MANAGE"], divisions: ["RETAIL_FORECOURT"] },
-  { id: "truckstop", title: "Truck stop", blurb: "Bays, stays and driver tabs.", available: false,
+  { id: "truckstop", title: "Truck stop", blurb: "The yard, check-in and check-out, bays and stay requests.", available: true,
     anyOf: ["FUEL_TRUCKSTOP_MANAGE", "FUEL_MANAGE"], divisions: ["TRUCK_STOP"] },
   { id: "depot", title: "Depot", blurb: "Tank levels, dip readings and receiving fuel.", available: true,
     anyOf: ["FUEL_STOCK_MANAGE", "FUEL_OPERATIONS_MANAGE", "FUEL_DISTRIBUTION_MANAGE", "FUEL_MANAGE"], divisions: ["WHOLESALE_SUPPLY", "DISTRIBUTION"] },

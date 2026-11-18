@@ -15,7 +15,7 @@ describe("modes", () => {
     expect(defaultMode(m)).toBeNull();
   });
   it("marks Driver and Depot as built", () => {
-    expect(modesFor(["FUEL_MANAGE"]).filter((m) => m.available).map((m) => m.id)).toEqual(["driver", "depot", "manager"]);
+    expect(modesFor(["FUEL_MANAGE"]).filter((m) => m.available).map((m) => m.id)).toEqual(["driver", "forecourt", "truckstop", "depot", "manager"]);
   });
   it("shows a read-only user the overview only", () => {
     expect(modesFor(["FUEL_READ"]).map((x) => x.id)).toEqual(["manager"]);

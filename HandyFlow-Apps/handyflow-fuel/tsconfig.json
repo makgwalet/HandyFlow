@@ -10,7 +10,9 @@
       "@/*": ["./src/*"],
       "@driver/*": ["./packages/fuel-driver/src/*"],
       "@depot/*": ["./packages/fuel-depot/src/*"],
-      "@overview/*": ["./packages/fuel-overview/src/*"]
+      "@overview/*": ["./packages/fuel-overview/src/*"],
+      "@forecourt/*": ["./packages/fuel-forecourt/src/*"],
+      "@truckstop/*": ["./packages/fuel-truckstop/src/*"]
     }
   },
   "include": ["**/*.ts", "**/*.tsx", ".expo/types/**/*.ts", "expo-env.d.ts"],

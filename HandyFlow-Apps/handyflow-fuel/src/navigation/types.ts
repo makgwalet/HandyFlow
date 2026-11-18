@@ -13,6 +13,14 @@ export type RootStackParamList = {
   Signature: { loadId: string };
   FailedAttempt: { loadId: string };
   Overview: undefined;
+  TruckStopYard: undefined;
+  StayDetail: { stayId: string };
+  StayRequests: undefined;
+  ForecourtShifts: undefined;
+  OpenShift: undefined;
+  ShiftDetail: { shiftId: string };
+  CloseShift: { shiftId: string };
+  Adjustment: { shiftId: string };
   DepotTanks: undefined;
   TankDetail: { tankId: string };
   ReceiveFuel: { tankId: string };

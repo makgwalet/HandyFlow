@@ -28,11 +28,23 @@ describe("HomeScreen", () => {
     await fireEvent.press(screen.getByLabelText("Depot"));
     expect(mockNavigate).toHaveBeenCalledWith("DepotTanks");
   });
-  it("says plainly when a mode is not built yet", async () => {
-    mockPermissions = ["FUEL_MANAGE"];
+  it("opens Shifts for forecourt staff", async () => {
+    mockPermissions = ["FUEL_FORECOURT"];
     await render(<HomeScreen />);
-    await fireEvent.press(screen.getByLabelText("Forecourt, not available yet"));
-    expect(mockNavigate).toHaveBeenCalledWith("ModePlanned", { mode: "forecourt" });
+    await fireEvent.press(screen.getByLabelText("Forecourt"));
+    expect(mockNavigate).toHaveBeenCalledWith("ForecourtShifts");
+  });
+  it("opens the yard for truck stop staff", async () => {
+    mockPermissions = ["FUEL_TRUCKSTOP_MANAGE"];
+    await render(<HomeScreen />);
+    await fireEvent.press(screen.getByLabelText("Truck stop"));
+    expect(mockNavigate).toHaveBeenCalledWith("TruckStopYard");
+  });
+  it("opens Overview for a read-only user", async () => {
+    mockPermissions = ["FUEL_READ"];
+    await render(<HomeScreen />);
+    await fireEvent.press(screen.getByLabelText("Overview"));
+    expect(mockNavigate).toHaveBeenCalledWith("Overview");
   });
   it("explains a sign-in with no Fuel access", async () => {
     mockPermissions = ["INVOICE_READ"];

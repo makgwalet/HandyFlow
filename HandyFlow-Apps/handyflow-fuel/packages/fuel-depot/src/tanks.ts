@@ -69,8 +69,8 @@ export function varianceText(r: Pick<DipReading, "varianceLitres" | "negativeVar
 /** The server enforces this too. Receiving fuel needs the same permission as a dip reading. */
 export const canReceiveFuel = canRecordDip;
 
-export interface ReceiveForm { litres: string; price: string; deliveryNote: string; invoiceRef: string; freight: string }
-export const emptyReceive: ReceiveForm = { litres: "", price: "", deliveryNote: "", invoiceRef: "", freight: "" };
+export interface ReceiveForm { litres: string; price: string; deliveryNote: string; invoiceRef: string; freight: string; supplierId: string | null; purchaseOrderId: string | null }
+export const emptyReceive: ReceiveForm = { litres: "", price: "", deliveryNote: "", invoiceRef: "", freight: "", supplierId: null, purchaseOrderId: null };
 
 const toNum = (t: string) => Number(t.trim().replace(",", "."));
 
@@ -87,6 +87,7 @@ export function validateReceive(f: ReceiveForm, tank: Pick<Tank, "capacityLitres
   if (!f.price.trim()) return "Enter the price per litre.";
   const p = toNum(f.price);
   if (!Number.isFinite(p) || p <= 0) return "Price per litre must be more than zero.";
+  if (f.purchaseOrderId && !f.supplierId) return "Choose the supplier to book this against an order.";
   if (f.freight.trim()) {
     const fr = toNum(f.freight);
     if (!Number.isFinite(fr) || fr < 0) return "Freight must be a number, zero or more.";
@@ -102,6 +103,8 @@ export function receiveBody(f: ReceiveForm, receivedAtIso: string) {
     receivedAt: receivedAtIso,
     ...(f.deliveryNote.trim() ? { deliveryNote: f.deliveryNote.trim() } : {}),
     ...(f.invoiceRef.trim() ? { invoiceRef: f.invoiceRef.trim() } : {}),
+    ...(f.supplierId ? { supplierId: f.supplierId } : {}),
+    ...(f.purchaseOrderId ? { purchaseOrderId: f.purchaseOrderId } : {}),
     ...(f.freight.trim() ? { freightAmount: toNum(f.freight) } : {}),
   };
 }
