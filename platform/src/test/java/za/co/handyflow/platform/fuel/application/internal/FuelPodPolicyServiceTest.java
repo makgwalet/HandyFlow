@@ -68,11 +68,38 @@ class FuelPodPolicyServiceTest {
     }
 
     private static CompleteDeliveryRequest req(String receiver, String exType, String exReason) {
-        return new CompleteDeliveryRequest(new BigDecimal("1000"), receiver, null, null, null, false, null, null, UUID.randomUUID(), exType, exReason);
+        // An ordinary delivery arrives signed; an exception has nobody to sign.
+        return new CompleteDeliveryRequest(new BigDecimal("1000"), receiver, null, null, null, false, null, exType == null ? SIGNATURE : null, UUID.randomUUID(), exType, exReason);
+    }
+
+    static final String SIGNATURE = "data:image/png;base64,iVBORw0KGgo=";
+
+    private static CompleteDeliveryRequest unsigned(String receiver) {
+        return new CompleteDeliveryRequest(new BigDecimal("1000"), receiver, null, null, null, false, null, null, UUID.randomUUID(), null, null);
     }
 
     private void photo() {
         when(evidence.findByDelivery(eq(T), any())).thenReturn(List.of(FuelDeliveryEvidence.create(T, load.getId(), "PHOTO", "x.jpg", null, null, null, "gate", DRIVER)));
+    }
+
+    @Test @DisplayName("a typed name is not a signature: an attended delivery without one is refused before anything is changed")
+    void nameIsNotASignature() {
+        IllegalStateException e = assertThrows(IllegalStateException.class, () -> service.complete(T, DRIVER, load.getId(), unsigned("Johannes van Wyk"), NOW));
+        assertTrue(e.getMessage().contains("signature"));
+        verify(fuelService, never()).completeDelivery(any(), any(), any());
+    }
+
+    @Test @DisplayName("a signature already uploaded on the load counts, so the office can complete after the driver captured it")
+    void uploadedSignatureCounts() {
+        when(evidence.findByDelivery(eq(T), any())).thenReturn(List.of(FuelDeliveryEvidence.create(T, load.getId(), "SIGNATURE", "sig.png", null, null, null, "receiver", DRIVER)));
+        service.complete(T, DRIVER, load.getId(), unsigned("Johannes van Wyk"), NOW);
+        verify(fuelService).completeDelivery(eq(T), eq(load.getId()), any());
+    }
+
+    @Test @DisplayName("a photo is not a signature")
+    void photoIsNotASignature() {
+        photo();
+        assertThrows(IllegalStateException.class, () -> service.complete(T, DRIVER, load.getId(), unsigned("Johannes van Wyk"), NOW));
     }
 
     @Test @DisplayName("a refused arrival check stops completion, for the office as for the driver, before anything is changed")

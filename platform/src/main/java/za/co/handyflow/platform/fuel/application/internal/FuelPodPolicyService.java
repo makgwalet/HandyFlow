@@ -86,6 +86,10 @@ public class FuelPodPolicyService {
             if (!hasName) throw new IllegalStateException("Enter the name of the person who received the fuel. If nobody can receive it, the delivery needs an authorised exception.");
             if (Boolean.TRUE.equals(req.signedOnBehalf()) && (req.onBehalfOf() == null || req.onBehalfOf().isBlank()))
                 throw new IllegalStateException("Enter the name of the designated receiver you signed on behalf of.");
+            // A typed name is not a signature: an attended delivery also needs the signature drawn on the device, or one already uploaded on the load.
+            boolean hasSignature = (req.receiverSignatureUrl() != null && !req.receiverSignatureUrl().isBlank())
+                    || evidence.findByDelivery(tenantId, d.getId()).stream().anyMatch(e -> "ACTIVE".equals(e.getStatus()) && "SIGNATURE".equals(e.getKind()));
+            if (!hasSignature) throw new IllegalStateException("Get the receiver's signature before completing. A typed name is not a signature. If nobody can sign, the delivery needs an authorised exception.");
             return null;
         }
         if (hasName) throw new IllegalStateException("Give either the receiver's name or an exception, not both.");
