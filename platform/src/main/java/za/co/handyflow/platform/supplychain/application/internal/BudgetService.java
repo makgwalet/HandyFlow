@@ -323,6 +323,13 @@ public class BudgetService {
         return new Usage(poUsage.committed(), poUsage.actual().add(noPo), poUsage.used().add(noPo));
     }
 
+    /** True when the tenant has any active budget: only then does an uncoded no-PO invoice escape something. */
+    @Transactional(readOnly = true)
+    public boolean hasActiveBudgets(TenantId tenantId) {
+        Integer n = jdbc.queryForObject("SELECT count(*) FROM sc_budgets WHERE tenant_id = ? AND status = 'ACTIVE' AND control_mode <> 'NONE'", Integer.class, tenantId.getValue());
+        return n != null && n > 0;
+    }
+
     /** Approved/paid invoices with no PO, coded to this budget's scope value and dated inside its period. */
     private BigDecimal noPoInvoiceActuals(UUID tid, ScBudget b) {
         BigDecimal v = jdbc.queryForObject("SELECT COALESCE(SUM(" + (includeVat ? "total_amount" : "subtotal") + "), 0) "

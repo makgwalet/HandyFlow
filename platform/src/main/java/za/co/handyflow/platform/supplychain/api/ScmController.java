@@ -381,6 +381,16 @@ public class ScmController {
                         TenantContext.getCurrentUserName())));
     }
 
+    public record CodingRequest(String department, String costCentre, String projectRef) {}
+
+    @PutMapping("/supplier-invoices/{id}/coding")
+    @PreAuthorize("hasAnyAuthority('SCM_INVOICE','SCM_ADMIN')")
+    @Operation(summary = "Code a no-PO invoice to a department, cost centre or project so it counts against budgets (before approval)")
+    public ResponseEntity<ApiResponse<ScSupplierInvoice>> codeSupplierInvoice(@PathVariable UUID id, @RequestBody CodingRequest req) {
+        return ResponseEntity.ok(ApiResponse.success("Invoice coded", scmService.codeSupplierInvoice(TenantContext.getTenantIdAsObject(), id,
+                req.department(), req.costCentre(), req.projectRef())));
+    }
+
     @PostMapping("/supplier-invoices/{id}/pay")
     @PreAuthorize("hasAuthority('SCM_INVOICE')")
     @Operation(summary = "Mark supplier invoice as paid (APPROVED → PAID)")

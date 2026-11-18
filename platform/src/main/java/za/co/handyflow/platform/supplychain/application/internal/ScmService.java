@@ -629,12 +629,38 @@ public class ScmService {
 
         requireNoOpenCriticalException(tenantId, inv);
         requireMatchClearedForApproval(inv);
+        requireCodingForBudgets(tenantId, inv);
         enforceSegregation(tenantId, "SCM_INVOICE", "ScSupplierInvoice", inv.getId(), inv.getCapturedBy(), approverId, "supplier invoice");
 
         inv.approve(approverId, approverName);
         log.info("[SCM] Supplier invoice {} approved by {}", inv.getInvoiceNumber(), approverName);
 
         handOffToAp(tenantId, inv, approverId);
+        return invoiceRepo.save(inv);
+    }
+
+    /**
+     * An invoice with no purchase order has no commitment to draw on, so it reaches a budget only through its coding. While
+     * the tenant has budgets that control spending, approving an uncoded one would let the spend bypass them: refuse it.
+     */
+    private void requireCodingForBudgets(TenantId tenantId, ScSupplierInvoice inv) {
+        if (inv.getPurchaseOrderId() != null) return;
+        boolean coded = inv.getDepartment() != null || inv.getCostCentre() != null || inv.getProjectRef() != null;
+        if (!coded && budgetService.hasActiveBudgets(tenantId))
+            throw new HandyFlowException("Invoice " + inv.getInvoiceNumber() + " has no purchase order and is not coded to a department, cost centre or project, "
+                    + "so it would count against no budget. Code it first.", HttpStatus.CONFLICT, "CODING_REQUIRED");
+    }
+
+    /** Sets or changes the coding of a no-PO invoice that is not yet approved. */
+    @Transactional
+    public ScSupplierInvoice codeSupplierInvoice(TenantId tenantId, UUID id, String department, String costCentre, String projectRef) {
+        ScSupplierInvoice inv = invoiceRepo.findByTenantIdAndId(tenantId.getValue(), id)
+                .orElseThrow(() -> new HandyFlowException("Invoice not found", HttpStatus.NOT_FOUND, "NOT_FOUND"));
+        if (inv.getPurchaseOrderId() != null)
+            throw new HandyFlowException("This invoice is on a purchase order, which carries the coding", HttpStatus.CONFLICT, "HAS_PO");
+        if (inv.getStatus() == InvoiceStatus.APPROVED || inv.getStatus() == InvoiceStatus.PAID)
+            throw new HandyFlowException("An approved or paid invoice can no longer be recoded", HttpStatus.CONFLICT, "INVOICE_LOCKED");
+        inv.codeTo(department, costCentre, projectRef);
         return invoiceRepo.save(inv);
     }
 
