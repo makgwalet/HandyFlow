@@ -72,6 +72,7 @@ public class RfqService {
     private final TenantSequenceService sequenceService;
     private final EmailService emailService;
     private final VatRateProvider vatRateProvider;
+    private final ProcurementPolicy procurementPolicy;
 
     @Value("${app.scm.rfq.min-invitations:2}")
     private int minInvitations;
@@ -303,9 +304,20 @@ public class RfqService {
             poRepo.save(linked);
             for (Pick p : picks) {
                 UUID rlId = p.rfqLine().getRequisitionLineId();
-                if (rlId != null && reqLines.containsKey(rlId))
-                    conversionRepo.save(ScRequisitionConversion.create(tid, requisition.getId(), rlId, poId, p.qty(),
-                            p.quoteLine().netUnitPrice(), userId, userName));
+                if (rlId == null || !reqLines.containsKey(rlId)) continue;
+                ScRequisitionLine rl = reqLines.get(rlId);
+                BigDecimal unit = p.quoteLine().netUnitPrice();
+                ScRequisitionConversion conv = ScRequisitionConversion.create(tid, requisition.getId(), rlId, poId, p.qty(),
+                        unit, userId, userName);
+                // The same buyer price check as a direct conversion: a quote above the requisition estimate by more than the
+                // category's (or company's) tolerance needs a second person's approval before the PO can be approved.
+                PriceOverrideRules.Assessment price = PriceOverrideRules.assess(rl.getEstimatedUnitCost(), unit, p.qty(),
+                        procurementPolicy.toleranceForItem(tid, rl.getCatalogueItemId()));
+                conv.recordPrice(rl.getEstimatedUnitCost(), price.needsApproval() ? "PENDING_APPROVAL" : "NONE",
+                        price.changed() ? "SUPPLIER_QUOTATION" : null,
+                        price.changed() ? "Awarded quotation from " + q.getSupplierName() + " (" + rfq.getRfqNumber() + ")" : null,
+                        rfq.getRfqNumber(), price.saving());
+                conversionRepo.save(conv);
             }
         }
         rfq.linkPo(poId);

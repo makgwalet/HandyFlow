@@ -321,7 +321,7 @@ public class BudgetService {
     @Transactional
     public void checkRequisition(TenantId tenantId, ScRequisition r, List<ScRequisitionLine> lines, boolean alert) {
         UUID tid = tenantId.getValue();
-        BigDecimal amount = requisitionAmount(tid, lines);
+        BigDecimal amount = requisitionAmount(tid, r.getCurrency(), lines);
         Dims d = new Dims(r.getDepartment(), r.getCostCentre(), r.getProjectRef(),
                 r.getRequiredByDate() != null ? r.getRequiredByDate() : LocalDate.now());
         enforce(tenantId, ScBudgetOverride.REQUISITION, r.getId(), "Requisition " + r.getRequisitionNumber(),
@@ -346,7 +346,7 @@ public class BudgetService {
         } else {
             ScRequisition r = requisitionRepo.findByTenantAndId(tid, entityId)
                     .orElseThrow(() -> new HandyFlowException("Requisition not found", HttpStatus.NOT_FOUND, "NOT_FOUND"));
-            amount = requisitionAmount(tid, requisitionLineRepo.findByRequisition(tid, entityId));
+            amount = requisitionAmount(tid, r.getCurrency(), requisitionLineRepo.findByRequisition(tid, entityId));
             label = "Requisition " + r.getRequisitionNumber();
         }
         overrideRepo.save(ScBudgetOverride.create(tid, entityType, entityId, amount, reason.trim(), userId, userName));
@@ -446,25 +446,32 @@ public class BudgetService {
     }
 
     private BigDecimal poAmount(ScPurchaseOrder po) {
-        BigDecimal vat = po.getTotalAmount().subtract(po.getSubtotal());
-        return ProcurementPolicy.budgetAmount(po.getSubtotal(), vat, policy.forTenant(po.getTenantId()));
+        // Supplier-specific VAT recoverability and the exchange rate to the base currency are applied inside the policy.
+        return policy.budgetAmountFor(po.getTenantId(), po.getSupplierId(), po.getCurrency(), po.getOrderDate(),
+                po.getSubtotal(), po.getTotalAmount());
     }
 
     /** SQL fragment: the budget amount of a document with subtotal and total_amount columns, under the company's VAT policy. */
     private String amountSql(UUID tid) {
-        // The factor is a number computed from validated policy values (0..1, four decimals), never user text.
-        return "(subtotal + (total_amount - subtotal) * " + ProcurementPolicy.vatFactor(policy.forTenant(tid)).toPlainString() + ")";
+        // Per-supplier VAT and the exchange rate are applied row by row; see ProcurementPolicy.amountSql.
+        return policy.amountSql(tid, "sc_supplier_invoices", "invoice_date");
     }
 
-    private BigDecimal requisitionAmount(UUID tid, List<ScRequisitionLine> lines) {
-        BigDecimal factor = ProcurementPolicy.vatFactor(policy.forTenant(tid));
+    private BigDecimal requisitionAmount(UUID tid, String currency, List<ScRequisitionLine> lines) {
+        ProcurementPolicy.Policy co = policy.forTenant(tid);
+        BigDecimal factor = ProcurementPolicy.vatFactor(co);
         BigDecimal total = BigDecimal.ZERO;
         for (ScRequisitionLine l : lines) {
             BigDecimal net = l.getQtyRequested().multiply(l.getEstimatedUnitCost()).setScale(2, RoundingMode.HALF_UP);
             total = total.add(net);
             total = total.add(net.multiply(l.getVatRate()).multiply(factor).divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP));
         }
-        return total;
+        if (ScmPolicyRules.isBase(currency, co.baseCurrency())) return total;
+        BigDecimal rate = policy.rateOrNull(tid, currency, LocalDate.now());
+        if (rate == null)
+            throw new HandyFlowException("There is no " + currency.toUpperCase(java.util.Locale.ROOT) + " to " + co.baseCurrency()
+                    + " exchange rate. Add one under Procurement policy > Exchange rates.", HttpStatus.CONFLICT, "NO_EXCHANGE_RATE");
+        return ScmPolicyRules.toBase(total, rate);
     }
 
     /**

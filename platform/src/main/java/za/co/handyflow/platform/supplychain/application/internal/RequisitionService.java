@@ -237,7 +237,6 @@ public class RequisitionService {
 
         record Pick(ScRequisitionLine line, BigDecimal qty, BigDecimal cost, BigDecimal vat,
                     PriceOverrideRules.Assessment price, String reason, String note, String quotationRef) {}
-        BigDecimal tolerance = procurementPolicy.forTenant(tid).priceIncreaseTolerancePct();
         List<Pick> picks = new ArrayList<>();
         Set<UUID> seen = new HashSet<>();
         for (ConvertRequisitionRequest.Line c : req.lines()) {
@@ -253,6 +252,8 @@ public class RequisitionService {
             if (cost.signum() < 0) throw bad(l.getItemName() + ": unit cost cannot be negative");
             // Policy: the buyer may set the real price, but a change from the estimate needs a reason; a decrease is a
             // saving; an increase beyond the company's tolerance must be approved by a second person before the PO is.
+            // The tolerance is the catalogue category's own when it has one, else the company's.
+            BigDecimal tolerance = procurementPolicy.toleranceForItem(tid, l.getCatalogueItemId());
             PriceOverrideRules.Assessment price = PriceOverrideRules.assess(l.getEstimatedUnitCost(), cost, qty, tolerance);
             String reason = c.priceChangeReason() == null ? null : c.priceChangeReason().trim().toUpperCase(Locale.ROOT);
             String problem = PriceOverrideRules.reasonProblem(price, reason, c.priceChangeNote());
@@ -316,6 +317,10 @@ public class RequisitionService {
             throw new HandyFlowException("Say why the price increase is rejected", HttpStatus.BAD_REQUEST, "REASON_REQUIRED");
         sod.require(tenantId, "SCM_PRICE_OVERRIDE_APPROVE", c.getConvertedBy(), userId,
                 "You cannot approve a price increase that you made yourself", "ScRequisitionConversion", c.getId(), "price override approval");
+        // An approver may only approve a price increase up to their own limit (the extra cost: qty x increase).
+        if (approve)
+            approvalLimits.enforce(tenantId, userId, ApprovalLimitRules.PRICE_OVERRIDE,
+                    ScmPolicyRules.increaseAmount(c.getRequisitionUnitCost(), c.getUnitCost(), c.getQty()));
         try {
             c.decidePrice(approve, userId, userName, note);
         } catch (IllegalStateException e) {

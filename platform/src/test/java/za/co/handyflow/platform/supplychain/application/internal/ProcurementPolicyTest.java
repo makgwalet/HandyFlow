@@ -50,4 +50,22 @@ class ProcurementPolicyTest {
         assertThat(ProcurementPolicy.problem(new Policy("EX_VAT", d("100"), true, d("-1")))).contains("tolerance");
         assertThat(ProcurementPolicy.problem(null)).isNotNull();
     }
+
+    @Test
+    void baseCurrencyDefaultsToRandAndIsUpperCased() {
+        assertThat(new Policy("EX_VAT", d("100"), true, d("5")).baseCurrency()).isEqualTo("ZAR");
+        assertThat(new Policy("EX_VAT", d("100"), true, d("5"), " usd ").baseCurrency()).isEqualTo("USD");
+        assertThat(new Policy("EX_VAT", d("100"), true, d("5"), null).baseCurrency()).isEqualTo("ZAR");
+    }
+
+    @Test
+    void rejectsAnInvalidBaseCurrency() {
+        assertThat(ProcurementPolicy.problem(new Policy("EX_VAT", d("100"), true, d("5"), "RAND"))).contains("Base currency");
+        assertThat(ProcurementPolicy.problem(new Policy("EX_VAT", d("100"), true, d("5"), "EUR"))).isNull();
+    }
+
+    @Test
+    void vatFactorMatchesTheSharedRule() {
+        assertThat(ProcurementPolicy.vatFactor(p("NET_OF_RECOVERABLE", "60", true))).isEqualByComparingTo("0.4");
+    }
 }

@@ -22,8 +22,8 @@ public final class ApprovalLimitRules {
 
     public static final String ANY = "*";
     public static final String REQUISITION = "REQUISITION", PURCHASE_ORDER = "PURCHASE_ORDER", RFQ_AWARD = "RFQ_AWARD",
-            PO_AMENDMENT = "PO_AMENDMENT", SUPPLIER_INVOICE = "SUPPLIER_INVOICE";
-    public static final List<String> DOCUMENT_TYPES = List.of(REQUISITION, PURCHASE_ORDER, RFQ_AWARD, PO_AMENDMENT, SUPPLIER_INVOICE);
+            PO_AMENDMENT = "PO_AMENDMENT", SUPPLIER_INVOICE = "SUPPLIER_INVOICE", PRICE_OVERRIDE = "PRICE_OVERRIDE";
+    public static final List<String> DOCUMENT_TYPES = List.of(REQUISITION, PURCHASE_ORDER, RFQ_AWARD, PO_AMENDMENT, SUPPLIER_INVOICE, PRICE_OVERRIDE);
 
     public record Limit(String subjectType, UUID subjectId, String documentType, BigDecimal max) {}
 
@@ -80,6 +80,7 @@ public final class ApprovalLimitRules {
             case RFQ_AWARD -> "RFQ award";
             case PO_AMENDMENT -> "purchase order amendment";
             case SUPPLIER_INVOICE -> "supplier invoice";
+            case PRICE_OVERRIDE -> "price increase";
             default -> "document";
         };
     }
@@ -91,6 +92,7 @@ public final class ApprovalLimitRules {
             case RFQ_AWARD -> "RFQ awards";
             case PO_AMENDMENT -> "purchase order amendments";
             case SUPPLIER_INVOICE -> "supplier invoices";
+            case PRICE_OVERRIDE -> "price increases";
             case ANY -> "all documents";
             default -> documentType.toLowerCase(Locale.ROOT);
         };
