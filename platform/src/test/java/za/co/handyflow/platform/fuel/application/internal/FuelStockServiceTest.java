@@ -13,6 +13,7 @@ import za.co.handyflow.platform.crm.CrmFacade;
 import za.co.handyflow.platform.fuel.domain.model.FuelReservation;
 import za.co.handyflow.platform.fuel.domain.model.FuelStockMovement;
 import za.co.handyflow.platform.fuel.domain.model.FuelTank;
+import za.co.handyflow.platform.fuel.domain.model.FuelTransfer;
 import za.co.handyflow.platform.fuel.domain.repository.*;
 import za.co.handyflow.platform.fuel.dto.*;
 import za.co.handyflow.platform.shared.ResourceNotFoundException;

@@ -12,6 +12,7 @@ import za.co.handyflow.platform.shared.TenantContext;
 import za.co.handyflow.platform.supplychain.application.internal.SupplierAuditService;
 import za.co.handyflow.platform.supplychain.application.internal.SupplierBankChangeService;
 import za.co.handyflow.platform.supplychain.application.internal.SupplierLifecycleService;
+import za.co.handyflow.platform.supplychain.dto.*;
 
 import java.util.List;
 import java.util.UUID;

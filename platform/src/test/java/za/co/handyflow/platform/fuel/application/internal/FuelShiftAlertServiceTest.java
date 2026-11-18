@@ -13,7 +13,7 @@ import za.co.handyflow.platform.fuel.domain.model.FuelShift;
 import za.co.handyflow.platform.fuel.domain.model.FuelShiftVariancePolicy;
 import za.co.handyflow.platform.fuel.domain.repository.FuelShiftRepository;
 import za.co.handyflow.platform.notifications.application.NotificationRequest;
-import za.co.handyflow.platform.notifications.application.NotificationService;
+import za.co.handyflow.platform.notifications.application.internal.NotificationService;
 import za.co.handyflow.platform.notifications.application.Recipient;
 import za.co.handyflow.platform.notifications.domain.model.NotificationType;
 import za.co.handyflow.platform.shared.TenantId;
