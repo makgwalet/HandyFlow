@@ -1,6 +1,7 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { ApiError, configureApi, type RefreshOutcome } from "@/api/client";
 import { accessExpiring, fuelSessionSchema, loginFuel, logoutFuel, refreshSession, refreshUsable, type FuelSession, type LoginInput } from "@/api/auth";
+import { unregisterPushToken } from "@/api/push";
 import { clearSession, getDeviceId, loadSession, saveSession, saveTenantSlug } from "./deviceStore";
 
 type Status = "loading" | "signedOut" | "signedIn";
@@ -107,6 +108,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Local sign-out must always work. Queued writes stay on the phone under their owner's id and are sent on that person's next sign-in.
   const signOut = useCallback(async () => {
     const current = sessionRef.current;
+    // Stop this person's alerts on this phone while the sign-in still works. Offline, the next person to sign in here takes the token over.
+    if (current) { try { await unregisterPushToken(await getDeviceId()); } catch { /* best effort */ } }
     if (current) { try { await logoutFuel(current.refreshToken); } catch { /* offline: the server-side token expires on its own */ } }
     await drop(false);
   }, [drop]);

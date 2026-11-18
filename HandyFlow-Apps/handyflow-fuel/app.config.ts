@@ -40,6 +40,7 @@ const config: ExpoConfig = {
     "expo-secure-store",
     "expo-sqlite",
     ["expo-location", { locationWhenInUsePermission: "HandyFlow Fuel records where you are when you save a delivery photo or a delivery." }],
+    ["expo-notifications", { defaultChannel: "default" }],
     ["expo-image-picker", { cameraPermission: "HandyFlow Fuel takes photos of delivery proof." }],
   ],
   extra: { apiBaseUrl },

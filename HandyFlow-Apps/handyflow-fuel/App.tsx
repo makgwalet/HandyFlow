@@ -11,6 +11,7 @@ import { OverviewScreen } from "@overview/index";
 import { StayDetailScreen, StayRequestsScreen, YardScreen } from "@truckstop/index";
 import { AdjustmentScreen, CloseShiftScreen, OpenShiftScreen, ShiftDetailScreen, ShiftsScreen } from "@forecourt/index";
 import { AuthProvider, useAuth } from "@/auth/AuthContext";
+import { PushBridge, navigationRef } from "@/PushBridge";
 import { OutboxProvider } from "@/offline/OutboxProvider";
 import { HomeScreen } from "@/screens/HomeScreen";
 import { LoginScreen } from "@/screens/LoginScreen";
@@ -27,7 +28,8 @@ const navTheme = { ...DarkTheme, colors: { ...DarkTheme.colors, background: colo
 function SignedIn() {
   return (
     <OutboxProvider>
-      <NavigationContainer theme={navTheme}>
+      <NavigationContainer theme={navTheme} ref={navigationRef}>
+        <PushBridge />
         <Stack.Navigator>
           <Stack.Screen name="Home" component={HomeScreen} options={{ title: "HandyFlow Fuel", headerBackVisible: false }} />
           <Stack.Screen name="ModePlanned" component={ModePlannedScreen} options={{ title: "Coming soon" }} />
