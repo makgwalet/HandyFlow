@@ -37,7 +37,7 @@ import java.util.*;
  * Config: app.scm.budget.near-limit-pct (default 90), app.scm.budget.include-vat (default false).
  */
 @Slf4j
-@Service
+@Service("scmBudgetService")
 @RequiredArgsConstructor
 public class BudgetService {
 
