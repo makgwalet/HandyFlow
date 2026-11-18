@@ -74,3 +74,53 @@ export function buildDashboard({ tanks, summary }: DashboardInput) {
     pendingDeliveries, openDeliveries, inTransit, alerts,
   }
 }
+
+// ── Retail takings and the truck stop yard ──────────────────────────────────
+
+/** GET /api/v1/fuel/forecourt/summary?days=7 */
+export interface RetailSummary { days: number; shifts: number; litres: number; sales: number; variance: number; flaggedShifts: number }
+/** GET /api/v1/fuel/truck-stop/stays/occupancy and .../capacity */
+export interface YardSummary { inYard: number; arrivals: number; departures: number; bays: number | null; free: number | null; overstays: number }
+
+export function asRetail(v: unknown): RetailSummary | null {
+  const o = v as any
+  if (!o || Array.isArray(o) || typeof o.shifts !== "number") return null
+  return { days: num(o.days), shifts: o.shifts, litres: num(o.litres), sales: num(o.sales), variance: num(o.variance), flaggedShifts: num(o.flaggedShifts) }
+}
+
+export function asYard(occupancy: unknown, capacity: unknown): YardSummary | null {
+  const o = occupancy as any
+  if (!o || Array.isArray(o) || typeof o.inYard !== "number") return null
+  const c = capacity as any
+  return {
+    inYard: o.inYard, arrivals: num(o.arrivals), departures: num(o.departures),
+    bays: o.bays == null ? null : num(o.bays), free: o.free == null ? null : num(o.free),
+    overstays: Array.isArray(c?.overstays) ? c.overstays.length : 0,
+  }
+}
+
+export const fmtRand = (n: number) => `R ${n.toLocaleString("en-ZA", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
+
+/** The retail tile. Amber when any shift closed outside its tolerance and still needs a look; the variance itself is the shifts' own, never recomputed here. */
+export function retailTile(r: RetailSummary) {
+  const flagged = r.flaggedShifts
+  return {
+    value: fmtRand(r.sales),
+    hint: r.shifts === 0 ? `No shifts in the last ${r.days} days` : `${fmtLitres(r.litres)} · ${r.shifts} shift${r.shifts === 1 ? "" : "s"}${flagged > 0 ? ` · ${flagged} flagged` : ""}`,
+    tone: (flagged > 0 ? "amber" : "green") as Tone,
+  }
+}
+
+/** The yard tile. Red when a truck is still in the yard past its planned departure. */
+export function yardTile(y: YardSummary) {
+  const room = y.bays != null && y.free != null ? `${y.free} of ${y.bays} bays free` : "No bay limit set"
+  const moves = `${y.arrivals} arriving · ${y.departures} leaving today`
+  return {
+    value: `${y.inYard} in the yard`,
+    hint: y.overstays > 0 ? `${y.overstays} overstaying · ${room}` : `${room} · ${moves}`,
+    tone: (y.overstays > 0 ? "red" : "violet") as Tone,
+  }
+}
+
+/** A division the company does not run, or a person without access to it, answers 401/403/404: the tile is left out rather than shown as broken. */
+export const isNotForYou = (status: number | undefined) => status === 401 || status === 403 || status === 404
