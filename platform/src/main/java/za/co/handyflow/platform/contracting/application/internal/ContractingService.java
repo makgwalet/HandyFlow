@@ -550,7 +550,10 @@ public class ContractingService {
 
     @Transactional
     public ContractResponse sendForSigning(TenantId tenantId, UUID id) {
-        Contract c = findActive(tenantId, id);
+        // Locked, like every negotiation and redline action on this contract, so a revision being applied cannot be overwritten by a
+        // send that read the body just before it (and the lock order stays contract row, then negotiation row).
+        Contract c = contractRepo.findForUpdate(tenantId.getValue(), id)
+                .orElseThrow(() -> new ResourceNotFoundException("Contract", id.toString()));
         signingPolicy.assertCanSign(c);
         List<ContractParty> parties = partyRepo.findByContract(id);
         c.setParties(parties);
