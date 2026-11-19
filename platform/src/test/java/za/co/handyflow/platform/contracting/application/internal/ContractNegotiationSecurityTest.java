@@ -109,15 +109,19 @@ class ContractNegotiationSecurityTest {
         assertEquals(List.of("kind", "blockIndex", "originalHtml", "proposedHtml", "rationale"), fields);
         List<String> comment = Arrays.stream(CounterpartyCommentInput.class.getRecordComponents()).map(RecordComponent::getName).toList();
         assertEquals(List.of("body", "blockIndex", "blockExcerpt", "proposalId", "parentId"), comment);
+        // a counter carries only wording and a reason: the target, round, author and status are all set by the server
+        List<String> counter = Arrays.stream(CounterInput.class.getRecordComponents()).map(RecordComponent::getName).toList();
+        assertEquals(List.of("proposedHtml", "rationale"), counter);
     }
 
     @Test
     void thePublicControllerCannotReachTheCanonicalContractBody() throws Exception {
         String src = Files.readString(Path.of("src/main/java/za/co/handyflow/platform/contracting/api/PublicNegotiationController.java"));
-        for (String banned : List.of("ContractRepository", "ContractRedlineService", "ContractingService", "applyAccepted", "setBody", "accept(", "reject("))
+        for (String banned : List.of("ContractRepository", "ContractRedlineService", "ContractingService", "applyAccepted", "setBody", "markReady", "staffPropose", "staffCounter"))
             assertFalse(src.contains(banned), "public controller references " + banned);
         String access = Files.readString(Path.of("src/main/java/za/co/handyflow/platform/contracting/application/internal/ContractNegotiationAccessService.java"));
-        for (String banned : List.of("applyAccepted", "markReady", ".accept(", ".reject(", "ContractRedlineService"))
+        // a counterparty may answer proposals addressed to them (counterpartyAccept/Reject/Counter), never use the staff decisions or apply anything
+        for (String banned : List.of("applyAccepted", "markReady", "negotiation.accept(", "negotiation.reject(", "staffPropose", "staffCounter", "staffWithdraw", "ContractRedlineService", "updateBody"))
             assertFalse(access.contains(banned), "access service references " + banned);
     }
 

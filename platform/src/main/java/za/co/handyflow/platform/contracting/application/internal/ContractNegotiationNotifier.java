@@ -75,11 +75,12 @@ public class ContractNegotiationNotifier {
     }
 
     static String subject(NegotiationActivity a, Contract c) {
-        return (NegotiationActivity.PROPOSAL.equals(a.kind()) ? "New proposal on " : "New comment on ") + c.getTitle();
+        String lead = NegotiationActivity.PROPOSAL.equals(a.kind()) ? "New proposal on " : NegotiationActivity.DECISION.equals(a.kind()) ? "Counterparty answered a proposal on " : "New comment on ";
+        return lead + c.getTitle();
     }
 
     static String body(NegotiationActivity a, Contract c) {
-        String what = NegotiationActivity.PROPOSAL.equals(a.kind()) ? "proposed a change to" : "commented on";
+        String what = NegotiationActivity.PROPOSAL.equals(a.kind()) ? "proposed a change to" : NegotiationActivity.DECISION.equals(a.kind()) ? "answered a proposal on" : "commented on";
         String who = a.partyName() == null || a.partyName().isBlank() ? "A counterparty" : HtmlUtils.htmlEscape(a.partyName());
         return "<p>" + who + " has " + what + " contract " + HtmlUtils.htmlEscape(c.getContractNumber()) + " (" + HtmlUtils.htmlEscape(c.getTitle())
                 + ").</p><p>Open the contract in HandyFlow to review it. The contract itself has not changed.</p>";

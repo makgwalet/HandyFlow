@@ -27,16 +27,24 @@ public final class ContractNegotiationDtos {
 
     public record ProposalInput(@NotBlank String kind, Integer blockIndex, String originalHtml, String proposedHtml, @Size(max = 2000) String rationale) {}
 
+    /** Staff propose a change to one counterparty party. */
+    public record StaffProposalRequest(@jakarta.validation.constraints.NotNull UUID partyId, @NotBlank String kind, Integer blockIndex, String originalHtml,
+                                       String proposedHtml, @Size(max = 2000) String rationale) {}
+
+    /** The other side's answer to a proposal: new wording for the same place. */
+    public record CounterInput(@NotBlank String proposedHtml, @Size(max = 2000) String rationale) {}
+
     public record CounterpartyCommentInput(@NotBlank @Size(max = 4000) String body, Integer blockIndex, String blockExcerpt, UUID proposalId, UUID parentId) {}
 
-    public record Counts(long pending, long conflicted, long accepted, long applied, long rejected, long withdrawn, long superseded) {}
+    public record Counts(long pending, long conflicted, long accepted, long applied, long rejected, long withdrawn, long superseded, long countered) {}
 
     public record NegotiationView(UUID id, UUID contractId, String status, LocalDate responseDeadline, boolean deadlinePassed, int baseVersionNo, Integer finalVersionNo,
                                   String finalBodyHash, Instant openedAt, Instant readyAt, Instant closedAt, String closeReason, Counts counts) {}
 
     public record ProposalView(UUID id, UUID partyId, String partyName, String kind, int baseVersionNo, Integer blockIndex, String originalHtml, String proposedHtml,
                                String rationale, String status, UUID conflictWith, Instant decidedAt, String decisionNote, Integer appliedVersionNo,
-                               boolean targetStillPresent, Instant createdAt) {}
+                               boolean targetStillPresent, Instant createdAt,
+                               String authorType, int roundNo, UUID parentId, String awaiting, boolean decidedByCounterparty) {}
 
     public record CommentView(UUID id, String authorType, UUID partyId, Integer blockIndex, String blockExcerpt, UUID proposalId, UUID parentId, String body,
                               boolean internalOnly, Instant createdAt) {}

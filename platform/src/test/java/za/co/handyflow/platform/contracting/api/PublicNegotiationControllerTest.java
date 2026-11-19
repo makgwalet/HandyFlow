@@ -97,7 +97,31 @@ class PublicNegotiationControllerTest {
         mvc.perform(put(BASE + "/negotiation").contentType(MediaType.APPLICATION_JSON).content("{}")).andExpect(status().isMethodNotAllowed());
         mvc.perform(delete(BASE + "/negotiation")).andExpect(status().isMethodNotAllowed());
         mvc.perform(post(BASE + "/apply").contentType(MediaType.APPLICATION_JSON).content("{}")).andExpect(status().isNotFound());
-        mvc.perform(post(BASE + "/proposals/" + java.util.UUID.randomUUID() + "/accept").contentType(MediaType.APPLICATION_JSON).content("{}")).andExpect(status().isNotFound());
+        // a counterparty answers proposals addressed to them, but staff-only steps do not exist on the public side
+        for (String staffOnly : new String[]{"/ready", "/close", "/reopen", "/deadline", "/proposals/" + java.util.UUID.randomUUID() + "/apply"})
+            mvc.perform(post(BASE + staffOnly).contentType(MediaType.APPLICATION_JSON).content("{}")).andExpect(status().isNotFound());
         verifyNoInteractions(access);
+    }
+
+    @Test
+    void answeringAProposalNeedsASessionAndIsRateLimitedFirst() throws Exception {
+        java.util.UUID id = java.util.UUID.randomUUID();
+        when(access.authenticate(eq("tok123"), isNull())).thenThrow(new HandyFlowException("Please confirm your code to continue.", HttpStatus.UNAUTHORIZED, "NEGOTIATION_SESSION_REQUIRED"));
+        mvc.perform(post(BASE + "/proposals/" + id + "/accept").contentType(MediaType.APPLICATION_JSON).content("{}")).andExpect(status().isUnauthorized());
+        mvc.perform(post(BASE + "/proposals/" + id + "/reject").contentType(MediaType.APPLICATION_JSON).content("{\"reason\":\"no\"}")).andExpect(status().isUnauthorized());
+        mvc.perform(post(BASE + "/proposals/" + id + "/counter").contentType(MediaType.APPLICATION_JSON).content("{\"proposedHtml\":\"<p>x</p>\"}")).andExpect(status().isUnauthorized());
+        verify(limiter, times(3)).checkNegotiateAct(any(), eq("tok123"));
+        verify(access, never()).accept(any(), any(), any(), any());
+        verify(access, never()).reject(any(), any(), any(), any());
+        verify(access, never()).counter(any(), any(), any(), any());
+    }
+
+    @Test
+    void aRejectionNeedsAReasonAndACounterNeedsWording() throws Exception {
+        java.util.UUID id = java.util.UUID.randomUUID();
+        mvc.perform(post(BASE + "/proposals/" + id + "/reject").header("X-Negotiation-Session", "s").contentType(MediaType.APPLICATION_JSON).content("{}")).andExpect(status().isBadRequest());
+        mvc.perform(post(BASE + "/proposals/" + id + "/counter").header("X-Negotiation-Session", "s").contentType(MediaType.APPLICATION_JSON).content("{}")).andExpect(status().isBadRequest());
+        verify(access, never()).reject(any(), any(), any(), any());
+        verify(access, never()).counter(any(), any(), any(), any());
     }
 }

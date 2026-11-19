@@ -57,6 +57,29 @@ public class ContractNegotiationController {
                 q.responseDeadline(), TenantContext.getCurrentUserId())));
     }
 
+    @PostMapping("/proposals")
+    @PreAuthorize(WRITE)
+    @Operation(summary = "Propose a change to a counterparty. They answer it from their link; the contract does not change")
+    public ResponseEntity<ApiResponse<ProposalView>> propose(@PathVariable UUID contractId, @Valid @RequestBody StaffProposalRequest q) {
+        return ResponseEntity.ok(ApiResponse.success("Proposal sent", service.staffPropose(TenantContext.getTenantIdAsObject(), contractId, q, TenantContext.getCurrentUserId())));
+    }
+
+    @PostMapping("/proposals/{proposalId}/counter")
+    @PreAuthorize(WRITE)
+    @Operation(summary = "Answer a counterparty proposal with different wording. The earlier round is kept")
+    public ResponseEntity<ApiResponse<ProposalView>> counter(@PathVariable UUID contractId, @PathVariable UUID proposalId, @Valid @RequestBody CounterInput q) {
+        return ResponseEntity.ok(ApiResponse.success("Counter-proposal sent", service.staffCounter(TenantContext.getTenantIdAsObject(), contractId, proposalId, q,
+                TenantContext.getCurrentUserId())));
+    }
+
+    @PostMapping("/proposals/{proposalId}/withdraw")
+    @PreAuthorize(WRITE)
+    @Operation(summary = "Take back a proposal staff made, while it has not been applied")
+    public ResponseEntity<ApiResponse<ProposalView>> withdrawProposal(@PathVariable UUID contractId, @PathVariable UUID proposalId) {
+        return ResponseEntity.ok(ApiResponse.success("Proposal withdrawn", service.staffWithdrawProposal(TenantContext.getTenantIdAsObject(), contractId, proposalId,
+                TenantContext.getCurrentUserId())));
+    }
+
     @PostMapping("/proposals/{proposalId}/accept")
     @PreAuthorize(WRITE)
     @Operation(summary = "Accept a proposal. It changes the contract only once applied")

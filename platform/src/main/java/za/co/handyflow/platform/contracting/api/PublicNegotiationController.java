@@ -84,6 +84,33 @@ public class PublicNegotiationController {
         return ResponseEntity.ok(ApiResponse.success("Proposal withdrawn", access.withdraw(a, proposalId, http.getRemoteAddr())));
     }
 
+    @PostMapping("/proposals/{proposalId}/accept")
+    @Operation(summary = "Accept a change staff proposed to you. The contract does not change until staff apply it, and signing is still separate")
+    public ResponseEntity<ApiResponse<ProposalView>> accept(@PathVariable String token, @PathVariable UUID proposalId,
+                                                            @RequestHeader(value = SESSION_HEADER, required = false) String session,
+                                                            @Valid @RequestBody(required = false) DecisionRequest q, HttpServletRequest http) {
+        Access a = authenticate(token, session, http, true);
+        return ResponseEntity.ok(ApiResponse.success("Proposal accepted", access.accept(a, proposalId, q == null ? null : q.note(), http.getRemoteAddr())));
+    }
+
+    @PostMapping("/proposals/{proposalId}/reject")
+    @Operation(summary = "Reject a change staff proposed to you, with a reason")
+    public ResponseEntity<ApiResponse<ProposalView>> reject(@PathVariable String token, @PathVariable UUID proposalId,
+                                                            @RequestHeader(value = SESSION_HEADER, required = false) String session,
+                                                            @Valid @RequestBody RejectRequest q, HttpServletRequest http) {
+        Access a = authenticate(token, session, http, true);
+        return ResponseEntity.ok(ApiResponse.success("Proposal rejected", access.reject(a, proposalId, q.reason(), http.getRemoteAddr())));
+    }
+
+    @PostMapping("/proposals/{proposalId}/counter")
+    @Operation(summary = "Answer a staff proposal with different wording for the same place; the earlier round is kept")
+    public ResponseEntity<ApiResponse<ProposalView>> counter(@PathVariable String token, @PathVariable UUID proposalId,
+                                                             @RequestHeader(value = SESSION_HEADER, required = false) String session,
+                                                             @Valid @RequestBody CounterInput q, HttpServletRequest http) {
+        Access a = authenticate(token, session, http, true);
+        return ResponseEntity.ok(ApiResponse.success("Counter-proposal submitted", access.counter(a, proposalId, q, http.getRemoteAddr())));
+    }
+
     @PostMapping("/comments")
     @Operation(summary = "Comment on a clause or proposal, or reply to staff")
     public ResponseEntity<ApiResponse<CommentView>> comment(@PathVariable String token, @RequestHeader(value = SESSION_HEADER, required = false) String session,

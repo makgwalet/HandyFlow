@@ -180,6 +180,125 @@ public class ContractNegotiationService {
         return commentView(cm);
     }
 
+    // ── Two-way: staff propose, either side answers ─────────────────────────
+
+    /** Staff propose a change to one counterparty party. The counterparty answers it from their link; the contract does not change. */
+    @Transactional
+    public ProposalView staffPropose(TenantId tenantId, UUID contractId, StaffProposalRequest in, UUID by) {
+        Contract c = lockContract(tenantId, contractId);
+        requireEditable(c);
+        ContractParty party = partyOf(contractId, in.partyId());
+        ContractNegotiation n = lockNegotiation(tenantId, contractId);
+        if (!n.isActive()) throw new IllegalStateException("This negotiation is not open (it is " + n.getStatus() + ")");
+        reconcile(n, c);
+        long open = proposalRepo.findByTenantIdAndContractIdAndPartyIdOrderByCreatedAtAsc(tenantId.getValue(), contractId, in.partyId()).stream()
+                .filter(x -> x.isOpen() && x.byStaff()).count();
+        if (open >= MAX_OPEN_PER_PARTY) throw new IllegalStateException("Too many of your proposals are waiting for an answer");
+        ContractNegotiationProposal p = ContractNegotiationProposal.createByStaff(tenantId.getValue(), contractId, n.getId(), in.partyId(), in.kind(), latestVersion(tenantId, c),
+                in.blockIndex(), in.originalHtml(), in.proposedHtml(), in.rationale(), by);
+        if (!NegotiationEngine.targetExists(c.getBody(), p))
+            throw new IllegalStateException("That wording is not in the current contract. Refresh the page and try again.");
+        // a newer staff proposal to the same party on the same wording replaces the earlier one that is still waiting
+        for (ContractNegotiationProposal old : proposalRepo.findByTenantIdAndContractIdAndPartyIdOrderByCreatedAtAsc(tenantId.getValue(), contractId, in.partyId()))
+            if (old.isUnresolved() && old.byStaff() && old.targetKey().equals(p.targetKey())) { old.supersede("Replaced by a newer proposal"); proposalRepo.save(old); }
+        proposalRepo.save(p);
+        reconcile(n, c);
+        event(n, "STAFF", by, in.partyId(), "STAFF_PROPOSAL_SUBMITTED", describe(p), null);
+        return proposalView(p, c.getBody(), party.getFullName());
+    }
+
+    /** Staff answer a counterparty proposal with different wording. The proposal they answer is kept as the previous round. */
+    @Transactional
+    public ProposalView staffCounter(TenantId tenantId, UUID contractId, UUID proposalId, CounterInput in, UUID by) {
+        Contract c = lockContract(tenantId, contractId);
+        requireEditable(c);
+        ContractNegotiation n = lockNegotiation(tenantId, contractId);
+        if (!n.isActive()) throw new IllegalStateException("This negotiation is not open (it is " + n.getStatus() + ")");
+        reconcile(n, c);
+        ContractNegotiationProposal parent = proposalOf(tenantId, contractId, proposalId);
+        ContractNegotiationProposal counter = parent.counter(true, by, latestVersion(tenantId, c), in.proposedHtml(), in.rationale());
+        if (!NegotiationEngine.targetExists(c.getBody(), counter))
+            throw new IllegalStateException("The wording this proposal changes has since changed. Reject it and ask the counterparty to propose again.");
+        parent.markCountered();
+        proposalRepo.save(parent);
+        proposalRepo.save(counter);
+        reconcile(n, c);
+        event(n, "STAFF", by, parent.getPartyId(), "PROPOSAL_COUNTERED", "Round " + counter.getRoundNo() + ": " + describe(counter), null);
+        return proposalView(counter, c.getBody(), nameOf(contractId).get(counter.getPartyId()));
+    }
+
+    @Transactional
+    public ProposalView staffWithdrawProposal(TenantId tenantId, UUID contractId, UUID proposalId, UUID by) {
+        Contract c = lockContract(tenantId, contractId);
+        ContractNegotiation n = lockNegotiation(tenantId, contractId);
+        if (!n.isActive()) throw new IllegalStateException("This negotiation is not open (it is " + n.getStatus() + ")");
+        ContractNegotiationProposal p = proposalOf(tenantId, contractId, proposalId);
+        p.withdrawByStaff();
+        proposalRepo.save(p);
+        reconcile(n, c);
+        event(n, "STAFF", by, p.getPartyId(), "STAFF_PROPOSAL_WITHDRAWN", describe(p), null);
+        return proposalView(p, c.getBody(), nameOf(contractId).get(p.getPartyId()));
+    }
+
+    /** The counterparty accepts a staff proposal addressed to them. Only the proposal's status changes; staff apply it as a new revision. */
+    @Transactional
+    public ProposalView counterpartyAccept(TenantId tenantId, UUID contractId, UUID partyId, UUID proposalId, String note, String ip) {
+        Contract c = lockContract(tenantId, contractId);
+        requireEditable(c);
+        ContractParty party = partyOf(contractId, partyId);
+        ContractNegotiation n = lockNegotiation(tenantId, contractId);
+        requireAcceptingInput(n);
+        reconcile(n, c);
+        ContractNegotiationProposal p = ownProposalOf(tenantId, contractId, partyId, proposalId);
+        if (!NegotiationEngine.targetExists(c.getBody(), p))
+            throw new IllegalStateException("The wording this proposal changes has since changed. Ask the sender to propose again.");
+        p.acceptByParty(partyId, note);
+        proposalRepo.save(p);
+        reconcile(n, c);
+        event(n, "COUNTERPARTY", null, partyId, "STAFF_PROPOSAL_ACCEPTED", describe(p), ip);
+        publisher.publishEvent(new NegotiationActivity(tenantId.getValue(), contractId, NegotiationActivity.DECISION, party.getFullName()));
+        return proposalView(p, c.getBody(), party.getFullName());
+    }
+
+    @Transactional
+    public ProposalView counterpartyReject(TenantId tenantId, UUID contractId, UUID partyId, UUID proposalId, String reason, String ip) {
+        Contract c = lockContract(tenantId, contractId);
+        requireEditable(c);
+        ContractParty party = partyOf(contractId, partyId);
+        ContractNegotiation n = lockNegotiation(tenantId, contractId);
+        requireAcceptingInput(n);
+        ContractNegotiationProposal p = ownProposalOf(tenantId, contractId, partyId, proposalId);
+        p.rejectByParty(partyId, reason);
+        proposalRepo.save(p);
+        reconcile(n, c);
+        event(n, "COUNTERPARTY", null, partyId, "STAFF_PROPOSAL_REJECTED", describe(p) + " — " + p.getDecisionNote(), ip);
+        publisher.publishEvent(new NegotiationActivity(tenantId.getValue(), contractId, NegotiationActivity.DECISION, party.getFullName()));
+        return proposalView(p, c.getBody(), party.getFullName());
+    }
+
+    /** The counterparty answers a staff proposal with different wording. */
+    @Transactional
+    public ProposalView counterpartyCounter(TenantId tenantId, UUID contractId, UUID partyId, UUID proposalId, CounterInput in, String ip) {
+        Contract c = lockContract(tenantId, contractId);
+        requireEditable(c);
+        ContractParty party = partyOf(contractId, partyId);
+        ContractNegotiation n = lockNegotiation(tenantId, contractId);
+        requireAcceptingInput(n);
+        reconcile(n, c);
+        ContractNegotiationProposal parent = ownProposalOf(tenantId, contractId, partyId, proposalId);
+        if (!parent.byStaff()) throw new IllegalStateException("This is not a proposal addressed to you");
+        ContractNegotiationProposal counter = parent.counter(false, null, latestVersion(tenantId, c), in.proposedHtml(), in.rationale());
+        if (!NegotiationEngine.targetExists(c.getBody(), counter))
+            throw new IllegalStateException("The wording this proposal changes has since changed. Ask the sender to propose again.");
+        parent.markCountered();
+        proposalRepo.save(parent);
+        proposalRepo.save(counter);
+        reconcile(n, c);
+        event(n, "COUNTERPARTY", null, partyId, "PROPOSAL_COUNTERED", "Round " + counter.getRoundNo() + ": " + describe(counter), ip);
+        publisher.publishEvent(new NegotiationActivity(tenantId.getValue(), contractId, NegotiationActivity.PROPOSAL, party.getFullName()));
+        return proposalView(counter, c.getBody(), party.getFullName());
+    }
+
     // ── Staff: reading ───────────────────────────────────────────────────────
 
     @Transactional
@@ -207,7 +326,7 @@ public class ContractNegotiationService {
         ContractNegotiation n = lockNegotiation(tenantId, contractId);
         requireAcceptingInput(n);
         reconcile(n, c);
-        long open = proposalRepo.findByTenantIdAndContractIdAndPartyIdOrderByCreatedAtAsc(tenantId.getValue(), contractId, partyId).stream().filter(ContractNegotiationProposal::isOpen).count();
+        long open = proposalRepo.findByTenantIdAndContractIdAndPartyIdOrderByCreatedAtAsc(tenantId.getValue(), contractId, partyId).stream().filter(x -> x.isOpen() && !x.byStaff()).count();
         if (open >= MAX_OPEN_PER_PARTY) throw new IllegalStateException("Too many proposals are waiting for a decision. Wait for staff to respond.");
         ContractNegotiationProposal p = ContractNegotiationProposal.create(tenantId.getValue(), contractId, n.getId(), partyId, in.kind(), latestVersion(tenantId, c),
                 in.blockIndex(), in.originalHtml(), in.proposedHtml(), in.rationale());
@@ -215,7 +334,7 @@ public class ContractNegotiationService {
             throw new IllegalStateException("That wording is not in the current contract. Refresh the page and try again.");
         // a newer proposal from the same party on the same wording replaces their earlier one
         for (ContractNegotiationProposal old : proposalRepo.findByTenantIdAndContractIdAndPartyIdOrderByCreatedAtAsc(tenantId.getValue(), contractId, partyId))
-            if (old.isUnresolved() && old.targetKey().equals(p.targetKey())) { old.supersede("Replaced by a newer proposal"); proposalRepo.save(old); }
+            if (old.isUnresolved() && !old.byStaff() && old.targetKey().equals(p.targetKey())) { old.supersede("Replaced by a newer proposal"); proposalRepo.save(old); }
         proposalRepo.save(p);
         reconcile(n, c);
         event(n, "COUNTERPARTY", null, partyId, "PROPOSAL_SUBMITTED", describe(p), ip);
@@ -321,7 +440,7 @@ public class ContractNegotiationService {
                 if (!with.equals(p.getConflictWith()) || !ContractNegotiationProposal.CONFLICTED.equals(p.getStatus())) { p.markConflict(with); proposalRepo.save(p); }
             } else if (with == null && ContractNegotiationProposal.CONFLICTED.equals(p.getStatus())) { p.clearConflict(); proposalRepo.save(p); }
         }
-        n.refresh(count(all, ContractNegotiationProposal::isUnresolved), count(all, p -> ContractNegotiationProposal.ACCEPTED.equals(p.getStatus())));
+        n.refresh(count(all, ContractNegotiationProposal::isAwaitingStaff), count(all, p -> ContractNegotiationProposal.ACCEPTED.equals(p.getStatus())));
         negotiationRepo.save(n);
         return all;
     }
@@ -329,7 +448,7 @@ public class ContractNegotiationService {
     private NegotiationView view(ContractNegotiation n, List<ContractNegotiationProposal> all) {
         Map<String, Long> by = all.stream().collect(Collectors.groupingBy(ContractNegotiationProposal::getStatus, Collectors.counting()));
         Counts counts = new Counts(by.getOrDefault("PENDING_REVIEW", 0L), by.getOrDefault("CONFLICTED", 0L), by.getOrDefault("ACCEPTED", 0L), by.getOrDefault("APPLIED", 0L),
-                by.getOrDefault("REJECTED", 0L), by.getOrDefault("WITHDRAWN", 0L), by.getOrDefault("SUPERSEDED", 0L));
+                by.getOrDefault("REJECTED", 0L), by.getOrDefault("WITHDRAWN", 0L), by.getOrDefault("SUPERSEDED", 0L), by.getOrDefault("COUNTERED", 0L));
         boolean passed = n.getResponseDeadline() != null && today().isAfter(n.getResponseDeadline());
         return new NegotiationView(n.getId(), n.getContractId(), n.getStatus(), n.getResponseDeadline(), passed, n.getBaseVersionNo(), n.getFinalVersionNo(), n.getFinalBodyHash(),
                 n.getOpenedAt(), n.getReadyAt(), n.getClosedAt(), n.getCloseReason(), counts);
@@ -337,7 +456,8 @@ public class ContractNegotiationService {
 
     private ProposalView proposalView(ContractNegotiationProposal p, String currentBody, String partyName) {
         return new ProposalView(p.getId(), p.getPartyId(), partyName, p.getKind(), p.getBaseVersionNo(), p.getBlockIndex(), p.getOriginalHtml(), p.getProposedHtml(), p.getRationale(),
-                p.getStatus(), p.getConflictWith(), p.getDecidedAt(), p.getDecisionNote(), p.getAppliedVersionNo(), NegotiationEngine.targetExists(currentBody, p), p.getCreatedAt());
+                p.getStatus(), p.getConflictWith(), p.getDecidedAt(), p.getDecisionNote(), p.getAppliedVersionNo(), NegotiationEngine.targetExists(currentBody, p), p.getCreatedAt(),
+                p.getAuthorType(), p.getRoundNo(), p.getParentProposalId(), p.awaiting(), p.getDecidedByPartyId() != null);
     }
 
     private static CommentView commentView(ContractNegotiationComment c) {
@@ -403,6 +523,13 @@ public class ContractNegotiationService {
 
     private ContractNegotiation lockNegotiation(TenantId tenantId, UUID contractId) {
         return negotiationRepo.findForUpdate(tenantId.getValue(), contractId).orElseThrow(() -> new ResourceNotFoundException("Negotiation", contractId.toString()));
+    }
+
+    /** A proposal that belongs to this party's thread; anything else looks like it does not exist, so one party learns nothing about another's. */
+    private ContractNegotiationProposal ownProposalOf(TenantId tenantId, UUID contractId, UUID partyId, UUID id) {
+        ContractNegotiationProposal p = proposalOf(tenantId, contractId, id);
+        if (!p.getPartyId().equals(partyId)) throw new ResourceNotFoundException("Proposal", id.toString());
+        return p;
     }
 
     private ContractNegotiationProposal proposalOf(TenantId tenantId, UUID contractId, UUID id) {

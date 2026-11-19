@@ -74,7 +74,7 @@ public class ContractNegotiationScheduler {
                 Contract c = contracts.get(n.getContractId());
                 if (c == null) continue;
                 List<ContractNegotiationProposal> pending = proposalRepo.findByTenantIdAndContractIdAndStatus(n.getTenantId(), n.getContractId(), ContractNegotiationProposal.PENDING);
-                Instant oldest = pending.stream().map(ContractNegotiationProposal::getCreatedAt).min(Comparator.naturalOrder()).orElse(null);
+                Instant oldest = pending.stream().filter(x -> !x.byStaff()).map(ContractNegotiationProposal::getCreatedAt).min(Comparator.naturalOrder()).orElse(null);
                 String reason = n.reminderReason(today, oldest, ZONE);
                 if (reason == null) continue;
                 List<String> to = ContractObligationReminderScheduler.recipientEmails(null,

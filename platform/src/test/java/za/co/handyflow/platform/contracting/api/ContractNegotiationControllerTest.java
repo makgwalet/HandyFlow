@@ -55,7 +55,7 @@ class ContractNegotiationControllerTest {
     @Test
     @WithMockUser(authorities = "CONTRACTS_READ")
     void aReaderCannotChangeAnything() throws Exception {
-        for (String url : new String[]{BASE + "/open", PROPOSAL + "/accept", PROPOSAL + "/reject", BASE + "/apply", BASE + "/comments",
+        for (String url : new String[]{BASE + "/open", BASE + "/proposals", PROPOSAL + "/counter", PROPOSAL + "/withdraw", PROPOSAL + "/accept", PROPOSAL + "/reject", BASE + "/apply", BASE + "/comments",
                 BASE + "/ready", BASE + "/close", BASE + "/reopen", BASE + "/links", BASE + "/links/" + UUID.randomUUID() + "/revoke"}) {
             mvc.perform(post(url).contentType(MediaType.APPLICATION_JSON).content("{}")).andExpect(status().isForbidden());
         }

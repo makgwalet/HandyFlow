@@ -185,6 +185,12 @@ public class ContractNegotiationAccessService {
 
     public ProposalView propose(Access a, ProposalInput in, String ip) { return negotiation.submitProposal(a.tenantId(), a.contractId(), a.partyId(), in, ip); }
 
+    public ProposalView accept(Access a, UUID proposalId, String note, String ip) { return negotiation.counterpartyAccept(a.tenantId(), a.contractId(), a.partyId(), proposalId, note, ip); }
+
+    public ProposalView reject(Access a, UUID proposalId, String reason, String ip) { return negotiation.counterpartyReject(a.tenantId(), a.contractId(), a.partyId(), proposalId, reason, ip); }
+
+    public ProposalView counter(Access a, UUID proposalId, CounterInput in, String ip) { return negotiation.counterpartyCounter(a.tenantId(), a.contractId(), a.partyId(), proposalId, in, ip); }
+
     public ProposalView withdraw(Access a, UUID proposalId, String ip) { return negotiation.withdraw(a.tenantId(), a.contractId(), a.partyId(), proposalId, ip); }
 
     public CommentView comment(Access a, CounterpartyCommentInput in, String ip) { return negotiation.counterpartyComment(a.tenantId(), a.contractId(), a.partyId(), in, ip); }
