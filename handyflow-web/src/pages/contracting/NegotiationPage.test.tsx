@@ -220,6 +220,67 @@ describe('outcomes and withdrawing', () => {
   })
 })
 
+describe('answering the sender’s proposals', () => {
+  const theirs = (o: Record<string, unknown> = {}) => proposal({ id: 's1', authorType: 'STAFF', roundNo: 1, awaiting: 'COUNTERPARTY', rationale: 'Our standard terms',
+    proposedHtml: '<p>Payment is due in 45 days.</p>', ...o })
+
+  it('shows what the sender proposed, marked as waiting for an answer', async () => {
+    current = view({ proposals: [theirs()] })
+    const el = await mount(true)
+    expect(el.textContent).toContain('From the sender')
+    expect(el.querySelector('[data-testid="proposal-status"]')!.textContent).toBe('Waiting for your answer')
+    expect(el.textContent).toContain('Their reason: Our standard terms')
+    expect(hasButton(el, 'Withdraw')).toBe(false)
+  })
+
+  it('accepts: only records the answer', async () => {
+    current = view({ proposals: [theirs()] })
+    const el = await mount(true)
+    await click(button(el, 'Accept'))
+    expect(api.post).toHaveBeenCalledWith(`/api/v1/negotiate/${TOKEN}/proposals/s1/accept`, {}, expect.anything())
+  })
+
+  it('rejecting needs a reason', async () => {
+    current = view({ proposals: [theirs()] })
+    const el = await mount(true)
+    await click(button(el, 'Reject'))
+    expect(button(el, 'Reject')!.disabled).toBe(true)
+    await type(byLabel(el, 'Reason for rejecting'), 'Cannot agree to 45 days')
+    await click(button(el, 'Reject'))
+    expect(api.post).toHaveBeenCalledWith(`/api/v1/negotiate/${TOKEN}/proposals/s1/reject`, { reason: 'Cannot agree to 45 days' }, expect.anything())
+  })
+
+  it('answers with different wording', async () => {
+    current = view({ proposals: [theirs()] })
+    const el = await mount(true)
+    await click(button(el, 'Suggest different wording'))
+    expect((byLabel(el, 'Your wording') as HTMLTextAreaElement).value).toBe('Payment is due in 45 days.')
+    await type(byLabel(el, 'Your wording'), 'Payment is due in 30 days.')
+    await type(byLabel(el, 'Why'), 'Our cycle')
+    await click(button(el, 'Send'))
+    expect(api.post).toHaveBeenCalledWith(`/api/v1/negotiate/${TOKEN}/proposals/s1/counter`, { proposedHtml: '<p>Payment is due in 30 days.</p>', rationale: 'Our cycle' }, expect.anything())
+  })
+
+  it('offers no way to answer a deletion with wording, but can accept or reject it', async () => {
+    current = view({ proposals: [theirs({ kind: 'DELETE', proposedHtml: null })] })
+    const el = await mount(true)
+    expect(hasButton(el, 'Accept')).toBe(true)
+    expect(hasButton(el, 'Suggest different wording')).toBe(false)
+  })
+
+  it('cannot answer once the negotiation no longer takes changes, nor a proposal that is already answered', async () => {
+    current = view({ canPropose: false, proposals: [theirs()] })
+    expect(hasButton(await mount(true), 'Accept')).toBe(false)
+  })
+
+  it('shows an answered proposal as history and does not offer buttons', async () => {
+    current = view({ proposals: [theirs({ status: 'COUNTERED', awaiting: null })] })
+    const el = await mount(true)
+    expect(el.querySelector('[data-testid="proposal-status"]')!.textContent).toBe('Answered with new wording')
+    expect(hasButton(el, 'Accept')).toBe(false)
+  })
+})
+
 describe('comments and safety', () => {
   it('lets the counterparty reply to a staff comment, quoting the parent', async () => {
     current = view({ comments: [{ id: 'c1', authorType: 'STAFF', body: 'Can you clarify?', internalOnly: false, createdAt: '2026-11-18T10:00:00Z', proposalId: null, blockIndex: 0, blockExcerpt: 'Payment' }] })

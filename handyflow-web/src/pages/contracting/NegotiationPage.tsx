@@ -9,7 +9,7 @@ import { sanitizeHtml } from './sanitizeHtml'
 import { Html, DiffView, type Segment } from './ContractRedlineSection'
 import { apiError, unwrapOne } from './contractingApi'
 import {
-  publicApi, SESSION_HEADER, httpStatus, loadSession, saveSession, buildReplacement, canEditAsText, blockText, excerpt, deadlineText, isLive,
+  publicApi, SESSION_HEADER, httpStatus, loadSession, saveSession, buildReplacement, canEditAsText, blockText, excerpt, deadlineText, isLive, byStaff, needsMyAnswer, roundOf,
   COUNTERPARTY_STATUS_LABEL, PROPOSAL_LABEL, KIND_LABEL,
   type CounterpartyNegotiation, type LinkInfo, type NegProposal, type NegComment, type ProposalKind,
 } from './negotiation'
@@ -85,19 +85,54 @@ function CodeStep({ token, info, onVerified }: { token: string; info: LinkInfo; 
 type Mode = 'REPLACE' | 'DELETE' | 'ADD' | 'COMMENT'
 interface Draft { blockIndex: number; mode: Mode }
 
-function ProposalNote({ p, onWithdraw, busy, canAct }: { p: NegProposal; onWithdraw: () => void; busy: boolean; canAct: boolean }) {
+interface NoteActions {
+  busy: boolean; canAct: boolean
+  onWithdraw: () => void; onAccept: () => void; onReject: (reason: string) => void; onCounter: (html: string, reason: string) => void
+}
+
+function ProposalNote({ p, a }: { p: NegProposal; a: NoteActions }) {
+  const [mode, setMode] = useState<'REJECT' | 'COUNTER' | null>(null)
+  const [reason, setReason] = useState('')
+  const [text, setText] = useState('')
   const segs: Segment[] | null = p.kind === 'ADD' ? null : [{ type: 'HUNK', hunkId: 0, blocks: [], removed: p.originalHtml ? [p.originalHtml] : [], added: p.proposedHtml ? [p.proposedHtml] : [] }]
+  const theirs = byStaff(p)
+  const answerable = a.canAct && needsMyAnswer(p)
+  const counterable = answerable && p.kind !== 'DELETE' && (p.kind === 'ADD' || !p.originalHtml || canEditAsText(p.originalHtml))
   return (
-    <div style={{ margin: '6px 0 0 14px', padding: '8px 10px', border: '1px dashed var(--hf-border)', borderRadius: 8, background: 'var(--hf-surface-muted)', fontSize: 12 }}>
+    <div style={{ margin: '6px 0 0 14px', padding: '8px 10px', border: theirs ? '1px solid var(--hf-primary)' : '1px dashed var(--hf-border)', borderRadius: 8, background: 'var(--hf-surface-muted)', fontSize: 12 }}>
       <div style={{ fontWeight: 700, color: 'var(--hf-text)' }}>
-        {KIND_LABEL[p.kind]} · <span data-testid="proposal-status">{PROPOSAL_LABEL[p.status]}</span>
+        {theirs ? 'From the sender' : 'From you'} · {KIND_LABEL[p.kind]}{roundOf(p) > 1 ? ` · round ${roundOf(p)}` : ''} · <span data-testid="proposal-status">{answerable ? 'Waiting for your answer' : PROPOSAL_LABEL[p.status]}</span>
         {p.appliedVersionNo != null && ` (version ${p.appliedVersionNo})`}
       </div>
       {segs ? <DiffView segments={segs} /> : p.proposedHtml && <div style={{ marginTop: 4, background: 'var(--hf-success-soft-strong)', padding: '6px 8px', borderRadius: 6 }}><Html html={p.proposedHtml} /></div>}
-      {p.rationale && <div style={{ marginTop: 4, color: 'var(--hf-text-muted)' }}>Your reason: {p.rationale}</div>}
-      {p.decisionNote && <div style={{ marginTop: 4, color: 'var(--hf-text-secondary)' }}>Reply from the sender: {p.decisionNote}</div>}
-      {p.status === 'SUPERSEDED' && p.decisionNote == null && <div style={{ marginTop: 4, color: 'var(--hf-text-muted)' }}>The wording changed after you proposed this.</div>}
-      {canAct && isLive(p) && <button style={{ ...btn, marginTop: 6 }} disabled={busy} onClick={onWithdraw}>Withdraw</button>}
+      {p.rationale && <div style={{ marginTop: 4, color: 'var(--hf-text-muted)' }}>{theirs ? 'Their reason' : 'Your reason'}: {p.rationale}</div>}
+      {p.decisionNote && <div style={{ marginTop: 4, color: 'var(--hf-text-secondary)' }}>{p.decidedByCounterparty ? 'Your answer' : 'Reply from the sender'}: {p.decisionNote}</div>}
+      {p.status === 'SUPERSEDED' && p.decisionNote == null && <div style={{ marginTop: 4, color: 'var(--hf-text-muted)' }}>The wording changed after this was proposed.</div>}
+      {a.canAct && !theirs && isLive(p) && <button style={{ ...btn, marginTop: 6 }} disabled={a.busy} onClick={a.onWithdraw}>Withdraw</button>}
+      {answerable && mode == null && (
+        <div style={{ display: 'flex', gap: 6, marginTop: 6, flexWrap: 'wrap' }}>
+          <button style={primary} disabled={a.busy} onClick={a.onAccept}>Accept</button>
+          {counterable && <button style={btn} disabled={a.busy} onClick={() => { setText(p.proposedHtml ? blockText(p.proposedHtml) : ''); setMode('COUNTER') }}>Suggest different wording</button>}
+          <button style={btn} disabled={a.busy} onClick={() => setMode('REJECT')}>Reject</button>
+        </div>
+      )}
+      {answerable && mode === 'REJECT' && (
+        <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
+          <input aria-label="Reason for rejecting" style={input} placeholder="Why? The sender will see this" value={reason} onChange={e => setReason(e.target.value)} />
+          <button style={primary} disabled={a.busy || !reason.trim()} onClick={() => { a.onReject(reason.trim()); setMode(null) }}>Reject</button>
+          <button style={btn} onClick={() => setMode(null)}>Cancel</button>
+        </div>
+      )}
+      {answerable && mode === 'COUNTER' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 6 }}>
+          <textarea aria-label="Your wording" style={{ ...input, minHeight: 80 }} value={text} onChange={e => setText(e.target.value)} />
+          <input aria-label="Why" style={input} placeholder="Why? (optional)" value={reason} onChange={e => setReason(e.target.value)} />
+          <div style={{ display: 'flex', gap: 6 }}>
+            <button style={primary} disabled={a.busy || !text.trim()} onClick={() => { a.onCounter(buildReplacement(p.originalHtml ?? null, text), reason.trim()); setMode(null) }}>Send</button>
+            <button style={btn} onClick={() => setMode(null)}>Cancel</button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -136,6 +171,11 @@ function Workspace({ token, session, onSessionLost, onInvalid }: { token: string
   const withdraw = useMutation({
     mutationFn: async (id: string) => publicApi.post(`/api/v1/negotiate/${token}/proposals/${id}/withdraw`, null, { headers }),
     onSuccess: refresh, onError: (e: unknown) => fail(e, 'The proposal could not be withdrawn'),
+  })
+  const answer = useMutation({
+    mutationFn: async (v: { id: string; action: 'accept' | 'reject' | 'counter'; body: Record<string, unknown> | null }) =>
+      publicApi.post(`/api/v1/negotiate/${token}/proposals/${v.id}/${v.action}`, v.body, { headers }),
+    onSuccess: refresh, onError: (e: unknown) => fail(e, 'Your answer could not be sent'),
   })
   const comment = useMutation({
     mutationFn: async (body: { body: string; blockIndex: number | null; blockExcerpt: string | null; proposalId: string | null; parentId: string | null }) =>
@@ -182,6 +222,13 @@ function Workspace({ token, session, onSessionLost, onInvalid }: { token: string
     </div>
   ) : null
 
+  const noteActions = (p: NegProposal): NoteActions => ({
+    busy: withdraw.isPending || answer.isPending, canAct: can,
+    onWithdraw: () => withdraw.mutate(p.id),
+    onAccept: () => answer.mutate({ id: p.id, action: 'accept', body: {} }),
+    onReject: r => answer.mutate({ id: p.id, action: 'reject', body: { reason: r } }),
+    onCounter: (html, r) => answer.mutate({ id: p.id, action: 'counter', body: { proposedHtml: html, rationale: r || null } }),
+  })
   const threads = v.comments
   const label = (c: NegComment) => c.authorType === 'STAFF' ? 'Sender' : 'You'
 
@@ -203,7 +250,7 @@ function Workspace({ token, session, onSessionLost, onInvalid }: { token: string
 
       <div style={card}>
         {can && <div style={{ marginBottom: 8 }}><button style={btn} onClick={() => startDraft(-1, 'ADD')}>Add a paragraph at the start</button>{renderForm(-1)}</div>}
-        {added(-1).map(p => <ProposalNote key={p.id} p={p} canAct={can} busy={withdraw.isPending} onWithdraw={() => withdraw.mutate(p.id)} />)}
+        {added(-1).map(p => <ProposalNote key={p.id} p={p} a={noteActions(p)} />)}
         {v.blocks.map((b, i) => (
           <div key={i} data-testid={`block-${i}`} style={{ padding: '8px 0', borderTop: i ? '1px solid var(--hf-border)' : undefined }}>
             <div style={{ fontSize: 14, lineHeight: 1.7, color: 'var(--hf-text)' }} dangerouslySetInnerHTML={{ __html: sanitizeHtml(b) }} />
@@ -216,8 +263,8 @@ function Workspace({ token, session, onSessionLost, onInvalid }: { token: string
               </div>
             )}
             {renderForm(i)}
-            {mine(i).map(p => <ProposalNote key={p.id} p={p} canAct={can} busy={withdraw.isPending} onWithdraw={() => withdraw.mutate(p.id)} />)}
-            {added(i).map(p => <ProposalNote key={p.id} p={p} canAct={can} busy={withdraw.isPending} onWithdraw={() => withdraw.mutate(p.id)} />)}
+            {mine(i).map(p => <ProposalNote key={p.id} p={p} a={noteActions(p)} />)}
+            {added(i).map(p => <ProposalNote key={p.id} p={p} a={noteActions(p)} />)}
           </div>
         ))}
       </div>

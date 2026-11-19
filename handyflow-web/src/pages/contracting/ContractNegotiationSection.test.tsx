@@ -247,3 +247,80 @@ describe('comments', () => {
     expect(api.post).toHaveBeenCalledWith('/api/v1/contracts/c1/negotiation/comments', { body: 'Hello Beta', internalOnly: false, audiencePartyId: 'b' })
   })
 })
+
+describe('two-way negotiation', () => {
+  const counterparty = (o: Record<string, unknown> = {}) => prop({ authorType: 'COUNTERPARTY', roundNo: 1, awaiting: 'STAFF', ...o })
+  const mineSent = (o: Record<string, unknown> = {}) => prop({ id: 's1', authorType: 'STAFF', roundNo: 1, awaiting: 'COUNTERPARTY', rationale: 'Our standard terms', ...o })
+
+  it('answers a counterparty proposal with new wording, keeping the round', async () => {
+    staffView.proposals = [counterparty()]
+    const el = await mount()
+    await click(button(el, 'Counter with new wording'))
+    await type(byLabel(el, 'Counter wording'), 'Payment is due in 21 days.')
+    await type(byLabel(el, 'Reason for counter'), 'Halfway')
+    await click(button(el, 'Send counter-proposal'))
+    expect(api.post).toHaveBeenCalledWith('/api/v1/contracts/c1/negotiation/proposals/p1/counter', { proposedHtml: '<p>Payment is due in 21 days.</p>', rationale: 'Halfway' })
+  })
+
+  it('shows earlier rounds inside one exchange, and only the live round can be answered', async () => {
+    const r1 = counterparty({ id: 'r1', status: 'COUNTERED', awaiting: null })
+    const r2 = mineSent({ id: 'r2', roundNo: 2, parentId: 'r1', status: 'COUNTERED', awaiting: null })
+    const r3 = counterparty({ id: 'r3', roundNo: 3, parentId: 'r2' })
+    staffView.proposals = [r1, r2, r3]
+    const el = await mount()
+    expect(el.querySelectorAll('[data-testid="proposal"]')).toHaveLength(1)
+    expect(el.textContent).toContain('2 earlier rounds')
+    expect(el.querySelectorAll('[data-testid="earlier-round"]')).toHaveLength(2)
+    expect(el.textContent).toContain('round 3')
+    await click(button(el, 'Accept'))
+    expect(api.post).toHaveBeenCalledWith('/api/v1/contracts/c1/negotiation/proposals/r3/accept', {})
+  })
+
+  it('lists what staff sent as waiting on the counterparty, with no accept or reject, and lets staff withdraw it', async () => {
+    staffView.proposals = [mineSent()]
+    const el = await mount()
+    expect(el.textContent).toContain('Waiting for the counterparty (1)')
+    expect(el.textContent).toContain('Waiting for their answer')
+    expect(hasButton(el, 'Accept')).toBe(false)
+    expect(hasButton(el, 'Reject')).toBe(false)
+    await click(button(el, 'Withdraw'))
+    expect(api.post).toHaveBeenCalledWith('/api/v1/contracts/c1/negotiation/proposals/s1/withdraw')
+  })
+
+  it('an agreed staff proposal is applied, not re-decided', async () => {
+    staffView.proposals = [mineSent({ status: 'ACCEPTED', awaiting: null })]
+    const el = await mount()
+    expect(el.textContent).toContain('Accepted, not yet applied (1)')
+    expect(el.textContent).toContain('agreed')
+    expect(hasButton(el, 'Reject')).toBe(false)
+  })
+
+  it('proposes a change to a counterparty without touching the contract', async () => {
+    staffView.proposals = []
+    const el = await mount()
+    await type(byLabel(el, 'Propose to'), 'a')
+    await type(byLabel(el, 'Proposed wording'), 'Payment is due in 45 days.')
+    await type(byLabel(el, 'Reason'), 'Group policy')
+    await click(button(el, 'Send proposal'))
+    expect(api.post).toHaveBeenCalledWith('/api/v1/contracts/c1/negotiation/proposals', {
+      partyId: 'a', kind: 'REPLACE', blockIndex: 0, originalHtml: P1, proposedHtml: '<p>Payment is due in 45 days.</p>', rationale: 'Group policy',
+    })
+    expect(api.post.mock.calls.some(c => String(c[0]).endsWith('/apply'))).toBe(false)
+  })
+
+  it('cannot send a proposal without a party or without wording', async () => {
+    staffView.proposals = []
+    const el = await mount()
+    await type(byLabel(el, 'Proposed wording'), '')
+    expect(button(el, 'Send proposal')!.disabled).toBe(true)
+    await type(byLabel(el, 'Propose to'), 'a')
+    expect(button(el, 'Send proposal')!.disabled).toBe(true)
+    await type(byLabel(el, 'Proposed wording'), 'Something')
+    expect(button(el, 'Send proposal')!.disabled).toBe(false)
+  })
+
+  it('offers no proposing to a read-only user or once the contract is sent', async () => {
+    perms.granted = ['CONTRACTS_READ']
+    expect(hasButton(await mount(), 'Send proposal')).toBe(false)
+  })
+})

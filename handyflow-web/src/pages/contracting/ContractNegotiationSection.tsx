@@ -9,8 +9,9 @@ import { usePermissions } from '../../hooks/usePermission'
 import { apiError, unwrapOne } from './contractingApi'
 import { DiffView, type Segment } from './ContractRedlineSection'
 import {
-  STATUS_LABEL, PROPOSAL_LABEL, KIND_LABEL, EVENT_LABEL, deadlineText, linkState, needsDecision, excerpt,
-  type StaffNegotiation, type NegLink, type IssuedLink, type NegProposal,
+  STATUS_LABEL, PROPOSAL_LABEL, KIND_LABEL, EVENT_LABEL, deadlineText, linkState, needsDecision, excerpt, byStaff, isLive, roundOf,
+  waitingOnCounterparty, exchanges, staffProposalBody, buildReplacement, blockText, canEditAsText,
+  type StaffNegotiation, type NegLink, type IssuedLink, type NegProposal, type ProposalKind,
 } from './negotiation'
 
 const btn: CSSProperties = { padding: '5px 11px', border: '1px solid var(--hf-border)', borderRadius: 7, background: 'var(--hf-surface)', fontSize: 12, fontWeight: 600, cursor: 'pointer', color: 'var(--hf-primary-text)' }
@@ -21,41 +22,126 @@ const h: CSSProperties = { margin: '0 0 6px', fontSize: 13, fontWeight: 700, col
 
 interface PartyRef { id: string; fullName: string }
 
-function ProposalRow({ p, canWrite, busy, onAccept, onReject }: { p: NegProposal; canWrite: boolean; busy: boolean; onAccept: () => void; onReject: (reason: string) => void }) {
-  const [rejecting, setRejecting] = useState(false)
-  const [reason, setReason] = useState('')
-  const segs: Segment[] = p.kind === 'ADD'
+function segsOf(p: NegProposal): Segment[] {
+  return p.kind === 'ADD'
     ? [{ type: 'HUNK', hunkId: 0, blocks: [], removed: [], added: p.proposedHtml ? [p.proposedHtml] : [] }]
     : [{ type: 'HUNK', hunkId: 0, blocks: [], removed: p.originalHtml ? [p.originalHtml] : [], added: p.proposedHtml ? [p.proposedHtml] : [] }]
-  const decidable = canWrite && (needsDecision(p) || p.status === 'ACCEPTED')
+}
+
+interface RowActions {
+  canWrite: boolean; busy: boolean
+  onAccept: () => void; onReject: (reason: string) => void; onCounter: (html: string, reason: string) => void; onWithdraw: () => void
+}
+
+/** One exchange: the rounds before the current one, in brief, then the current proposal with whatever the staff member can do next. */
+function ProposalRow({ chain, a }: { chain: NegProposal[]; a: RowActions }) {
+  const p = chain[chain.length - 1]
+  const earlier = chain.slice(0, -1)
+  const [rejecting, setRejecting] = useState(false)
+  const [countering, setCountering] = useState(false)
+  const [reason, setReason] = useState('')
+  const [text, setText] = useState('')
+  const [why, setWhy] = useState('')
+  const mine = byStaff(p)
+  const decidable = a.canWrite && needsDecision(p)
+  const canWithdraw = a.canWrite && mine && isLive(p)
+  const canReject = a.canWrite && !mine && (needsDecision(p) || p.status === 'ACCEPTED')
+  const textEditable = p.kind === 'DELETE' ? false : (!p.originalHtml || canEditAsText(p.originalHtml)) || p.kind === 'ADD'
+  const startCounter = () => { setText(p.proposedHtml ? blockText(p.proposedHtml) : (p.originalHtml ? blockText(p.originalHtml) : '')); setWhy(''); setCountering(true); setRejecting(false) }
   return (
     <div style={{ ...panel, background: 'var(--hf-surface)' }} data-testid="proposal">
+      {earlier.length > 0 && (
+        <details style={{ marginBottom: 6, fontSize: 12 }}>
+          <summary style={{ cursor: 'pointer', color: 'var(--hf-text-muted)' }}>{earlier.length} earlier round{earlier.length === 1 ? '' : 's'}</summary>
+          {earlier.map(e => (
+            <div key={e.id} data-testid="earlier-round" style={{ margin: '6px 0', paddingLeft: 8, borderLeft: '2px solid var(--hf-border)' }}>
+              <div style={{ color: 'var(--hf-text-muted)' }}>Round {roundOf(e)} · {byStaff(e) ? 'You' : e.partyName ?? 'Counterparty'} · {PROPOSAL_LABEL[e.status]}</div>
+              <DiffView segments={segsOf(e)} />
+              {e.rationale && <div style={{ color: 'var(--hf-text-secondary)' }}>Reason given: {e.rationale}</div>}
+            </div>
+          ))}
+        </details>
+      )}
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, fontSize: 12 }}>
-        <strong>{p.partyName ?? 'Counterparty'} · {KIND_LABEL[p.kind]}</strong>
-        <span data-testid="proposal-status" style={{ color: p.status === 'CONFLICTED' ? 'var(--hf-danger-text)' : 'var(--hf-text-muted)' }}>{PROPOSAL_LABEL[p.status]}</span>
+        <strong>{mine ? `You to ${p.partyName ?? 'counterparty'}` : p.partyName ?? 'Counterparty'} · {KIND_LABEL[p.kind]}{roundOf(p) > 1 ? ` · round ${roundOf(p)}` : ''}</strong>
+        <span data-testid="proposal-status" style={{ color: p.status === 'CONFLICTED' ? 'var(--hf-danger-text)' : 'var(--hf-text-muted)' }}>
+          {waitingOnCounterparty(p) ? 'Waiting for their answer' : PROPOSAL_LABEL[p.status]}
+        </span>
       </div>
       {p.kind === 'ADD' && p.originalHtml && <div style={{ fontSize: 11, color: 'var(--hf-text-muted)' }}>Added after “{excerpt(p.originalHtml, 70)}”</div>}
       {p.kind === 'ADD' && !p.originalHtml && <div style={{ fontSize: 11, color: 'var(--hf-text-muted)' }}>Added at the start</div>}
-      <div style={{ marginTop: 4 }}><DiffView segments={segs} /></div>
+      <div style={{ marginTop: 4 }}><DiffView segments={segsOf(p)} /></div>
       {p.rationale && <div style={{ fontSize: 12, color: 'var(--hf-text-secondary)', marginTop: 4 }}>Reason given: {p.rationale}</div>}
       {p.status === 'CONFLICTED' && <div style={{ fontSize: 12, color: 'var(--hf-danger-text)', marginTop: 4 }}>Another proposal changes the same wording. Reject one so the other can be decided.</div>}
-      {!p.targetStillPresent && p.status !== 'APPLIED' && p.status !== 'REJECTED' && p.status !== 'WITHDRAWN' && p.status !== 'SUPERSEDED' &&
+      {!p.targetStillPresent && !['APPLIED', 'REJECTED', 'WITHDRAWN', 'SUPERSEDED', 'COUNTERED'].includes(p.status) &&
         <div style={{ fontSize: 12, color: 'var(--hf-danger-text)', marginTop: 4 }}>The wording this changes has since been edited, so it cannot be accepted.</div>}
       {p.decisionNote && <div style={{ fontSize: 12, color: 'var(--hf-text-muted)', marginTop: 4 }}>Decision note: {p.decisionNote}</div>}
       {p.appliedVersionNo != null && <div style={{ fontSize: 12, color: 'var(--hf-text-muted)', marginTop: 4 }}>Applied as version {p.appliedVersionNo}</div>}
-      {decidable && !rejecting && (
-        <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
-          {needsDecision(p) && <button style={solid} disabled={busy || p.status === 'CONFLICTED' || !p.targetStillPresent} onClick={onAccept}>Accept</button>}
-          <button style={btn} disabled={busy} onClick={() => setRejecting(true)}>Reject</button>
+      {mine && p.status === 'ACCEPTED' && <div style={{ fontSize: 12, color: 'var(--hf-text-muted)', marginTop: 4 }}>{p.partyName ?? 'The counterparty'} agreed. Apply it to put it in the contract.</div>}
+      {!rejecting && !countering && (decidable || canReject || canWithdraw) && (
+        <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
+          {decidable && <button style={solid} disabled={a.busy || p.status === 'CONFLICTED' || !p.targetStillPresent} onClick={a.onAccept}>Accept</button>}
+          {decidable && p.kind !== 'DELETE' && textEditable && <button style={btn} disabled={a.busy || !p.targetStillPresent} onClick={startCounter}>Counter with new wording</button>}
+          {canReject && <button style={btn} disabled={a.busy} onClick={() => { setRejecting(true); setCountering(false) }}>Reject</button>}
+          {canWithdraw && <button style={btn} disabled={a.busy} onClick={a.onWithdraw}>Withdraw</button>}
         </div>
       )}
-      {decidable && rejecting && (
+      {rejecting && (
         <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
           <input aria-label="Reason for rejecting" style={{ ...field, flex: 1 }} placeholder="Why? The counterparty will see this" value={reason} onChange={e => setReason(e.target.value)} />
-          <button style={solid} disabled={busy || !reason.trim()} onClick={() => { onReject(reason.trim()); setRejecting(false); setReason('') }}>Reject proposal</button>
+          <button style={solid} disabled={a.busy || !reason.trim()} onClick={() => { a.onReject(reason.trim()); setRejecting(false); setReason('') }}>Reject proposal</button>
           <button style={btn} onClick={() => setRejecting(false)}>Cancel</button>
         </div>
       )}
+      {countering && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 8 }}>
+          <textarea aria-label="Counter wording" style={{ ...field, minHeight: 80 }} value={text} onChange={e => setText(e.target.value)} />
+          <input aria-label="Reason for counter" style={field} placeholder="Why? (optional, the counterparty will see this)" value={why} onChange={e => setWhy(e.target.value)} />
+          <div style={{ display: 'flex', gap: 6 }}>
+            <button style={solid} disabled={a.busy || !text.trim()} onClick={() => { a.onCounter(buildReplacement(p.originalHtml ?? null, text), why.trim()); setCountering(false) }}>Send counter-proposal</button>
+            <button style={btn} onClick={() => setCountering(false)}>Cancel</button>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+/** Staff start an exchange: pick who, what kind of change, where, and the wording. The counterparty answers from their link. */
+function ProposeForm({ parties, blocks, busy, onSend }: { parties: PartyRef[]; blocks: string[]; busy: boolean; onSend: (partyId: string, body: ReturnType<typeof staffProposalBody>) => void }) {
+  const [party, setParty] = useState('')
+  const [kind, setKind] = useState<ProposalKind>('REPLACE')
+  const [at, setAt] = useState(0)
+  const [text, setText] = useState('')
+  const [why, setWhy] = useState('')
+  const block = at >= 0 ? blocks[at] : null
+  const wordingNeeded = kind !== 'DELETE'
+  const textOk = kind !== 'REPLACE' || (block != null && canEditAsText(block))
+  const valid = !!party && (kind === 'ADD' ? at >= -1 : block != null) && (!wordingNeeded || text.trim().length > 0) && textOk
+  const pick = (k: ProposalKind, i: number) => { setKind(k); setAt(i); if (k === 'REPLACE' && blocks[i]) setText(blockText(blocks[i])) }
+  return (
+    <div style={panel}>
+      <div style={h}>Propose a change</div>
+      <div style={{ fontSize: 12, color: 'var(--hf-text-secondary)', marginBottom: 6 }}>
+        The contract does not change. {`They see it the next time they open their link and can accept, reject or answer with their own wording.`}
+      </div>
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        <select aria-label="Propose to" style={field} value={party} onChange={e => setParty(e.target.value)}>
+          <option value="">To…</option>
+          {parties.map(x => <option key={x.id} value={x.id}>{x.fullName}</option>)}
+        </select>
+        <select aria-label="Kind of change" style={field} value={kind} onChange={e => pick(e.target.value as ProposalKind, at)}>
+          <option value="REPLACE">Change wording</option><option value="DELETE">Remove a paragraph</option><option value="ADD">Add a paragraph</option>
+        </select>
+        <select aria-label="Where" style={{ ...field, maxWidth: 280 }} value={at} onChange={e => pick(kind, Number(e.target.value))}>
+          {kind === 'ADD' && <option value={-1}>At the start</option>}
+          {blocks.map((b, i) => <option key={i} value={i}>{kind === 'ADD' ? 'After: ' : ''}{excerpt(b, 50)}</option>)}
+        </select>
+      </div>
+      {wordingNeeded && <textarea aria-label="Proposed wording" style={{ ...field, width: '100%', boxSizing: 'border-box', minHeight: 70, marginTop: 6 }} value={text} onChange={e => setText(e.target.value)} />}
+      {kind === 'REPLACE' && block != null && !canEditAsText(block) && <div style={{ fontSize: 12, color: 'var(--hf-text-muted)', marginTop: 4 }}>This paragraph has formatting that plain text would lose. Remove it and add a new one instead.</div>}
+      <input aria-label="Reason" style={{ ...field, width: '100%', boxSizing: 'border-box', marginTop: 6 }} placeholder="Why? (optional)" value={why} onChange={e => setWhy(e.target.value)} />
+      <button style={{ ...solid, marginTop: 6 }} disabled={busy || !valid} onClick={() => { onSend(party, staffProposalBody(kind, blocks, at, text, why)); setText(''); setWhy('') }}>Send proposal</button>
     </div>
   )
 }
@@ -100,6 +186,9 @@ export function ContractNegotiationSection({ contractId, status, parties }: { co
   const setDl = useRun<void>(() => apiClient.put(`${base}/deadline`, { responseDeadline: deadline || null }), 'The deadline could not be changed')
   const accept = useRun<string>(id => apiClient.post(`${base}/proposals/${id}/accept`, {}), 'The proposal could not be accepted')
   const reject = useRun<{ id: string; reason: string }>(v => apiClient.post(`${base}/proposals/${v.id}/reject`, { reason: v.reason }), 'The proposal could not be rejected')
+  const counter = useRun<{ id: string; html: string; reason: string }>(v => apiClient.post(`${base}/proposals/${v.id}/counter`, { proposedHtml: v.html, rationale: v.reason || null }), 'The counter-proposal could not be sent')
+  const withdrawP = useRun<string>(id => apiClient.post(`${base}/proposals/${id}/withdraw`), 'The proposal could not be withdrawn')
+  const propose = useRun<{ partyId: string; body: ReturnType<typeof staffProposalBody> }>(v => apiClient.post(`${base}/proposals`, { partyId: v.partyId, ...v.body }), 'The proposal could not be sent')
   const apply = useRun<void>(() => apiClient.post(`${base}/apply`, {}), 'The accepted proposals could not be applied')
   const ready = useRun<void>(() => apiClient.post(`${base}/ready`), 'The negotiation could not be marked ready')
   const close = useRun<void>(() => apiClient.post(`${base}/close`, { reason: closeReason || null }), 'The negotiation could not be closed', () => setCloseReason(''))
@@ -112,12 +201,20 @@ export function ContractNegotiationSection({ contractId, status, parties }: { co
   const comment = useRun<void>(() => apiClient.post(`${base}/comments`, { body: note, internalOnly: internal, audiencePartyId: internal || !audience ? null : audience }),
     'The comment could not be posted', () => { setNote(''); setInternal(false) })
 
-  const busy = [openIt, setDl, accept, reject, apply, ready, close, reopen, revoke, comment].some(m => m.isPending)
+  const busy = [openIt, setDl, accept, reject, counter, withdrawP, propose, apply, ready, close, reopen, revoke, comment].some(m => m.isPending)
   const d = neg.data
   const props = d?.proposals ?? []
-  const waiting = props.filter(needsDecision)
-  const accepted = props.filter(p => p.status === 'ACCEPTED')
-  const history = props.filter(p => !needsDecision(p) && p.status !== 'ACCEPTED')
+  const threads = exchanges(props)
+  const last = (c: NegProposal[]) => c[c.length - 1]
+  const waiting = threads.filter(c => needsDecision(last(c)))
+  const sent = threads.filter(c => waitingOnCounterparty(last(c)))
+  const accepted = threads.filter(c => last(c).status === 'ACCEPTED')
+  const history = threads.filter(c => !needsDecision(last(c)) && !waitingOnCounterparty(last(c)) && last(c).status !== 'ACCEPTED')
+  const actions = (p: NegProposal, writable: boolean): RowActions => ({
+    canWrite: writable, busy,
+    onAccept: () => accept.mutate(p.id), onReject: r => reject.mutate({ id: p.id, reason: r }),
+    onCounter: (html, r) => counter.mutate({ id: p.id, html, reason: r }), onWithdraw: () => withdrawP.mutate(p.id),
+  })
   const active = n && ['OPEN', 'STAFF_REVIEW', 'CHANGES_REQUIRED'].includes(n.status)
   const nameOf = (id?: string | null) => parties.find(p => p.id === id)?.fullName
 
@@ -155,7 +252,7 @@ export function ContractNegotiationSection({ contractId, status, parties }: { co
                   <div style={{ fontSize: 12, color: n.deadlinePassed ? 'var(--hf-danger-text)' : 'var(--hf-text-muted)' }}>{deadlineText(n.responseDeadline)}</div>
                 </div>
                 <div style={{ fontSize: 12, color: 'var(--hf-text-secondary)' }}>
-                  {n.counts.pending + n.counts.conflicted} to decide · {n.counts.accepted} accepted, not yet applied · {n.counts.applied} applied · {n.counts.rejected} rejected
+                  {waiting.length} to decide · {sent.length} waiting for the counterparty · {n.counts.accepted} accepted, not yet applied · {n.counts.applied} applied · {n.counts.rejected} rejected
                   · {n.counts.withdrawn + n.counts.superseded} withdrawn or superseded
                 </div>
                 {n.status === 'READY_FOR_SIGNATURE' && <div style={{ fontSize: 12, marginTop: 4 }}>Final wording pinned at version {n.finalVersionNo}. Editing the contract now blocks sending until it is marked ready again.</div>}
@@ -210,13 +307,16 @@ export function ContractNegotiationSection({ contractId, status, parties }: { co
                 </div>
               )}
 
+              {active && canWrite && editable && <ProposeForm parties={parties} blocks={d.blocks} busy={busy} onSend={(partyId, body) => propose.mutate({ partyId, body })} />}
               {waiting.length > 0 && <div><div style={h}>Needs your decision ({waiting.length})</div><div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {waiting.map(p => <ProposalRow key={p.id} p={p} canWrite={canWrite && editable} busy={busy} onAccept={() => accept.mutate(p.id)} onReject={r => reject.mutate({ id: p.id, reason: r })} />)}</div></div>}
+                {waiting.map(c => <ProposalRow key={last(c).id} chain={c} a={actions(last(c), canWrite && editable)} />)}</div></div>}
+              {sent.length > 0 && <div><div style={h}>Waiting for the counterparty ({sent.length})</div><div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {sent.map(c => <ProposalRow key={last(c).id} chain={c} a={actions(last(c), canWrite && editable)} />)}</div></div>}
               {accepted.length > 0 && <div><div style={h}>Accepted, not yet applied ({accepted.length})</div><div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {accepted.map(p => <ProposalRow key={p.id} p={p} canWrite={canWrite && editable} busy={busy} onAccept={() => accept.mutate(p.id)} onReject={r => reject.mutate({ id: p.id, reason: r })} />)}</div></div>}
+                {accepted.map(c => <ProposalRow key={last(c).id} chain={c} a={actions(last(c), canWrite && editable)} />)}</div></div>}
               {props.length === 0 && <div style={{ fontSize: 12, color: 'var(--hf-text-muted)' }}>No proposals yet.</div>}
               {history.length > 0 && <details><summary style={{ ...h, cursor: 'pointer' }}>History ({history.length})</summary><div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {history.map(p => <ProposalRow key={p.id} p={p} canWrite={false} busy={busy} onAccept={() => undefined} onReject={() => undefined} />)}</div></details>}
+                {history.map(c => <ProposalRow key={last(c).id} chain={c} a={actions(last(c), false)} />)}</div></details>}
 
               <div style={panel}>
                 <div style={h}>Comments</div>

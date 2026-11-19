@@ -3,20 +3,22 @@ import axios from 'axios'
 import { toText } from './wordDiff'
 
 export type ProposalKind = 'ADD' | 'DELETE' | 'REPLACE'
-export type ProposalStatus = 'PENDING_REVIEW' | 'ACCEPTED' | 'REJECTED' | 'WITHDRAWN' | 'SUPERSEDED' | 'CONFLICTED' | 'APPLIED'
+export type ProposalStatus = 'PENDING_REVIEW' | 'ACCEPTED' | 'REJECTED' | 'WITHDRAWN' | 'SUPERSEDED' | 'CONFLICTED' | 'APPLIED' | 'COUNTERED'
 export type NegotiationStatus = 'OPEN' | 'STAFF_REVIEW' | 'CHANGES_REQUIRED' | 'READY_FOR_SIGNATURE' | 'CLOSED'
 
 export interface NegProposal {
   id: string; partyId: string; partyName?: string | null; kind: ProposalKind; baseVersionNo: number; blockIndex?: number | null
   originalHtml?: string | null; proposedHtml?: string | null; rationale?: string | null; status: ProposalStatus; conflictWith?: string | null
   decidedAt?: string | null; decisionNote?: string | null; appliedVersionNo?: number | null; targetStillPresent: boolean; createdAt: string
+  /** Two-way negotiation. Older responses carry none of these, which reads as a counterparty proposal in round 1. */
+  authorType?: 'STAFF' | 'COUNTERPARTY'; roundNo?: number; parentId?: string | null; awaiting?: 'STAFF' | 'COUNTERPARTY' | null; decidedByCounterparty?: boolean
 }
 export interface NegComment {
   id: string; authorType: 'STAFF' | 'COUNTERPARTY'; partyId?: string | null; blockIndex?: number | null; blockExcerpt?: string | null
   proposalId?: string | null; parentId?: string | null; body: string; internalOnly: boolean; createdAt: string
 }
 export interface NegEvent { id: string; actorType: string; actorUserId?: string | null; partyId?: string | null; eventType: string; detail?: string | null; createdAt: string }
-export interface NegCounts { pending: number; conflicted: number; accepted: number; applied: number; rejected: number; withdrawn: number; superseded: number }
+export interface NegCounts { pending: number; conflicted: number; accepted: number; applied: number; rejected: number; withdrawn: number; superseded: number; countered?: number }
 export interface NegSummary {
   id: string; contractId: string; status: NegotiationStatus; responseDeadline?: string | null; deadlinePassed: boolean; baseVersionNo: number
   finalVersionNo?: number | null; finalBodyHash?: string | null; openedAt: string; readyAt?: string | null; closedAt?: string | null; closeReason?: string | null; counts: NegCounts
@@ -40,7 +42,7 @@ export const COUNTERPARTY_STATUS_LABEL: Record<NegotiationStatus, string> = {
 }
 export const PROPOSAL_LABEL: Record<ProposalStatus, string> = {
   PENDING_REVIEW: 'Waiting for review', ACCEPTED: 'Accepted', REJECTED: 'Rejected', WITHDRAWN: 'Withdrawn', SUPERSEDED: 'Superseded',
-  CONFLICTED: 'Conflicts with another proposal', APPLIED: 'Applied to the contract',
+  CONFLICTED: 'Conflicts with another proposal', APPLIED: 'Applied to the contract', COUNTERED: 'Answered with new wording',
 }
 export const KIND_LABEL: Record<ProposalKind, string> = { ADD: 'Addition', DELETE: 'Deletion', REPLACE: 'Replacement' }
 export const EVENT_LABEL: Record<string, string> = {
@@ -49,12 +51,49 @@ export const EVENT_LABEL: Record<string, string> = {
   PROPOSALS_APPLIED: 'Accepted proposals applied', STAFF_COMMENT: 'Staff comment', INTERNAL_NOTE: 'Internal note', COUNTERPARTY_COMMENT: 'Counterparty comment',
   LINK_ISSUED: 'Link issued', LINK_REVOKED: 'Link revoked', CODE_REQUESTED: 'Code requested', CODE_FAILED: 'Wrong code entered', ACCESS_VERIFIED: 'Identity confirmed',
   FROZEN_ON_SEND: 'Closed because the contract was sent',
+  PROPOSAL_COUNTERED: 'Proposal answered with new wording', STAFF_PROPOSAL_SUBMITTED: 'You proposed a change', STAFF_PROPOSAL_WITHDRAWN: 'You withdrew a proposal',
+  STAFF_PROPOSAL_ACCEPTED: 'Counterparty accepted your proposal', STAFF_PROPOSAL_REJECTED: 'Counterparty rejected your proposal',
 }
 
-/** Proposals that still need a decision from staff. */
-export const needsDecision = (p: NegProposal): boolean => p.status === 'PENDING_REVIEW' || p.status === 'CONFLICTED'
-/** Proposals that are still in play (can be withdrawn by their author, or rejected by staff). */
-export const isLive = (p: NegProposal): boolean => needsDecision(p) || p.status === 'ACCEPTED'
+/** Proposals that need a decision from staff. A proposal staff made themselves waits on the counterparty, not on staff. */
+export const needsDecision = (p: NegProposal): boolean => (p.status === 'PENDING_REVIEW' || p.status === 'CONFLICTED') && p.awaiting !== 'COUNTERPARTY'
+/** Proposals staff made that the counterparty has not answered yet. */
+export const waitingOnCounterparty = (p: NegProposal): boolean => p.status === 'PENDING_REVIEW' && p.awaiting === 'COUNTERPARTY'
+/** Proposals staff sent that the counterparty can still answer, seen from the counterparty side. */
+export const needsMyAnswer = (p: NegProposal): boolean => p.status === 'PENDING_REVIEW' && p.awaiting === 'COUNTERPARTY'
+export const byStaff = (p: NegProposal): boolean => p.authorType === 'STAFF'
+export const roundOf = (p: NegProposal): number => p.roundNo ?? 1
+/** Proposals that are still in play (can be withdrawn by their author, or rejected by the other side). */
+export const isLive = (p: NegProposal): boolean => p.status === 'PENDING_REVIEW' || p.status === 'CONFLICTED' || p.status === 'ACCEPTED'
+
+/** Every round of one exchange, oldest first, ending with the proposal that is currently in play. Proposals with no parent stand alone. */
+export function threadOf(all: NegProposal[], p: NegProposal): NegProposal[] {
+  const byId = new Map(all.map(x => [x.id, x]))
+  const chain: NegProposal[] = [p]
+  const seen = new Set([p.id])
+  for (let cur = p; cur.parentId; ) {
+    const up = byId.get(cur.parentId)
+    if (!up || seen.has(up.id)) break
+    chain.unshift(up); seen.add(up.id); cur = up
+  }
+  return chain
+}
+
+/** The proposals to show as exchanges: those no later round answers. Earlier rounds appear inside their exchange. */
+export function exchanges(all: NegProposal[]): NegProposal[][] {
+  const answered = new Set(all.map(x => x.parentId).filter((x): x is string => !!x))
+  return all.filter(p => !answered.has(p.id)).map(p => threadOf(all, p))
+}
+
+/** The wording to propose, for a change staff make. Same shape the counterparty page builds. */
+export function staffProposalBody(kind: ProposalKind, blocks: string[], blockIndex: number, text: string, rationale: string) {
+  const block = blockIndex >= 0 ? blocks[blockIndex] ?? null : null
+  return {
+    kind, blockIndex, originalHtml: block,
+    proposedHtml: kind === 'DELETE' ? null : buildReplacement(kind === 'REPLACE' ? block : null, text),
+    rationale: rationale.trim() || null,
+  }
+}
 
 const escapeHtml = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 

@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   buildReplacement, canEditAsText, textBlockTag, excerpt, daysLeft, deadlineText, linkState, needsDecision, isLive, httpStatus, loadSession, saveSession,
+  waitingOnCounterparty, threadOf, exchanges, staffProposalBody,
   type NegLink, type NegProposal,
 } from './negotiation'
 
@@ -84,5 +85,40 @@ describe('session storage', () => {
     expect(httpStatus(new Error('x'))).toBeUndefined()
     expect(() => saveSession('abcdefghijklmnop', 's')).not.toThrow()
     expect(() => loadSession('abcdefghijklmnop')).not.toThrow()
+  })
+})
+
+describe('two-way negotiation helpers', () => {
+  const base = { partyId: 'a', kind: 'REPLACE', baseVersionNo: 1, status: 'PENDING_REVIEW', targetStillPresent: true, createdAt: '2026-11-18T10:00:00Z' } as const
+  const r1 = { ...base, id: 'r1', authorType: 'COUNTERPARTY', roundNo: 1, status: 'COUNTERED', awaiting: null } as NegProposal
+  const r2 = { ...base, id: 'r2', authorType: 'STAFF', roundNo: 2, parentId: 'r1', status: 'COUNTERED', awaiting: null } as NegProposal
+  const r3 = { ...base, id: 'r3', authorType: 'COUNTERPARTY', roundNo: 3, parentId: 'r2', awaiting: 'STAFF' } as NegProposal
+
+  it('staff decide only what is waiting on staff', () => {
+    expect(needsDecision(r3)).toBe(true)
+    expect(needsDecision({ ...r3, authorType: 'STAFF', awaiting: 'COUNTERPARTY' })).toBe(false)
+    expect(waitingOnCounterparty({ ...r3, authorType: 'STAFF', awaiting: 'COUNTERPARTY' })).toBe(true)
+    expect(needsDecision({ ...base, id: 'old' } as NegProposal)).toBe(true)
+  })
+
+  it('threads every round of an exchange, oldest first, and shows only the live end', () => {
+    expect(threadOf([r1, r2, r3], r3).map(x => x.id)).toEqual(['r1', 'r2', 'r3'])
+    const lone = { ...base, id: 'x' } as NegProposal
+    const ex = exchanges([r1, r2, r3, lone])
+    expect(ex.map(c => c.map(x => x.id))).toEqual([['r1', 'r2', 'r3'], ['x']])
+  })
+
+  it('survives a parent that is missing or a loop', () => {
+    expect(threadOf([r3], r3).map(x => x.id)).toEqual(['r3'])
+    const a = { ...base, id: 'a', parentId: 'b' } as NegProposal
+    const b = { ...base, id: 'b', parentId: 'a' } as NegProposal
+    expect(threadOf([a, b], a).length).toBeLessThanOrEqual(2)
+  })
+
+  it('builds the body for a change staff make', () => {
+    const blocks = ['<p>One</p>', '<h2>Two</h2>']
+    expect(staffProposalBody('REPLACE', blocks, 1, 'New two', ' because ')).toEqual({ kind: 'REPLACE', blockIndex: 1, originalHtml: '<h2>Two</h2>', proposedHtml: '<h2>New two</h2>', rationale: 'because' })
+    expect(staffProposalBody('DELETE', blocks, 0, '', '')).toEqual({ kind: 'DELETE', blockIndex: 0, originalHtml: '<p>One</p>', proposedHtml: null, rationale: null })
+    expect(staffProposalBody('ADD', blocks, -1, 'First', '')).toMatchObject({ blockIndex: -1, originalHtml: null, proposedHtml: '<p>First</p>' })
   })
 })
