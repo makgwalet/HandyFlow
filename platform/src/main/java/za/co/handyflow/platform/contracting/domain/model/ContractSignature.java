@@ -21,6 +21,8 @@ public class ContractSignature {
     @Column(name = "otp_code_hash") String otpCodeHash;
     @Column(name = "phone_last4")  String phoneLast4;
     @Column(name = "ip_address")   String ipAddress;
+    /** DIRECT (the connection itself) or TRUSTED_PROXY (a forwarded header from a configured proxy). Null when unknown. */
+    @Column(name = "ip_source")    String ipSource;
     @Column(name = "user_agent")   String userAgent;
     @Column(name = "signed_at")    Instant signedAt;
     @Column(name = "signature_data") String signatureData;
@@ -52,6 +54,8 @@ public class ContractSignature {
         s.signedAt      = Instant.now();
         return s;
     }
+
+    public void recordIpSource(String source) { this.ipSource = source; }
 
     /** Disposal under the records retention rules: the drawn signature and the device details go; when and how it was signed stays. */
     public void scrubForDisposal() {

@@ -477,7 +477,7 @@ public class ContractNegotiationService {
     }
 
     private void event(ContractNegotiation n, String actor, UUID userId, UUID partyId, String type, String detail, String ip) {
-        eventRepo.save(ContractNegotiationEvent.of(n.getTenantId(), n.getContractId(), n.getId(), actor, userId, partyId, type, detail, ip));
+        eventRepo.save(ContractNegotiationEvent.of(n.getTenantId(), n.getContractId(), n.getId(), actor, userId, partyId, type, detail, ip).withIpSource(ClientIpContext.sourceFor(ip)));
     }
 
     private static String describe(ContractNegotiationProposal p) {

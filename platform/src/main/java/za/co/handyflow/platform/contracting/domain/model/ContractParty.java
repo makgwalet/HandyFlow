@@ -28,6 +28,7 @@ public class ContractParty {
     @Column(name = "signing_status") String signingStatus = "PENDING";
     @Column(name = "signed_at")     Instant signedAt;
     @Column(name = "sign_ip_address") String signIpAddress;
+    @Column(name = "sign_ip_source") String signIpSource;
     @Column(name = "sign_user_agent") String signUserAgent;
     @Column(name = "otp_sent_at")   Instant otpSentAt;
     @Column(name = "otp_verified_at") Instant otpVerifiedAt;
@@ -93,6 +94,8 @@ public class ContractParty {
         this.signUserAgent  = userAgent;
         this.updatedAt      = Instant.now();
     }
+
+    public void recordSignIpSource(String source) { this.signIpSource = source; }
 
     public void decline() {
         this.signingStatus = "DECLINED";

@@ -160,7 +160,7 @@ public class ContractNegotiationAccessService {
         sessionRepo.deleteExpired(Instant.now().minus(1, ChronoUnit.DAYS));
         String sessionToken = newToken();
         Instant expires = Instant.now().plus(sessionMinutes, ChronoUnit.MINUTES);
-        sessionRepo.save(ContractNegotiationSession.start(l.getTenantId(), l.getId(), sha256(sessionToken), expires, ip));
+        sessionRepo.save(ContractNegotiationSession.start(l.getTenantId(), l.getId(), sha256(sessionToken), expires, ip).withIpSource(ClientIpContext.sourceFor(ip)));
         l.touch();
         linkRepo.save(l);
         audit(l, "COUNTERPARTY", null, l.getPartyId(), "ACCESS_VERIFIED", null, ip);
@@ -226,7 +226,7 @@ public class ContractNegotiationAccessService {
     }
 
     private void audit(ContractNegotiationLink l, String actor, UUID userId, UUID partyId, String type, String detail, String ip) {
-        eventRepo.save(ContractNegotiationEvent.of(l.getTenantId(), l.getContractId(), l.getNegotiationId(), actor, userId, partyId, type, detail, ip));
+        eventRepo.save(ContractNegotiationEvent.of(l.getTenantId(), l.getContractId(), l.getNegotiationId(), actor, userId, partyId, type, detail, ip).withIpSource(ClientIpContext.sourceFor(ip)));
     }
 
     static String channelOf(ContractParty p) { return p.getPhone() != null && !p.getPhone().isBlank() ? "SMS" : "EMAIL"; }

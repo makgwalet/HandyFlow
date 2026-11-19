@@ -90,4 +90,68 @@ class ClientIpResolverTest {
         for (String bad : new String[]{"10.0.0.0/40", "nope", "10.0.0.0/x", "999.0.0.1", "proxy.example.com"})
             assertThrows(IllegalArgumentException.class, () -> new ClientIpResolver(bad), bad);
     }
+
+    // ── the source of each address is remembered for whatever stores it ──
+
+    @org.junit.jupiter.api.AfterEach
+    void clearRequest() { org.springframework.web.context.request.RequestContextHolder.resetRequestAttributes(); }
+
+    private static void bind(MockHttpServletRequest r) {
+        org.springframework.web.context.request.RequestContextHolder.setRequestAttributes(
+                new org.springframework.web.context.request.ServletRequestAttributes(r));
+    }
+
+    @Test
+    void theSourceIsDirectWhenNothingIsConfiguredEvenIfTheCallerSendsForwardingHeaders() {
+        MockHttpServletRequest r = request("198.51.100.7", "203.0.113.9");
+        r.addHeader("X-Forwarded-Proto", "https");
+        r.addHeader("X-Real-IP", "203.0.113.9");
+        bind(r);
+        assertEquals("198.51.100.7", new ClientIpResolver("").address(r));
+        assertEquals("DIRECT", ClientIpContext.currentSource());
+        assertEquals("DIRECT", ClientIpContext.sourceFor("198.51.100.7"));
+    }
+
+    @Test
+    void theSourceIsDirectWhenTheForwardedHeaderComesFromAnUntrustedPeer() {
+        MockHttpServletRequest r = request("198.51.100.7", "203.0.113.9");
+        bind(r);
+        assertEquals("198.51.100.7", new ClientIpResolver("10.0.0.0/8").address(r));
+        assertEquals("DIRECT", ClientIpContext.currentSource());
+    }
+
+    @Test
+    void theSourceIsTrustedProxyOnlyWhenAConfiguredProxyVouchedForTheAddress() {
+        MockHttpServletRequest r = request("10.0.0.5", "203.0.113.9");
+        bind(r);
+        assertEquals("203.0.113.9", new ClientIpResolver("10.0.0.0/8").address(r));
+        assertEquals("TRUSTED_PROXY", ClientIpContext.currentSource());
+    }
+
+    @Test
+    void aTrustedPeerWithAMalformedChainIsRecordedAsDirect() {
+        MockHttpServletRequest r = request("10.0.0.5", "not-an-ip");
+        bind(r);
+        assertEquals("10.0.0.5", new ClientIpResolver("10.0.0.0/8").address(r));
+        assertEquals("DIRECT", ClientIpContext.currentSource());
+    }
+
+    @Test
+    void nothingIsRecordedOutsideARequestOrWithoutAnAddress() {
+        assertNull(ClientIpContext.currentSource());
+        assertNull(ClientIpContext.sourceFor("198.51.100.7"));
+        MockHttpServletRequest r = request("198.51.100.7");
+        bind(r);
+        new ClientIpResolver("").resolve(r);
+        assertNull(ClientIpContext.sourceFor(null));
+        assertNull(ClientIpContext.sourceFor(" "));
+    }
+
+    @Test
+    void trustingEveryProxyIsNotPossible() {
+        assertThrows(IllegalArgumentException.class, () -> new ClientIpResolver("*"));
+        assertThrows(IllegalArgumentException.class, () -> new ClientIpResolver("0.0.0.0/0"));
+        assertThrows(IllegalArgumentException.class, () -> new ClientIpResolver("::/0"));
+        assertThrows(IllegalArgumentException.class, () -> new ClientIpResolver("10.0.0.0/8,0.0.0.0/0"));
+    }
 }

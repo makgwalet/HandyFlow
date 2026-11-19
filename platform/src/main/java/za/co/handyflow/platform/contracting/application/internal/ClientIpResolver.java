@@ -60,6 +60,12 @@ public class ClientIpResolver {
     public String address(HttpServletRequest request) { return resolve(request).address(); }
 
     public ClientIp resolve(HttpServletRequest request) {
+        ClientIp result = compute(request);
+        ClientIpContext.remember(request, result.source());   // so whatever stores this address can record where it came from
+        return result;
+    }
+
+    private ClientIp compute(HttpServletRequest request) {
         String peer = request.getRemoteAddr();
         if (trusted.isEmpty()) return direct(peer);
         byte[] peerBytes = parseAddress(peer);
@@ -111,6 +117,7 @@ public class ClientIpResolver {
             int max = bytes.length * 8;
             if (prefix == null) prefix = max;
             if (prefix < 0 || prefix > max) throw new IllegalArgumentException("Invalid trusted proxy entry: " + entry);
+            if (prefix == 0) throw new IllegalArgumentException("Trusted proxy entry " + entry + " would trust every address");
             out.add(new Cidr(bytes, prefix));
         }
         return out;

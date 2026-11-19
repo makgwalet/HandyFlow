@@ -24,6 +24,7 @@ public class ContractNegotiationEvent {
     @Column(name = "event_type") private String eventType;
     private String detail;
     @Column(name = "ip_address") private String ipAddress;
+    @Column(name = "ip_source") private String ipSource;
     @Column(name = "created_at") private Instant createdAt;
 
     public static ContractNegotiationEvent of(UUID tenantId, UUID contractId, UUID negotiationId, String actorType, UUID userId, UUID partyId,
@@ -38,4 +39,7 @@ public class ContractNegotiationEvent {
         e.createdAt = Instant.now();
         return e;
     }
+
+    /** Where the stored address came from (DIRECT or TRUSTED_PROXY). Set once, when the event is created. */
+    public ContractNegotiationEvent withIpSource(String source) { this.ipSource = source; return this; }
 }

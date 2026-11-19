@@ -1243,9 +1243,12 @@ public class ContractingService {
 
         ContractSignature sig = ContractSignature.create(tenantId, contractId, partyId,
                 otpHash, last4, ipAddress, userAgent, req.signatureData(), witnessedByUserId);
+        String ipSource = ClientIpContext.sourceFor(ipAddress);
+        sig.recordIpSource(ipSource);
         signatureRepo.save(sig);
 
         party.markSigned(ipAddress, userAgent);
+        party.recordSignIpSource(ipSource);
         partyRepo.save(party);
     }
 
