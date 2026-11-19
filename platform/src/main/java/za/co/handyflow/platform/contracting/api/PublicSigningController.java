@@ -8,6 +8,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import za.co.handyflow.platform.contracting.application.internal.ClientIpResolver;
 import za.co.handyflow.platform.contracting.application.internal.ContractingService;
 import za.co.handyflow.platform.contracting.application.internal.PublicSigningRateLimiter;
 import za.co.handyflow.platform.contracting.application.internal.SigningTokenService;
@@ -50,12 +51,13 @@ public class PublicSigningController {
     private final ContractingService  contractingService;
     private final SigningTokenService tokenService;
     private final PublicSigningRateLimiter rateLimiter;
+    private final ClientIpResolver clientIps;
 
     @GetMapping("/{token}/contract")
     @Operation(summary = "Fetch contract content for the signing party — marks first view")
     public ResponseEntity<ApiResponse<PublicContractView>> getContractForSigning(
             @PathVariable String token, HttpServletRequest http) {
-        rateLimiter.checkView(http.getRemoteAddr(), token);
+        rateLimiter.checkView(clientIps.address(http), token);
         SigningClaims claims = tokenService.validateToken(token);
         // FIX: tenantId always comes from the validated token, never from TenantContext
         TenantId tenantId = TenantId.of(claims.tenantId());
@@ -79,11 +81,11 @@ public class PublicSigningController {
             @PathVariable String token,
             @Valid @RequestBody SignContractRequest req,
             HttpServletRequest http) {
-        rateLimiter.checkSubmit(http.getRemoteAddr(), token);
+        rateLimiter.checkSubmit(clientIps.address(http), token);
         SigningClaims claims = tokenService.validateToken(token);
         rateLimiter.checkOtpVerify(claims.partyId());
         TenantId tenantId = TenantId.of(claims.tenantId());
-        String ip = http.getRemoteAddr();
+        String ip = clientIps.address(http);
         String ua = http.getHeader("User-Agent");
         SigningResultView result = contractingService.signByToken(
                 tenantId, claims.contractId(), claims.partyId(), req, ip, ua, token);
@@ -96,7 +98,7 @@ public class PublicSigningController {
             @PathVariable String token,
             @RequestBody DeclineSignRequest req,
             HttpServletRequest http) {
-        rateLimiter.checkDecline(http.getRemoteAddr(), token);
+        rateLimiter.checkDecline(clientIps.address(http), token);
         SigningClaims claims = tokenService.validateToken(token);
         TenantId tenantId = TenantId.of(claims.tenantId());
         contractingService.declineByToken(tenantId, claims.contractId(), claims.partyId(),
@@ -110,7 +112,7 @@ public class PublicSigningController {
             @PathVariable String token,
             @Valid @RequestBody AddCommentRequest req,
             HttpServletRequest http) {
-        rateLimiter.checkComment(http.getRemoteAddr(), token);
+        rateLimiter.checkComment(clientIps.address(http), token);
         SigningClaims claims = tokenService.validateToken(token);
         TenantId tenantId = TenantId.of(claims.tenantId());
         CommentView comment = contractingService.addCommentByToken(
@@ -122,7 +124,7 @@ public class PublicSigningController {
     @Operation(summary = "List all comments on this contract")
     public ResponseEntity<ApiResponse<List<CommentView>>> getComments(
             @PathVariable String token, HttpServletRequest http) {
-        rateLimiter.checkView(http.getRemoteAddr(), token);
+        rateLimiter.checkView(clientIps.address(http), token);
         SigningClaims claims = tokenService.validateToken(token);
         TenantId tenantId = TenantId.of(claims.tenantId());
         return ResponseEntity.ok(ApiResponse.success("Comments",

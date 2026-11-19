@@ -231,6 +231,10 @@ contracting:
 # The dev OTP endpoint has its own switch (below) and is OFF unless DEV_OTP_ENDPOINT=true.
 
 handyflow:
+  contracting:
+    # Proxies (addresses or CIDR ranges, comma-separated) whose X-Forwarded-For the Contracting public endpoints may believe.
+    # Empty by default: forwarded headers are ignored and the connection address is used. Set only once the hosting topology is confirmed.
+    trusted-proxies: ${CONTRACTING_TRUSTED_PROXIES:}
   entitlement:
     enforce: ${ENTITLEMENT_ENFORCE:false}   # false = log ENTITLEMENT-REPORT lines only; true = refuse with 402/403
   dev:

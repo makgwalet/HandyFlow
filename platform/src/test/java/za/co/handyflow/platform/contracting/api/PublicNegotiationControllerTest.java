@@ -10,6 +10,7 @@ import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import za.co.handyflow.platform.WebMvcTestSecuritySupport;
+import za.co.handyflow.platform.contracting.application.internal.ClientIpResolver;
 import za.co.handyflow.platform.contracting.application.internal.ContractNegotiationAccessService;
 import za.co.handyflow.platform.contracting.application.internal.PublicSigningRateLimiter;
 import za.co.handyflow.platform.contracting.dto.ContractNegotiationDtos.LinkInfo;
@@ -35,6 +36,10 @@ class PublicNegotiationControllerTest {
     @Autowired MockMvc mvc;
     @MockitoBean ContractNegotiationAccessService access;
     @MockitoBean PublicSigningRateLimiter limiter;
+    @MockitoBean ClientIpResolver clientIps;
+
+    @org.junit.jupiter.api.BeforeEach
+    void address() { when(clientIps.address(any())).thenReturn("127.0.0.1"); }
 
     @Test
     void anAnonymousVisitorReachesTheLinkInfoAndIsRateLimitedBeforeAnyLookup() throws Exception {

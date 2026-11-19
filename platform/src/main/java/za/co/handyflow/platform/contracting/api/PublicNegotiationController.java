@@ -8,6 +8,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import za.co.handyflow.platform.contracting.application.internal.ClientIpResolver;
 import za.co.handyflow.platform.contracting.application.internal.ContractNegotiationAccessService;
 import za.co.handyflow.platform.contracting.application.internal.ContractNegotiationAccessService.Access;
 import za.co.handyflow.platform.contracting.application.internal.PublicSigningRateLimiter;
@@ -33,29 +34,30 @@ public class PublicNegotiationController {
 
     private final ContractNegotiationAccessService access;
     private final PublicSigningRateLimiter rateLimiter;
+    private final ClientIpResolver clientIps;
 
     @GetMapping
     @Operation(summary = "What the link is for, before the code is confirmed")
     public ResponseEntity<ApiResponse<LinkInfo>> info(@PathVariable String token, HttpServletRequest http) {
-        rateLimiter.checkNegotiateIp(http.getRemoteAddr());
-        rateLimiter.checkNegotiateView(http.getRemoteAddr(), token);
+        rateLimiter.checkNegotiateIp(clientIps.address(http));
+        rateLimiter.checkNegotiateView(clientIps.address(http), token);
         return ResponseEntity.ok(ApiResponse.success("Link", access.info(token)));
     }
 
     @PostMapping("/code")
     @Operation(summary = "Send a one-time code to the contact details held for this party")
     public ResponseEntity<ApiResponse<OtpSentView>> code(@PathVariable String token, HttpServletRequest http) {
-        rateLimiter.checkNegotiateIp(http.getRemoteAddr());
-        rateLimiter.checkNegotiateView(http.getRemoteAddr(), token);
-        return ResponseEntity.ok(ApiResponse.success("Code sent", access.requestCode(token, http.getRemoteAddr())));
+        rateLimiter.checkNegotiateIp(clientIps.address(http));
+        rateLimiter.checkNegotiateView(clientIps.address(http), token);
+        return ResponseEntity.ok(ApiResponse.success("Code sent", access.requestCode(token, clientIps.address(http))));
     }
 
     @PostMapping("/verify")
     @Operation(summary = "Confirm the code and receive a short-lived session")
     public ResponseEntity<ApiResponse<SessionView>> verify(@PathVariable String token, @Valid @RequestBody VerifyRequest q, HttpServletRequest http) {
-        rateLimiter.checkNegotiateIp(http.getRemoteAddr());
-        rateLimiter.checkNegotiateView(http.getRemoteAddr(), token);
-        SessionView s = access.verifyCode(token, q.code(), http.getRemoteAddr());
+        rateLimiter.checkNegotiateIp(clientIps.address(http));
+        rateLimiter.checkNegotiateView(clientIps.address(http), token);
+        SessionView s = access.verifyCode(token, q.code(), clientIps.address(http));
         if (s == null) throw new HandyFlowException("That code is not correct or has expired.", HttpStatus.UNAUTHORIZED, "NEGOTIATION_CODE_INVALID");
         return ResponseEntity.ok(ApiResponse.success("Verified", s));
     }
@@ -73,7 +75,7 @@ public class PublicNegotiationController {
     public ResponseEntity<ApiResponse<ProposalView>> propose(@PathVariable String token, @RequestHeader(value = SESSION_HEADER, required = false) String session,
                                                              @Valid @RequestBody ProposalInput q, HttpServletRequest http) {
         Access a = authenticate(token, session, http, true);
-        return ResponseEntity.ok(ApiResponse.success("Proposal submitted", access.propose(a, q, http.getRemoteAddr())));
+        return ResponseEntity.ok(ApiResponse.success("Proposal submitted", access.propose(a, q, clientIps.address(http))));
     }
 
     @PostMapping("/proposals/{proposalId}/withdraw")
@@ -81,7 +83,7 @@ public class PublicNegotiationController {
     public ResponseEntity<ApiResponse<ProposalView>> withdraw(@PathVariable String token, @PathVariable UUID proposalId,
                                                               @RequestHeader(value = SESSION_HEADER, required = false) String session, HttpServletRequest http) {
         Access a = authenticate(token, session, http, true);
-        return ResponseEntity.ok(ApiResponse.success("Proposal withdrawn", access.withdraw(a, proposalId, http.getRemoteAddr())));
+        return ResponseEntity.ok(ApiResponse.success("Proposal withdrawn", access.withdraw(a, proposalId, clientIps.address(http))));
     }
 
     @PostMapping("/proposals/{proposalId}/accept")
@@ -90,7 +92,7 @@ public class PublicNegotiationController {
                                                             @RequestHeader(value = SESSION_HEADER, required = false) String session,
                                                             @Valid @RequestBody(required = false) DecisionRequest q, HttpServletRequest http) {
         Access a = authenticate(token, session, http, true);
-        return ResponseEntity.ok(ApiResponse.success("Proposal accepted", access.accept(a, proposalId, q == null ? null : q.note(), http.getRemoteAddr())));
+        return ResponseEntity.ok(ApiResponse.success("Proposal accepted", access.accept(a, proposalId, q == null ? null : q.note(), clientIps.address(http))));
     }
 
     @PostMapping("/proposals/{proposalId}/reject")
@@ -99,7 +101,7 @@ public class PublicNegotiationController {
                                                             @RequestHeader(value = SESSION_HEADER, required = false) String session,
                                                             @Valid @RequestBody RejectRequest q, HttpServletRequest http) {
         Access a = authenticate(token, session, http, true);
-        return ResponseEntity.ok(ApiResponse.success("Proposal rejected", access.reject(a, proposalId, q.reason(), http.getRemoteAddr())));
+        return ResponseEntity.ok(ApiResponse.success("Proposal rejected", access.reject(a, proposalId, q.reason(), clientIps.address(http))));
     }
 
     @PostMapping("/proposals/{proposalId}/counter")
@@ -108,7 +110,7 @@ public class PublicNegotiationController {
                                                              @RequestHeader(value = SESSION_HEADER, required = false) String session,
                                                              @Valid @RequestBody CounterInput q, HttpServletRequest http) {
         Access a = authenticate(token, session, http, true);
-        return ResponseEntity.ok(ApiResponse.success("Counter-proposal submitted", access.counter(a, proposalId, q, http.getRemoteAddr())));
+        return ResponseEntity.ok(ApiResponse.success("Counter-proposal submitted", access.counter(a, proposalId, q, clientIps.address(http))));
     }
 
     @PostMapping("/comments")
@@ -116,13 +118,13 @@ public class PublicNegotiationController {
     public ResponseEntity<ApiResponse<CommentView>> comment(@PathVariable String token, @RequestHeader(value = SESSION_HEADER, required = false) String session,
                                                             @Valid @RequestBody CounterpartyCommentInput q, HttpServletRequest http) {
         Access a = authenticate(token, session, http, true);
-        return ResponseEntity.ok(ApiResponse.success("Comment posted", access.comment(a, q, http.getRemoteAddr())));
+        return ResponseEntity.ok(ApiResponse.success("Comment posted", access.comment(a, q, clientIps.address(http))));
     }
 
     private Access authenticate(String token, String session, HttpServletRequest http, boolean acting) {
-        rateLimiter.checkNegotiateIp(http.getRemoteAddr());
-        if (acting) rateLimiter.checkNegotiateAct(http.getRemoteAddr(), token);
-        else rateLimiter.checkNegotiateView(http.getRemoteAddr(), token);
+        rateLimiter.checkNegotiateIp(clientIps.address(http));
+        if (acting) rateLimiter.checkNegotiateAct(clientIps.address(http), token);
+        else rateLimiter.checkNegotiateView(clientIps.address(http), token);
         return access.authenticate(token, session);
     }
 }

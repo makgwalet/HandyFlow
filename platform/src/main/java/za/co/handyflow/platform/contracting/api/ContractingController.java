@@ -13,6 +13,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
+import za.co.handyflow.platform.contracting.application.internal.ClientIpResolver;
 import za.co.handyflow.platform.contracting.application.internal.ContractingService;
 import za.co.handyflow.platform.contracting.dto.*;
 import za.co.handyflow.platform.documents.application.DocumentsFacade;
@@ -30,6 +31,7 @@ import java.util.UUID;
 public class ContractingController {
 
     private final ContractingService contractingService;
+    private final ClientIpResolver clientIps;
 
     // ── Templates ─────────────────────────────────────────────────────────────
 
@@ -283,7 +285,7 @@ public class ContractingController {
             @PathVariable UUID partyId,
             @Valid @RequestBody SignContractRequest req,
             HttpServletRequest http) {
-        String ip = http.getRemoteAddr();
+        String ip = clientIps.address(http);
         String ua = http.getHeader("User-Agent");
         return ResponseEntity.ok(ApiResponse.success("Signature recorded",
                 contractingService.signContract(TenantContext.getTenantIdAsObject(), id, partyId,
