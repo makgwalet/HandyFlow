@@ -49,7 +49,19 @@ class ContractApprovalServiceTest {
         lenient().when(approvalRepo.findForUpdate(eq(tenant.getValue()), any())).thenAnswer(i -> store.stream().filter(a -> a.getId().equals(i.getArgument(1))).findFirst());
     }
 
-    private ContractApproval requested() { return service.request(tenant, ApprovalAction.SEND_FOR_SIGNING, contract.getId(), maker, "please"); }
+    /** Sending for signing is off by default, so tests that exercise the gate switch it on first (unless they set their own policy). */
+    private void ensureSendRequired() {
+        if (policyRepo.findOne(tenant.getValue(), ApprovalAction.SEND_FOR_SIGNING).isEmpty()) {
+            ContractApprovalPolicy p = ContractApprovalPolicy.create(tenant.getValue(), ApprovalAction.SEND_FOR_SIGNING);
+            p.set(true, true, maker);
+            lenient().when(policyRepo.findOne(tenant.getValue(), ApprovalAction.SEND_FOR_SIGNING)).thenReturn(Optional.of(p));
+        }
+    }
+
+    private ContractApproval requested() {
+        ensureSendRequired();
+        return service.request(tenant, ApprovalAction.SEND_FOR_SIGNING, contract.getId(), maker, "please");
+    }
 
     private static final Set<String> MANAGER = Set.of("CONTRACTS_MANAGE");
 
@@ -60,8 +72,10 @@ class ContractApprovalServiceTest {
         var all = service.policies(tenant);
         assertEquals(4, all.size());
         assertTrue(all.stream().allMatch(ContractApprovalService.EffectivePolicy::isDefault));
-        assertTrue(service.policy(tenant, ApprovalAction.SEND_FOR_SIGNING).required());
-        assertFalse(service.policy(tenant, ApprovalAction.TERMINATE).required());
+        assertFalse(service.policy(tenant, ApprovalAction.SEND_FOR_SIGNING).required(), "sending for signing needs approval only when the tenant asks");
+        assertTrue(service.policy(tenant, ApprovalAction.TERMINATE).required());
+        assertTrue(service.policy(tenant, ApprovalAction.PUBLISH_TEMPLATE).required());
+        assertTrue(service.policy(tenant, ApprovalAction.PUBLISH_CLAUSE).required());
     }
 
     @Test
@@ -91,6 +105,7 @@ class ContractApprovalServiceTest {
 
     @Test
     void withoutAnApprovalTheActionIsBlocked() {
+        ensureSendRequired();
         IllegalStateException e = assertThrows(IllegalStateException.class, () -> service.assertApproved(tenant, ApprovalAction.SEND_FOR_SIGNING, contract.getId()));
         assertTrue(e.getMessage().contains("second person"));
     }
@@ -223,6 +238,17 @@ class ContractApprovalServiceTest {
         assertDoesNotThrow(() -> service.assertApproved(tenant, ApprovalAction.SEND_FOR_SIGNING, contract.getId()));
         when(p.getEmail()).thenReturn("someone-else@example.com");
         assertThrows(IllegalStateException.class, () -> service.assertApproved(tenant, ApprovalAction.SEND_FOR_SIGNING, contract.getId()));
+    }
+
+    @Test
+    void whenNotRequiredTheActionGoesAheadWithoutAnyApproval() {
+        assertDoesNotThrow(() -> service.assertApproved(tenant, ApprovalAction.SEND_FOR_SIGNING, contract.getId()));
+    }
+
+    @Test
+    void terminatingIsBlockedByDefaultUntilSomeoneElseApproves() {
+        IllegalStateException e = assertThrows(IllegalStateException.class, () -> service.assertApproved(tenant, ApprovalAction.TERMINATE, contract.getId()));
+        assertTrue(e.getMessage().contains("second person"));
     }
 
     @Test

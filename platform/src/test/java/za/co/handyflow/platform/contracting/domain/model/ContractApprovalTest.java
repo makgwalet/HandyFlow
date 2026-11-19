@@ -94,9 +94,9 @@ class ContractApprovalTest {
 
     @Test
     void safeDefaults() {
-        assertTrue(ApprovalAction.SEND_FOR_SIGNING.requiredByDefault());
+        assertFalse(ApprovalAction.SEND_FOR_SIGNING.requiredByDefault());
         assertTrue(ApprovalAction.PUBLISH_CLAUSE.requiredByDefault());
         assertTrue(ApprovalAction.PUBLISH_TEMPLATE.requiredByDefault());
-        assertFalse(ApprovalAction.TERMINATE.requiredByDefault());
+        assertTrue(ApprovalAction.TERMINATE.requiredByDefault());
     }
 }
