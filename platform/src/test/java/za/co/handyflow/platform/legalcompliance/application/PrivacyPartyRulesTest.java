@@ -9,6 +9,8 @@ import za.co.handyflow.platform.legalcompliance.domain.model.RiskLevel;
 
 import java.time.LocalDate;
 
+import static org.junit.jupiter.api.Assertions.*;
+
 class PrivacyPartyRulesTest {
 
     private static final LocalDate D = LocalDate.of(2026, 3, 10);

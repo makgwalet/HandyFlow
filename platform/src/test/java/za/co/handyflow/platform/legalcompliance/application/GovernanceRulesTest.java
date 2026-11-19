@@ -8,6 +8,8 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 
+import static org.junit.jupiter.api.Assertions.*;
+
 class GovernanceRulesTest {
 
     private final LocalDate today = LocalDate.of(2026, 11, 19);
