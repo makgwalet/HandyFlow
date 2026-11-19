@@ -27,6 +27,7 @@ import {
   Calendar, MessageSquare, RefreshCw, Eye, EyeOff, LayoutList, LayoutGrid, ArrowUpDown,
 } from 'lucide-react'
 import { unwrap, fmtR, apiError, type ContractRow, type ContractParty, type ContractComment, type ContractTemplateRow, type SignIcon } from './contractingApi'
+import { ContractWizard } from './ContractWizard'
 import { ContractSharingSection } from './ContractSharingSection'
 import { ContractRedlineSection } from './ContractRedlineSection'
 import { ContractRiskSection } from './ContractRiskSection'
@@ -260,17 +261,6 @@ export default function ContractsTab() {
   const [isAmendment,  setIsAmendment]  = useState(false)
   const [clauseRef,    setClauseRef]    = useState('')
   const [error,        setError]        = useState('')
-  const [selectedTemplate, setSelectedTemplate] = useState<ContractTemplateRow | null>(null)
-
-  const INIT_FORM = () => ({
-    title: '', contractType: 'SERVICE_AGREEMENT', templateId: '',
-    valueAmount: '', startDate: '', endDate: '',
-    autoRenew: false, renewalNoticeDays: '30', notes: '',
-    variables: {} as Record<string, string>,
-  })
-  const [form, setForm] = useState(INIT_FORM())
-  const sf = (k: string, v: string | boolean | Record<string, string>) => setForm(p => ({ ...p, [k]: v }))
-
   const [partyForm, setPartyForm] = useState({
     partyType: 'INDIVIDUAL', partyRole: 'COUNTERPARTY',
     fullName: '', email: '', phone: '', companyName: '',
@@ -306,12 +296,6 @@ export default function ContractsTab() {
     qc.invalidateQueries({ queryKey: ['contracts'] })
     qc.invalidateQueries({ queryKey: ['contract-detail'] })
   }
-
-  const createContract = useMutation({
-    mutationFn: (body: Record<string, unknown>) => apiClient.post('/api/v1/contracts', body),
-    onSuccess: () => { invalidate(); setShowCreate(false); setForm(INIT_FORM()); setSelectedTemplate(null); setError('') },
-    onError: (e: unknown) => setError(apiError(e, 'Failed to create contract')),
-  })
 
   const contractAction = useMutation({
     mutationFn: ({ id, action, body }: { id: string; action: string; body?: Record<string, unknown> }) =>
@@ -396,21 +380,6 @@ export default function ContractsTab() {
     } catch { alert('Failed to download PDF') }
   }
 
-  const handleTemplateChange = (templateId: string) => {
-    const tmpl = templates.find(t => t.id === templateId) ?? null
-    setSelectedTemplate(tmpl)
-    sf('templateId', templateId)
-    if (tmpl) sf('contractType', tmpl.contractType)
-    sf('variables', {})
-  }
-
-  // NEW: drives the live warning banner in the Template Variables section
-  // below — recomputed on every keystroke since it reads live form state.
-  const templateVarKeys = selectedTemplate?.variables
-    ? Object.keys(selectedTemplate.variables as Record<string, string>)
-    : []
-  const unfilledVarKeys = templateVarKeys.filter(k => !(form.variables[k] ?? '').trim())
-
   const getNextActions = (status: string) => {
     if (status === 'DRAFT')        return [{ label: 'Submit for Review', action: 'submit-for-review', color: 'var(--hf-info-text)', bg: 'var(--hf-info-soft)' }]
     if (status === 'UNDER_REVIEW') return [{ label: 'Send for Signing',  action: 'send-for-signing',  color: 'var(--hf-success-text-strong)', bg: 'var(--hf-success-soft-strong)' }]
@@ -465,7 +434,7 @@ export default function ContractsTab() {
           <button onClick={() => qc.invalidateQueries({ queryKey: ['contracts'] })} style={{ ...btnS, padding: '9px 11px' }} title="Refresh">
             <RefreshCw size={13} />
           </button>
-          {canManage && <button onClick={() => { setShowCreate(true); setError(''); setForm(INIT_FORM()); setSelectedTemplate(null) }} style={btnP()}>
+          {canManage && <button onClick={() => { setShowCreate(true); setError('') }} style={btnP()}>
             <Plus size={14} /> New Contract
           </button>}
         </div>
@@ -884,138 +853,7 @@ export default function ContractsTab() {
 
       {/* Create contract modal */}
       {showCreate && (
-        <div style={MODAL}>
-          <div style={mBox(700)}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 22 }}>
-              <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: 'var(--hf-text)' }}>New Contract</h3>
-              <button onClick={() => setShowCreate(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex' }}><X size={20} style={{ color: 'var(--hf-text-faint)' }} /></button>
-            </div>
-
-            <Sect title="Template">
-              <div>
-                <label style={lbl}>Start from template (optional)</label>
-                <select value={form.templateId} onChange={e => handleTemplateChange(e.target.value)} style={{ ...inp, background: 'var(--hf-surface)' }}>
-                  <option value="">Blank contract</option>
-                  {templates.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-                </select>
-              </div>
-            </Sect>
-
-            <Sect title="Contract Details">
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
-                <div style={{ gridColumn: '1/-1' }}>
-                  <label style={lbl}>Title *</label>
-                  <input autoFocus value={form.title} onChange={e => sf('title', e.target.value)} placeholder="Service Agreement — Acme Corp" style={inp} />
-                </div>
-                <div>
-                  <label style={lbl}>Contract Type *</label>
-                  <select value={form.contractType} onChange={e => sf('contractType', e.target.value)} style={{ ...inp, background: 'var(--hf-surface)' }}>
-                    {CONTRACT_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label style={lbl}>Value (R)</label>
-                  <input type="number" value={form.valueAmount} onChange={e => sf('valueAmount', e.target.value)} placeholder="0.00" style={inp} />
-                </div>
-                <div>
-                  <label style={lbl}>Start Date</label>
-                  <input type="date" value={form.startDate} onChange={e => sf('startDate', e.target.value)} style={inp} />
-                </div>
-                <div>
-                  <label style={lbl}>End Date</label>
-                  <input type="date" value={form.endDate} min={form.startDate} onChange={e => sf('endDate', e.target.value)} style={inp} />
-                </div>
-                <div style={{ gridColumn: '1/-1' }}>
-                  <label style={lbl}>Notes</label>
-                  <textarea value={form.notes} onChange={e => sf('notes', e.target.value)} rows={2} style={{ ...inp, resize: 'vertical' }} />
-                </div>
-                <div style={{ gridColumn: '1/-1', display: 'flex', alignItems: 'center', gap: 14 }}>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 13, fontWeight: 500, color: 'var(--hf-text-secondary)', cursor: 'pointer' }}>
-                    <input type="checkbox" checked={form.autoRenew} onChange={e => sf('autoRenew', e.target.checked)} />
-                    Auto-renew on expiry
-                  </label>
-                  {form.autoRenew && (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-                      <span style={{ fontSize: 12, color: 'var(--hf-text-muted)' }}>Renewal notice</span>
-                      <input type="number" value={form.renewalNoticeDays} onChange={e => sf('renewalNoticeDays', e.target.value)} style={{ ...inp, width: 70 }} />
-                      <span style={{ fontSize: 12, color: 'var(--hf-text-muted)' }}>days</span>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </Sect>
-
-            {/* Template variable fields */}
-            {selectedTemplate && selectedTemplate.variables && Object.keys(selectedTemplate.variables).length > 0 && (
-              <Sect title="Template Variables">
-                {/* FIX: was a static "Leave blank to fill in later" banner
-                    with no indication of what happens later. Sending for
-                    signing genuinely blocks on ANY unfilled placeholder
-                    (see ContractingService.sendForSigning() ->
-                    findUnresolved()) — this now says so explicitly and
-                    names exactly which fields are still blank, live, as
-                    the person fills the form in. Still non-blocking here:
-                    saving an incomplete DRAFT is a legitimate, intentional
-                    part of this workflow, not something to prevent. */}
-                <div style={{
-                  marginBottom: 10, padding: '9px 12px', borderRadius: 8, fontSize: 12,
-                  background: unfilledVarKeys.length > 0 ? 'var(--hf-warning-soft)' : 'var(--hf-success-soft)',
-                  border: `1px solid ${unfilledVarKeys.length > 0 ? 'var(--hf-warning-border)' : 'var(--hf-success-border-subtle)'}`,
-                  color: unfilledVarKeys.length > 0 ? 'var(--hf-warning-text-deep)' : 'var(--hf-success-text-strong)',
-                }}>
-                  {unfilledVarKeys.length > 0 ? (
-                    <>
-                      You can save this as a draft with blanks, but <strong>{unfilledVarKeys.length} placeholder{unfilledVarKeys.length !== 1 ? 's' : ''}</strong> must
-                      be filled in before it can be sent for signing: {unfilledVarKeys.map(k => k.replace(/_/g, ' ')).join(', ')}.
-                    </>
-                  ) : (
-                    <>All placeholders are filled — this contract will be ready to send for signing once reviewed.</>
-                  )}
-                </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
-                  {Object.entries(selectedTemplate.variables as Record<string, string>).map(([key, type]) => (
-                    <div key={key}>
-                      <label style={lbl}>
-                        {key.replace(/_/g, ' ')}
-                        <span style={{ fontWeight: 400, color: 'var(--hf-text-faint)', marginLeft: 4 }}>({type})</span>
-                      </label>
-                      <input
-                        type={type === 'date' ? 'date' : type === 'number' ? 'number' : 'text'}
-                        value={form.variables[key] ?? ''}
-                        onChange={e => sf('variables', { ...form.variables, [key]: e.target.value })}
-                        placeholder={`Enter ${key.replace(/_/g, ' ')}`}
-                        style={inp}
-                      />
-                    </div>
-                  ))}
-                </div>
-              </Sect>
-            )}
-
-            <ErrBox msg={humanizeActionError(error)} />
-            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 20 }}>
-              <button onClick={() => setShowCreate(false)} style={btnC}>Cancel</button>
-              <button
-                disabled={!form.title || createContract.isPending}
-                onClick={() => createContract.mutate({
-                  title:           form.title,
-                  contractType:    form.contractType,
-                  templateId:      form.templateId || null,
-                  variables:       Object.keys(form.variables).length ? form.variables : null,
-                  valueAmount:     parseFloat(form.valueAmount) || null,
-                  currency:        'ZAR',
-                  startDate:       form.startDate || null,
-                  endDate:         form.endDate   || null,
-                  autoRenew:       form.autoRenew,
-                  renewalNoticeDays: form.autoRenew ? Number(form.renewalNoticeDays) || 30 : null,
-                  notes:           form.notes || null,
-                })}
-                style={btnP()}>
-                {createContract.isPending ? 'Creating…' : 'Create Contract'}
-              </button>
-            </div>
-          </div>
-        </div>
+        <ContractWizard templates={templates} onClose={() => setShowCreate(false)} onCreated={id => setExpanded(id)} />
       )}
 
       {/* Add party modal */}
