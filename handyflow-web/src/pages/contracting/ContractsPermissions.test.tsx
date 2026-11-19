@@ -31,6 +31,7 @@ vi.mock('../../api/client', () => ({
 // The expanded sections make their own requests and have their own tests.
 vi.mock('./ContractRedlineSection', () => ({ ContractRedlineSection: () => null }))
 vi.mock('./ContractRiskSection', () => ({ ContractRiskSection: () => null }))
+vi.mock('./ContractNegotiationSection', () => ({ ContractNegotiationSection: () => null }))
 vi.mock('./ContractSharingSection', () => ({ ContractSharingSection: () => null }))
 
 import ContractsTab from './ContractsTab'

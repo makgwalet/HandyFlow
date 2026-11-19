@@ -56,6 +56,7 @@ import VideoDockProvider                from './pages/clinic/VideoDockProvider'
 import { EventsPage }                   from './pages/events/EventsPage'
 import ContractingPage                  from './pages/contracting/ContractingPage'
 import SigningPage                      from './pages/contracting/SigningPage'
+import NegotiationPage                 from './pages/contracting/NegotiationPage'
 import { ExpensesPage }                 from './pages/expenses/ExpensesPage'
 import { AcceptInvitePage }             from './pages/auth/AcceptInvitePage'
 import { CreativePage }                 from './pages/creative/CreativePage'
@@ -369,6 +370,7 @@ export default function App() {
           <Route path="/auditor/portal/tenants/:tenantId" element={<AuditorPortalProtectedRoute><AuditorPortalTenantDetailPage /></AuditorPortalProtectedRoute>} />
 
           <Route path="/sign/:token"                   element={<SigningPage />} />
+          <Route path="/negotiate/:token"              element={<NegotiationPage />} />
           <Route path="/creative/approve/:token"       element={<CreativeApprovePage />} />
           <Route path="/unsubscribe/:token"            element={<UnsubscribePage />} />
 

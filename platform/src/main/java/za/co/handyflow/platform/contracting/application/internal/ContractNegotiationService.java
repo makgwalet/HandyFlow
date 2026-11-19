@@ -185,11 +185,11 @@ public class ContractNegotiationService {
         Contract c = contractOf(tenantId, contractId);
         Optional<ContractNegotiation> n = negotiationRepo.findByTenantIdAndContractId(tenantId.getValue(), contractId);
         int version = latestVersion(tenantId, c);
-        if (n.isEmpty()) return new StaffView(null, version, c.getBody(), List.of(), List.of(), List.of());
+        if (n.isEmpty()) return new StaffView(null, version, c.getBody(), BodyDiff.blocks(c.getBody()), List.of(), List.of(), List.of());
         List<ContractNegotiationProposal> all = n.get().isActive() && isEditable(c) ? reconcile(n.get(), c)
                 : proposalRepo.findByTenantIdAndContractIdOrderByCreatedAtAsc(tenantId.getValue(), contractId);
         Map<UUID, String> names = nameOf(contractId);
-        return new StaffView(view(n.get(), all), version, c.getBody(),
+        return new StaffView(view(n.get(), all), version, c.getBody(), BodyDiff.blocks(c.getBody()),
                 all.stream().map(p -> proposalView(p, c.getBody(), names.get(p.getPartyId()))).toList(),
                 commentRepo.findByTenantIdAndContractIdOrderByCreatedAtAsc(tenantId.getValue(), contractId).stream().map(ContractNegotiationService::commentView).toList(),
                 eventRepo.findTop200ByTenantIdAndContractIdOrderByCreatedAtDesc(tenantId.getValue(), contractId).stream().map(ContractNegotiationService::eventView).toList());
@@ -264,7 +264,7 @@ public class ContractNegotiationService {
         List<CommentView> comments = commentRepo.findByTenantIdAndContractIdAndInternalOnlyFalseOrderByCreatedAtAsc(tenantId.getValue(), contractId).stream()
                 .filter(cm -> cm.visibleTo(partyId)).map(ContractNegotiationService::commentView).toList();
         boolean can = isEditable(c) && n.acceptsCounterpartyInput(today());
-        return new CounterpartyView(n.getStatus(), n.getResponseDeadline(), can, latestVersion(tenantId, c), c.getBody(), mine, comments);
+        return new CounterpartyView(n.getStatus(), n.getResponseDeadline(), can, latestVersion(tenantId, c), c.getBody(), BodyDiff.blocks(c.getBody()), mine, comments);
     }
 
     // ── Signing hooks ────────────────────────────────────────────────────────

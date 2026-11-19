@@ -43,11 +43,11 @@ public final class ContractNegotiationDtos {
 
     public record EventView(UUID id, String actorType, UUID actorUserId, UUID partyId, String eventType, String detail, Instant createdAt) {}
 
-    /** NOT_STARTED is returned as {@code negotiation == null}. */
-    public record StaffView(NegotiationView negotiation, int currentVersionNo, String body, List<ProposalView> proposals, List<CommentView> comments, List<EventView> events) {}
+    /** NOT_STARTED is returned as {@code negotiation == null}. {@code blocks} are the body's blocks exactly as the server splits them; proposals quote them verbatim. */
+    public record StaffView(NegotiationView negotiation, int currentVersionNo, String body, List<String> blocks, List<ProposalView> proposals, List<CommentView> comments, List<EventView> events) {}
 
     /** What one counterparty sees: the current text, their own proposals and the comments addressed to them. */
-    public record CounterpartyView(String status, LocalDate responseDeadline, boolean canPropose, int currentVersionNo, String body, List<ProposalView> proposals,
+    public record CounterpartyView(String status, LocalDate responseDeadline, boolean canPropose, int currentVersionNo, String body, List<String> blocks, List<ProposalView> proposals,
                                    List<CommentView> comments) {}
 
     // ── access ───────────────────────────────────────────────────────────────

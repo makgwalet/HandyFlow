@@ -10,7 +10,7 @@ import type { Clause } from './ClausesTab'
 import { RichTextEditor } from './RichTextEditor'
 import { hunkWordDiff, type WordOp } from './wordDiff'
 
-interface Segment { type: 'EQUAL' | 'HUNK'; hunkId: number; blocks: string[]; removed: string[]; added: string[] }
+export interface Segment { type: 'EQUAL' | 'HUNK'; hunkId: number; blocks: string[]; removed: string[]; added: string[] }
 interface VersionInfo { versionNo: number; source: string; note?: string | null; createdAt: string }
 interface Proposal {
   id: string; baseVersionNo: number; status: 'OPEN' | 'APPLIED' | 'REJECTED'; note?: string | null; createdAt: string
@@ -30,19 +30,19 @@ const errMsg = (e: unknown, fallback: string): string =>
 const data = <T,>(r: { data?: { data?: T } & T }): T => (r.data?.data ?? r.data) as T
 
 /** One side of a word-level comparison: unchanged words plain, changed words (deleted on the left, added on the right) marked. */
-function Words({ ops, side }: { ops: WordOp[]; side: 'del' | 'add' }) {
+export function Words({ ops, side }: { ops: WordOp[]; side: 'del' | 'add' }) {
   const mark = side === 'del'
     ? { background: 'var(--hf-danger-border)', textDecoration: 'line-through' as const, borderRadius: 3 }
     : { background: 'var(--hf-success-border)', fontWeight: 700, borderRadius: 3 }
   return <div style={{ whiteSpace: 'pre-wrap' }}>{ops.filter(o => o.type === 'same' || o.type === side).map((o, i) => o.type === 'same' ? <span key={i}>{o.text}</span> : <span key={i} style={mark}>{o.text}</span>)}</div>
 }
 
-function Html({ html }: { html: string }) {
+export function Html({ html }: { html: string }) {
   return <div dangerouslySetInnerHTML={{ __html: sanitizeHtml(html) }} />
 }
 
 /** Unchanged blocks are muted; removed blocks are struck through in red, added blocks green. Optional per-change checkboxes. */
-function DiffView({ segments, accepted, onToggle }: { segments: Segment[]; accepted?: Set<number>; onToggle?: (id: number) => void }) {
+export function DiffView({ segments, accepted, onToggle }: { segments: Segment[]; accepted?: Set<number>; onToggle?: (id: number) => void }) {
   const [words, setWords] = useState(true)
   const anyWords = segments.some(s => s.type === 'HUNK' && hunkWordDiff(s.removed, s.added))
   return (

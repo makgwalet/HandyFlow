@@ -29,6 +29,7 @@ import { unwrap, fmtR, apiError, type ContractRow, type ContractParty, type Cont
 import { ContractSharingSection } from './ContractSharingSection'
 import { ContractRedlineSection } from './ContractRedlineSection'
 import { ContractRiskSection } from './ContractRiskSection'
+import { ContractNegotiationSection } from './ContractNegotiationSection'
 import { linkStatus, LINK_TONE_COLOR } from './signingLink'
 import { usePermissions } from '../../hooks/usePermission'
 
@@ -553,6 +554,7 @@ export default function ContractsTab() {
                     </div>
 
                     <ContractRedlineSection contractId={c.id} status={c.status} />
+                    <ContractNegotiationSection contractId={c.id} status={c.status} parties={(c.parties ?? []).map(p => ({ id: p.id, fullName: p.fullName }))} />
                     <ContractRiskSection contractId={c.id} />
 
                     {/* Secure sharing of the signed contract (executed copy) */}
