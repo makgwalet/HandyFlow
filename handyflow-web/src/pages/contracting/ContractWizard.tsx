@@ -9,7 +9,7 @@ import { templateUnusableReason } from './templateHealth'
 import {
   WIZARD_STEPS, WIZARD_CONTRACT_TYPES, emptyDraft, emptyParty, termsFor, validateStep, firstInvalidStep, buildContractPayload,
   buildPartyPayload, readinessNotes, unfilledVariables, type WizardDraft, type WizardParty, type WizardStep, type Errors,
-} from './contractWizard'
+} from './wizardRules'
 
 const typeLabel = (t: string) => WIZARD_CONTRACT_TYPES.find(x => x[0] === t)?.[1] ?? t
 

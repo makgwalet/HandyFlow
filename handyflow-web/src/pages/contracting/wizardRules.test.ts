@@ -2,9 +2,9 @@ import { describe, it, expect } from 'vitest'
 import {
   emptyDraft, emptyParty, termsFor, validateStep, firstInvalidStep, buildContractPayload,
   buildPartyPayload, readinessNotes, unfilledVariables,
-} from './contractWizard'
+} from './wizardRules'
 
-describe('contractWizard', () => {
+describe('wizardRules', () => {
   it('requires a title, and a template when starting from one', () => {
     const d = emptyDraft()
     expect(validateStep('basics', d).title).toBeTruthy()
