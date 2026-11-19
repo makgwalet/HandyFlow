@@ -39,6 +39,7 @@ import { ContractRedlineSection } from './ContractRedlineSection'
 import { ContractRiskSection } from './ContractRiskSection'
 import { ContractNegotiationSection } from './ContractNegotiationSection'
 import { linkStatus, LINK_TONE_COLOR } from './signingLink'
+import { nextSigningOrder, partyBlocker, orderNote } from './partyRules'
 import { usePermissions } from '../../hooks/usePermission'
 import { VIEWS, isViewKey, applyRegister, viewCounts, toCsv, daysToEnd, type ViewKey, type Sort, type SortKey } from './contractRegister'
 
@@ -672,7 +673,7 @@ export default function ContractsTab() {
                           Parties & Signing
                         </div>
                         {canManage && (c.status === 'DRAFT' || c.status === 'UNDER_REVIEW') && (
-                          <button onClick={() => { setShowParty(c.id); setError('') }}
+                          <button onClick={() => { setShowParty(c.id); setError(''); setPartyForm(p => ({ ...p, signingOrder: String(nextSigningOrder((contractDetail?.id === c.id ? contractDetail?.parties : c.parties) ?? [])) })) }}
                             style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '4px 10px', background: 'var(--hf-surface-muted)', border: '1px solid var(--hf-border)', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer', color: 'var(--hf-text-secondary)' }}>
                             <Plus size={11} /> Add Party
                           </button>
@@ -1006,7 +1007,7 @@ export default function ContractsTab() {
                 <label style={lbl}>Signing Order</label>
                 <input type="number" min="1" value={partyForm.signingOrder} onChange={e => spf('signingOrder', e.target.value)} style={inp} />
                 <div style={{ fontSize: 11, color: 'var(--hf-text-faint)', marginTop: 3 }}>
-                  Parties sign in numerical order. Same number = can sign simultaneously.
+                  {orderNote(parseInt(partyForm.signingOrder) || 1, contractDetail?.parties ?? [])}
                 </div>
               </div>
             </div>
@@ -1017,16 +1018,11 @@ export default function ContractsTab() {
                 disabled={!partyForm.fullName || addParty.isPending}
                 onClick={() => {
                   const order = parseInt(partyForm.signingOrder) || 1
-                  const existingParties = contractDetail?.parties ?? []
-                  const duplicate = existingParties.find(p =>
-                    p.signingOrder === order && p.signingStatus !== 'DECLINED'
-                  )
-                  if (duplicate) {
-                    setError(`Signing order ${order} is already taken by "${duplicate.fullName}". Use a different number, or use the same number if they should sign simultaneously.`)
-                    return
-                  }
+                  const blocker = partyBlocker(partyForm)
+                  if (blocker) { setError(blocker); return }
                   addParty.mutate({ id: showParty, body: {
                     ...partyForm,
+                    email: partyForm.email.trim() || null,
                     signingOrder: order,
                     idNumber:    partyForm.idNumber    || null,
                     companyName: partyForm.companyName || null,

@@ -590,47 +590,12 @@ public class ContractingService {
         approvals.consume(tenantId, ApprovalAction.SEND_FOR_SIGNING, c.getId(), TenantContext.getCurrentUserId());
         negotiationService.freezeOnSend(tenantId, c, TenantContext.getCurrentUserId());
 
-        // Issue a signing token and send invitation per party
+        // Links go out in signing order: only the first group (lowest order number; parties sharing a number sign together)
+        // gets one now. Each later group gets its link when the group before it has signed (see notifyNextParty).
+        int firstOrder = parties.stream().mapToInt(ContractParty::getSigningOrder).min().orElse(1);
         for (ContractParty party : parties) {
-            IssuedLink issued = issueSigningToken(tenantId, c.getId(), party.getId());
-            String signUrl = issued.url();
-            boolean hasEmail = party.getEmail() != null && !party.getEmail().isBlank();
-            issued.token().recordDelivery(hasEmail ? "QUEUED" : "NO_CHANNEL");
-            signingTokenRepo.save(issued.token());
-
-            // FIX: previously also called party.setSigningToken(token) here,
-            // persisting a second, unsynchronized raw copy of the same secret
-            // on contract_parties — see ContractParty.java for the removed
-            // field. The single source of truth for a party's active token is
-            // now signingTokenRepo.findActiveByPartyId(...), used wherever the
-            // raw token needs to be recovered later (e.g. notifyNextParty()).
-
-            // Email invitation — async (EmailService is @Async)
-            if (party.getEmail() != null && !party.getEmail().isBlank()) {
-                emailService.send(
-                        party.getEmail(),
-                        "Action required: Please sign " + c.getTitle(),
-                        EmailTemplates.contractSigningInvitation(
-                                party.getFullName(),
-                                c.getTitle(),
-                                c.getContractNumber(),
-                                c.getContractType().replace("_", " "),
-                                signUrl));
-                party.setEmailSentAt(Instant.now());
-                partyRepo.save(party);
-            }
-
-            // FIX: SMS now actually called via SmsService
-            // OTP is not sent here — parties use the signing link to request OTP themselves
-            // SMS here is a notification that a signing link has been sent
-            if (party.getPhone() != null && !party.getPhone().isBlank()) {
-                String smsBody = "HandyFlow: You have been invited to sign \""
-                        + truncate(c.getTitle(), 40)
-                        + "\". Open: " + signUrl;
-                safeSms(party.getPhone(), smsBody);
-            }
-
-            log.info("Signing token issued for party={} contract={}", party.getId(), c.getContractNumber());
+            if (party.getSigningOrder() != firstOrder) continue;
+            deliverLink(tenantId, c, party, false);
         }
 
         log.info("Contract {} sent for signing — {} parties", c.getContractNumber(), parties.size());
@@ -755,6 +720,11 @@ public class ContractingService {
             throw new IllegalStateException(party.getFullName() + " has declined. " +
                     "Withdraw the declination before resending.");
 
+        boolean earlierUnsigned = partyRepo.findByContract(contractId).stream()
+                .anyMatch(o -> o.getSigningOrder() < party.getSigningOrder() && !"SIGNED".equals(o.getSigningStatus()));
+        if (earlierUnsigned)
+            throw new IllegalStateException(party.getFullName() + " signs after earlier parties, and their turn has not come yet");
+
         IssuedLink issued = issueSigningToken(tenantId, c.getId(), partyId);
         String signUrl = issued.url();
         boolean emailQueued = party.getEmail() != null && !party.getEmail().isBlank();
@@ -800,13 +770,22 @@ public class ContractingService {
     @Transactional
     public PartyResponse addParty(TenantId tenantId, UUID contractId, AddPartyRequest req) {
         findActive(tenantId, contractId);
+        String email = req.email() == null ? "" : req.email().trim();
+        if (!email.isEmpty() && !EMAIL.matcher(email).matches())
+            throw new IllegalArgumentException("\"" + email + "\" is not a valid email address");
+        // Left blank, the party signs after everyone already added. The same number as another party means they sign together.
+        int order = req.signingOrder() != null ? req.signingOrder()
+                : partyRepo.findByContract(contractId).stream().mapToInt(ContractParty::getSigningOrder).max().orElse(0) + 1;
+        if (order < 1) throw new IllegalArgumentException("Signing order must be 1 or more");
         ContractParty party = ContractParty.create(tenantId, contractId,
                 req.partyType(), req.partyRole(), req.fullName(),
-                req.email(), req.phone(), req.companyName(),
-                req.signingOrder() != null ? req.signingOrder() : 1);
+                email.isEmpty() ? null : email, req.phone(), req.companyName(), order);
         partyRepo.save(party);
         return toPartyResponse(party);
     }
+
+    private static final java.util.regex.Pattern EMAIL =
+            java.util.regex.Pattern.compile("^[A-Za-z0-9._%+'-]+@[A-Za-z0-9-]+(\\.[A-Za-z0-9-]+)*\\.[A-Za-z]{2,}$");
 
     @Transactional
     public PartyResponse requestOtp(TenantId tenantId, UUID contractId, UUID partyId) {
@@ -1293,40 +1272,56 @@ public class ContractingService {
     }
 
     /**
-     * Notifies the next party (lowest signingOrder that is still PENDING/SENT)
-     * that it is now their turn to sign.
+     * Gives the next group in signing order its link: the lowest order number that still has someone to sign. Parties sharing
+     * that number are told together. Someone who already holds a working link is left alone, so this is safe to call after
+     * every signature.
      */
     private void notifyNextParty(Contract c, List<ContractParty> parties) {
         parties.stream()
                 .filter(p -> "PENDING".equals(p.getSigningStatus()) || "SENT".equals(p.getSigningStatus()))
-                .min(Comparator.comparingInt(ContractParty::getSigningOrder))
-                .ifPresent(next -> {
-                    // Links are stored as hashes only, so the link sent when the contract went out cannot be read
-                    // back. The signer's turn notice carries a new link; the earlier one stops working.
-                    IssuedLink issued = issueSigningToken(TenantId.of(c.getTenantId()), c.getId(), next.getId());
-                    String signUrl = issued.url();
-                    boolean hasEmail = next.getEmail() != null && !next.getEmail().isBlank();
-                    issued.token().recordDelivery(hasEmail ? "QUEUED" : "NO_CHANNEL");
-                    signingTokenRepo.save(issued.token());
-
-                    if (next.getEmail() != null && !next.getEmail().isBlank()) {
-                        emailService.send(
-                                next.getEmail(),
-                                "It's your turn to sign: " + c.getTitle(),
-                                EmailTemplates.contractSigningTurnNotification(
-                                        next.getFullName(), c.getTitle(),
-                                        c.getContractNumber(),
-                                        signUrl));
+                .mapToInt(ContractParty::getSigningOrder)
+                .min()
+                .ifPresent(order -> {
+                    TenantId tenantId = TenantId.of(c.getTenantId());
+                    for (ContractParty next : parties) {
+                        boolean waiting = "PENDING".equals(next.getSigningStatus()) || "SENT".equals(next.getSigningStatus());
+                        if (!waiting || next.getSigningOrder() != order) continue;
+                        if (signingTokenRepo.findActiveByPartyId(next.getId()).isPresent()) continue;
+                        deliverLink(tenantId, c, next, true);
                     }
-                    if (next.getPhone() != null && !next.getPhone().isBlank()) {
-                        safeSms(next.getPhone(),
-                                "HandyFlow: It's your turn to sign \""
-                                        + truncate(c.getTitle(), 30) + "\". "
-                                        + "Check your email for the signing link.");
-                    }
-                    log.info("Notified next signer partyId={} for contract={}",
-                            next.getId(), c.getContractNumber());
                 });
+    }
+
+    /**
+     * Issues a fresh working link for one signer and sends it by email and SMS. Links are stored as hashes only, so the
+     * raw link exists only here, at issue time; every message that needs a link has to come through this method.
+     */
+    private void deliverLink(TenantId tenantId, Contract c, ContractParty party, boolean theirTurn) {
+        IssuedLink issued = issueSigningToken(tenantId, c.getId(), party.getId());
+        String signUrl = issued.url();
+        boolean hasEmail = party.getEmail() != null && !party.getEmail().isBlank();
+        issued.token().recordDelivery(hasEmail ? "QUEUED" : "NO_CHANNEL");
+        signingTokenRepo.save(issued.token());
+
+        if (hasEmail) {
+            emailService.send(
+                    party.getEmail(),
+                    theirTurn ? "It's your turn to sign: " + c.getTitle() : "Action required: Please sign " + c.getTitle(),
+                    theirTurn
+                            ? EmailTemplates.contractSigningTurnNotification(
+                                    party.getFullName(), c.getTitle(), c.getContractNumber(), signUrl)
+                            : EmailTemplates.contractSigningInvitation(
+                                    party.getFullName(), c.getTitle(), c.getContractNumber(),
+                                    c.getContractType().replace("_", " "), signUrl));
+            party.setEmailSentAt(Instant.now());
+            partyRepo.save(party);
+        }
+        if (party.getPhone() != null && !party.getPhone().isBlank()) {
+            safeSms(party.getPhone(), theirTurn
+                    ? "HandyFlow: It's your turn to sign \"" + truncate(c.getTitle(), 30) + "\". Open: " + signUrl
+                    : "HandyFlow: You have been invited to sign \"" + truncate(c.getTitle(), 40) + "\". Open: " + signUrl);
+        }
+        log.info("Signing link issued for party={} contract={} turn={}", party.getId(), c.getContractNumber(), theirTurn);
     }
 
     // FIX: PDF generation could theoretically throw (though generatePdf's own
