@@ -27,6 +27,7 @@ import {
   Columns3, Zap, History, Plug, Filter, Copy, SlidersHorizontal, Tags, Target, Ruler,
   UserPlus, Mail, KeyRound, Layers,
   BarChart3, FileSignature, Undo2, ShieldAlert, PackageSearch,
+  Workflow,
 } from 'lucide-react'
 
 export interface ModuleSection {
@@ -851,8 +852,9 @@ export const MARKETING_SECTIONS: ModuleSections = {
   basePath: '/marketing',
   title: 'Marketing',
   icon: Megaphone,
-  defaultSection: 'campaigns',
+  defaultSection: 'dashboard',
   groups: [
+    { label: 'Overview', sections: [{ id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard }] },
     {
       label: 'Campaigns',
       sections: [
@@ -860,8 +862,16 @@ export const MARKETING_SECTIONS: ModuleSections = {
         { id: 'templates', label: 'Templates', icon: FileText },
       ],
     },
-    { label: 'Audience', sections: [{ id: 'contacts', label: 'Contacts', icon: Users }] },
-    { label: 'Insights', sections: [{ id: 'analytics', label: 'Analytics', icon: BarChart2 }] },
+    {
+      label: 'Audience',
+      sections: [
+        { id: 'contacts', label: 'Contacts', icon: Users },
+        { id: 'segments', label: 'Segments', icon: Filter },
+      ],
+    },
+    { label: 'Automation', sections: [{ id: 'automation', label: 'Automation', icon: Workflow }] },
+    { label: 'Insights', sections: [{ id: 'reports', label: 'Reports', icon: BarChart2 }] },
+    { label: 'Setup', sections: [{ id: 'settings', label: 'Settings', icon: Settings }] },
   ],
 }
 
