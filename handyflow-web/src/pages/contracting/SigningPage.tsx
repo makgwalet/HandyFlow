@@ -176,10 +176,17 @@ function SignatureCanvas({ onCapture }: { onCapture: (data: string | null) => vo
 // SigningPage
 // ═══════════════════════════════════════════════════════════════════════════════
 
+type SigningStep = 'loading' | 'review' | 'otp' | 'sign' | 'done' | 'declined' | 'error'
+
+function apiMessage(e: unknown, fallback: string): string {
+  return (e as { response?: { data?: { message?: string } } })?.response?.data?.message ?? fallback
+}
+
 export default function SigningPage() {
   const { token } = useParams<{ token: string }>()
 
-  const [step,          setStep]         = useState<'loading' | 'review' | 'otp' | 'sign' | 'done' | 'declined' | 'error'>('loading')
+  // What the user has done (requested a code, signed, declined). Until they do something the step follows the loaded contract.
+  const [stepOverride, setStep] = useState<SigningStep | null>(null)
   const [otpCode,       setOtpCode]      = useState('')
   const [signatureData, setSignatureData] = useState<string | null>(null)
   const [devOtp,        setDevOtp]       = useState(false)
@@ -193,8 +200,8 @@ export default function SigningPage() {
   const [errMsg,        setErrMsg]       = useState('')
   const [result,        setResult]       = useState<SigningResult | null>(null)
 
-  // Token expiry countdown
-  const [timeLeft, setTimeLeft] = useState('')
+  // Token expiry countdown: the clock ticks from an interval callback, the text is derived from it
+  const [now, setNow] = useState(() => Date.now())
 
   // ── Load contract ─────────────────────────────────────────────────────────────
 
@@ -214,28 +221,29 @@ export default function SigningPage() {
   // list short of a manual page reload.
   const queryClient = useQueryClient()
 
+  const loadStep: SigningStep = isError ? 'error'
+    : !contract ? 'loading'
+    : contract.alreadySigned ? 'done'
+    : contract.status !== 'SENT' ? 'error'
+    : 'review'
+  const step: SigningStep = stepOverride ?? loadStep
+  const loadErrMsg = isError ? apiMessage(loadError, 'This signing link is invalid, expired, or has already been used.')
+    : loadStep === 'error' ? 'This contract is no longer open for signing.' : ''
+  const shownErr = errMsg || loadErrMsg
+
+  const hasContract = !!contract
   useEffect(() => {
-    if (!contract) return
-
-    if (contract.alreadySigned) { setStep('done'); return }
-    if (contract.status !== 'SENT') { setStep('error'); setErrMsg('This contract is no longer open for signing.'); return }
-    setStep('review')
-
-    // Token expiry countdown
-    const update = () => {
-      const diff = Math.max(0, new Date(contract.tokenExpiresAt).getTime() - Date.now())
-      const h    = Math.floor(diff / 3600000)
-      const m    = Math.floor((diff % 3600000) / 60000)
-      setTimeLeft(diff === 0 ? 'Expired' : `${h}h ${m}m remaining`)
-    }
-    update()
-    const timer = setInterval(update, 60_000)
+    if (!hasContract) return
+    const timer = setInterval(() => setNow(Date.now()), 60_000)
     return () => clearInterval(timer)
-  }, [contract])
+  }, [hasContract])
 
-  useEffect(() => {
-    if (isError) { setStep('error'); setErrMsg((loadError as any)?.response?.data?.message ?? 'This signing link is invalid, expired, or has already been used.') }
-  }, [isError, loadError])
+  const timeLeft = (() => {
+    if (!contract) return ''
+    const diff = Math.max(0, new Date(contract.tokenExpiresAt).getTime() - now)
+    const h = Math.floor(diff / 3600000), m = Math.floor((diff % 3600000) / 60000)
+    return diff === 0 ? 'Expired' : `${h}h ${m}m remaining`
+  })()
 
   // ── Mutations ─────────────────────────────────────────────────────────────────
 
@@ -250,19 +258,19 @@ export default function SigningPage() {
         if (otp && typeof otp === 'string' && /^\d{6}$/.test(otp)) { setOtpCode(otp); setDevOtp(true) }
       } catch { /* production: endpoint not available */ }
     },
-    onError: (e: any) => setErrMsg(e.response?.data?.message ?? 'Failed to send OTP. Check your phone number is registered.'),
+    onError: (e: unknown) => setErrMsg(apiMessage(e, 'Failed to send OTP. Check your phone number is registered.')),
   })
 
   const submitMut = useMutation({
     mutationFn: () => apiClient.post(`/api/v1/sign/${token}/submit`, { otpCode, signatureData }),
     onSuccess: (r) => { setResult(r.data?.data ?? r.data); setStep('done') },
-    onError: (e: any) => setErrMsg(e.response?.data?.message ?? 'Incorrect OTP — please try again or request a new one.'),
+    onError: (e: unknown) => setErrMsg(apiMessage(e, 'Incorrect OTP — please try again or request a new one.')),
   })
 
   const declineMut = useMutation({
     mutationFn: () => apiClient.post(`/api/v1/sign/${token}/decline`, { reason: declineReason }),
     onSuccess: () => setStep('declined'),
-    onError: (e: any) => setErrMsg(e.response?.data?.message ?? 'Failed to record declination'),
+    onError: (e: unknown) => setErrMsg(apiMessage(e, 'Failed to record declination')),
   })
 
   const postCommentMut = useMutation({
@@ -279,7 +287,7 @@ export default function SigningPage() {
       // from a silently swallowed failure until the page was manually reloaded.
       queryClient.invalidateQueries({ queryKey: ['public-contract', token] })
     },
-    onError: (e: any) => setErrMsg(e.response?.data?.message ?? 'Failed to post comment'),
+    onError: (e: unknown) => setErrMsg(apiMessage(e, 'Failed to post comment')),
   })
 
   // ─── Shared styles ─────────────────────────────────────────────────────────────
@@ -310,7 +318,7 @@ export default function SigningPage() {
             <AlertTriangle size={28} style={{ color: 'var(--hf-danger-text)' }} />
           </div>
           <h2 style={{ fontSize: 20, fontWeight: 700, color: 'var(--hf-text)', marginBottom: 8 }}>Link not valid</h2>
-          <p style={{ fontSize: 14, color: 'var(--hf-text-muted)', lineHeight: 1.7 }}>{errMsg}</p>
+          <p style={{ fontSize: 14, color: 'var(--hf-text-muted)', lineHeight: 1.7 }}>{shownErr}</p>
           <p style={{ fontSize: 13, color: 'var(--hf-text-faint)', marginTop: 16 }}>
             Please contact the person who sent this contract to request a new signing link.
           </p>
