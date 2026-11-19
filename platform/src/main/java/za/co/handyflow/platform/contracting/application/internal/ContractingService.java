@@ -1206,8 +1206,12 @@ public class ContractingService {
         String tokenHash = signingTokenService.sha256(token);
         ContractSigningToken st = signingTokenRepo.findByTokenHash(tokenHash)
                 .orElseThrow(() -> new IllegalArgumentException("Signing link not found or already used"));
-        if (st.getRevokedAt() != null)
-            throw new IllegalArgumentException("This signing link has been revoked. Ask the sender to resend.");
+        if (st.getRevokedAt() != null) {
+            boolean withdrawn = contractRepo.findById(st.getContractId()).map(Contract::isWithdrawn).orElse(false);
+            throw new IllegalArgumentException(withdrawn
+                    ? "The sender has withdrawn this signing request. Nothing more is needed from you."
+                    : "This signing link has been revoked. Ask the sender to resend.");
+        }
         if (st.getUsedAt() != null)
             throw new IllegalArgumentException("This signing link has already been used.");
         return st;

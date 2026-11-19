@@ -39,6 +39,7 @@ class WithdrawContractTest {
     @Mock ContractApprovalService approvals;
     @Mock EmailService emailService;
     @Mock SigningPolicy signingPolicy;
+    @Mock SigningTokenService signingTokenService;
     @InjectMocks ContractingService service;
 
     TenantId tenant = TenantId.generate();
@@ -192,5 +193,30 @@ class WithdrawContractTest {
         assertEquals(contract.getId(), draft.getRevisionOfContractId());
         assertEquals(2, draft.getRevisionNo());
         assertThrows(IllegalStateException.class, () -> Contract.reviseFrom(draft, "CON-10", null), "a draft is not a withdrawn contract");
+    }
+
+    @Test
+    void aSignerWhoOpensARevokedLinkOfAWithdrawnContractIsToldItWasWithdrawn() {
+        ContractSigningToken t = token(alice);
+        t.setRevokedAt(java.time.Instant.now());
+        contract.withdraw();
+        when(signingTokenService.sha256("raw")).thenReturn("h");
+        when(signingTokenRepo.findByTokenHash("h")).thenReturn(Optional.of(t));
+        when(contractRepo.findById(contract.getId())).thenReturn(Optional.of(contract));
+        IllegalArgumentException e = assertThrows(IllegalArgumentException.class, () ->
+                org.springframework.test.util.ReflectionTestUtils.invokeMethod(service, "findValidToken", "raw"));
+        assertTrue(e.getMessage().contains("withdrawn"));
+    }
+
+    @Test
+    void aRevokedLinkOfAnOrdinaryContractStillSaysToAskForAResend() {
+        ContractSigningToken t = token(alice);
+        t.setRevokedAt(java.time.Instant.now());
+        when(signingTokenService.sha256("raw")).thenReturn("h");
+        when(signingTokenRepo.findByTokenHash("h")).thenReturn(Optional.of(t));
+        when(contractRepo.findById(contract.getId())).thenReturn(Optional.of(contract));
+        IllegalArgumentException e = assertThrows(IllegalArgumentException.class, () ->
+                org.springframework.test.util.ReflectionTestUtils.invokeMethod(service, "findValidToken", "raw"));
+        assertTrue(e.getMessage().contains("resend"));
     }
 }

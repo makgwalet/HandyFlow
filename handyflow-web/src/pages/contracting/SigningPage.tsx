@@ -16,6 +16,7 @@
 //   • View comments thread       (GET  /api/v1/sign/{token}/comments)
 
 import { sanitizeHtml } from './sanitizeHtml'
+import { progressSteps, waitingOn, turnMessage, linkProblem } from './signerPortal'
 import { useState, useRef, useEffect } from 'react'
 import { useParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
@@ -229,7 +230,7 @@ export default function SigningPage() {
   const step: SigningStep = stepOverride ?? loadStep
   const loadErrMsg = isError ? apiMessage(loadError, 'This signing link is invalid, expired, or has already been used.')
     : loadStep === 'error' ? 'This contract is no longer open for signing.' : ''
-  const shownErr = errMsg || loadErrMsg
+  const problem = linkProblem(loadErrMsg)
 
   const hasContract = !!contract
   useEffect(() => {
@@ -317,11 +318,8 @@ export default function SigningPage() {
           <div style={{ width: 60, height: 60, borderRadius: '50%', background: 'var(--hf-danger-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px' }}>
             <AlertTriangle size={28} style={{ color: 'var(--hf-danger-text)' }} />
           </div>
-          <h2 style={{ fontSize: 20, fontWeight: 700, color: 'var(--hf-text)', marginBottom: 8 }}>Link not valid</h2>
-          <p style={{ fontSize: 14, color: 'var(--hf-text-muted)', lineHeight: 1.7 }}>{shownErr}</p>
-          <p style={{ fontSize: 13, color: 'var(--hf-text-faint)', marginTop: 16 }}>
-            Please contact the person who sent this contract to request a new signing link.
-          </p>
+          <h2 style={{ fontSize: 20, fontWeight: 700, color: 'var(--hf-text)', marginBottom: 8 }}>{problem.title}</h2>
+          <p style={{ fontSize: 14, color: 'var(--hf-text-muted)', lineHeight: 1.7 }}>{problem.advice}</p>
         </div>
       </div>
     )
@@ -375,7 +373,7 @@ export default function SigningPage() {
             )}
 
             <div style={{ background: 'var(--hf-surface-muted)', borderRadius: 10, padding: '14px 18px', textAlign: 'left', fontSize: 13 }}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 8 }}>
                 {[
                   { l: 'Contract',   v: contract?.title        },
                   { l: 'Reference',  v: contract?.contractNumber },
@@ -401,12 +399,14 @@ export default function SigningPage() {
 
   if (!contract) return null
 
+  const turnNote = turnMessage(waitingOn(contract.myDetails, contract.otherParties))
+
   // ─── Main signing flow ────────────────────────────────────────────────────────
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--hf-surface-muted)' }}>
       {/* Top bar */}
-      <div style={{ background: 'var(--hf-primary)', padding: '14px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+      <div style={{ background: 'var(--hf-primary)', padding: '14px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 6 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <FileText size={20} style={{ color: 'var(--hf-text-on-solid)' }} />
           <span style={{ fontSize: 16, fontWeight: 700, color: 'var(--hf-text-on-solid)' }}>HandyFlow</span>
@@ -421,9 +421,24 @@ export default function SigningPage() {
       {/* Content */}
       <div style={{ maxWidth: 760, margin: '0 auto', padding: '28px 20px' }}>
 
+        {/* Where you are */}
+        <ol aria-label="Signing progress" style={{ display: 'flex', gap: 8, listStyle: 'none', margin: '0 0 16px', padding: 0, flexWrap: 'wrap' }}>
+          {progressSteps(step).map((it, i) => (
+            <li key={it.id} aria-current={it.state === 'current' ? 'step' : undefined}
+              style={{ flex: '1 1 140px', display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', borderRadius: 10, fontSize: 13, fontWeight: 600,
+                background: it.state === 'current' ? 'var(--hf-info-soft)' : 'var(--hf-surface)', border: '1px solid var(--hf-border)',
+                color: it.state === 'done' ? 'var(--hf-success-text-strong)' : it.state === 'current' ? 'var(--hf-info-text)' : 'var(--hf-text-faint)' }}>
+              <span style={{ width: 22, height: 22, borderRadius: '50%', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, border: '1.5px solid currentColor' }}>
+                {it.state === 'done' ? '✓' : i + 1}
+              </span>
+              {it.label}
+            </li>
+          ))}
+        </ol>
+
         {/* Contract header card */}
         <div style={{ background: 'var(--hf-surface)', borderRadius: 14, border: '1px solid var(--hf-border)', padding: '22px 24px', marginBottom: 16 }}>
-          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 12 }}>
+          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
             <div>
               <div style={{ fontSize: 20, fontWeight: 800, color: 'var(--hf-text)', marginBottom: 4 }}>{contract.title}</div>
               <div style={{ fontSize: 13, color: 'var(--hf-text-muted)' }}>
@@ -436,7 +451,7 @@ export default function SigningPage() {
           </div>
 
           {/* Contract metadata */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, marginBottom: 14 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 10, marginBottom: 14 }}>
             {[
               { l: 'Start date', v: fmtDate(contract.startDate) },
               { l: 'End date',   v: fmtDate(contract.endDate)   },
@@ -573,7 +588,7 @@ export default function SigningPage() {
                 <textarea value={commentText} onChange={e => setCommentText(e.target.value)} rows={3}
                   placeholder="Write your comment or describe the amendment you are requesting…"
                   style={{ ...inp, resize: 'vertical', marginBottom: 10 }} />
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 10, marginBottom: 10 }}>
                   <div>
                     <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--hf-text-secondary)', marginBottom: 3 }}>Clause reference (optional)</label>
                     <input value={clauseRef} onChange={e => setClauseRef(e.target.value)} placeholder="e.g. Clause 4.1" style={inp} />
@@ -605,15 +620,15 @@ export default function SigningPage() {
                 <p style={{ fontSize: 13, color: 'var(--hf-text-muted)', marginBottom: 16, lineHeight: 1.7 }}>
                   Review the contract above, then click <strong>Sign with OTP</strong>. A 6-digit code will be sent to your registered phone number ending in <strong>{contract.myDetails.phoneMasked?.slice(-4)}</strong>.
                 </p>
-                {contract.myDetails.signingOrder > 1 && contract.otherParties.some(p => p.signingOrder < contract.myDetails.signingOrder && p.signingStatus !== 'SIGNED') && (
-                  <div style={{ marginBottom: 16, padding: '10px 14px', background: 'var(--hf-warning-soft)', border: '1px solid var(--hf-warning-border)', borderRadius: 8, fontSize: 13, color: 'var(--hf-warning-text-deep)' }}>
-                    Waiting for party {contract.myDetails.signingOrder - 1} to sign before you. You will receive an SMS when it is your turn.
+                {turnNote && (
+                  <div role="note" style={{ marginBottom: 16, padding: '10px 14px', background: 'var(--hf-warning-soft)', border: '1px solid var(--hf-warning-border)', borderRadius: 8, fontSize: 13, color: 'var(--hf-warning-text-deep)' }}>
+                    {turnNote}
                   </div>
                 )}
                 {errMsg && <div style={{ marginBottom: 14, padding: '10px 12px', background: 'var(--hf-danger-soft)', border: '1px solid var(--hf-danger-border)', borderRadius: 8, fontSize: 13, color: 'var(--hf-danger-text)' }}>{errMsg}</div>}
-                <div style={{ display: 'flex', gap: 10 }}>
-                  <button onClick={() => requestOtpMut.mutate()} disabled={requestOtpMut.isPending}
-                    style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, background: 'var(--hf-primary)', color: 'var(--hf-text-on-solid)', border: 'none', borderRadius: 10, padding: '14px', fontSize: 15, fontWeight: 700, cursor: 'pointer' }}>
+                <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                  <button onClick={() => requestOtpMut.mutate()} disabled={requestOtpMut.isPending || !!turnNote}
+                    style={{ flex: '1 1 200px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, background: 'var(--hf-primary)', color: 'var(--hf-text-on-solid)', border: 'none', borderRadius: 10, padding: '14px', fontSize: 15, fontWeight: 700, cursor: turnNote ? 'not-allowed' : 'pointer', opacity: turnNote ? 0.55 : 1 }}>
                     <Shield size={18} />{requestOtpMut.isPending ? 'Sending OTP…' : 'Sign with OTP'}
                   </button>
                   <button onClick={() => setShowDecline(true)}
