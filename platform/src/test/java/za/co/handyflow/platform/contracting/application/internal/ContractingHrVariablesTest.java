@@ -40,7 +40,7 @@ class ContractingHrVariablesTest {
     void leavesLegalTermsForStaffInsteadOfAssumingDefaults() {
         Map<String, String> v = ContractingHrEventHandler.buildVariables(event, tenant("Acme", Map.of("city", "Durban")));
         for (String key : new String[]{"probation_months", "working_hours", "pay_day", "annual_leave_days",
-                "notice_period_weeks", "job_duties", "employee_address", "employer_reg"}) {
+                "notice_period_weeks", "job_duties", "employer_reg"}) {
             assertFalse(v.containsKey(key), key + " must be left for staff");
         }
     }
@@ -49,5 +49,47 @@ class ContractingHrVariablesTest {
     void worksWithoutATenantProfile() {
         Map<String, String> v = ContractingHrEventHandler.buildVariables(event, null);
         assertEquals(5, v.size());
+    }
+
+    private EmployeeCreatedEvent withAddress(Map<String, String> address, LocalDate end) {
+        return EmployeeCreatedEvent.of(TenantId.of(UUID.randomUUID()), UUID.randomUUID(), "Thandi", "Nkosi", "8001015009087",
+                "Site Foreman", LocalDate.of(2026, 12, 1), new BigDecimal("32000.00"), address, end);
+    }
+
+    @Test
+    void fillsTheEmployeesOwnAddressFromHr() {
+        Map<String, String> v = ContractingHrEventHandler.buildVariables(
+                withAddress(Map.of("street", "7 Protea Ave", "suburb", "Glenwood", "city", "Durban", "postalCode", "4001"), null), null);
+        assertEquals("7 Protea Ave, Glenwood, Durban, 4001", v.get("employee_address"));
+    }
+
+    @Test
+    void anEmployeeAddressIsNeverMistakenForTheEmployers() {
+        Map<String, String> v = ContractingHrEventHandler.buildVariables(
+                withAddress(Map.of("street", "7 Protea Ave", "city", "Durban"), null), tenant("Acme", Map.of("street", "1 Main Rd", "city", "Cape Town")));
+        assertEquals("7 Protea Ave, Durban", v.get("employee_address"));
+        assertEquals("1 Main Rd, Cape Town", v.get("employer_address"));
+    }
+
+    @Test
+    void aBlankOrMissingAddressLeavesTheVariableForStaff() {
+        assertFalse(ContractingHrEventHandler.buildVariables(withAddress(Map.of("street", "  "), null), null).containsKey("employee_address"));
+        assertFalse(ContractingHrEventHandler.buildVariables(withAddress(null, null), null).containsKey("employee_address"));
+    }
+
+    @Test
+    void theEventCopiesTheAddressSoLaterChangesDoNotReachIt() {
+        Map<String, String> live = new java.util.HashMap<>(Map.of("street", "7 Protea Ave"));
+        EmployeeCreatedEvent e = withAddress(live, LocalDate.of(2027, 11, 30));
+        live.put("street", "changed");
+        assertEquals("7 Protea Ave", e.address().get("street"));
+        assertEquals(LocalDate.of(2027, 11, 30), e.endDate());
+        assertThrows(UnsupportedOperationException.class, () -> e.address().put("x", "y"));
+    }
+
+    @Test
+    void theShortFormStillWorksForCallersThatHoldNoAddress() {
+        assertTrue(event.address().isEmpty());
+        assertNull(event.endDate());
     }
 }

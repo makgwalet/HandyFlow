@@ -6,6 +6,7 @@ import za.co.handyflow.platform.shared.TenantId;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.Map;
 import java.util.UUID;
 
 /**
@@ -21,7 +22,7 @@ import java.util.UUID;
  * Carries only what HrEmployee actually captures at creation time — see
  * contracting.application.internal.ContractingHrEventHandler's own
  * Javadoc for why several of the BCEA employment-template's variables
- * (address, job duties, working hours, probation length, etc.) are
+ * (job duties, working hours, probation length, etc.) are
  * deliberately left for HR to fill in afterward via contracting's
  * existing "leave blank to fill in later" edit flow, not guessed at here.
  */
@@ -34,6 +35,8 @@ public record EmployeeCreatedEvent(
         String jobTitle,
         LocalDate startDate,
         BigDecimal grossSalary,
+        Map<String, String> address,   // the employee's home address as HR holds it (street, suburb, city, postalCode); may be null
+        LocalDate endDate,             // set for a fixed-term engagement; null for a permanent one
         Instant occurredOn
 ) implements DomainEvent {
 
@@ -41,7 +44,18 @@ public record EmployeeCreatedEvent(
                                           String firstName, String lastName,
                                           String idNumber, String jobTitle,
                                           LocalDate startDate, BigDecimal grossSalary) {
+        return of(tenantId, employeeId, firstName, lastName, idNumber, jobTitle, startDate, grossSalary, null, null);
+    }
+
+    /** As above, with the address and end date HR holds at creation. The address is copied, with blank values dropped. */
+    public static EmployeeCreatedEvent of(TenantId tenantId, UUID employeeId,
+                                          String firstName, String lastName,
+                                          String idNumber, String jobTitle,
+                                          LocalDate startDate, BigDecimal grossSalary,
+                                          Map<String, String> address, LocalDate endDate) {
+        Map<String, String> copy = new java.util.HashMap<>();
+        if (address != null) address.forEach((k, v) -> { if (k != null && v != null && !v.isBlank()) copy.put(k, v); });
         return new EmployeeCreatedEvent(tenantId, employeeId, firstName, lastName,
-                idNumber, jobTitle, startDate, grossSalary, Instant.now());
+                idNumber, jobTitle, startDate, grossSalary, Map.copyOf(copy), endDate, Instant.now());
     }
 }

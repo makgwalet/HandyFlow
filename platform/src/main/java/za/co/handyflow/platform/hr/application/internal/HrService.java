@@ -108,7 +108,8 @@ public class HrService {
         // doesn't actually exist.
         eventPublisher.publishEvent(EmployeeCreatedEvent.of(
                 tenantId, emp.getId(), emp.getFirstName(), emp.getLastName(),
-                emp.getIdNumber(), emp.getJobTitle(), emp.getStartDate(), emp.getGrossSalary()));
+                emp.getIdNumber(), emp.getJobTitle(), emp.getStartDate(), emp.getGrossSalary(),
+                emp.getAddress(), emp.getEndDate()));
 
         return toEmployeeResponse(emp);
     }

@@ -84,7 +84,7 @@ class ContractingHrEventHandler {
                     variables,
                     null,           // valueAmount — not applicable to an employment contract
                     event.startDate(),
-                    null,           // endDate — permanent by default; HR sets this if fixed-term
+                    event.endDate(), // set when HR recorded a fixed-term engagement; otherwise permanent
                     false,          // autoRenew
                     null,           // renewalNoticeDays
                     "Auto-generated on employee creation — complete remaining fields before sending for signing."
@@ -111,7 +111,7 @@ class ContractingHrEventHandler {
 
     /**
      * Variables the employment template can fill without asking anyone. From HR: name, ID number, job title, start date and
-     * salary. From the tenant's profile: employer name, employer address and city. Everything else (employee address, job
+     * salary, home address. From the tenant's profile: employer name, employer address and city. Everything else (job
      * duties, probation, working hours, pay day, leave days, notice period, employer registration number) is left for staff to
      * complete: HR does not hold it, and the system does not assume legal defaults for it.
      */
@@ -123,17 +123,25 @@ class ContractingHrEventHandler {
         if (event.jobTitle() != null) variables.put("job_title", event.jobTitle());
         if (event.startDate() != null) variables.put("start_date", event.startDate().toString());
         if (event.grossSalary() != null) variables.put("basic_salary", event.grossSalary().toPlainString());
+        String home = addressLine(event.address());
+        if (home != null) variables.put("employee_address", home);
         if (tenant != null) {
             if (tenant.companyName() != null && !tenant.companyName().isBlank()) variables.put("employer_name", tenant.companyName());
             Map<String, String> address = tenant.address();
             if (address != null) {
-                String line = java.util.stream.Stream.of("street", "suburb", "city", "postalCode")
-                        .map(address::get).filter(v -> v != null && !v.isBlank()).collect(java.util.stream.Collectors.joining(", "));
-                if (!line.isBlank()) variables.put("employer_address", line);
+                String line = addressLine(address);
+                if (line != null) variables.put("employer_address", line);
                 String city = address.get("city");
                 if (city != null && !city.isBlank()) variables.put("city_name", city);
             }
         }
         return variables;
+    }
+
+    private static String addressLine(Map<String, String> address) {
+        if (address == null) return null;
+        String line = java.util.stream.Stream.of("street", "suburb", "city", "postalCode")
+                .map(address::get).filter(v -> v != null && !v.isBlank()).collect(java.util.stream.Collectors.joining(", "));
+        return line.isBlank() ? null : line;
     }
 }
