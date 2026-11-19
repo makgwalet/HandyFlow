@@ -42,6 +42,7 @@ public class ContractNegotiationService {
     private final ContractRedlineService redline;
     private final SigningTokenService hashing;
     private final ApplicationEventPublisher publisher;   // tells staff, after the transaction commits, that a counterparty acted
+    private final ContractApprovalService approvals;    // maker-checker for accepting a counterparty's proposed change (off unless the tenant switches it on)
 
     // ── Staff: lifecycle ─────────────────────────────────────────────────────
 
@@ -122,8 +123,10 @@ public class ContractNegotiationService {
         ContractNegotiationProposal p = proposalOf(tenantId, contractId, proposalId);
         if (!NegotiationEngine.targetExists(c.getBody(), p))
             throw new IllegalStateException("The wording this proposal changes has since changed. Reject it and ask the counterparty to propose again.");
+        if (!p.byStaff()) approvals.assertApproved(tenantId, ApprovalAction.ACCEPT_COUNTERPARTY_REDLINE, proposalId);
         p.accept(note, by);
         proposalRepo.save(p);
+        if (!p.byStaff()) approvals.consume(tenantId, ApprovalAction.ACCEPT_COUNTERPARTY_REDLINE, proposalId, by);
         reconcile(n, c);
         event(n, "STAFF", by, p.getPartyId(), "PROPOSAL_ACCEPTED", describe(p), null);
         return proposalView(p, c.getBody(), nameOf(contractId).get(p.getPartyId()));

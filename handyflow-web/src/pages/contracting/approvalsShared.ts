@@ -1,7 +1,7 @@
 // Shared types and rules for the approvals screen.
 
 export type ApprovalAction =
-  | 'SEND_FOR_SIGNING' | 'TERMINATE' | 'PUBLISH_CLAUSE' | 'PUBLISH_TEMPLATE'
+  | 'SEND_FOR_SIGNING' | 'TERMINATE' | 'PUBLISH_CLAUSE' | 'PUBLISH_TEMPLATE' | 'ACCEPT_COUNTERPARTY_REDLINE' | 'SIGN_ON_BEHALF'
 
 export interface Approval {
   id: string
@@ -31,6 +31,8 @@ export const ACTION_LABEL: Record<string, string> = {
   TERMINATE: 'Terminate contract',
   PUBLISH_CLAUSE: 'Publish clause',
   PUBLISH_TEMPLATE: 'Publish template',
+  ACCEPT_COUNTERPARTY_REDLINE: 'Accept a counterparty change',
+  SIGN_ON_BEHALF: 'Sign on behalf of a party',
 }
 
 /** Pure rule for whether the decision form may be submitted. Exported for tests. */

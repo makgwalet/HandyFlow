@@ -772,6 +772,9 @@ public class ContractingService {
                 .findFirst()
                 .orElseThrow(() -> new ResourceNotFoundException("Party", partyId.toString()));
 
+        // Staff recording a signature for someone else can be put behind a second person's approval (off unless the tenant switches it on).
+        if (witnessedByUserId != null) approvals.assertApproved(tenantId, ApprovalAction.SIGN_ON_BEHALF, partyId);
+
         if (!otpService.verify(partyId.toString(), req.otpCode())) {
             recordOtpFailure(partyId.toString());
             throw new IllegalArgumentException("Invalid or expired OTP");
@@ -787,6 +790,7 @@ public class ContractingService {
         // change needed here was threading witnessedByUserId through to the
         // audit trail — see ContractSignature.witnessedByUserId's Javadoc.
         recordSignature(tenantId, contractId, partyId, party, req, ipAddress, userAgent, witnessedByUserId);
+        if (witnessedByUserId != null) approvals.consume(tenantId, ApprovalAction.SIGN_ON_BEHALF, partyId, witnessedByUserId);
 
         // Reload parties after signature
         parties = partyRepo.findByContract(contractId);

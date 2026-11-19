@@ -36,6 +36,7 @@ public class ContractApprovalService {
     private final ContractPartyRepository partyRepo;
     private final ContractClauseRepository clauseRepo;
     private final ContractTemplateRepository templateRepo;
+    private final ContractNegotiationProposalRepository proposalRepo;
 
     public record EffectivePolicy(ApprovalAction action, boolean required, boolean allowSoleUserException, boolean isDefault) {}
 
@@ -241,6 +242,19 @@ public class ContractApprovalService {
                 return templateRepo.findActiveById(tenantId, id).map(t -> new Subject(t.getName() + " v" + t.getTemplateVersion(),
                         sha256(List.of(t.getId().toString(), nz(t.getName()), nz(t.getContractType()), nz(t.getDescription()), nz(t.getBodyTemplate()),
                                 nz(t.getLegalArea()), nz(t.getRequiredSigningMethod()), String.valueOf(t.getTemplateVersion())))));
+            case "PROPOSAL":
+                return proposalRepo.findByTenantIdAndId(tenantId.getValue(), id).map(p -> {
+                    String number = contractRepo.findActiveById(tenantId, p.getContractId()).map(Contract::getContractNumber).orElse("contract");
+                    return new Subject("Proposed change on " + number,
+                            sha256(List.of(p.getId().toString(), p.getContractId().toString(), nz(p.getKind()), String.valueOf(p.getBlockIndex()),
+                                    nz(p.getOriginalHtml()), nz(p.getProposedHtml()), nz(p.getRationale()))));
+                });
+            case "PARTY":
+                return partyRepo.findByTenantAndId(tenantId, id).flatMap(party ->
+                        contractRepo.findActiveById(tenantId, party.getContractId()).map(c ->
+                                new Subject(c.getContractNumber() + " — signing for " + nz(party.getFullName()),
+                                        sha256(List.of(party.getId().toString(), c.getId().toString(), nz(c.getBodyHash()), nz(party.getFullName()),
+                                                nz(party.getEmail()), nz(party.getIdNumber())))))));
             default:
                 return Optional.empty();
         }

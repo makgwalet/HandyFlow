@@ -4,13 +4,18 @@ import java.util.Set;
 
 /**
  * The contracting actions that can require a second person's approval. Defaults follow the approved policy: publishing wording and
- * terminating need a second person; sending for signing does not unless the tenant switches it on.
+ * terminating need a second person; sending for signing, accepting a counterparty's proposed change and signing on behalf of a party do
+ * not unless the tenant switches them on.
  */
 public enum ApprovalAction {
     SEND_FOR_SIGNING(false, "CONTRACT", Set.of("CONTRACTS_ADMIN", "CONTRACTS_MANAGE")),
     PUBLISH_CLAUSE(true, "CLAUSE", Set.of("CONTRACTS_ADMIN", "CONTRACTS_TEMPLATES")),
     PUBLISH_TEMPLATE(true, "TEMPLATE", Set.of("CONTRACTS_ADMIN", "CONTRACTS_TEMPLATES")),
-    TERMINATE(true, "CONTRACT", Set.of("CONTRACTS_ADMIN", "CONTRACTS_MANAGE"));
+    TERMINATE(true, "CONTRACT", Set.of("CONTRACTS_ADMIN", "CONTRACTS_MANAGE")),
+    /** Staff accepting a change a counterparty proposed. The subject is the proposal. */
+    ACCEPT_COUNTERPARTY_REDLINE(false, "PROPOSAL", Set.of("CONTRACTS_ADMIN", "CONTRACTS_MANAGE")),
+    /** Staff recording a signature for a party in person. The subject is the party. */
+    SIGN_ON_BEHALF(false, "PARTY", Set.of("CONTRACTS_ADMIN", "CONTRACTS_MANAGE"));
 
     private final boolean requiredByDefault;
     private final String subjectType;

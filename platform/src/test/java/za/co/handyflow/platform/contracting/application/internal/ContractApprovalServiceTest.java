@@ -28,6 +28,7 @@ class ContractApprovalServiceTest {
     @Mock ContractPartyRepository partyRepo;
     @Mock ContractClauseRepository clauseRepo;
     @Mock ContractTemplateRepository templateRepo;
+    @Mock ContractNegotiationProposalRepository proposalRepo;
     ContractApprovalService service;
 
     TenantId tenant = TenantId.generate();
@@ -37,7 +38,7 @@ class ContractApprovalServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new ContractApprovalService(policyRepo, approvalRepo, eventRepo, contractRepo, partyRepo, clauseRepo, templateRepo);
+        service = new ContractApprovalService(policyRepo, approvalRepo, eventRepo, contractRepo, partyRepo, clauseRepo, templateRepo, proposalRepo);
         contract = Contract.create(tenant, "CTR-1", "Services", "SERVICE", "<p>Original</p>", null, maker);
         lenient().when(contractRepo.findActiveById(tenant, contract.getId())).thenReturn(Optional.of(contract));
         lenient().when(partyRepo.findByContract(contract.getId())).thenReturn(List.of());
@@ -70,12 +71,67 @@ class ContractApprovalServiceTest {
     @Test
     void withNoStoredPolicyTheSafeDefaultsApply() {
         var all = service.policies(tenant);
-        assertEquals(4, all.size());
+        assertEquals(6, all.size());
         assertTrue(all.stream().allMatch(ContractApprovalService.EffectivePolicy::isDefault));
         assertFalse(service.policy(tenant, ApprovalAction.SEND_FOR_SIGNING).required(), "sending for signing needs approval only when the tenant asks");
         assertTrue(service.policy(tenant, ApprovalAction.TERMINATE).required());
         assertTrue(service.policy(tenant, ApprovalAction.PUBLISH_TEMPLATE).required());
         assertTrue(service.policy(tenant, ApprovalAction.PUBLISH_CLAUSE).required());
+        assertFalse(service.policy(tenant, ApprovalAction.ACCEPT_COUNTERPARTY_REDLINE).required(), "accepting a counterparty change needs approval only where configured");
+        assertFalse(service.policy(tenant, ApprovalAction.SIGN_ON_BEHALF).required(), "signing on behalf needs approval only where dual authorisation is required");
+    }
+
+    private void switchOn(ApprovalAction a) {
+        ContractApprovalPolicy p = ContractApprovalPolicy.create(tenant.getValue(), a);
+        p.set(true, true, maker);
+        lenient().when(policyRepo.findOne(tenant.getValue(), a)).thenReturn(Optional.of(p));
+    }
+
+    @Test
+    void acceptingACounterpartyChangeIsApprovedAgainstTheExactProposal() {
+        switchOn(ApprovalAction.ACCEPT_COUNTERPARTY_REDLINE);
+        UUID pid = UUID.randomUUID();
+        ContractNegotiationProposal prop = mock(ContractNegotiationProposal.class);
+        lenient().when(prop.getId()).thenReturn(pid);
+        lenient().when(prop.getContractId()).thenReturn(contract.getId());
+        lenient().when(prop.getKind()).thenReturn("REPLACE");
+        lenient().when(prop.getBlockIndex()).thenReturn(1);
+        lenient().when(prop.getOriginalHtml()).thenReturn("<p>a</p>");
+        lenient().when(prop.getProposedHtml()).thenReturn("<p>b</p>");
+        lenient().when(proposalRepo.findByTenantIdAndId(tenant.getValue(), pid)).thenReturn(Optional.of(prop));
+
+        IllegalStateException none = assertThrows(IllegalStateException.class, () -> service.assertApproved(tenant, ApprovalAction.ACCEPT_COUNTERPARTY_REDLINE, pid));
+        assertTrue(none.getMessage().contains("second person"));
+        ContractApproval a = service.request(tenant, ApprovalAction.ACCEPT_COUNTERPARTY_REDLINE, pid, maker, null);
+        service.approve(tenant, a.getId(), checker, MANAGER, null, false, null);
+        assertDoesNotThrow(() -> service.assertApproved(tenant, ApprovalAction.ACCEPT_COUNTERPARTY_REDLINE, pid));
+
+        lenient().when(prop.getProposedHtml()).thenReturn("<p>b, but worse</p>");
+        IllegalStateException changed = assertThrows(IllegalStateException.class, () -> service.assertApproved(tenant, ApprovalAction.ACCEPT_COUNTERPARTY_REDLINE, pid));
+        assertTrue(changed.getMessage().contains("changed since it was approved"));
+    }
+
+    @Test
+    void signingOnBehalfIsApprovedForOnePartyAndItsDetails() {
+        switchOn(ApprovalAction.SIGN_ON_BEHALF);
+        UUID partyId = UUID.randomUUID();
+        ContractParty party = mock(ContractParty.class);
+        lenient().when(party.getId()).thenReturn(partyId);
+        lenient().when(party.getContractId()).thenReturn(contract.getId());
+        lenient().when(party.getFullName()).thenReturn("Acme");
+        lenient().when(party.getEmail()).thenReturn("a@x.co");
+        lenient().when(partyRepo.findByTenantAndId(tenant, partyId)).thenReturn(Optional.of(party));
+
+        ContractApproval a = service.request(tenant, ApprovalAction.SIGN_ON_BEHALF, partyId, maker, null);
+        assertTrue(a.getSubjectLabel().contains("signing for Acme"));
+        service.approve(tenant, a.getId(), checker, MANAGER, null, false, null);
+        assertDoesNotThrow(() -> service.assertApproved(tenant, ApprovalAction.SIGN_ON_BEHALF, partyId));
+        service.consume(tenant, ApprovalAction.SIGN_ON_BEHALF, partyId, maker);
+        assertEquals("CONSUMED", a.getStatus());
+
+        // a different party has no approval
+        UUID other = UUID.randomUUID();
+        assertThrows(RuntimeException.class, () -> service.assertApproved(tenant, ApprovalAction.SIGN_ON_BEHALF, other));
     }
 
     @Test

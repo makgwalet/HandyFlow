@@ -40,6 +40,7 @@ class ContractNegotiationServiceTest {
     ContractNegotiationLinkRepository linkRepo;
     final SigningTokenService hashing = new SigningTokenService(mock(ContractSigningTokenRepository.class));
     ContractNegotiationService service;
+    ContractApprovalService approvals;
 
     @BeforeEach
     void setUp() {
@@ -82,7 +83,8 @@ class ContractNegotiationServiceTest {
         when(redline.snapshot(any(), any(), anyString(), any(), any())).thenAnswer(i -> version.incrementAndGet());
 
         linkRepo = mock(ContractNegotiationLinkRepository.class);
-        service = new ContractNegotiationService(contractRepo, partyRepo, nRepo, pRepo, cRepo, eRepo, linkRepo, redline, hashing, mock(org.springframework.context.ApplicationEventPublisher.class));
+        approvals = mock(ContractApprovalService.class);
+        service = new ContractNegotiationService(contractRepo, partyRepo, nRepo, pRepo, cRepo, eRepo, linkRepo, redline, hashing, mock(org.springframework.context.ApplicationEventPublisher.class), approvals);
     }
 
     UUID cid() { return contract.getId(); }
@@ -125,6 +127,27 @@ class ContractNegotiationServiceTest {
         assertEquals(Integer.valueOf(2), after.proposals().get(0).appliedVersionNo());
         assertEquals("OPEN", after.negotiation().status());
         assertTrue(events.stream().anyMatch(e -> e.getEventType().equals("PROPOSALS_APPLIED")));
+    }
+
+    @Test
+    void acceptingACounterpartyProposalAsksTheApprovalGateAndUsesUpTheApproval() {
+        open();
+        ProposalView v = propose(partyA, "REPLACE", 0, P1, "<p>Payment is due in 14 days.</p>");
+        service.accept(tenant, cid(), v.id(), null, staff);
+        org.mockito.InOrder order = org.mockito.Mockito.inOrder(approvals);
+        order.verify(approvals).assertApproved(tenant, ApprovalAction.ACCEPT_COUNTERPARTY_REDLINE, v.id());
+        order.verify(approvals).consume(tenant, ApprovalAction.ACCEPT_COUNTERPARTY_REDLINE, v.id(), staff);
+    }
+
+    @Test
+    void aBlockedApprovalGateStopsTheAcceptanceAndLeavesTheProposalPending() {
+        open();
+        ProposalView v = propose(partyA, "REPLACE", 0, P1, "<p>Payment is due in 14 days.</p>");
+        org.mockito.Mockito.doThrow(new IllegalStateException("This needs a second person's approval first. Request approval, then try again."))
+                .when(approvals).assertApproved(tenant, ApprovalAction.ACCEPT_COUNTERPARTY_REDLINE, v.id());
+        assertThrows(IllegalStateException.class, () -> service.accept(tenant, cid(), v.id(), null, staff));
+        assertEquals(ContractNegotiationProposal.PENDING, proposals.get(0).getStatus());
+        org.mockito.Mockito.verify(approvals, org.mockito.Mockito.never()).consume(any(), any(), any(), any());
     }
 
     @Test

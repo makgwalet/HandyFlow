@@ -324,3 +324,40 @@ describe('two-way negotiation', () => {
     expect(hasButton(await mount(), 'Send proposal')).toBe(false)
   })
 })
+
+describe('approval before accepting a counterparty change', () => {
+  const gateOn = (list: unknown[] = []) => {
+    const base = api.get.getMockImplementation()!
+    api.get.mockImplementation(async (url: string) => {
+      if (url.endsWith('/approvals/policy')) return ok([{ action: 'ACCEPT_COUNTERPARTY_REDLINE', required: true, allowSoleUserException: true, usingDefault: false }])
+      if (url.endsWith('/approvals')) return ok(list)
+      return base(url)
+    })
+  }
+  const approval = (status: string) => ({ id: 'ap1', action: 'ACCEPT_COUNTERPARTY_REDLINE', subjectId: 'p1', status })
+
+  it('offers to ask for approval instead of Accept when the policy needs it', async () => {
+    gateOn()
+    const el = await mount()
+    expect(hasButton(el, 'Accept')).toBe(false)
+    await click(button(el, 'Ask for approval to accept'))
+    expect(api.post).toHaveBeenCalledWith('/api/v1/contracts/approvals', { action: 'ACCEPT_COUNTERPARTY_REDLINE', subjectId: 'p1', note: null })
+    expect(api.post).not.toHaveBeenCalledWith(expect.stringContaining('/accept'), expect.anything())
+  })
+
+  it('waits while the request is pending', async () => {
+    gateOn([approval('PENDING')])
+    const el = await mount()
+    expect(button(el, 'Waiting for approval to accept')?.disabled).toBe(true)
+    expect(hasButton(el, 'Accept')).toBe(false)
+  })
+
+  it('shows Accept once it is approved', async () => {
+    gateOn([approval('APPROVED')])
+    expect(hasButton(await mount(), 'Accept')).toBe(true)
+  })
+
+  it('does not change anything when the policy does not need approval', async () => {
+    expect(hasButton(await mount(), 'Accept')).toBe(true)
+  })
+})

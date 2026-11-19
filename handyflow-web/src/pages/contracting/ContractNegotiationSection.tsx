@@ -7,6 +7,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { apiClient } from '../../api/client'
 import { usePermissions } from '../../hooks/usePermission'
 import { apiError, unwrapOne } from './contractingApi'
+import { listOf, approvalState, type Approval, type PolicyRow, type ApprovalState } from './approvalsShared'
 import { DiffView, type Segment } from './ContractRedlineSection'
 import {
   STATUS_LABEL, PROPOSAL_LABEL, KIND_LABEL, EVENT_LABEL, deadlineText, linkState, needsDecision, excerpt, byStaff, isLive, roundOf,
@@ -30,6 +31,8 @@ function segsOf(p: NegProposal): Segment[] {
 
 interface RowActions {
   canWrite: boolean; busy: boolean
+  /** Set when accepting this proposal needs a second person's approval first. */
+  gate?: { required: boolean; state: ApprovalState }; onAskApproval?: () => void
   onAccept: () => void; onReject: (reason: string) => void; onCounter: (html: string, reason: string) => void; onWithdraw: () => void
 }
 
@@ -80,7 +83,11 @@ function ProposalRow({ chain, a }: { chain: NegProposal[]; a: RowActions }) {
       {mine && p.status === 'ACCEPTED' && <div style={{ fontSize: 12, color: 'var(--hf-text-muted)', marginTop: 4 }}>{p.partyName ?? 'The counterparty'} agreed. Apply it to put it in the contract.</div>}
       {!rejecting && !countering && (decidable || canReject || canWithdraw) && (
         <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
-          {decidable && <button style={solid} disabled={a.busy || p.status === 'CONFLICTED' || !p.targetStillPresent} onClick={a.onAccept}>Accept</button>}
+          {decidable && (a.gate?.required && a.gate.state !== 'APPROVED'
+            ? (a.gate.state === 'NONE'
+              ? <button style={btn} disabled={a.busy || p.status === 'CONFLICTED' || !p.targetStillPresent} onClick={a.onAskApproval}>Ask for approval to accept</button>
+              : <button style={btn} disabled title="Someone else needs to approve this under Approvals">Waiting for approval to accept</button>)
+            : <button style={solid} disabled={a.busy || p.status === 'CONFLICTED' || !p.targetStillPresent} onClick={a.onAccept}>Accept</button>)}
           {decidable && p.kind !== 'DELETE' && textEditable && <button style={btn} disabled={a.busy || !p.targetStillPresent} onClick={startCounter}>Counter with new wording</button>}
           {canReject && <button style={btn} disabled={a.busy} onClick={() => { setRejecting(true); setCountering(false) }}>Reject</button>}
           {canWithdraw && <button style={btn} disabled={a.busy} onClick={a.onWithdraw}>Withdraw</button>}
@@ -201,7 +208,18 @@ export function ContractNegotiationSection({ contractId, status, parties }: { co
   const comment = useRun<void>(() => apiClient.post(`${base}/comments`, { body: note, internalOnly: internal, audiencePartyId: internal || !audience ? null : audience }),
     'The comment could not be posted', () => { setNote(''); setInternal(false) })
 
-  const busy = [openIt, setDl, accept, reject, counter, withdrawP, propose, apply, ready, close, reopen, revoke, comment].some(m => m.isPending)
+  // Accepting a counterparty's change can be put behind a second person's approval; same cache keys as the Approvals screen.
+  const approvalList = useQuery<Approval[]>({ queryKey: ['contract-approvals', 'list'], enabled: open,
+    queryFn: async () => listOf(await apiClient.get('/api/v1/contracts/approvals')) })
+  const approvalPolicy = useQuery<PolicyRow[]>({ queryKey: ['contract-approvals', 'policy'], enabled: open,
+    queryFn: async () => listOf(await apiClient.get('/api/v1/contracts/approvals/policy')) })
+  const askApproval = useMutation({
+    mutationFn: (id: string) => apiClient.post('/api/v1/contracts/approvals', { action: 'ACCEPT_COUNTERPARTY_REDLINE', subjectId: id, note: null }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['contract-approvals'] }); setError('') },
+    onError: (e: unknown) => setError(apiError(e, 'Could not ask for approval')),
+  })
+
+  const busy = [openIt, setDl, accept, reject, counter, withdrawP, propose, apply, ready, close, reopen, revoke, comment, askApproval].some(m => m.isPending)
   const d = neg.data
   const props = d?.proposals ?? []
   const threads = exchanges(props)
@@ -212,6 +230,11 @@ export function ContractNegotiationSection({ contractId, status, parties }: { co
   const history = threads.filter(c => !needsDecision(last(c)) && !waitingOnCounterparty(last(c)) && last(c).status !== 'ACCEPTED')
   const actions = (p: NegProposal, writable: boolean): RowActions => ({
     canWrite: writable, busy,
+    gate: byStaff(p) ? undefined : {
+      required: (approvalPolicy.data ?? []).find(x => x.action === 'ACCEPT_COUNTERPARTY_REDLINE')?.required ?? false,
+      state: approvalState(approvalList.data ?? [], 'ACCEPT_COUNTERPARTY_REDLINE', p.id),
+    },
+    onAskApproval: () => askApproval.mutate(p.id),
     onAccept: () => accept.mutate(p.id), onReject: r => reject.mutate({ id: p.id, reason: r }),
     onCounter: (html, r) => counter.mutate({ id: p.id, html, reason: r }), onWithdraw: () => withdrawP.mutate(p.id),
   })

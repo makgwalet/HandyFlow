@@ -302,6 +302,17 @@ export default function ContractsTab() {
     enabled: !!expanded,
   })
 
+  // Signing in person for a party can be put behind a second person's approval (off unless the tenant switches it on).
+  const signGate = (partyId: string) => ({
+    required: approvalPolicy.find(p => p.action === 'SIGN_ON_BEHALF')?.required ?? false,
+    state: approvalState(approvalList, 'SIGN_ON_BEHALF', partyId),
+  })
+  const askSignApproval = useMutation({
+    mutationFn: (partyId: string) => apiClient.post('/api/v1/contracts/approvals', { action: 'SIGN_ON_BEHALF', subjectId: partyId, note: null }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['contract-approvals'] }); setError('') },
+    onError: (e: unknown) => setError(apiError(e, 'Could not ask for approval')),
+  })
+
   const { data: templates = [] } = useQuery<ContractTemplateRow[]>({
     queryKey: ['contract-templates'],
     queryFn: async () => unwrap<ContractTemplateRow>(await apiClient.get('/api/v1/contracts/templates')),
@@ -711,7 +722,13 @@ export default function ContractsTab() {
                                   )}
 
                                   {/* Action buttons based on party state */}
-                                  {canSign && c.status === 'SENT' && party.signingStatus === 'PENDING' && (
+                                  {canSign && c.status === 'SENT' && (party.signingStatus === 'PENDING' || party.signingStatus === 'SENT') && signGate(party.id).required && signGate(party.id).state !== 'APPROVED' && (
+                                    signGate(party.id).state === 'NONE'
+                                      ? <button onClick={() => askSignApproval.mutate(party.id)} disabled={askSignApproval.isPending}
+                                          style={{ ...btnP(), padding: '5px 10px', fontSize: 11 }}>Ask approval to sign for {party.fullName}</button>
+                                      : <span style={{ fontSize: 11, color: 'var(--hf-warning-text)' }}>Waiting for approval to sign for {party.fullName}</span>
+                                  )}
+                                  {canSign && c.status === 'SENT' && party.signingStatus === 'PENDING' && !(signGate(party.id).required && signGate(party.id).state !== 'APPROVED') && (
                                     <button
                                       onClick={() => { setShowOtp({ contractId: c.id, partyId: party.id, name: party.fullName, isResend: false }); setError('') }}
                                       style={{ ...btnP(), padding: '5px 10px', fontSize: 11 }}>
@@ -719,7 +736,7 @@ export default function ContractsTab() {
                                     </button>
                                   )}
 
-                                  {canSign && c.status === 'SENT' && party.signingStatus === 'SENT' && (
+                                  {canSign && c.status === 'SENT' && party.signingStatus === 'SENT' && !(signGate(party.id).required && signGate(party.id).state !== 'APPROVED') && (
                                     <button
                                       onClick={() => { setShowOtp({ contractId: c.id, partyId: party.id, name: party.fullName, isResend: true }); setError('') }}
                                       style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '5px 10px', background: otpExpired ? 'var(--hf-danger-soft)' : 'var(--hf-warning-soft)', color: otpExpired ? 'var(--hf-danger-text)' : 'var(--hf-warning-text)', border: `1px solid ${otpExpired ? 'var(--hf-danger-border)' : 'var(--hf-warning-border)'}`, borderRadius: 6, fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>
