@@ -3,6 +3,7 @@ package za.co.handyflow.platform.legalcompliance.application;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import za.co.handyflow.platform.legalcompliance.application.internal.ControlTestRules;
+import za.co.handyflow.platform.legalcompliance.domain.model.*;
 
 import java.time.LocalDate;
 

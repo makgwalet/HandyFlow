@@ -8,7 +8,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import za.co.handyflow.platform.billing.FeatureGuard;
-import za.co.handyflow.platform.expenses.dto.ExpensePolicyDtos;
 import za.co.handyflow.platform.legalcompliance.application.internal.PolicyService;
 import za.co.handyflow.platform.legalcompliance.dto.AssuranceDtos.*;
 import za.co.handyflow.platform.legalcompliance.dto.GovernanceDtos.*;
@@ -35,7 +34,7 @@ public class PolicyController {
 
     @GetMapping
     @PreAuthorize(CAN_READ)
-    public ResponseEntity<ApiResponse<List<ExpensePolicyDtos.PolicyResponse>>> list(@RequestParam(defaultValue = "false") boolean includeRetired) {
+    public ResponseEntity<ApiResponse<List<PolicyResponse>>> list(@RequestParam(defaultValue = "false") boolean includeRetired) {
         featureGuard.requireModule("legalcompliance");
         return ResponseEntity.ok(ApiResponse.success(policies.list(tenant(), includeRetired)));
     }
