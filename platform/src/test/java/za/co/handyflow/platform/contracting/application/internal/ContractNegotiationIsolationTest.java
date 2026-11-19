@@ -145,7 +145,7 @@ class ContractNegotiationIsolationTest {
     void anotherTenantCannotIssueListOrRevokeLinks() {
         IssuedLinkView link = h.inTx(() -> access().issueLink(tenantA, a1.getId(), h.party(a1, 0).getId(), staff));
         notFound(() -> access().issueLink(tenantB, a1.getId(), h.party(a1, 0).getId(), staff));
-        notFound(() -> access().revokeLink(tenantB, a1.getId(), link.linkId(), staff));
+        notFound(() -> { access().revokeLink(tenantB, a1.getId(), link.linkId(), staff); return null; });
         assertTrue(access().links(tenantB, a1.getId()).isEmpty());
         assertEquals(1, access().links(tenantA, a1.getId()).size());
         assertNull(h.links.get(0).getRevokedAt());
@@ -154,7 +154,7 @@ class ContractNegotiationIsolationTest {
     @Test
     void aLinkRevokeCannotBeAimedThroughAnotherContract() {
         IssuedLinkView link = h.inTx(() -> access().issueLink(tenantA, a1.getId(), h.party(a1, 0).getId(), staff));
-        notFound(() -> access().revokeLink(tenantA, a2.getId(), link.linkId(), staff));
+        notFound(() -> { access().revokeLink(tenantA, a2.getId(), link.linkId(), staff); return null; });
         assertNull(h.links.get(0).getRevokedAt());
     }
 
