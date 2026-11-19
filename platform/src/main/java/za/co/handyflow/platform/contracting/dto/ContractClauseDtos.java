@@ -11,7 +11,9 @@ import java.util.UUID;
 public final class ContractClauseDtos {
     private ContractClauseDtos() {}
 
-    public record ClauseRequest(@NotBlank String title, @NotBlank String category, @NotBlank String body, String legalArea, String jurisdiction) {}
+    /** clauseKind: STANDARD (the default), CUSTOM, REGULATORY, SENSITIVE or SOURCED. Anything but STANDARD needs evidence before publishing; SOURCED also needs sourceReference. */
+    public record ClauseRequest(@NotBlank String title, @NotBlank String category, @NotBlank String body, String legalArea, String jurisdiction,
+                                String clauseKind, String sourceReference) {}
 
     public record ApproveClauseRequest(@NotBlank String reviewerName, @NotBlank String reviewerProfessionalDetails, @NotNull LocalDate reviewDate,
                                        LocalDate nextReviewDate, String notes) {}
@@ -25,7 +27,8 @@ public final class ContractClauseDtos {
     public record ClauseResponse(UUID id, UUID familyId, int versionNo, String title, String category, String body, String legalArea, String jurisdiction,
                                  String status, String legalStatus, String reviewerName, String reviewerProfessionalDetails, LocalDate reviewDate,
                                  LocalDate nextReviewDate, String reviewNotes, Instant publishedAt, String withdrawnReason, boolean usable,
-                                 UUID evidenceDocumentId, String evidenceFileName) {}
+                                 UUID evidenceDocumentId, String evidenceFileName,
+                                 String clauseKind, String sourceReference, boolean evidenceRequired, String evidenceRequiredReason) {}
 
     /** state: CURRENT, SUPERSEDED, WITHDRAWN or REVIEW_EXPIRED, judged today against the clause as it stands now. */
     public record ClauseUsageResponse(UUID clauseId, String title, int clauseVersionNo, String state, Integer contractVersionNo, Instant insertedAt) {}

@@ -23,6 +23,11 @@ public class ContractClause {
     public static final Set<String> CATEGORIES = Set.of("DEFINITIONS", "FORCE_MAJEURE", "DOMICILIUM", "PAYMENT", "TERMINATION",
             "CONFIDENTIALITY", "LIABILITY", "DISPUTE_RESOLUTION", "DATA_PROTECTION", "OTHER");
 
+    /** STANDARD wording needs no evidence file; every other kind does before it can be published. */
+    public static final Set<String> KINDS = Set.of("STANDARD", "CUSTOM", "REGULATORY", "SENSITIVE", "SOURCED");
+    /** Categories whose wording is sensitive whatever the author says: they always need evidence before publishing. */
+    public static final Set<String> SENSITIVE_CATEGORIES = Set.of("DATA_PROTECTION", "LIABILITY");
+
     @Id private UUID id;
     @Column(name = "tenant_id") private UUID tenantId;
     @Column(name = "family_id") private UUID familyId;
@@ -38,6 +43,8 @@ public class ContractClause {
     @Column(name = "review_date") private LocalDate reviewDate;
     @Column(name = "next_review_date") private LocalDate nextReviewDate;
     @Column(name = "review_notes", columnDefinition = "TEXT") private String reviewNotes;
+    @Column(name = "clause_kind") private String clauseKind = "STANDARD";
+    @Column(name = "source_reference") private String sourceReference;
     @Column(name = "evidence_document_id") private UUID evidenceDocumentId;
     @Column(name = "published_at") private Instant publishedAt;
     @Column(name = "withdrawn_at") private Instant withdrawnAt;
@@ -58,6 +65,27 @@ public class ContractClause {
         c.applyDetails(title, category, body, legalArea, jurisdiction);
         return c;
     }
+
+    /** Says what sort of clause this is and, for a sourced one, where the wording came from. Draft only. */
+    public void classify(String kind, String source) {
+        if (!"DRAFT".equals(status)) throw new IllegalStateException("Only a draft clause can be reclassified (this one is " + status + ")");
+        String k = kind == null || kind.isBlank() ? "STANDARD" : kind.trim().toUpperCase();
+        if (!KINDS.contains(k)) throw new IllegalArgumentException("Unknown clause kind: " + kind);
+        boolean noSource = source == null || source.isBlank();
+        if ("SOURCED".equals(k) && noSource) throw new IllegalArgumentException("Say where the wording came from");
+        this.clauseKind = k;
+        this.sourceReference = noSource ? null : source.trim();
+        this.updatedAt = Instant.now();
+    }
+
+    /** Why the reviewer's signed-off review must be attached before publishing, or null when it is optional. */
+    public String evidenceReason() {
+        if (!"STANDARD".equals(clauseKind)) return "it is a " + clauseKind.toLowerCase() + " clause";
+        if (SENSITIVE_CATEGORIES.contains(category)) return "its category (" + category.toLowerCase().replace('_', ' ') + ") is sensitive";
+        return null;
+    }
+
+    public boolean evidenceRequired() { return evidenceReason() != null; }
 
     /** Draft only. A clause that has been approved or published is replaced by a new version, never edited. */
     public void edit(String title, String category, String body, String legalArea, String jurisdiction) {
@@ -117,9 +145,19 @@ public class ContractClause {
         updatedAt = Instant.now();
     }
 
-    public void publish(LocalDate today) {
+    public void publish(LocalDate today) { publish(today, evidenceDocumentId != null); }
+
+    /** Throws unless the clause may be published now. Changes nothing, so it can run before anything else is touched. */
+    public void assertPublishable(LocalDate today, boolean evidenceOnFile) {
         if (!"APPROVED".equals(status)) throw new IllegalStateException("Only an approved clause can be published (this one is " + status + ")");
         if (reviewExpired(today)) throw new IllegalStateException("The legal review of this clause has expired. It needs a new review.");
+        String why = evidenceReason();
+        if (why != null && !evidenceOnFile)
+            throw new IllegalStateException("The reviewer's signed-off review must be attached before this clause can be published, because " + why + ".");
+    }
+
+    public void publish(LocalDate today, boolean evidenceOnFile) {
+        assertPublishable(today, evidenceOnFile);
         status = "PUBLISHED";
         publishedAt = Instant.now();
         updatedAt = publishedAt;
@@ -152,6 +190,8 @@ public class ContractClause {
         c.createdBy = by;
         c.createdAt = Instant.now();
         c.applyDetails(title, category, body, legalArea, jurisdiction);
+        c.clauseKind = clauseKind;
+        c.sourceReference = sourceReference;
         return c;
     }
 

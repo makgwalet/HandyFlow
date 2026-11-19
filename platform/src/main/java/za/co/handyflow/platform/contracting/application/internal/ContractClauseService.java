@@ -52,6 +52,7 @@ public class ContractClauseService {
     @Transactional
     public ClauseResponse create(TenantId tenantId, ClauseRequest req, UUID by) {
         ContractClause c = ContractClause.create(tenantId.getValue(), req.title(), req.category(), req.body(), req.legalArea(), req.jurisdiction(), by);
+        c.classify(req.clauseKind(), req.sourceReference());
         return toResponse(clauseRepo.save(c), LocalDate.now());
     }
 
@@ -59,6 +60,8 @@ public class ContractClauseService {
     public ClauseResponse edit(TenantId tenantId, UUID id, ClauseRequest req) {
         ContractClause c = clause(tenantId, id);
         c.edit(req.title(), req.category(), req.body(), req.legalArea(), req.jurisdiction());
+        // an edit that does not mention the kind keeps it; one that does replaces it
+        c.classify(req.clauseKind() != null ? req.clauseKind() : c.getClauseKind(), req.clauseKind() != null || req.sourceReference() != null ? req.sourceReference() : c.getSourceReference());
         return toResponse(clauseRepo.save(c), LocalDate.now());
     }
 
@@ -108,11 +111,13 @@ public class ContractClauseService {
     public ClauseResponse publish(TenantId tenantId, UUID id) {
         ContractClause c = clause(tenantId, id);
         LocalDate today = LocalDate.now();
+        // every check first, before the previous version is touched
+        c.assertPublishable(today, c.getEvidenceDocumentId() != null && documents.find(tenantId, c.getEvidenceDocumentId()).isPresent());
         clauseRepo.findFirstByTenantIdAndFamilyIdAndStatus(tenantId.getValue(), c.getFamilyId(), "PUBLISHED").ifPresent(prev -> {
             prev.supersede();
             clauseRepo.saveAndFlush(prev);
         });
-        c.publish(today);
+        c.publish(today, true);   // checked above
         return toResponse(clauseRepo.save(c), today);
     }
 
@@ -185,7 +190,8 @@ public class ContractClauseService {
     private ClauseResponse toResponse(ContractClause c, LocalDate today) {
         return new ClauseResponse(c.getId(), c.getFamilyId(), c.getVersionNo(), c.getTitle(), c.getCategory(), c.getBody(), c.getLegalArea(), c.getJurisdiction(),
                 c.getStatus(), legalStatus(c, today), c.getReviewerName(), c.getReviewerProfessionalDetails(), c.getReviewDate(), c.getNextReviewDate(),
-                c.getReviewNotes(), c.getPublishedAt(), c.getWithdrawnReason(), c.usable(today), c.getEvidenceDocumentId(), evidenceFileName(c));
+                c.getReviewNotes(), c.getPublishedAt(), c.getWithdrawnReason(), c.usable(today), c.getEvidenceDocumentId(), evidenceFileName(c),
+                c.getClauseKind(), c.getSourceReference(), c.evidenceRequired(), c.evidenceReason());
     }
 
     private String evidenceFileName(ContractClause c) {
