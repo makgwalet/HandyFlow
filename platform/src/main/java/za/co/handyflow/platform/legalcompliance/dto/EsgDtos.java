@@ -3,6 +3,10 @@ package za.co.handyflow.platform.legalcompliance.dto;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
+import za.co.handyflow.platform.legalcompliance.domain.model.EsgCategory;
+import za.co.handyflow.platform.legalcompliance.domain.model.EsgDirection;
+import za.co.handyflow.platform.legalcompliance.domain.model.EsgFrequency;
+import za.co.handyflow.platform.legalcompliance.domain.model.EsgMetricStatus;
 
 import java.math.BigDecimal;
 import java.time.Instant;

@@ -4,7 +4,13 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import za.co.handyflow.platform.legalcompliance.domain.model.*;
+import za.co.handyflow.platform.legalcompliance.domain.repository.CommitteeMeetingRepository;
+import za.co.handyflow.platform.legalcompliance.domain.repository.CommitteeMemberRepository;
+import za.co.handyflow.platform.legalcompliance.domain.repository.CommitteeRepository;
+import za.co.handyflow.platform.legalcompliance.domain.repository.CommitteeResolutionRepository;
 import za.co.handyflow.platform.legalcompliance.dto.AssuranceDtos.ReasonRequest;
+import za.co.handyflow.platform.legalcompliance.dto.GovernanceDtos;
 import za.co.handyflow.platform.shared.HandyFlowException;
 import za.co.handyflow.platform.shared.ResourceNotFoundException;
 import za.co.handyflow.platform.shared.TenantId;
@@ -34,7 +40,7 @@ public class CommitteeService {
     // ── Committees ──
 
     @Transactional
-    public CommitteeDetail create(TenantId t, CommitteeRequest r, UUID uid, String uname) {
+    public GovernanceDtos.CommitteeDetail create(TenantId t, GovernanceDtos.CommitteeRequest r, UUID uid, String uname) {
         Committee c = guarded(() -> Committee.create(t, String.format("COM-%05d", committees.nextRef()), r.name(), r.committeeType(), r.charter(), orDefault(r.meetingFrequencyMonths(), 3),
                 orDefault(r.quorumMin(), 2), orDefault(r.charterReviewMonths(), 12), uid, uname));
         committees.save(c);
@@ -43,7 +49,7 @@ public class CommitteeService {
     }
 
     @Transactional
-    public CommitteeDetail update(TenantId t, UUID id, CommitteeRequest r, UUID uid, String uname) {
+    public GovernanceDtos.CommitteeDetail update(TenantId t, UUID id, GovernanceDtos.CommitteeRequest r, UUID uid, String uname) {
         Committee c = load(t, id);
         guarded(() -> { c.update(r.name(), r.committeeType(), r.charter(), orDefault(r.meetingFrequencyMonths(), c.getMeetingFrequencyMonths()), orDefault(r.quorumMin(), c.getQuorumMin()),
                 orDefault(r.charterReviewMonths(), c.getCharterReviewMonths())); return null; });
@@ -53,7 +59,7 @@ public class CommitteeService {
     }
 
     @Transactional
-    public CommitteeDetail reviewCharter(TenantId t, UUID id, CharterReviewRequest r, UUID uid, String uname) {
+    public GovernanceDtos.CommitteeDetail reviewCharter(TenantId t, UUID id, GovernanceDtos.CharterReviewRequest r, UUID uid, String uname) {
         Committee c = load(t, id);
         guarded(() -> { c.reviewCharter(r.reviewedOn(), today()); return null; });
         committees.save(c);
@@ -62,7 +68,7 @@ public class CommitteeService {
     }
 
     @Transactional
-    public CommitteeDetail dissolve(TenantId t, UUID id, ReasonRequest r, UUID uid, String uname) {
+    public GovernanceDtos.CommitteeDetail dissolve(TenantId t, UUID id, ReasonRequest r, UUID uid, String uname) {
         Committee c = load(t, id);
         if (meetings.findForCommittee(t, id).stream().anyMatch(m -> m.getStatus() == MeetingStatus.SCHEDULED))
             throw new HandyFlowException("Cancel or hold the scheduled meetings first", HttpStatus.CONFLICT, "INVALID_STATE");
@@ -75,7 +81,7 @@ public class CommitteeService {
     // ── Members ──
 
     @Transactional
-    public CommitteeDetail addMember(TenantId t, UUID id, MemberRequest r, UUID uid, String uname) {
+    public GovernanceDtos.CommitteeDetail addMember(TenantId t, UUID id, GovernanceDtos.MemberRequest r, UUID uid, String uname) {
         Committee c = activeCommittee(t, id);
         if (r.memberRole() == MemberRole.CHAIR && members.findForCommittee(t, id).stream().anyMatch(m -> m.isActive() && m.getMemberRole() == MemberRole.CHAIR))
             throw new HandyFlowException("This committee already has a chair — end that membership first", HttpStatus.CONFLICT, "INVALID_STATE");
@@ -86,7 +92,7 @@ public class CommitteeService {
     }
 
     @Transactional
-    public CommitteeDetail endMember(TenantId t, UUID id, UUID memberId, EndMemberRequest r, UUID uid, String uname) {
+    public GovernanceDtos.CommitteeDetail endMember(TenantId t, UUID id, UUID memberId, GovernanceDtos.EndMemberRequest r, UUID uid, String uname) {
         Committee c = activeCommittee(t, id);
         CommitteeMember m = loadMember(t, id, memberId);
         guarded(() -> { m.end(r.endedOn(), today()); return null; });
@@ -98,7 +104,7 @@ public class CommitteeService {
     // ── Meetings ──
 
     @Transactional
-    public MeetingDetail scheduleMeeting(TenantId t, UUID id, MeetingRequest r, UUID uid, String uname) {
+    public GovernanceDtos.MeetingDetail scheduleMeeting(TenantId t, UUID id, GovernanceDtos.MeetingRequest r, UUID uid, String uname) {
         activeCommittee(t, id);
         CommitteeMeeting m = guarded(() -> CommitteeMeeting.schedule(t, id, r.meetingDate(), r.title(), r.agenda()));
         meetings.save(m);
@@ -107,7 +113,7 @@ public class CommitteeService {
     }
 
     @Transactional
-    public MeetingDetail updateMeeting(TenantId t, UUID id, UUID mid, MeetingRequest r, UUID uid, String uname) {
+    public GovernanceDtos.MeetingDetail updateMeeting(TenantId t, UUID id, UUID mid, GovernanceDtos.MeetingRequest r, UUID uid, String uname) {
         CommitteeMeeting m = loadMeeting(t, id, mid);
         guarded(() -> { m.update(r.meetingDate(), r.title(), r.agenda()); return null; });
         meetings.save(m);
@@ -116,7 +122,7 @@ public class CommitteeService {
     }
 
     @Transactional
-    public MeetingDetail cancelMeeting(TenantId t, UUID id, UUID mid, ReasonRequest r, UUID uid, String uname) {
+    public GovernanceDtos.MeetingDetail cancelMeeting(TenantId t, UUID id, UUID mid, ReasonRequest r, UUID uid, String uname) {
         CommitteeMeeting m = loadMeeting(t, id, mid);
         guarded(() -> { m.cancel(r.reason()); return null; });
         meetings.save(m);
@@ -125,7 +131,7 @@ public class CommitteeService {
     }
 
     @Transactional
-    public MeetingDetail holdMeeting(TenantId t, UUID id, UUID mid, HoldRequest r, UUID uid, String uname) {
+    public GovernanceDtos.MeetingDetail holdMeeting(TenantId t, UUID id, UUID mid, GovernanceDtos.HoldRequest r, UUID uid, String uname) {
         Committee c = load(t, id);
         CommitteeMeeting m = loadMeeting(t, id, mid);
         Map<UUID, CommitteeMember> onDate = members.findForCommittee(t, id).stream().filter(x -> memberOn(x, m.getMeetingDate())).collect(Collectors.toMap(CommitteeMember::getId, x -> x));
@@ -139,7 +145,7 @@ public class CommitteeService {
     }
 
     @Transactional
-    public MeetingDetail recordMinutes(TenantId t, UUID id, UUID mid, MinutesRequest r, UUID uid, String uname) {
+    public GovernanceDtos.MeetingDetail recordMinutes(TenantId t, UUID id, UUID mid, GovernanceDtos.MinutesRequest r, UUID uid, String uname) {
         CommitteeMeeting m = loadMeeting(t, id, mid);
         guarded(() -> { m.recordMinutes(r.minutes(), uid, uname); return null; });
         meetings.save(m);
@@ -148,7 +154,7 @@ public class CommitteeService {
     }
 
     @Transactional
-    public MeetingDetail approveMinutes(TenantId t, UUID id, UUID mid, UUID uid, String uname) {
+    public GovernanceDtos.MeetingDetail approveMinutes(TenantId t, UUID id, UUID mid, UUID uid, String uname) {
         CommitteeMeeting m = loadMeeting(t, id, mid);
         guarded(() -> { m.approveMinutes(uid, uname, today()); return null; });
         meetings.save(m);
@@ -159,7 +165,7 @@ public class CommitteeService {
     // ── Decisions and actions ──
 
     @Transactional
-    public MeetingDetail addResolution(TenantId t, UUID id, UUID mid, ResolutionRequest r, UUID uid, String uname) {
+    public GovernanceDtos.MeetingDetail addResolution(TenantId t, UUID id, UUID mid, GovernanceDtos.ResolutionRequest r, UUID uid, String uname) {
         CommitteeMeeting m = loadMeeting(t, id, mid);
         requireOpenForResolutions(m);
         CommitteeResolution x = guarded(() -> CommitteeResolution.create(t, mid, id, r.kind(), r.description(), r.ownerName(), r.dueDate(), m.getMeetingDate()));
@@ -169,7 +175,7 @@ public class CommitteeService {
     }
 
     @Transactional
-    public MeetingDetail updateResolution(TenantId t, UUID id, UUID mid, UUID rid, ResolutionRequest r, UUID uid, String uname) {
+    public GovernanceDtos.MeetingDetail updateResolution(TenantId t, UUID id, UUID mid, UUID rid, GovernanceDtos.ResolutionRequest r, UUID uid, String uname) {
         CommitteeMeeting m = loadMeeting(t, id, mid);
         requireOpenForResolutions(m);
         CommitteeResolution x = loadResolution(t, mid, rid);
@@ -180,7 +186,7 @@ public class CommitteeService {
     }
 
     @Transactional
-    public MeetingDetail removeResolution(TenantId t, UUID id, UUID mid, UUID rid, UUID uid, String uname) {
+    public GovernanceDtos.MeetingDetail removeResolution(TenantId t, UUID id, UUID mid, UUID rid, UUID uid, String uname) {
         CommitteeMeeting m = loadMeeting(t, id, mid);
         requireOpenForResolutions(m);
         CommitteeResolution x = loadResolution(t, mid, rid);
@@ -192,7 +198,7 @@ public class CommitteeService {
 
     /** Completing an action stays possible after the minutes are approved: the minutes record what was decided, not what has since been done. */
     @Transactional
-    public MeetingDetail completeAction(TenantId t, UUID id, UUID mid, UUID rid, CompleteRequest r, UUID uid, String uname) {
+    public GovernanceDtos.MeetingDetail completeAction(TenantId t, UUID id, UUID mid, UUID rid, GovernanceDtos.CompleteRequest r, UUID uid, String uname) {
         CommitteeMeeting m = loadMeeting(t, id, mid);
         CommitteeResolution x = loadResolution(t, mid, rid);
         guarded(() -> { x.complete(r.completedOn(), r.note(), today()); return null; });
@@ -204,7 +210,7 @@ public class CommitteeService {
     // ── Reads ──
 
     @Transactional(readOnly = true)
-    public List<CommitteeResponse> list(TenantId t, CommitteeStatus status) {
+    public List<GovernanceDtos.CommitteeResponse> list(TenantId t, CommitteeStatus status) {
         List<Committee> cs = committees.search(t, status);
         if (cs.isEmpty()) return List.of();
         List<UUID> ids = cs.stream().map(Committee::getId).toList();
@@ -215,14 +221,14 @@ public class CommitteeService {
     }
 
     @Transactional(readOnly = true)
-    public CommitteeDetail get(TenantId t, UUID id) { return detail(t, load(t, id)); }
+    public GovernanceDtos.CommitteeDetail get(TenantId t, UUID id) { return detail(t, load(t, id)); }
 
     @Transactional(readOnly = true)
-    public MeetingDetail getMeeting(TenantId t, UUID id, UUID mid) { return meetingDetail(t, loadMeeting(t, id, mid)); }
+    public GovernanceDtos.MeetingDetail getMeeting(TenantId t, UUID id, UUID mid) { return meetingDetail(t, loadMeeting(t, id, mid)); }
 
     /** Actions across every committee, soonest due first. */
     @Transactional(readOnly = true)
-    public List<ResolutionResponse> actions(TenantId t, boolean openOnly) {
+    public List<GovernanceDtos.ResolutionResponse> actions(TenantId t, boolean openOnly) {
         List<CommitteeResolution> rs = resolutions.findActions(t, openOnly);
         if (rs.isEmpty()) return List.of();
         Map<UUID, Committee> cs = committees.search(t, null).stream().collect(Collectors.toMap(Committee::getId, c -> c));
@@ -233,11 +239,11 @@ public class CommitteeService {
     }
 
     @Transactional(readOnly = true)
-    public GovernanceSummary summary(TenantId t) {
-        List<CommitteeResponse> all = list(t, CommitteeStatus.ACTIVE);
-        long open = all.stream().mapToLong(CommitteeResponse::openActions).sum();
-        return new GovernanceSummary(all.size(), all.stream().filter(CommitteeResponse::meetingOverdue).count(), all.stream().filter(CommitteeResponse::charterReviewOverdue).count(),
-                all.stream().mapToLong(CommitteeResponse::minutesPending).sum(), open, all.stream().mapToLong(CommitteeResponse::overdueActions).sum(),
+    public GovernanceDtos.GovernanceSummary summary(TenantId t) {
+        List<GovernanceDtos.CommitteeResponse> all = list(t, CommitteeStatus.ACTIVE);
+        long open = all.stream().mapToLong(GovernanceDtos.CommitteeResponse::openActions).sum();
+        return new GovernanceDtos.GovernanceSummary(all.size(), all.stream().filter(GovernanceDtos.CommitteeResponse::meetingOverdue).count(), all.stream().filter(GovernanceDtos.CommitteeResponse::charterReviewOverdue).count(),
+                all.stream().mapToLong(GovernanceDtos.CommitteeResponse::minutesPending).sum(), open, all.stream().mapToLong(GovernanceDtos.CommitteeResponse::overdueActions).sum(),
                 all.stream().filter(c -> c.qualifyingMembers() < c.quorumMin()).count());
     }
 
@@ -284,33 +290,33 @@ public class CommitteeService {
         return x;
     }
 
-    private CommitteeDetail detail(TenantId t, Committee c) {
+    private GovernanceDtos.CommitteeDetail detail(TenantId t, Committee c) {
         List<CommitteeMember> ms = members.findForCommittee(t, c.getId());
         List<CommitteeMeeting> mt = meetings.findForCommittee(t, c.getId());
         List<CommitteeResolution> acts = resolutions.findOpenActionsForCommittees(t, List.of(c.getId()));
         Map<UUID, String> names = ms.stream().collect(Collectors.toMap(CommitteeMember::getId, CommitteeMember::getMemberName));
-        return new CommitteeDetail(view(c, ms, mt, acts), ms.stream().map(m -> new MemberResponse(m.getId(), m.getMemberName(), m.getUserId(), m.getMemberRole(), m.getAppointedOn(), m.getEndedOn(), m.isActive())).toList(),
+        return new GovernanceDtos.CommitteeDetail(view(c, ms, mt, acts), ms.stream().map(m -> new GovernanceDtos.MemberResponse(m.getId(), m.getMemberName(), m.getUserId(), m.getMemberRole(), m.getAppointedOn(), m.getEndedOn(), m.isActive())).toList(),
                 mt.stream().map(m -> meetingView(m, names)).toList());
     }
 
-    private MeetingDetail meetingDetail(TenantId t, CommitteeMeeting m) {
+    private GovernanceDtos.MeetingDetail meetingDetail(TenantId t, CommitteeMeeting m) {
         Map<UUID, String> names = members.findForCommittee(t, m.getCommitteeId()).stream().collect(Collectors.toMap(CommitteeMember::getId, CommitteeMember::getMemberName));
         LocalDate today = today();
-        return new MeetingDetail(meetingView(m, names), resolutions.findForMeeting(t, m.getId()).stream().map(x -> resView(x, today, null, m)).toList());
+        return new GovernanceDtos.MeetingDetail(meetingView(m, names), resolutions.findForMeeting(t, m.getId()).stream().map(x -> resView(x, today, null, m)).toList());
     }
 
-    private static MeetingResponse meetingView(CommitteeMeeting m, Map<UUID, String> names) {
+    private static GovernanceDtos.MeetingResponse meetingView(CommitteeMeeting m, Map<UUID, String> names) {
         List<String> attendees = m.getAttendance() == null ? List.of() : m.getAttendance().stream().map(s -> names.getOrDefault(UUID.fromString(s), "Former member")).toList();
-        return new MeetingResponse(m.getId(), m.getCommitteeId(), m.getMeetingDate(), m.getTitle(), m.getAgenda(), m.getStatus(), attendees, m.getPresentCount(), m.getQuorumMet(), m.getCancelReason(),
+        return new GovernanceDtos.MeetingResponse(m.getId(), m.getCommitteeId(), m.getMeetingDate(), m.getTitle(), m.getAgenda(), m.getStatus(), attendees, m.getPresentCount(), m.getQuorumMet(), m.getCancelReason(),
                 m.getMinutes(), m.getMinutesStatus(), m.getMinutesByName(), m.getMinutesApprovedByName(), m.getMinutesApprovedOn(), m.canRecordResolutions());
     }
 
-    private static ResolutionResponse resView(CommitteeResolution x, LocalDate today, Committee c, CommitteeMeeting m) {
-        return new ResolutionResponse(x.getId(), x.getMeetingId(), x.getCommitteeId(), x.getKind(), x.getDescription(), x.getOwnerName(), x.getDueDate(), x.getStatus(), x.getCompletedOn(), x.getNote(),
+    private static GovernanceDtos.ResolutionResponse resView(CommitteeResolution x, LocalDate today, Committee c, CommitteeMeeting m) {
+        return new GovernanceDtos.ResolutionResponse(x.getId(), x.getMeetingId(), x.getCommitteeId(), x.getKind(), x.getDescription(), x.getOwnerName(), x.getDueDate(), x.getStatus(), x.getCompletedOn(), x.getNote(),
                 x.getStatus() == ResolutionStatus.OPEN && EthicsGovernanceRules.actionOverdue(x.getDueDate(), today), c == null ? null : c.getName(), m == null ? null : m.getMeetingDate());
     }
 
-    private CommitteeResponse view(Committee c, List<CommitteeMember> ms, List<CommitteeMeeting> mt, List<CommitteeResolution> openActions) {
+    private GovernanceDtos.CommitteeResponse view(Committee c, List<CommitteeMember> ms, List<CommitteeMeeting> mt, List<CommitteeResolution> openActions) {
         LocalDate today = today();
         List<CommitteeMember> active = ms.stream().filter(CommitteeMember::isActive).toList();
         LocalDate lastHeld = mt.stream().filter(m -> m.getStatus() == MeetingStatus.HELD).map(CommitteeMeeting::getMeetingDate).max(Comparator.naturalOrder()).orElse(null);
@@ -318,7 +324,7 @@ public class CommitteeService {
         LocalDate start = lastHeld != null ? lastHeld : c.getCreatedAt().atZone(ZoneId.of("Africa/Johannesburg")).toLocalDate();
         boolean live = c.getStatus() == CommitteeStatus.ACTIVE;
         LocalDate charterFrom = c.getLastCharterReview() != null ? c.getLastCharterReview() : c.getCreatedAt().atZone(ZoneId.of("Africa/Johannesburg")).toLocalDate();
-        return new CommitteeResponse(c.getId(), c.getReference(), c.getName(), c.getCommitteeType(), c.getCharter(), c.getMeetingFrequencyMonths(), c.getQuorumMin(), c.getCharterReviewMonths(),
+        return new GovernanceDtos.CommitteeResponse(c.getId(), c.getReference(), c.getName(), c.getCommitteeType(), c.getCharter(), c.getMeetingFrequencyMonths(), c.getQuorumMin(), c.getCharterReviewMonths(),
                 c.getLastCharterReview(), c.getStatus(), c.getDissolvedReason(), active.size(), (int) active.stream().filter(CommitteeMember::countsForQuorum).count(),
                 active.stream().anyMatch(m -> m.getMemberRole() == MemberRole.CHAIR), lastHeld, next, live && EthicsGovernanceRules.meetingOverdue(start, c.getMeetingFrequencyMonths(), next != null, today),
                 live && EthicsGovernanceRules.charterReviewOverdue(charterFrom, c.getCharterReviewMonths(), today), live ? openActions.size() : 0,

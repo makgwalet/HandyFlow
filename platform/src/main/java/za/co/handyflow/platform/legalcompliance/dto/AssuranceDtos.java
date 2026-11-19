@@ -1,6 +1,8 @@
 package za.co.handyflow.platform.legalcompliance.dto;
 
 import jakarta.validation.constraints.*;
+import za.co.handyflow.platform.legalcompliance.domain.model.FindingSeverity;
+import za.co.handyflow.platform.legalcompliance.domain.model.FindingStatus;
 
 import java.time.Instant;
 import java.time.LocalDate;

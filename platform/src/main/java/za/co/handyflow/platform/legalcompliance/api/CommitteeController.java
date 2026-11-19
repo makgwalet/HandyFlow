@@ -8,7 +8,9 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import za.co.handyflow.platform.billing.FeatureGuard;
 import za.co.handyflow.platform.legalcompliance.application.internal.CommitteeService;
+import za.co.handyflow.platform.legalcompliance.domain.model.CommitteeStatus;
 import za.co.handyflow.platform.legalcompliance.dto.AssuranceDtos.ReasonRequest;
+import za.co.handyflow.platform.legalcompliance.dto.GovernanceDtos;
 import za.co.handyflow.platform.shared.ApiResponse;
 import za.co.handyflow.platform.shared.TenantContext;
 import za.co.handyflow.platform.shared.TenantId;
@@ -31,147 +33,147 @@ public class CommitteeController {
 
     @GetMapping("")
     @PreAuthorize(CAN_READ)
-    public ResponseEntity<ApiResponse<List<CommitteeResponse>>> list(@RequestParam(required = false) CommitteeStatus status) {
+    public ResponseEntity<ApiResponse<List<GovernanceDtos.CommitteeResponse>>> list(@RequestParam(required = false) CommitteeStatus status) {
         featureGuard.requireModule("legalcompliance");
         return ResponseEntity.ok(ApiResponse.success(committees.list(tenant(), status)));
     }
 
     @GetMapping("/summary")
     @PreAuthorize(CAN_READ)
-    public ResponseEntity<ApiResponse<GovernanceSummary>> summary() {
+    public ResponseEntity<ApiResponse<GovernanceDtos.GovernanceSummary>> summary() {
         featureGuard.requireModule("legalcompliance");
         return ResponseEntity.ok(ApiResponse.success(committees.summary(tenant())));
     }
 
     @GetMapping("/actions")
     @PreAuthorize(CAN_READ)
-    public ResponseEntity<ApiResponse<List<ResolutionResponse>>> actions(@RequestParam(defaultValue = "true") boolean open) {
+    public ResponseEntity<ApiResponse<List<GovernanceDtos.ResolutionResponse>>> actions(@RequestParam(defaultValue = "true") boolean open) {
         featureGuard.requireModule("legalcompliance");
         return ResponseEntity.ok(ApiResponse.success(committees.actions(tenant(), open)));
     }
 
     @GetMapping("/{id}")
     @PreAuthorize(CAN_READ)
-    public ResponseEntity<ApiResponse<CommitteeDetail>> get(@PathVariable UUID id) {
+    public ResponseEntity<ApiResponse<GovernanceDtos.CommitteeDetail>> get(@PathVariable UUID id) {
         featureGuard.requireModule("legalcompliance");
         return ResponseEntity.ok(ApiResponse.success(committees.get(tenant(), id)));
     }
 
     @GetMapping("/{id}/meetings/{mid}")
     @PreAuthorize(CAN_READ)
-    public ResponseEntity<ApiResponse<MeetingDetail>> meeting(@PathVariable UUID id, @PathVariable UUID mid) {
+    public ResponseEntity<ApiResponse<GovernanceDtos.MeetingDetail>> meeting(@PathVariable UUID id, @PathVariable UUID mid) {
         featureGuard.requireModule("legalcompliance");
         return ResponseEntity.ok(ApiResponse.success(committees.getMeeting(tenant(), id, mid)));
     }
 
     @PostMapping("")
     @PreAuthorize(CAN_MANAGE)
-    public ResponseEntity<ApiResponse<CommitteeDetail>> create(@Valid @RequestBody CommitteeRequest req) {
+    public ResponseEntity<ApiResponse<GovernanceDtos.CommitteeDetail>> create(@Valid @RequestBody GovernanceDtos.CommitteeRequest req) {
         featureGuard.requireModule("legalcompliance");
         return ResponseEntity.ok(ApiResponse.success("Committee created", committees.create(tenant(), req, uid(), uname())));
     }
 
     @PutMapping("/{id}")
     @PreAuthorize(CAN_MANAGE)
-    public ResponseEntity<ApiResponse<CommitteeDetail>> update(@PathVariable UUID id, @Valid @RequestBody CommitteeRequest req) {
+    public ResponseEntity<ApiResponse<GovernanceDtos.CommitteeDetail>> update(@PathVariable UUID id, @Valid @RequestBody GovernanceDtos.CommitteeRequest req) {
         featureGuard.requireModule("legalcompliance");
         return ResponseEntity.ok(ApiResponse.success("Committee updated", committees.update(tenant(), id, req, uid(), uname())));
     }
 
     @PostMapping("/{id}/charter-review")
     @PreAuthorize(CAN_MANAGE)
-    public ResponseEntity<ApiResponse<CommitteeDetail>> reviewCharter(@PathVariable UUID id, @Valid @RequestBody CharterReviewRequest req) {
+    public ResponseEntity<ApiResponse<GovernanceDtos.CommitteeDetail>> reviewCharter(@PathVariable UUID id, @Valid @RequestBody GovernanceDtos.CharterReviewRequest req) {
         featureGuard.requireModule("legalcompliance");
         return ResponseEntity.ok(ApiResponse.success("Charter review recorded", committees.reviewCharter(tenant(), id, req, uid(), uname())));
     }
 
     @PostMapping("/{id}/dissolve")
     @PreAuthorize(CAN_MANAGE)
-    public ResponseEntity<ApiResponse<CommitteeDetail>> dissolve(@PathVariable UUID id, @Valid @RequestBody ReasonRequest req) {
+    public ResponseEntity<ApiResponse<GovernanceDtos.CommitteeDetail>> dissolve(@PathVariable UUID id, @Valid @RequestBody ReasonRequest req) {
         featureGuard.requireModule("legalcompliance");
         return ResponseEntity.ok(ApiResponse.success("Committee dissolved", committees.dissolve(tenant(), id, req, uid(), uname())));
     }
 
     @PostMapping("/{id}/members")
     @PreAuthorize(CAN_MANAGE)
-    public ResponseEntity<ApiResponse<CommitteeDetail>> addMember(@PathVariable UUID id, @Valid @RequestBody MemberRequest req) {
+    public ResponseEntity<ApiResponse<GovernanceDtos.CommitteeDetail>> addMember(@PathVariable UUID id, @Valid @RequestBody GovernanceDtos.MemberRequest req) {
         featureGuard.requireModule("legalcompliance");
         return ResponseEntity.ok(ApiResponse.success("Member added", committees.addMember(tenant(), id, req, uid(), uname())));
     }
 
     @PostMapping("/{id}/members/{memberId}/end")
     @PreAuthorize(CAN_MANAGE)
-    public ResponseEntity<ApiResponse<CommitteeDetail>> endMember(@PathVariable UUID id, @PathVariable UUID memberId, @Valid @RequestBody EndMemberRequest req) {
+    public ResponseEntity<ApiResponse<GovernanceDtos.CommitteeDetail>> endMember(@PathVariable UUID id, @PathVariable UUID memberId, @Valid @RequestBody GovernanceDtos.EndMemberRequest req) {
         featureGuard.requireModule("legalcompliance");
         return ResponseEntity.ok(ApiResponse.success("Membership ended", committees.endMember(tenant(), id, memberId, req, uid(), uname())));
     }
 
     @PostMapping("/{id}/meetings")
     @PreAuthorize(CAN_MANAGE)
-    public ResponseEntity<ApiResponse<MeetingDetail>> schedule(@PathVariable UUID id, @Valid @RequestBody MeetingRequest req) {
+    public ResponseEntity<ApiResponse<GovernanceDtos.MeetingDetail>> schedule(@PathVariable UUID id, @Valid @RequestBody GovernanceDtos.MeetingRequest req) {
         featureGuard.requireModule("legalcompliance");
         return ResponseEntity.ok(ApiResponse.success("Meeting scheduled", committees.scheduleMeeting(tenant(), id, req, uid(), uname())));
     }
 
     @PutMapping("/{id}/meetings/{mid}")
     @PreAuthorize(CAN_MANAGE)
-    public ResponseEntity<ApiResponse<MeetingDetail>> updateMeeting(@PathVariable UUID id, @PathVariable UUID mid, @Valid @RequestBody MeetingRequest req) {
+    public ResponseEntity<ApiResponse<GovernanceDtos.MeetingDetail>> updateMeeting(@PathVariable UUID id, @PathVariable UUID mid, @Valid @RequestBody GovernanceDtos.MeetingRequest req) {
         featureGuard.requireModule("legalcompliance");
         return ResponseEntity.ok(ApiResponse.success("Meeting updated", committees.updateMeeting(tenant(), id, mid, req, uid(), uname())));
     }
 
     @PostMapping("/{id}/meetings/{mid}/cancel")
     @PreAuthorize(CAN_MANAGE)
-    public ResponseEntity<ApiResponse<MeetingDetail>> cancel(@PathVariable UUID id, @PathVariable UUID mid, @Valid @RequestBody ReasonRequest req) {
+    public ResponseEntity<ApiResponse<GovernanceDtos.MeetingDetail>> cancel(@PathVariable UUID id, @PathVariable UUID mid, @Valid @RequestBody ReasonRequest req) {
         featureGuard.requireModule("legalcompliance");
         return ResponseEntity.ok(ApiResponse.success("Meeting cancelled", committees.cancelMeeting(tenant(), id, mid, req, uid(), uname())));
     }
 
     @PostMapping("/{id}/meetings/{mid}/hold")
     @PreAuthorize(CAN_MANAGE)
-    public ResponseEntity<ApiResponse<MeetingDetail>> hold(@PathVariable UUID id, @PathVariable UUID mid, @Valid @RequestBody HoldRequest req) {
+    public ResponseEntity<ApiResponse<GovernanceDtos.MeetingDetail>> hold(@PathVariable UUID id, @PathVariable UUID mid, @Valid @RequestBody GovernanceDtos.HoldRequest req) {
         featureGuard.requireModule("legalcompliance");
         return ResponseEntity.ok(ApiResponse.success("Meeting recorded", committees.holdMeeting(tenant(), id, mid, req, uid(), uname())));
     }
 
     @PostMapping("/{id}/meetings/{mid}/minutes")
     @PreAuthorize(CAN_MANAGE)
-    public ResponseEntity<ApiResponse<MeetingDetail>> minutes(@PathVariable UUID id, @PathVariable UUID mid, @Valid @RequestBody MinutesRequest req) {
+    public ResponseEntity<ApiResponse<GovernanceDtos.MeetingDetail>> minutes(@PathVariable UUID id, @PathVariable UUID mid, @Valid @RequestBody GovernanceDtos.MinutesRequest req) {
         featureGuard.requireModule("legalcompliance");
         return ResponseEntity.ok(ApiResponse.success("Minutes saved", committees.recordMinutes(tenant(), id, mid, req, uid(), uname())));
     }
 
     @PostMapping("/{id}/meetings/{mid}/minutes/approve")
     @PreAuthorize(CAN_MANAGE)
-    public ResponseEntity<ApiResponse<MeetingDetail>> approveMinutes(@PathVariable UUID id, @PathVariable UUID mid) {
+    public ResponseEntity<ApiResponse<GovernanceDtos.MeetingDetail>> approveMinutes(@PathVariable UUID id, @PathVariable UUID mid) {
         featureGuard.requireModule("legalcompliance");
         return ResponseEntity.ok(ApiResponse.success("Minutes approved", committees.approveMinutes(tenant(), id, mid, uid(), uname())));
     }
 
     @PostMapping("/{id}/meetings/{mid}/resolutions")
     @PreAuthorize(CAN_MANAGE)
-    public ResponseEntity<ApiResponse<MeetingDetail>> addResolution(@PathVariable UUID id, @PathVariable UUID mid, @Valid @RequestBody ResolutionRequest req) {
+    public ResponseEntity<ApiResponse<GovernanceDtos.MeetingDetail>> addResolution(@PathVariable UUID id, @PathVariable UUID mid, @Valid @RequestBody GovernanceDtos.ResolutionRequest req) {
         featureGuard.requireModule("legalcompliance");
         return ResponseEntity.ok(ApiResponse.success("Recorded", committees.addResolution(tenant(), id, mid, req, uid(), uname())));
     }
 
     @PutMapping("/{id}/meetings/{mid}/resolutions/{rid}")
     @PreAuthorize(CAN_MANAGE)
-    public ResponseEntity<ApiResponse<MeetingDetail>> updateResolution(@PathVariable UUID id, @PathVariable UUID mid, @PathVariable UUID rid, @Valid @RequestBody ResolutionRequest req) {
+    public ResponseEntity<ApiResponse<GovernanceDtos.MeetingDetail>> updateResolution(@PathVariable UUID id, @PathVariable UUID mid, @PathVariable UUID rid, @Valid @RequestBody GovernanceDtos.ResolutionRequest req) {
         featureGuard.requireModule("legalcompliance");
         return ResponseEntity.ok(ApiResponse.success("Updated", committees.updateResolution(tenant(), id, mid, rid, req, uid(), uname())));
     }
 
     @DeleteMapping("/{id}/meetings/{mid}/resolutions/{rid}")
     @PreAuthorize(CAN_MANAGE)
-    public ResponseEntity<ApiResponse<MeetingDetail>> removeResolution(@PathVariable UUID id, @PathVariable UUID mid, @PathVariable UUID rid) {
+    public ResponseEntity<ApiResponse<GovernanceDtos.MeetingDetail>> removeResolution(@PathVariable UUID id, @PathVariable UUID mid, @PathVariable UUID rid) {
         featureGuard.requireModule("legalcompliance");
         return ResponseEntity.ok(ApiResponse.success("Removed", committees.removeResolution(tenant(), id, mid, rid, uid(), uname())));
     }
 
     @PostMapping("/{id}/meetings/{mid}/resolutions/{rid}/complete")
     @PreAuthorize(CAN_MANAGE)
-    public ResponseEntity<ApiResponse<MeetingDetail>> complete(@PathVariable UUID id, @PathVariable UUID mid, @PathVariable UUID rid, @Valid @RequestBody CompleteRequest req) {
+    public ResponseEntity<ApiResponse<GovernanceDtos.MeetingDetail>> complete(@PathVariable UUID id, @PathVariable UUID mid, @PathVariable UUID rid, @Valid @RequestBody GovernanceDtos.CompleteRequest req) {
         featureGuard.requireModule("legalcompliance");
         return ResponseEntity.ok(ApiResponse.success("Action completed", committees.completeAction(tenant(), id, mid, rid, req, uid(), uname())));
     }

@@ -8,6 +8,8 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import za.co.handyflow.platform.billing.FeatureGuard;
 import za.co.handyflow.platform.legalcompliance.application.internal.EthicsService;
+import za.co.handyflow.platform.legalcompliance.domain.model.DeclarationStatus;
+import za.co.handyflow.platform.legalcompliance.domain.model.GiftStatus;
 import za.co.handyflow.platform.legalcompliance.dto.AssuranceDtos.ReasonRequest;
 import za.co.handyflow.platform.legalcompliance.dto.EthicsDtos.*;
 import za.co.handyflow.platform.shared.ApiResponse;

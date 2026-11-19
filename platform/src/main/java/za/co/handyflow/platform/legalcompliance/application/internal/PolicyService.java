@@ -176,11 +176,11 @@ public class PolicyService {
         return new PolicyDetailResponse(view(tenantId, p), versions.findByPolicy(tenantId, p.getId()).stream().map(v -> VersionResponse.of(v, true)).toList());
     }
 
-    private PolicyResponse view(TenantId tenantId, Policy p) {
+    private ExpensePolicyDtos.PolicyResponse view(TenantId tenantId, Policy p) {
         LocalDate today = LocalDate.now();
         PolicyVersion published = p.getPublishedVersionId() == null ? null : versions.findPublished(tenantId, p.getId()).orElse(null);
         PolicyVersion open = versions.findOpen(tenantId, p.getId()).orElse(null);
-        return new PolicyResponse(p.getId(), p.getReference(), p.getTitle(), p.getPolicyType(), p.getOwnerName(), p.getReviewMonths(), p.getStatus(),
+        return new ExpensePolicyDtos.PolicyResponse(p.getId(), p.getReference(), p.getTitle(), p.getPolicyType(), p.getOwnerName(), p.getReviewMonths(), p.getStatus(),
                 published == null ? null : published.getVersionNumber(), published == null ? null : published.getEffectiveDate(), p.getNextReviewDue(),
                 GovernanceRules.reviewOverdue(p.getNextReviewDue(), p.isActive(), today), GovernanceRules.reviewDueSoon(p.getNextReviewDue(), p.isActive(), today),
                 open == null ? null : open.getStatus(), open == null ? null : open.getVersionNumber(), p.getRetiredReason(), campaigns.findOpenForPolicy(tenantId, p.getId()).size());

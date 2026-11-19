@@ -2,6 +2,8 @@ package za.co.handyflow.platform.notifications.domain.repository;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import za.co.handyflow.platform.legalcompliance.domain.model.GrcLink;
+import za.co.handyflow.platform.legalcompliance.domain.model.GrcLinkType;
 import za.co.handyflow.platform.shared.TenantId;
 
 import java.util.List;
