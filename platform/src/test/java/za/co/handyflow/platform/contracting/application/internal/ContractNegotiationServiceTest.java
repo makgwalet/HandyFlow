@@ -84,7 +84,7 @@ class ContractNegotiationServiceTest {
 
         linkRepo = mock(ContractNegotiationLinkRepository.class);
         approvals = mock(ContractApprovalService.class);
-        service = new ContractNegotiationService(contractRepo, partyRepo, nRepo, pRepo, cRepo, eRepo, linkRepo, redline, hashing, mock(org.springframework.context.ApplicationEventPublisher.class), approvals);
+        service = new ContractNegotiationService(contractRepo, partyRepo, nRepo, pRepo, cRepo, eRepo, linkRepo, redline, hashing, mock(org.springframework.context.ApplicationEventPublisher.class), approvals, mock(ContractAuthorityService.class));
     }
 
     UUID cid() { return contract.getId(); }

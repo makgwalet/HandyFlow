@@ -35,6 +35,7 @@ class SignOnBehalfApprovalTest {
     @Mock SigningPolicy signingPolicy;
     @Mock OtpService otpService;
     @Mock ContractApprovalService approvals;
+    @Mock ContractAuthorityService authority;
     @Mock OtpRateLimitRepository otpRateLimitRepo;
     @InjectMocks ContractingService service;
 
@@ -81,5 +82,23 @@ class SignOnBehalfApprovalTest {
                 () -> service.signContract(tenant, contractId, partyId, request(), "10.0.0.1", "agent", staff));
         verify(approvals).assertApproved(tenant, ApprovalAction.SIGN_ON_BEHALF, partyId);
         verify(approvals, never()).consume(any(), any(), any(), any());
+    }
+
+    @Test
+    void signingForSomeoneElseNeedsSigningAuthorityBeforeAnythingElseHappens() {
+        doThrow(new org.springframework.security.access.AccessDeniedException("Not authorised to sign this contract. Your authority does not include sign."))
+                .when(authority).assertCurrentUser(eq(tenant), eq(za.co.handyflow.platform.contracting.domain.model.AuthorityAction.SIGN), any());
+        assertThrows(org.springframework.security.access.AccessDeniedException.class,
+                () -> service.signContract(tenant, contractId, partyId, request(), "10.0.0.1", "agent", staff));
+        verifyNoInteractions(otpService);
+        verify(approvals, never()).assertApproved(any(), any(), any());
+    }
+
+    @Test
+    void aSignatureTheCounterpartyGivesForThemselvesNeverAsksForAuthority() {
+        when(otpService.verify(eq(partyId.toString()), anyString())).thenReturn(false);
+        assertThrows(IllegalArgumentException.class,
+                () -> service.signContract(tenant, contractId, partyId, request(), "10.0.0.1", "agent", null));
+        verifyNoInteractions(authority);
     }
 }

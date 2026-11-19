@@ -31,6 +31,7 @@ public class ContractObligationService {
     private final ContractObligationRepository obligationRepo;
     private final ContractRenewalDecisionRepository decisionRepo;
     private final ContractNumberGenerator numberGen;
+    private final ContractAuthorityService authority;
 
     // ── Obligations ──────────────────────────────────────────────────────────
 
@@ -142,6 +143,7 @@ public class ContractObligationService {
         String decision = req.decision() == null ? "" : req.decision().trim().toUpperCase();
         UUID successorId = null;
         if ("RENEW".equals(decision)) {
+            authority.assertCurrentUser(tenantId, AuthorityAction.RENEW, c);
             boolean already = decisionRepo.findByTenantIdAndContractIdOrderByDecidedAtDesc(tenantId.getValue(), contractId).stream()
                     .anyMatch(d -> d.getSuccessorContractId() != null);
             if (already) throw new IllegalStateException("A renewal draft was already created for this contract");

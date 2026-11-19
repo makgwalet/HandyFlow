@@ -134,7 +134,7 @@ final class NegotiationHarness {
         when(otp.verify(anyString(), anyString())).thenAnswer(i -> "123456".equals(i.<String>getArgument(1)));
         when(sms.send(anyString(), anyString())).thenReturn(true);
 
-        service = new ContractNegotiationService(contractRepo, partyRepo, negotiationRepo, proposalRepo, commentRepo, eventRepo, linkRepo, redline, hashing, publisher, approvals);
+        service = new ContractNegotiationService(contractRepo, partyRepo, negotiationRepo, proposalRepo, commentRepo, eventRepo, linkRepo, redline, hashing, publisher, approvals, mock(ContractAuthorityService.class));
         access = new ContractNegotiationAccessService(contractRepo, partyRepo, negotiationRepo, linkRepo, sessionRepo, eventRepo, service, otp, limiter, email, sms);
         org.springframework.test.util.ReflectionTestUtils.setField(access, "baseUrl", "https://app.test");
         org.springframework.test.util.ReflectionTestUtils.setField(access, "linkValidityDays", 14);

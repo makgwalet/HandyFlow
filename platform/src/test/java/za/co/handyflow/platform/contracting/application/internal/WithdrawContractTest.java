@@ -39,6 +39,7 @@ class WithdrawContractTest {
     @Mock ContractApprovalService approvals;
     @Mock EmailService emailService;
     @Mock SigningPolicy signingPolicy;
+    @Mock ContractAuthorityService authority;
     @Mock SigningTokenService signingTokenService;
     @InjectMocks ContractingService service;
 

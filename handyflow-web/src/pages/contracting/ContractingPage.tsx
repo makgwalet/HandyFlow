@@ -6,6 +6,7 @@ import ContractsDashboard from './ContractsDashboard'
 import ContractsTab       from './ContractsTab'
 import TemplatesTab       from './TemplatesTab'
 import ApprovalsTab       from './ApprovalsTab'
+import AuthorityTab       from './AuthorityTab'
 import ClausesTab         from './ClausesTab'
 import RiskRulesTab       from './RiskRulesTab'
 import ObligationsTab     from './ObligationsTab'
@@ -54,6 +55,7 @@ export default function ContractingPage() {
           case 'contracts': return <ContractsTab />
           case 'templates': return <TemplatesTab />
           case 'approvals': return <ApprovalsTab />
+          case 'authority': return <AuthorityTab />
           case 'clauses':     return <ClausesTab />
           case 'risk-rules':  return <RiskRulesTab />
           case 'obligations': return <ObligationsTab />

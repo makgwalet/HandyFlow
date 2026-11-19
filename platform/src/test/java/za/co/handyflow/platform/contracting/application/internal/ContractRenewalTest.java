@@ -29,6 +29,7 @@ import static org.mockito.Mockito.*;
 class ContractRenewalTest {
 
     @Mock ContractRepository contractRepo;
+    @Mock ContractAuthorityService authority;
     @Mock ContractPartyRepository partyRepo;
     @Mock ContractObligationRepository obligationRepo;
     @Mock ContractRenewalDecisionRepository decisionRepo;

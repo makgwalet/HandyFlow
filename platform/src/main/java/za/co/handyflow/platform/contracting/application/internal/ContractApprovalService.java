@@ -37,6 +37,7 @@ public class ContractApprovalService {
     private final ContractClauseRepository clauseRepo;
     private final ContractTemplateRepository templateRepo;
     private final ContractNegotiationProposalRepository proposalRepo;
+    private final ContractAuthorityService authority;
 
     public record EffectivePolicy(ApprovalAction action, boolean required, boolean allowSoleUserException, boolean isDefault) {}
 
@@ -99,6 +100,7 @@ public class ContractApprovalService {
             approvalRepo.save(a);
             throw new IllegalStateException("It has changed since it was requested; ask for approval again");
         }
+        requireAuthority(tenantId, a, by, authorities);
         a.approve(by, note, soleUserException, exceptionReason, policy(tenantId, a.getAction()).allowSoleUserException());
         event(a, a.isSoleUserException() ? "APPROVED_SOLE_USER_EXCEPTION" : "APPROVED", by,
                 a.isSoleUserException() ? "Reason: " + a.getExceptionReason() : note);
@@ -183,6 +185,28 @@ public class ContractApprovalService {
     }
 
     // ── internals ────────────────────────────────────────────────────────────
+
+    /**
+     * When the organisation enforces delegated authority, the person approving must hold authority for what is being approved, up to the
+     * contract's value. Approving a template or clause is not contract authority (it is governed by the templates permission and legal review).
+     */
+    private void requireAuthority(TenantId tenantId, ContractApproval a, UUID by, Collection<String> roles) {
+        AuthorityAction needed = switch (a.getAction()) {
+            case SEND_FOR_SIGNING, WITHDRAW -> AuthorityAction.APPROVE;
+            case ACCEPT_COUNTERPARTY_REDLINE -> AuthorityAction.NEGOTIATE;
+            case SIGN_ON_BEHALF -> AuthorityAction.SIGN;
+            case TERMINATE -> AuthorityAction.TERMINATE;
+            default -> null;
+        };
+        if (needed == null) return;
+        Optional<Contract> contract = switch (a.getAction().subjectType()) {
+            case "CONTRACT" -> contractRepo.findActiveById(tenantId, a.getSubjectId());
+            case "PROPOSAL" -> proposalRepo.findByTenantIdAndId(tenantId.getValue(), a.getSubjectId()).flatMap(p -> contractRepo.findActiveById(tenantId, p.getContractId()));
+            case "PARTY" -> partyRepo.findByTenantAndId(tenantId, a.getSubjectId()).flatMap(p -> contractRepo.findActiveById(tenantId, p.getContractId()));
+            default -> Optional.<Contract>empty();
+        };
+        contract.ifPresent(c -> authority.assertAuthorised(tenantId, by, roles, needed, ContractAuthorityService.contextOf(c)));
+    }
 
     private void requireApprover(ContractApproval a, Collection<String> authorities) {
         if (!a.getAction().canBeDecidedBy(authorities))

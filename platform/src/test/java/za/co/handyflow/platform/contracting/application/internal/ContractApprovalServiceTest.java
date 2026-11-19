@@ -29,6 +29,7 @@ class ContractApprovalServiceTest {
     @Mock ContractClauseRepository clauseRepo;
     @Mock ContractTemplateRepository templateRepo;
     @Mock ContractNegotiationProposalRepository proposalRepo;
+    @Mock ContractAuthorityService authority;
     ContractApprovalService service;
 
     TenantId tenant = TenantId.generate();
@@ -38,7 +39,7 @@ class ContractApprovalServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new ContractApprovalService(policyRepo, approvalRepo, eventRepo, contractRepo, partyRepo, clauseRepo, templateRepo, proposalRepo);
+        service = new ContractApprovalService(policyRepo, approvalRepo, eventRepo, contractRepo, partyRepo, clauseRepo, templateRepo, proposalRepo, authority);
         contract = Contract.create(tenant, "CTR-1", "Services", "SERVICE", "<p>Original</p>", null, maker);
         lenient().when(contractRepo.findActiveById(tenant, contract.getId())).thenReturn(Optional.of(contract));
         lenient().when(partyRepo.findByContract(contract.getId())).thenReturn(List.of());
@@ -311,5 +312,37 @@ class ContractApprovalServiceTest {
     @Test
     void theHashDoesNotConfuseShiftedFieldBoundaries() {
         assertNotEquals(ContractApprovalService.sha256(List.of("ab", "c")), ContractApprovalService.sha256(List.of("a", "bc")));
+    }
+
+    // ── delegated authority ──
+
+    @Test
+    void anApproverWithoutAuthorityForThisContractCannotApproveAndNothingIsApproved() {
+        ContractApproval a = requested();
+        doThrow(new org.springframework.security.access.AccessDeniedException("Not authorised to approve this contract. This contract is worth more than your limit of R100000."))
+                .when(authority).assertAuthorised(eq(tenant), eq(checker), any(), eq(AuthorityAction.APPROVE), any());
+        var e = assertThrows(org.springframework.security.access.AccessDeniedException.class,
+                () -> service.approve(tenant, a.getId(), checker, MANAGER, null, false, null));
+        assertTrue(e.getMessage().contains("limit"));
+        assertFalse(a.isApproved());
+    }
+
+    @Test
+    void authorityIsCheckedForTheKindOfThingBeingApproved() {
+        ContractApproval a = requested();
+        service.approve(tenant, a.getId(), checker, MANAGER, null, false, null);
+        verify(authority).assertAuthorised(eq(tenant), eq(checker), eq(MANAGER), eq(AuthorityAction.APPROVE), any());
+    }
+
+    @Test
+    void approvingATemplateIsNotContractAuthority() {
+        ContractTemplate t = mock(ContractTemplate.class);
+        UUID id = UUID.randomUUID();
+        lenient().when(t.getId()).thenReturn(id);
+        lenient().when(t.getName()).thenReturn("NDA");
+        lenient().when(templateRepo.findActiveById(tenant, id)).thenReturn(Optional.of(t));
+        ContractApproval a = service.request(tenant, ApprovalAction.PUBLISH_TEMPLATE, id, maker, null);
+        service.approve(tenant, a.getId(), checker, Set.of("CONTRACTS_TEMPLATES"), null, false, null);
+        verifyNoInteractions(authority);
     }
 }

@@ -57,7 +57,8 @@ public class ContractingService {
     private final ContractRiskService            riskService;   // risk rules that block sending
     private final ContractNegotiationService     negotiationService; // counterparty negotiation: blocks sending while proposals wait
     private final ContractRecordsService         records;   // executed copy + records retention (V581)
-    private final ContractWithdrawalRepository   withdrawalRepo;   // immutable record of each withdrawn signing attempt
+    private final ContractWithdrawalRepository   withdrawalRepo;
+    private final ContractAuthorityService       authority;       // delegated authority (enforced only when the organisation turns it on)   // immutable record of each withdrawn signing attempt
 
     @Value("${contracting.signing.base-url:http://localhost:5173}")
     private String baseUrl;
@@ -639,6 +640,7 @@ public class ContractingService {
     @Transactional
     public ContractResponse terminate(TenantId tenantId, UUID id, String reason) {
         Contract c = findActive(tenantId, id);
+        authority.assertCurrentUser(tenantId, AuthorityAction.TERMINATE, c);
         approvals.assertApproved(tenantId, ApprovalAction.TERMINATE, id);
         c.terminate(reason);
         contractRepo.save(c);
@@ -855,6 +857,8 @@ public class ContractingService {
                 .findFirst()
                 .orElseThrow(() -> new ResourceNotFoundException("Party", partyId.toString()));
 
+        // Signing for someone else needs signing authority when the organisation enforces delegated authority; approval authority is not enough.
+        if (witnessedByUserId != null) authority.assertCurrentUser(tenantId, AuthorityAction.SIGN, c);
         // Staff recording a signature for someone else can be put behind a second person's approval (off unless the tenant switches it on).
         if (witnessedByUserId != null) approvals.assertApproved(tenantId, ApprovalAction.SIGN_ON_BEHALF, partyId);
 
