@@ -28,6 +28,7 @@ import {
   UserPlus, Mail, KeyRound, Layers,
   BarChart3, FileSignature, Undo2, ShieldAlert, PackageSearch,
   Workflow,
+  GitCompare, BookMarked, ShieldHalf, ScrollText, HeartHandshake, BadgeCheck, LifeBuoy, Leaf, Flag,
 } from 'lucide-react'
 
 export interface ModuleSection {
@@ -540,17 +541,78 @@ export const LEGAL_COMPLIANCE_SECTIONS: ModuleSections = {
   icon: Scale,
   defaultSection: 'dashboard',
   groups: [
-    { label: 'Overview', sections: [{ id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard }] },
     {
-      label: 'Compliance',
+      label: 'Overview',
       sections: [
+        { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+        { id: 'executive', label: 'Executive overview', icon: Gauge },
+      ],
+    },
+    {
+      label: 'Regulatory',
+      sections: [
+        { id: 'regulatory', label: 'Regulatory register', icon: BookMarked },
+        { id: 'applicability', label: 'Applicability', icon: ListChecks },
+        { id: 'changes', label: 'Regulatory changes', icon: GitCompare },
         { id: 'obligations', label: 'Obligations', icon: ClipboardList },
-        { id: 'popia', label: 'POPIA Register', icon: Lock },
-        { id: 'dsar', label: 'DSAR Requests', icon: FileSearch },
         { id: 'calendar', label: 'Calendar', icon: CalendarDays },
       ],
     },
-    { label: 'Legal matters', sections: [{ id: 'litigation', label: 'Litigation', icon: Gavel }] },
+    {
+      label: 'Risk & controls',
+      sections: [
+        { id: 'risks', label: 'Risk register', icon: ShieldAlert },
+        { id: 'controls', label: 'Controls', icon: ShieldCheck },
+        { id: 'testing', label: 'Control testing', icon: FlaskConical },
+      ],
+    },
+    {
+      label: 'Assurance',
+      sections: [
+        { id: 'audits', label: 'Audits', icon: ClipboardCheck },
+        { id: 'findings', label: 'Findings', icon: Flag },
+        { id: 'capa', label: 'Corrective actions', icon: Wrench },
+      ],
+    },
+    {
+      label: 'Governance',
+      sections: [
+        { id: 'policies', label: 'Policies', icon: ScrollText },
+        { id: 'attestations', label: 'Attestations', icon: FileSignature },
+        { id: 'committees', label: 'Committees', icon: Users },
+        { id: 'ethics', label: 'Conflicts & ethics', icon: HeartHandshake },
+        { id: 'licences', label: 'Licences & permits', icon: BadgeCheck },
+      ],
+    },
+    {
+      label: 'Privacy & incidents',
+      sections: [
+        { id: 'privacy', label: 'Privacy & PAIA', icon: ShieldHalf },
+        { id: 'popia', label: 'POPIA register', icon: Lock },
+        { id: 'dsar', label: 'DSAR requests', icon: FileSearch },
+        { id: 'incidents', label: 'Incidents', icon: Siren },
+        { id: 'fica', label: 'FICA', icon: Landmark, anyPermission: ['LEGALCOMPLIANCE_FICA_MANAGE', 'LEGALCOMPLIANCE_ADMIN'] },
+      ],
+    },
+    {
+      label: 'Third parties & matters',
+      sections: [
+        { id: 'thirdparties', label: 'Third parties', icon: Building2 },
+        { id: 'litigation', label: 'Litigation', icon: Gavel },
+        {
+          id: 'providers', label: 'Clients & providers', icon: Handshake,
+          anyPermission: ['LEGALCOMPLIANCE_PROVIDER_MANAGE', 'LEGALCOMPLIANCE_PROVIDER_CONSULT', 'LEGALCOMPLIANCE_ADMIN'],
+        },
+      ],
+    },
+    {
+      label: 'Resilience & ESG',
+      sections: [
+        { id: 'continuity', label: 'Business continuity', icon: LifeBuoy },
+        { id: 'esg', label: 'ESG', icon: Leaf },
+      ],
+    },
+    { label: 'Insights', sections: [{ id: 'reports', label: 'Reports', icon: FileBarChart }] },
   ],
 }
 

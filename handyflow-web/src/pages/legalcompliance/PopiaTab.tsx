@@ -57,7 +57,9 @@ async function downloadPdf() {
 
 export default function PopiaTab() {
   const qc = useQueryClient()
-  const canManage = usePermission("LEGALCOMPLIANCE_MANAGE") || usePermission("LEGALCOMPLIANCE_ADMIN")
+  const hasManagePerm = usePermission("LEGALCOMPLIANCE_MANAGE")
+  const hasAdminPerm = usePermission("LEGALCOMPLIANCE_ADMIN")
+  const canManage = hasManagePerm || hasAdminPerm
   const canAdmin = usePermission("LEGALCOMPLIANCE_ADMIN")
 
   const [filterActive, setFilterActive] = useState<"ALL" | "ACTIVE" | "INACTIVE">("ACTIVE")
@@ -133,7 +135,7 @@ export default function PopiaTab() {
     border: `1.5px solid ${fieldErrors[k] ? "var(--hf-danger)" : "var(--hf-border)"}`,
     borderRadius: 8, fontSize: 14, background: fieldErrors[k] ? "var(--hf-danger-soft)" : "var(--hf-surface)", outline: "none",
   })
-  const FErr = ({ k }: { k: string }) => fieldErrors[k] ? (
+  const fErr = (k: string) => fieldErrors[k] ? (
     <div style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 12, color: "var(--hf-danger-text)", marginTop: 4 }}><AlertCircle size={12} />{fieldErrors[k]}</div>
   ) : null
 
@@ -254,7 +256,7 @@ export default function PopiaTab() {
             <div style={{ marginBottom: 14 }}>
               <label style={lbl}>Activity name *</label>
               <input autoFocus value={form.activityName} onChange={e => { setForm(f => ({ ...f, activityName: e.target.value })); setFieldErrors(f => omit(f, "activityName")) }} placeholder="Customer marketing database" style={inp("activityName")} />
-              <FErr k="activityName" />
+              {fErr("activityName")}
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
               <div>
@@ -310,7 +312,7 @@ export default function PopiaTab() {
               <div>
                 <label style={lbl}>Cross-border details *</label>
                 <textarea value={form.crossBorderDetails} onChange={e => { setForm(f => ({ ...f, crossBorderDetails: e.target.value })); setFieldErrors(f => omit(f, "crossBorderDetails")) }} rows={2} style={{ ...inp("crossBorderDetails"), resize: "vertical" as const }} placeholder="Destination country, safeguards in place, recipient..." />
-                <FErr k="crossBorderDetails" />
+                {fErr("crossBorderDetails")}
                 <div style={{ fontSize: 11, color: "var(--hf-text-faint)", marginTop: 4 }}>Required under POPIA s72 whenever cross-border transfer is enabled.</div>
               </div>
             )}
@@ -341,7 +343,7 @@ export default function PopiaTab() {
   )
 }
 
-function Overlay({ onClose: _onClose, children }: { onClose: () => void; children: React.ReactNode }) {
+function Overlay({ children }: { onClose?: () => void; children: React.ReactNode }) {
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, backdropFilter: "blur(2px)" }}>
       <div style={{ background: "var(--hf-surface)", borderRadius: 16, padding: 28, width: 640, maxHeight: "92vh", overflowY: "auto", boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>{children}</div>

@@ -27,7 +27,7 @@ const SOURCE_CFG: Record<string, { color: string; bg: string; label: string }> =
 const OPEN_LITIGATION_STATUSES = new Set(["OPEN", "IN_PROGRESS"])
 const OPEN_DSAR_STATUSES = new Set(["RECEIVED", "IN_PROGRESS"])
 
-type Tab = "dashboard" | "obligations" | "litigation" | "popia" | "dsar" | "calendar"
+type Tab = string
 
 export default function LegalComplianceDashboard({ onNavigate }: { onNavigate: (t: Tab) => void }) {
   const { data: obligations = [] } = useQuery<any[]>({

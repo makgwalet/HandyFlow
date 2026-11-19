@@ -67,7 +67,9 @@ async function downloadPdf() {
 
 export default function ObligationsTab() {
   const qc = useQueryClient()
-  const canManage = usePermission("LEGALCOMPLIANCE_MANAGE") || usePermission("LEGALCOMPLIANCE_ADMIN")
+  const hasManagePerm = usePermission("LEGALCOMPLIANCE_MANAGE")
+  const hasAdminPerm = usePermission("LEGALCOMPLIANCE_ADMIN")
+  const canManage = hasManagePerm || hasAdminPerm
   const canAdmin = usePermission("LEGALCOMPLIANCE_ADMIN")
 
   const [filterStatus, setFilterStatus] = useState("ALL")
@@ -161,7 +163,7 @@ export default function ObligationsTab() {
     border: `1.5px solid ${fieldErrors[k] ? "var(--hf-danger)" : "var(--hf-border)"}`,
     borderRadius: 8, fontSize: 14, background: fieldErrors[k] ? "var(--hf-danger-soft)" : "var(--hf-surface)", outline: "none",
   })
-  const FErr = ({ k }: { k: string }) => fieldErrors[k] ? (
+  const fErr = (k: string) => fieldErrors[k] ? (
     <div style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 12, color: "var(--hf-danger-text)", marginTop: 4 }}>
       <AlertCircle size={12} />{fieldErrors[k]}
     </div>
@@ -285,7 +287,7 @@ export default function ObligationsTab() {
             <div style={{ marginBottom: 14 }}>
               <label style={lbl}>Title *</label>
               <input autoFocus value={form.title} onChange={e => { setForm(f => ({ ...f, title: e.target.value })); setFieldErrors(f => omit(f, "title")) }} placeholder="Annual POPIA Information Officer registration" style={inp("title")} />
-              <FErr k="title" />
+              {fErr("title")}
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
               <div>
@@ -315,7 +317,7 @@ export default function ObligationsTab() {
               <div>
                 <label style={lbl}>Review date *</label>
                 <input type="date" value={form.reviewDate} onChange={e => { setForm(f => ({ ...f, reviewDate: e.target.value })); setFieldErrors(f => omit(f, "reviewDate")) }} style={inp("reviewDate")} />
-                <FErr k="reviewDate" />
+                {fErr("reviewDate")}
               </div>
               <div>
                 <label style={lbl}>Recurrence *</label>
@@ -405,7 +407,7 @@ export default function ObligationsTab() {
   )
 }
 
-function Overlay({ onClose: _onClose, children }: { onClose: () => void; children: React.ReactNode }) {
+function Overlay({ children }: { onClose?: () => void; children: React.ReactNode }) {
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, backdropFilter: "blur(2px)" }}>
       <div style={{ background: "var(--hf-surface)", borderRadius: 16, padding: 28, width: 620, maxHeight: "92vh", overflowY: "auto", boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>{children}</div>

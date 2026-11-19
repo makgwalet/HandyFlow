@@ -114,7 +114,9 @@ function EvidenceSection({ matterId, canManage }: { matterId: string; canManage:
 
 export default function LitigationTab() {
   const qc = useQueryClient()
-  const canManage = usePermission("LEGALCOMPLIANCE_MANAGE") || usePermission("LEGALCOMPLIANCE_ADMIN")
+  const hasManagePerm = usePermission("LEGALCOMPLIANCE_MANAGE")
+  const hasAdminPerm = usePermission("LEGALCOMPLIANCE_ADMIN")
+  const canManage = hasManagePerm || hasAdminPerm
   const canAdmin = usePermission("LEGALCOMPLIANCE_ADMIN")
 
   const [filterStatus, setFilterStatus] = useState("ALL")
@@ -210,7 +212,7 @@ export default function LitigationTab() {
     border: `1.5px solid ${fieldErrors[k] ? "var(--hf-danger)" : "var(--hf-border)"}`,
     borderRadius: 8, fontSize: 14, background: fieldErrors[k] ? "var(--hf-danger-soft)" : "var(--hf-surface)", outline: "none",
   })
-  const FErr = ({ k }: { k: string }) => fieldErrors[k] ? (
+  const fErr = (k: string) => fieldErrors[k] ? (
     <div style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 12, color: "var(--hf-danger-text)", marginTop: 4 }}><AlertCircle size={12} />{fieldErrors[k]}</div>
   ) : null
 
@@ -348,7 +350,7 @@ export default function LitigationTab() {
             <div style={{ marginBottom: 14 }}>
               <label style={lbl}>Title *</label>
               <input autoFocus value={form.title} onChange={e => { setForm(f => ({ ...f, title: e.target.value })); setFieldErrors(f => omit(f, "title")) }} placeholder="Dismissal dispute — J. Nkosi" style={inp("title")} />
-              <FErr k="title" />
+              {fErr("title")}
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
               <div>
@@ -362,7 +364,7 @@ export default function LitigationTab() {
               <div>
                 <label style={lbl}>Opposing party *</label>
                 <input value={form.opposingParty} onChange={e => { setForm(f => ({ ...f, opposingParty: e.target.value })); setFieldErrors(f => omit(f, "opposingParty")) }} style={inp("opposingParty")} />
-                <FErr k="opposingParty" />
+                {fErr("opposingParty")}
               </div>
               <div>
                 <label style={lbl}>Our side</label>
@@ -392,7 +394,7 @@ export default function LitigationTab() {
               <div>
                 <label style={lbl}>{editing ? "Opened date" : "Opened date *"}</label>
                 {editing ? <div style={{ ...inp("_"), background: "var(--hf-surface-sunken)", color: "var(--hf-text-muted)" }}>{fmtDate(editing.openedDate)}</div> : (
-                  <><input type="date" value={form.openedDate} onChange={e => { setForm(f => ({ ...f, openedDate: e.target.value })); setFieldErrors(f => omit(f, "openedDate")) }} style={inp("openedDate")} /><FErr k="openedDate" /></>
+                  <><input type="date" value={form.openedDate} onChange={e => { setForm(f => ({ ...f, openedDate: e.target.value })); setFieldErrors(f => omit(f, "openedDate")) }} style={inp("openedDate")} />{fErr("openedDate")}</>
                 )}
               </div>
               <div style={{ gridColumn: editing ? "1 / -1" : undefined }}>
@@ -483,7 +485,7 @@ export default function LitigationTab() {
   )
 }
 
-function Overlay({ onClose: _onClose, children }: { onClose: () => void; children: React.ReactNode }) {
+function Overlay({ children }: { onClose?: () => void; children: React.ReactNode }) {
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, backdropFilter: "blur(2px)" }}>
       <div style={{ background: "var(--hf-surface)", borderRadius: 16, padding: 28, width: 640, maxHeight: "92vh", overflowY: "auto", boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>{children}</div>

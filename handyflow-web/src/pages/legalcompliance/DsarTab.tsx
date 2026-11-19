@@ -114,7 +114,9 @@ function EvidenceSection({ requestId, canManage }: { requestId: string; canManag
 
 export default function DsarTab() {
   const qc = useQueryClient()
-  const canManage = usePermission("LEGALCOMPLIANCE_MANAGE") || usePermission("LEGALCOMPLIANCE_ADMIN")
+  const hasManagePerm = usePermission("LEGALCOMPLIANCE_MANAGE")
+  const hasAdminPerm = usePermission("LEGALCOMPLIANCE_ADMIN")
+  const canManage = hasManagePerm || hasAdminPerm
   const canAdmin = usePermission("LEGALCOMPLIANCE_ADMIN")
 
   const [filterStatus, setFilterStatus] = useState("ALL")
@@ -192,7 +194,7 @@ export default function DsarTab() {
     border: `1.5px solid ${fieldErrors[k] ? "var(--hf-danger)" : "var(--hf-border)"}`,
     borderRadius: 8, fontSize: 14, background: fieldErrors[k] ? "var(--hf-danger-soft)" : "var(--hf-surface)", outline: "none",
   })
-  const FErr = ({ k }: { k: string }) => fieldErrors[k] ? (
+  const fErr = (k: string) => fieldErrors[k] ? (
     <div style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 12, color: "var(--hf-danger-text)", marginTop: 4 }}><AlertCircle size={12} />{fieldErrors[k]}</div>
   ) : null
 
@@ -349,7 +351,7 @@ export default function DsarTab() {
           <div style={{ marginBottom: 14 }}>
             <label style={lbl}>Requester name *</label>
             <input autoFocus value={form.requesterName} onChange={e => { setForm(f => ({ ...f, requesterName: e.target.value })); setFieldErrors(f => omit(f, "requesterName")) }} style={inp("requesterName")} />
-            <FErr k="requesterName" />
+            {fErr("requesterName")}
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 14 }}>
             <div>
@@ -364,7 +366,7 @@ export default function DsarTab() {
           <div>
             <label style={lbl}>Received date *</label>
             <input type="date" value={form.receivedDate} onChange={e => { setForm(f => ({ ...f, receivedDate: e.target.value })); setFieldErrors(f => omit(f, "receivedDate")) }} style={inp("receivedDate")} />
-            <FErr k="receivedDate" />
+            {fErr("receivedDate")}
           </div>
           {apiError && <ErrBanner msg={apiError} />}
           <MFoot
@@ -414,7 +416,7 @@ export default function DsarTab() {
   )
 }
 
-function Overlay({ onClose: _onClose, children }: { onClose: () => void; children: React.ReactNode }) {
+function Overlay({ children }: { onClose?: () => void; children: React.ReactNode }) {
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, backdropFilter: "blur(2px)" }}>
       <div style={{ background: "var(--hf-surface)", borderRadius: 16, padding: 28, width: 600, maxHeight: "92vh", overflowY: "auto", boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>{children}</div>
