@@ -7,6 +7,7 @@ import { apiClient } from '../../api/client'
 import { Plus, X } from 'lucide-react'
 import { usePermissions } from '../../hooks/usePermission'
 import { sanitizeHtml } from './sanitizeHtml'
+import { clauseFormProblem, publishBlocker, kindLabel, needsApprovalMessage, CLAUSE_KINDS } from './clauseRules'
 import { RichTextEditor } from './RichTextEditor'
 import { hasContent } from './richText'
 
@@ -17,6 +18,7 @@ export interface Clause {
   reviewerName?: string | null; reviewerProfessionalDetails?: string | null; reviewDate?: string | null; nextReviewDate?: string | null
   reviewNotes?: string | null; withdrawnReason?: string | null; usable: boolean
   evidenceDocumentId?: string | null; evidenceFileName?: string | null
+  clauseKind?: string; sourceReference?: string | null; evidenceRequired?: boolean; evidenceRequiredReason?: string | null
 }
 
 const CLAUSE_CATEGORIES = [
@@ -39,7 +41,7 @@ const errMsg = (e: unknown, fallback: string): string =>
   (e as { response?: { data?: { message?: string } } })?.response?.data?.message ?? fallback
 const list = <T,>(r: { data?: { data?: T } & T }): T => (r.data?.data ?? r.data) as T
 
-const EMPTY = { title: '', category: 'OTHER', body: '', legalArea: '', jurisdiction: 'South Africa' }
+const EMPTY = { title: '', category: 'OTHER', body: '', legalArea: '', jurisdiction: 'South Africa', clauseKind: 'STANDARD', sourceReference: '' }
 const EMPTY_REVIEW = { reviewerName: '', reviewerProfessionalDetails: '', reviewDate: new Date().toISOString().slice(0, 10), nextReviewDate: '', notes: '' }
 
 export default function ClausesTab() {
@@ -53,6 +55,7 @@ export default function ClausesTab() {
   const [review, setReview] = useState(EMPTY_REVIEW)
   const [reviewFile, setReviewFile] = useState<File | null>(null)
   const [error, setError] = useState('')
+  const [askFor, setAskFor] = useState<string | null>(null)
 
   const { data: clauses = [], isLoading } = useQuery<Clause[]>({
     queryKey: ['contract-clauses', category],
@@ -67,8 +70,17 @@ export default function ClausesTab() {
   })
   const act = useMutation({
     mutationFn: ({ id, action, body }: { id: string; action: string; body?: Record<string, unknown> }) => apiClient.post(`/api/v1/contracts/clauses/${id}/${action}`, body ?? {}),
-    onSuccess: refresh,
-    onError: (e: unknown) => setError(errMsg(e, 'That step could not be completed')),
+    onSuccess: () => { refresh(); setAskFor(null) },
+    onError: (e: unknown, v) => {
+      const m = errMsg(e, 'That step could not be completed')
+      setError(m)
+      setAskFor(v.action === 'publish' && needsApprovalMessage(m) ? v.id : null)
+    },
+  })
+  const requestApproval = useMutation({
+    mutationFn: (id: string) => apiClient.post('/api/v1/contracts/approvals', { action: 'PUBLISH_CLAUSE', subjectId: id, note: null }),
+    onSuccess: () => { refresh(); setAskFor(null); setError('Approval requested. Someone else can now review it under Approvals.') },
+    onError: (e: unknown) => setError(errMsg(e, 'Could not ask for approval')),
   })
   const uploadEvidence = (id: string, fl: File) => {
     const fd = new FormData()
@@ -107,9 +119,10 @@ export default function ClausesTab() {
   }
 
   const openNew = () => { setEditing(null); setForm(EMPTY); setShowForm(true); setError('') }
-  const openEdit = (c: Clause) => { setEditing(c); setForm({ title: c.title, category: c.category, body: c.body, legalArea: c.legalArea ?? '', jurisdiction: c.jurisdiction }); setShowForm(true); setError('') }
+  const openEdit = (c: Clause) => { setEditing(c); setForm({ title: c.title, category: c.category, body: c.body, legalArea: c.legalArea ?? '', jurisdiction: c.jurisdiction, clauseKind: c.clauseKind ?? 'STANDARD', sourceReference: c.sourceReference ?? '' }); setShowForm(true); setError('') }
   const withdraw = (c: Clause) => { const r = window.prompt('Why is this clause being withdrawn?'); if (r && r.trim()) act.mutate({ id: c.id, action: 'withdraw', body: { reason: r.trim() } }) }
-  const validForm = form.title.trim() && hasContent(form.body)
+  const formProblem = clauseFormProblem(form, hasContent(form.body))
+  const validForm = !formProblem
   const validReview = review.reviewerName.trim() && review.reviewerProfessionalDetails.trim() && review.reviewDate
 
   return (
@@ -134,7 +147,8 @@ export default function ClausesTab() {
           {clauses.map(c => (
             <div key={c.id} style={{ border: '1px solid var(--hf-border)', borderRadius: 10, padding: '12px 14px', background: 'var(--hf-surface)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
-                <div style={{ fontWeight: 700, color: 'var(--hf-text)' }}>{c.title} <span style={{ fontWeight: 400, color: 'var(--hf-text-muted)', fontSize: 12 }}>v{c.versionNo} · {catLabel(c.category)}</span></div>
+                <div style={{ fontWeight: 700, color: 'var(--hf-text)' }}>{c.title} <span style={{ fontWeight: 400, color: 'var(--hf-text-muted)', fontSize: 12 }}>v{c.versionNo} · {catLabel(c.category)}</span>
+                  {c.clauseKind && c.clauseKind !== 'STANDARD' && <span style={{ marginLeft: 8, fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 999, background: 'var(--hf-warning-soft)', color: 'var(--hf-warning-text)' }}>{kindLabel(c.clauseKind)}</span>}</div>
                 <div style={{ fontSize: 12 }}>
                   <strong>{STATUS_LABEL[c.status]}</strong> · <span style={{ color: LEGAL_COLOR[c.legalStatus] }}>{LEGAL_LABEL[c.legalStatus]}</span>
                 </div>
@@ -151,6 +165,10 @@ export default function ClausesTab() {
                     : <span style={{ color: 'var(--hf-warning-text)' }}>none attached</span>}
                 </div>
               )}
+              {c.sourceReference && <div style={{ fontSize: 12, color: 'var(--hf-text-muted)', marginTop: 2 }}>Source: {c.sourceReference}</div>}
+              {c.evidenceRequired && !c.evidenceDocumentId && c.status !== 'DRAFT' && c.status !== 'SUPERSEDED' && c.status !== 'WITHDRAWN' && (
+                <div role="note" style={{ fontSize: 12, color: 'var(--hf-warning-text)', marginTop: 2 }}>{publishBlocker(c)}</div>
+              )}
               {c.legalStatus === 'REVIEW_EXPIRED' && <div style={{ fontSize: 12, color: 'var(--hf-danger-text)', marginTop: 2 }}>This clause cannot be put into contracts until it has a new review.</div>}
               {c.withdrawnReason && <div style={{ fontSize: 12, color: 'var(--hf-danger-text)', marginTop: 2 }}>Withdrawn: {c.withdrawnReason}</div>}
               <div style={{ marginTop: 8, fontSize: 13, lineHeight: 1.7, color: 'var(--hf-text-secondary)', maxHeight: 140, overflowY: 'auto', border: '1px solid var(--hf-border)', borderRadius: 8, padding: '6px 10px', background: 'var(--hf-surface-muted)' }}
@@ -166,7 +184,8 @@ export default function ClausesTab() {
                         onChange={e => { const fl = e.target.files?.[0]; if (fl) attach.mutate({ id: c.id, file: fl }); e.target.value = '' }} />
                     </label>
                   )}
-                  {c.status === 'APPROVED' && <button style={btn} disabled={act.isPending} onClick={() => act.mutate({ id: c.id, action: 'publish' })}>Publish</button>}
+                  {c.status === 'APPROVED' && <button style={btn} disabled={act.isPending || !!publishBlocker(c)} title={publishBlocker(c) ?? undefined} onClick={() => act.mutate({ id: c.id, action: 'publish' })}>Publish</button>}
+                  {c.status === 'APPROVED' && askFor === c.id && <button style={btn} disabled={requestApproval.isPending} onClick={() => requestApproval.mutate(c.id)}>Ask for approval</button>}
                   {c.status === 'APPROVED' && <button style={btn} disabled={act.isPending} onClick={() => act.mutate({ id: c.id, action: 'return-to-draft' })}>Return to draft</button>}
                   {c.status === 'PUBLISHED' && <button style={btn} disabled={act.isPending} onClick={() => act.mutate({ id: c.id, action: 'new-version' })}>New version</button>}
                   {(c.status === 'PUBLISHED' || c.status === 'APPROVED') && <button style={btn} disabled={act.isPending} onClick={() => withdraw(c)}>Withdraw</button>}
@@ -188,12 +207,18 @@ export default function ClausesTab() {
               <div style={{ gridColumn: '1/-1' }}><label style={lbl}>Title *</label><input style={inp} value={form.title} onChange={e => setForm(p => ({ ...p, title: e.target.value }))} /></div>
               <div><label style={lbl}>Category</label><select style={inp} value={form.category} onChange={e => setForm(p => ({ ...p, category: e.target.value }))}>{CLAUSE_CATEGORIES.map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select></div>
               <div><label style={lbl}>Legal area</label><input style={inp} value={form.legalArea} onChange={e => setForm(p => ({ ...p, legalArea: e.target.value }))} /></div>
+              <div><label style={lbl}>Kind of wording</label>
+                <select style={inp} value={form.clauseKind} onChange={e => setForm(p => ({ ...p, clauseKind: e.target.value }))}>{CLAUSE_KINDS.map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select></div>
+              <div><label style={lbl}>Source{form.clauseKind === 'SOURCED' ? ' *' : ''}</label>
+                <input style={inp} value={form.sourceReference} placeholder="Where the wording came from" onChange={e => setForm(p => ({ ...p, sourceReference: e.target.value }))} /></div>
+              <div style={{ gridColumn: '1/-1', fontSize: 12, color: 'var(--hf-text-muted)' }}>{CLAUSE_KINDS.find(([k]) => k === form.clauseKind)?.[2]}</div>
               <div style={{ gridColumn: '1/-1' }}>
                 <label style={lbl}>Wording *</label>
                 <RichTextEditor key={editing?.id ?? 'new'} value={form.body} onChange={html => setForm(p => ({ ...p, body: html }))} minHeight={200} />
               </div>
             </div>
             {error && <div style={{ marginTop: 12, fontSize: 13, color: 'var(--hf-danger-text)' }}>{error}</div>}
+            {formProblem && form.title.trim() && <div style={{ marginTop: 8, fontSize: 12, color: 'var(--hf-text-muted)' }}>{formProblem}</div>}
             <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 18 }}>
               <button onClick={() => setShowForm(false)} style={btn}>Cancel</button>
               <button disabled={!validForm || save.isPending} onClick={() => save.mutate()} style={{ ...btn, background: validForm ? 'var(--hf-primary)' : 'var(--hf-text-faint)', color: 'var(--hf-text-on-solid)', border: 'none' }}>{save.isPending ? 'Saving…' : 'Save draft'}</button>

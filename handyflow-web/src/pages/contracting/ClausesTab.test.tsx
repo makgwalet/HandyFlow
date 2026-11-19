@@ -116,4 +116,32 @@ describe('clause review evidence', () => {
     expect(urls[1]).toBe('/api/v1/contracts/clauses/c1/evidence')
     expect(document.body.textContent).toContain('The approval was recorded, but the evidence file was not stored: File type not allowed')
   })
+
+  it('turns Publish off, and says why, for a clause that needs evidence and has none', async () => {
+    state.clauses = [clause({ clauseKind: 'CUSTOM', evidenceRequired: true, evidenceRequiredReason: 'Custom wording needs evidence of the legal review.' })]
+    const el = await mount()
+    expect(button(el, 'Publish')!.disabled).toBe(true)
+    expect(el.textContent).toContain('Custom wording needs evidence of the legal review.')
+    expect(el.textContent).toContain('Custom wording')
+  })
+
+  it('leaves Publish on for ordinary wording, and for required evidence that is attached', async () => {
+    state.clauses = [clause({}), clause({ id: 'c2', title: 'Other', clauseKind: 'REGULATORY', evidenceRequired: true, evidenceDocumentId: 'd1', evidenceFileName: 'r.pdf' })]
+    const el = await mount()
+    const publish = Array.from(el.querySelectorAll('button')).filter(b => b.textContent === 'Publish') as HTMLButtonElement[]
+    expect(publish).toHaveLength(2)
+    expect(publish.every(b => !b.disabled)).toBe(true)
+  })
+
+  it('offers to ask for approval when publishing is stopped for want of one, and sends the request', async () => {
+    state.clauses = [clause({})]
+    api.post.mockImplementation(async (url: string) => {
+      if (url.endsWith('/publish')) throw { response: { data: { message: "This needs a second person's approval before it can go ahead." } } }
+      return { data: { data: {} } }
+    })
+    const el = await mount()
+    await click(button(el, 'Publish'))
+    await click(button(el, 'Ask for approval'))
+    expect(api.post).toHaveBeenCalledWith('/api/v1/contracts/approvals', { action: 'PUBLISH_CLAUSE', subjectId: 'c1', note: null })
+  })
 })
