@@ -18,12 +18,13 @@
 
 import { sanitizeHtml } from './sanitizeHtml'
 import { useState, useRef } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { apiClient } from '../../api/client'
 import {
   Plus, X, Download, Send, CheckCircle, Clock, User,
   AlertTriangle, ChevronDown, FileText, PenLine, Search,
-  Calendar, MessageSquare, RefreshCw, Eye, EyeOff,
+  Calendar, MessageSquare, RefreshCw, Eye, EyeOff, LayoutList, LayoutGrid, ArrowUpDown,
 } from 'lucide-react'
 import { unwrap, fmtR, apiError, type ContractRow, type ContractParty, type ContractComment, type ContractTemplateRow, type SignIcon } from './contractingApi'
 import { ContractSharingSection } from './ContractSharingSection'
@@ -32,6 +33,7 @@ import { ContractRiskSection } from './ContractRiskSection'
 import { ContractNegotiationSection } from './ContractNegotiationSection'
 import { linkStatus, LINK_TONE_COLOR } from './signingLink'
 import { usePermissions } from '../../hooks/usePermission'
+import { VIEWS, isViewKey, applyRegister, viewCounts, toCsv, daysToEnd, type ViewKey, type Sort, type SortKey } from './contractRegister'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -224,7 +226,14 @@ export default function ContractsTab() {
   const canSign       = usePermissions(['CONTRACTS_SIGN', 'CONTRACTS_MANAGE'], 'any')
 
   // ── UI state ─────────────────────────────────────────────────────────────────
-  const [statusFilter, setStatus]       = useState('')
+  // The register's view lives in the address (?view=expiring) so a dashboard figure can open exactly those contracts and the link can be shared.
+  const [params, setParams] = useSearchParams()
+  const viewParam = params.get('view')
+  const view: ViewKey = isViewKey(viewParam) ? viewParam : 'all'
+  const setView = (v: ViewKey) => setParams(prev => { const n = new URLSearchParams(prev); if (v === 'all') n.delete('view'); else n.set('view', v); return n }, { replace: true })
+  const [typeFilter, setTypeFilter] = useState('')
+  const [sort, setSort] = useState<Sort>({ key: 'end', dir: 'asc' })
+  const [layout, setLayout] = useState<'table' | 'cards'>('table')
   const [search,       setSearch]       = useState('')
   const [expanded,     setExpanded]     = useState<string | null>(null)
   const [showBodyId,   setShowBodyId]   = useState<string | null>(null)
@@ -272,12 +281,8 @@ export default function ContractsTab() {
   // ── Queries ──────────────────────────────────────────────────────────────────
 
   const { data: contracts = [], isLoading } = useQuery<ContractRow[]>({
-    queryKey: ['contracts', statusFilter],
-    queryFn: async () => {
-      const params = new URLSearchParams({ size: '100' })
-      if (statusFilter) params.set('status', statusFilter)
-      return unwrap<ContractRow>(await apiClient.get(`/api/v1/contracts?${params}`))
-    },
+    queryKey: ['contracts', 'register'],
+    queryFn: async () => unwrap<ContractRow>(await apiClient.get('/api/v1/contracts?size=100')),
   })
 
   const { data: contractDetail } = useQuery<ContractRow>({
@@ -413,11 +418,16 @@ export default function ContractsTab() {
     return []
   }
 
-  const filtered = contracts.filter(c => {
-    if (!search) return true
-    const q = search.toLowerCase()
-    return `${c.title} ${c.contractNumber} ${c.contractType}`.toLowerCase().includes(q)
-  })
+  const typeLabel = (t: string) => CONTRACT_TYPES.find(x => x.value === t)?.label ?? t
+  const filtered = applyRegister(contracts, { view, search, type: typeFilter, sort }, typeLabel)
+  const counts = viewCounts(contracts)
+  const toggleSort = (key: SortKey) => setSort(s0 => s0.key === key ? { key, dir: s0.dir === 'asc' ? 'desc' : 'asc' } : { key, dir: key === 'value' ? 'desc' : 'asc' })
+  // In the table layout one contract at a time opens below the table, in the same detail panel the cards use.
+  const detailRows = layout === 'cards' ? filtered : filtered.filter(c => c.id === expanded)
+  const exportCsv = () => {
+    const url = URL.createObjectURL(new Blob([toCsv(filtered, typeLabel)], { type: 'text/csv;charset=utf-8' }))
+    const a = document.createElement('a'); a.href = url; a.download = 'contracts.csv'; a.click(); URL.revokeObjectURL(url)
+  }
 
   // ─── Render ──────────────────────────────────────────────────────────────────
 
@@ -425,24 +435,22 @@ export default function ContractsTab() {
     <div>
       {/* Toolbar */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18, gap: 10, flexWrap: 'wrap' }}>
-        <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', alignItems: 'center' }}>
-          {[
-            { key: '',             label: 'All'          },
-            { key: 'DRAFT',        label: 'Draft'        },
-            { key: 'UNDER_REVIEW', label: 'Under Review' },
-            { key: 'SENT',         label: 'Pending Sign' },
-            { key: 'SIGNED',       label: 'Signed'       },
-            { key: 'TERMINATED',   label: 'Terminated'   },
-          ].map(s => (
-            <button key={s.key} onClick={() => setStatus(s.key)} style={{
+        <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', alignItems: 'center' }} role="tablist" aria-label="Saved views">
+          {VIEWS.map(v => (
+            <button key={v.key} role="tab" aria-selected={view === v.key} title={v.hint} onClick={() => setView(v.key)} style={{
               padding: '5px 12px', borderRadius: 20, fontSize: 12, cursor: 'pointer',
-              border: 'none', fontWeight: statusFilter === s.key ? 600 : 400,
-              background: statusFilter === s.key ? 'var(--hf-primary)' : 'var(--hf-surface-sunken)',
-              color: statusFilter === s.key ? 'var(--hf-text-on-solid)' : 'var(--hf-text-muted)',
+              border: 'none', fontWeight: view === v.key ? 600 : 400,
+              background: view === v.key ? 'var(--hf-primary)' : 'var(--hf-surface-sunken)',
+              color: view === v.key ? 'var(--hf-text-on-solid)' : 'var(--hf-text-muted)',
             }}>
-              {s.label}
+              {v.label} <span style={{ opacity: 0.7 }}>{counts[v.key]}</span>
             </button>
           ))}
+          <select aria-label="Contract type" value={typeFilter} onChange={e => setTypeFilter(e.target.value)}
+            style={{ padding: '6px 8px', border: '1px solid var(--hf-border)', borderRadius: 8, fontSize: 12, background: 'var(--hf-surface)' }}>
+            <option value="">All types</option>
+            {CONTRACT_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+          </select>
           <div style={{ position: 'relative' }}>
             <Search size={12} style={{ position: 'absolute', left: 9, top: '50%', transform: 'translateY(-50%)', color: 'var(--hf-text-faint)' }} />
             <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search contracts…"
@@ -450,6 +458,10 @@ export default function ContractsTab() {
           </div>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
+          <button onClick={() => setLayout(layout === 'table' ? 'cards' : 'table')} style={{ ...btnS, padding: '9px 11px' }} title={layout === 'table' ? 'Show as cards' : 'Show as table'} aria-label={layout === 'table' ? 'Show as cards' : 'Show as table'}>
+            {layout === 'table' ? <LayoutGrid size={13} /> : <LayoutList size={13} />}
+          </button>
+          <button onClick={exportCsv} disabled={filtered.length === 0} style={{ ...btnS, padding: '9px 11px' }} title="Export what is shown as CSV" aria-label="Export CSV"><Download size={13} /></button>
           <button onClick={() => qc.invalidateQueries({ queryKey: ['contracts'] })} style={{ ...btnS, padding: '9px 11px' }} title="Refresh">
             <RefreshCw size={13} />
           </button>
@@ -465,12 +477,62 @@ export default function ContractsTab() {
       ) : filtered.length === 0 ? (
         <div style={{ textAlign: 'center', padding: '50px 20px', color: 'var(--hf-text-faint)' }}>
           <FileText size={36} style={{ marginBottom: 12, opacity: 0.3 }} />
-          <div style={{ fontWeight: 600, color: 'var(--hf-text-tertiary)' }}>No contracts found</div>
-          <div style={{ fontSize: 13, marginTop: 4 }}>Create your first contract from a template or from scratch.</div>
+          {contracts.length === 0 ? (
+            <>
+              <div style={{ fontWeight: 600, color: 'var(--hf-text-tertiary)' }}>No contracts yet</div>
+              <div style={{ fontSize: 13, marginTop: 4 }}>Create your first contract from a template or from scratch.</div>
+            </>
+          ) : (
+            <>
+              <div style={{ fontWeight: 600, color: 'var(--hf-text-tertiary)' }}>No contracts match</div>
+              <div style={{ fontSize: 13, marginTop: 4 }}>{VIEWS.find(v => v.key === view)?.hint}{search || typeFilter ? ', with the search and type you chose' : ''}.</div>
+              <button onClick={() => { setView('all'); setSearch(''); setTypeFilter('') }} style={{ ...btnS, marginTop: 10 }}>Clear filters</button>
+            </>
+          )}
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {filtered.map(c => {
+          {layout === 'table' && (
+            <div style={{ overflowX: 'auto', border: '1px solid var(--hf-border)', borderRadius: 10 }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                <thead>
+                  <tr style={{ background: 'var(--hf-surface-muted)', textAlign: 'left' }}>
+                    {([['title', 'Contract'], ['status', 'Status'], ['value', 'Value'], ['end', 'Ends']] as [SortKey, string][]).map(([k, label]) => (
+                      <th key={k} aria-sort={sort.key === k ? (sort.dir === 'asc' ? 'ascending' : 'descending') : 'none'} style={{ padding: '9px 12px', fontSize: 11, textTransform: 'uppercase', color: 'var(--hf-text-muted)' }}>
+                        <button onClick={() => toggleSort(k)} style={{ all: 'unset', cursor: 'pointer', display: 'inline-flex', gap: 4, alignItems: 'center' }}>{label}<ArrowUpDown size={10} /></button>
+                      </th>
+                    ))}
+                    <th style={{ padding: '9px 12px', fontSize: 11, textTransform: 'uppercase', color: 'var(--hf-text-muted)' }}>Signed</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filtered.map(c => {
+                    const cfg = STATUS_CFG[c.status] ?? STATUS_CFG.DRAFT
+                    const left = daysToEnd(c.endDate)
+                    return (
+                      <tr key={c.id} data-testid="register-row" tabIndex={0} aria-expanded={expanded === c.id}
+                        onClick={() => { setExpanded(expanded === c.id ? null : c.id); setError('') }}
+                        onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setExpanded(expanded === c.id ? null : c.id); setError('') } }}
+                        style={{ cursor: 'pointer', borderTop: '1px solid var(--hf-border)', background: expanded === c.id ? 'var(--hf-surface-muted)' : undefined }}>
+                        <td style={{ padding: '10px 12px' }}>
+                          <div style={{ fontWeight: 600, color: 'var(--hf-text)' }}>{c.title}</div>
+                          <div style={{ fontSize: 11, color: 'var(--hf-text-muted)' }}>{c.contractNumber} · {typeLabel(c.contractType)}</div>
+                        </td>
+                        <td style={{ padding: '10px 12px' }}><span style={{ background: cfg.bg, color: cfg.color, padding: '1px 8px', borderRadius: 20, fontSize: 11, fontWeight: 700 }}>{cfg.label}</span></td>
+                        <td style={{ padding: '10px 12px' }}>{(c.valueAmount ?? 0) > 0 ? fmtR(c.valueAmount) : '—'}</td>
+                        <td style={{ padding: '10px 12px', color: left != null && left < 0 ? 'var(--hf-danger-text)' : left != null && left <= 30 && c.status === 'SIGNED' ? 'var(--hf-warning-text)' : undefined }}>
+                          {fmtDate(c.endDate)}{c.status === 'SIGNED' && left != null && left >= 0 && left <= 30 ? ` (${left}d)` : ''}
+                        </td>
+                        <td style={{ padding: '10px 12px' }}>{c.totalPartyCount ? `${c.signedPartyCount ?? 0}/${c.totalPartyCount}` : '—'}</td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+          {contracts.length >= 100 && <div style={{ fontSize: 11, color: 'var(--hf-text-muted)' }}>Showing the 100 most recent contracts. Filters and search apply to those.</div>}
+          {detailRows.map(c => {
             const cfg    = STATUS_CFG[c.status] ?? STATUS_CFG.DRAFT
             const isOpen = expanded === c.id
             const canPdf = c.status === 'SIGNED' || c.status === 'TERMINATED'

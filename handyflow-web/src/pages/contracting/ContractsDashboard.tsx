@@ -6,6 +6,7 @@ import {
   ArrowRight, Calendar, TrendingUp, XCircle,
 } from 'lucide-react'
 import { unwrapOne, fmtR, type ContractDashboard } from './contractingApi'
+import { registerLink, type ViewKey } from './contractRegister'
 
 const fmtDate = (d: string | null | undefined) =>
   d ? new Date(d).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'
@@ -55,14 +56,15 @@ export default function ContractsDashboard({ onNavigate }: { onNavigate: (t: str
   const typeEntries = Object.entries((dash?.typeCounts ?? {}) as Record<string, number>).sort((a, b) => b[1] - a[1])
 
   // Pipeline stages
-  const STAGES = [
-    { label: 'Draft',        count: draft.length,      color: 'var(--hf-text-muted)', Icon: FileText     },
-    { label: 'Under Review', count: review.length,     color: 'var(--hf-warning-text)', Icon: Clock        },
-    { label: 'Pending Sign', count: pendingCount,    color: 'var(--hf-info-text)', Icon: Clock        },
-    { label: 'Signed',       count: signed.length,     color: 'var(--hf-success-text-strong)', Icon: CheckCircle  },
-    { label: 'Terminated',   count: terminated.length, color: 'var(--hf-danger-text)', Icon: XCircle      },
-    { label: 'Expired',      count: expired.length,    color: 'var(--hf-text-faint)', Icon: AlertTriangle },
-  ].filter(s => s.count > 0 || ['Draft', 'Pending Sign', 'Signed'].includes(s.label))
+  type Stage = { label: string; count: number; color: string; Icon: typeof FileText; view: ViewKey }
+  const STAGES = ([
+    { label: 'Draft',        count: draft.length,      color: 'var(--hf-text-muted)', Icon: FileText, view: 'drafts' },
+    { label: 'Under Review', count: review.length,     color: 'var(--hf-warning-text)', Icon: Clock, view: 'review' },
+    { label: 'Pending Sign', count: pendingCount,    color: 'var(--hf-info-text)', Icon: Clock, view: 'awaiting' },
+    { label: 'Signed',       count: signed.length,     color: 'var(--hf-success-text-strong)', Icon: CheckCircle, view: 'active' },
+    { label: 'Terminated',   count: terminated.length, color: 'var(--hf-danger-text)', Icon: XCircle, view: 'terminated' },
+    { label: 'Expired',      count: expired.length,    color: 'var(--hf-text-faint)', Icon: AlertTriangle, view: 'expired' },
+  ] as Stage[]).filter(s => s.count > 0 || ['Draft', 'Pending Sign', 'Signed'].includes(s.label))
 
   // ── Render ──────────────────────────────────────────────────────────────────
 
@@ -70,18 +72,19 @@ export default function ContractsDashboard({ onNavigate }: { onNavigate: (t: str
     <div>
       {/* KPI row */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 28 }}>
-        {[
-          { label: 'Active contracts',      value: signed.length,     color: 'var(--hf-success-text-strong)', bg: 'var(--hf-success-soft-strong)' },
-          { label: 'Awaiting signature',    value: pendingCount,    color: 'var(--hf-info-text)', bg: 'var(--hf-info-soft)' },
-          { label: 'Active contract value', value: fmtR(totalActiveVal), color: 'var(--hf-primary-text)', bg: 'var(--hf-indigo-soft)' },
-          { label: 'Pending value',         value: fmtR(pendingVal),  color: 'var(--hf-warning-text)', bg: 'var(--hf-warning-soft)' },
-        ].map(k => (
-          <div key={k.label} style={{ background: k.bg, borderRadius: 12, padding: '15px 18px' }}>
+        {([
+          { label: 'Active contracts',      value: signed.length,     color: 'var(--hf-success-text-strong)', bg: 'var(--hf-success-soft-strong)', view: 'active' },
+          { label: 'Awaiting signature',    value: pendingCount,    color: 'var(--hf-info-text)', bg: 'var(--hf-info-soft)', view: 'awaiting' },
+          { label: 'Active contract value', value: fmtR(totalActiveVal), color: 'var(--hf-primary-text)', bg: 'var(--hf-indigo-soft)', view: 'active' },
+          { label: 'Pending value',         value: fmtR(pendingVal),  color: 'var(--hf-warning-text)', bg: 'var(--hf-warning-soft)', view: 'awaiting' },
+        ] as { label: string; value: number | string; color: string; bg: string; view: ViewKey }[]).map(k => (
+          <button key={k.label} onClick={() => onNavigate(registerLink(k.view))} title="Open these contracts in the register"
+            style={{ all: 'unset', display: 'block', boxSizing: 'border-box', cursor: 'pointer', background: k.bg, borderRadius: 12, padding: '15px 18px' }}>
             <div style={{ fontSize: typeof k.value === 'number' ? 26 : 20, fontWeight: 800, color: k.color }}>
               {k.value}
             </div>
             <div style={{ fontSize: 11, color: k.color, marginTop: 3, opacity: 0.8 }}>{k.label}</div>
-          </div>
+          </button>
         ))}
       </div>
 
@@ -98,13 +101,13 @@ export default function ContractsDashboard({ onNavigate }: { onNavigate: (t: str
                 const { Icon } = s
                 return (
                   <div key={s.label} style={{ display: 'flex', alignItems: 'center' }}>
-                    <div style={{ minWidth: 90, background: `color-mix(in srgb, ${s.color} 7%, transparent)`, border: `1px solid color-mix(in srgb, ${s.color} 19%, transparent)`, borderRadius: 10, padding: '14px 10px', textAlign: 'center' }}>
+                    <button onClick={() => onNavigate(registerLink(s.view))} title={`Open ${s.label.toLowerCase()} contracts`} style={{ all: 'unset', display: 'block', boxSizing: 'border-box', cursor: 'pointer', minWidth: 90, background: `color-mix(in srgb, ${s.color} 7%, transparent)`, border: `1px solid color-mix(in srgb, ${s.color} 19%, transparent)`, borderRadius: 10, padding: '14px 10px', textAlign: 'center' }}>
                       <Icon size={15} style={{ color: s.color, marginBottom: 6 }} />
                       <div style={{ fontSize: 22, fontWeight: 800, color: s.color }}>{s.count}</div>
                       <div style={{ fontSize: 10, color: s.color, opacity: 0.8, marginTop: 2, lineHeight: 1.3 }}>
                         {s.label}
                       </div>
-                    </div>
+                    </button>
                     {i < STAGES.length - 1 && (
                       <div style={{ color: 'var(--hf-text-disabled)', fontSize: 16, margin: '0 2px', flexShrink: 0 }}>→</div>
                     )}
@@ -127,7 +130,7 @@ export default function ContractsDashboard({ onNavigate }: { onNavigate: (t: str
                 )}
               </div>
               {expiringSoon.length > 3 && (
-                <button onClick={() => onNavigate('contracts')} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, color: 'var(--hf-primary-text)', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600 }}>
+                <button onClick={() => onNavigate(registerLink('expiring'))} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, color: 'var(--hf-primary-text)', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600 }}>
                   View all <ArrowRight size={12} />
                 </button>
               )}
@@ -176,7 +179,7 @@ export default function ContractsDashboard({ onNavigate }: { onNavigate: (t: str
                   <Clock size={14} style={{ color: 'var(--hf-info-text)' }} />
                   <span style={{ fontWeight: 700, fontSize: 14, color: 'var(--hf-text)' }}>Awaiting signature</span>
                 </div>
-                <button onClick={() => onNavigate('contracts')} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, color: 'var(--hf-primary-text)', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600 }}>
+                <button onClick={() => onNavigate(registerLink('awaiting'))} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, color: 'var(--hf-primary-text)', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600 }}>
                   Manage <ArrowRight size={12} />
                 </button>
               </div>

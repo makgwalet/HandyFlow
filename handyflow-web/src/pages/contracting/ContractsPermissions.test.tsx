@@ -4,6 +4,7 @@
 import { describe, it, expect, afterEach, vi, beforeEach } from 'vitest'
 import { createRoot, type Root } from 'react-dom/client'
 import { act } from 'react'
+import { MemoryRouter } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 
 const perms = vi.hoisted(() => ({ granted: [] as string[], status: 'DRAFT' }))
@@ -51,15 +52,15 @@ async function mount(granted: string[]) {
   document.body.appendChild(host)
   root = createRoot(host)
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
-  await act(async () => { root!.render(<QueryClientProvider client={qc}><ContractsTab /></QueryClientProvider>) })
+  await act(async () => { root!.render(<QueryClientProvider client={qc}><MemoryRouter><ContractsTab /></MemoryRouter></QueryClientProvider>) })
   await wait(); await wait()
   // Expand the contract card so its actions render.
-  const row = Array.from(host.querySelectorAll('div')).find(d => d.textContent?.includes('Service agreement') && d.style.cursor === 'pointer')
+  const row = host.querySelector('[data-testid="register-row"]') ?? Array.from(host.querySelectorAll('div')).find(d => d.textContent?.includes('Service agreement') && d.style.cursor === 'pointer')
   if (row) { await act(async () => { row.dispatchEvent(new MouseEvent('click', { bubbles: true })) }); await wait(); await wait() }
   return host
 }
 
-// Exact label match: 'Terminate' must not match the 'Terminated' status filter, nor 'Edit' something like 'Edited'.
+// Exact label match: 'Terminate' must not match the 'Terminated' view tab, nor 'Edit' something like 'Edited'.
 const has = (el: HTMLElement, text: string) => Array.from(el.querySelectorAll('button')).some(b => b.textContent?.trim() === text)
 
 describe('Contracts screen permissions', () => {
