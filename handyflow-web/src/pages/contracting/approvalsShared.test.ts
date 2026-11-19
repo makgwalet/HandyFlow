@@ -15,6 +15,7 @@ describe('requestableActions', () => {
   it('offers send approval under review and termination approval once signed', () => {
     expect(requestableActions('UNDER_REVIEW', [], 'c1')).toEqual(['SEND_FOR_SIGNING'])
     expect(requestableActions('SIGNED', [], 'c1')).toEqual(['TERMINATE'])
+    expect(requestableActions('SENT', [], 'c1')).toEqual(['WITHDRAW'])
     expect(requestableActions('DRAFT', [], 'c1')).toEqual([])
   })
   it('does not offer one that is already waiting or granted', () => {

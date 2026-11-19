@@ -568,6 +568,27 @@ public class EmailTemplates {
      * @param terminatedAt   Formatted termination timestamp
      * @param frontendUrl    Base URL
      */
+    public static String contractWithdrawn(String partyName, String contractTitle, String contractNumber,
+                                           String reason, String withdrawnAt) {
+        String reasonBlock = (reason != null && !reason.isBlank())
+                ? "<p><strong>Reason:</strong><br/>" + org.springframework.web.util.HtmlUtils.htmlEscape(reason) + "</p>"
+                : "";
+        return wrap("""
+            <p>Dear <strong>%s</strong>,</p>
+            <p>The request to sign the following contract has been withdrawn by the sender. Your signing link no longer works and
+               nothing further is needed from you.</p>
+            <div class="highlight-red">
+              <p><strong>%s</strong> &nbsp;&middot;&nbsp; %s<br/>
+                 <span style="font-size:12px;font-weight:400;color:#4B5563">Withdrawn on %s</span>
+              </p>
+              %s
+            </div>
+            <p>If the sender issues a revised version you will receive a new signing link. A signature you already gave on this
+               version is kept on record, but this version is not treated as signed by everyone.</p>
+            """.formatted(org.springframework.web.util.HtmlUtils.htmlEscape(partyName),
+                org.springframework.web.util.HtmlUtils.htmlEscape(contractTitle), contractNumber, withdrawnAt, reasonBlock));
+    }
+
     public static String contractTerminated(String partyName, String contractTitle,
                                             String contractNumber, String reason,
                                             String terminatedAt, String frontendUrl) {

@@ -70,6 +70,9 @@ public class Contract {
     @Column(name = "signed_at")       Instant   signedAt;
     @Column(name = "terminated_at")   Instant   terminatedAt;
     @Column(name = "termination_reason") String terminationReason;
+    /** Set on a new draft that was made from a withdrawn contract. The withdrawn record itself is never changed into the new one. */
+    @Column(name = "revision_of_contract_id") UUID revisionOfContractId;
+    @Column(name = "revision_no")     int       revisionNo = 1;
     @Column(name = "created_by")      UUID      createdBy;
     @Column(name = "created_at")      Instant   createdAt;
     @Column(name = "updated_at")      Instant   updatedAt;
@@ -197,6 +200,40 @@ public class Contract {
         this.status    = "SENT";
         this.sentAt    = Instant.now();
         this.updatedAt = Instant.now();
+    }
+
+    /**
+     * Cancels the signing attempt. Only a contract that is out for signature can be withdrawn; one that every party has signed is
+     * executed and is ended through termination or an amendment instead. Signatures already given stay on the record.
+     */
+    public void withdraw() {
+        if ("SIGNED".equals(status))
+            throw new IllegalStateException("A fully signed contract cannot be withdrawn. End it through termination or an amendment instead.");
+        if (!"SENT".equals(status))
+            throw new IllegalStateException("Only a contract that has been sent for signing can be withdrawn (this one is " + status + ")");
+        this.status    = "WITHDRAWN";
+        this.updatedAt = Instant.now();
+    }
+
+    public boolean isWithdrawn() { return "WITHDRAWN".equals(status); }
+
+    /** A new draft that carries a withdrawn contract's text and parties forward. Fresh number, fresh approvals, fresh signing. */
+    public static Contract reviseFrom(Contract withdrawn, String newNumber, UUID createdBy) {
+        if (!withdrawn.isWithdrawn())
+            throw new IllegalStateException("Only a withdrawn contract can be revised into a new draft");
+        Contract c = create(TenantId.of(withdrawn.tenantId), newNumber, withdrawn.title, withdrawn.contractType,
+                withdrawn.body, withdrawn.templateId, createdBy);
+        c.valueAmount = withdrawn.valueAmount;
+        c.currency = withdrawn.currency;
+        c.startDate = withdrawn.startDate;
+        c.endDate = withdrawn.endDate;
+        c.autoRenew = withdrawn.autoRenew;
+        c.renewalNoticeDays = withdrawn.renewalNoticeDays;
+        c.notes = withdrawn.notes;
+        c.requiredSigningMethod = withdrawn.requiredSigningMethod;
+        c.revisionOfContractId = withdrawn.id;
+        c.revisionNo = withdrawn.revisionNo + 1;
+        return c;
     }
 
     public void markSigned() {

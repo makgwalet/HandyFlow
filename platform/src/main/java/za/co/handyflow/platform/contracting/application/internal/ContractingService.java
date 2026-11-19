@@ -57,6 +57,7 @@ public class ContractingService {
     private final ContractRiskService            riskService;   // risk rules that block sending
     private final ContractNegotiationService     negotiationService; // counterparty negotiation: blocks sending while proposals wait
     private final ContractRecordsService         records;   // executed copy + records retention (V581)
+    private final ContractWithdrawalRepository   withdrawalRepo;   // immutable record of each withdrawn signing attempt
 
     @Value("${contracting.signing.base-url:http://localhost:5173}")
     private String baseUrl;
@@ -651,6 +652,86 @@ public class ContractingService {
         return toContractResponse(c);
     }
 
+    // ── Withdraw a contract that was sent for signing ─────────────────────────
+
+    /**
+     * Cancels the signing attempt: every signing link is revoked, waiting codes are discarded, the contract becomes WITHDRAWN and
+     * everyone it was sent to is told. Views, code attempts and signatures already recorded stay. A contract every party has signed
+     * is not withdrawn; it is ended through termination or an amendment.
+     */
+    @Transactional
+    public ContractResponse withdraw(TenantId tenantId, UUID id, String reason) {
+        String why = reason == null ? "" : reason.trim();
+        if (why.length() < 10)
+            throw new IllegalArgumentException("Say why the contract is being withdrawn (at least 10 characters)");
+        Contract c = contractRepo.findForUpdate(tenantId.getValue(), id)
+                .orElseThrow(() -> new ResourceNotFoundException("Contract", id.toString()));
+        approvals.assertApproved(tenantId, ApprovalAction.WITHDRAW, id);
+        List<ContractParty> parties = partyRepo.findByContract(id);
+        c.setParties(parties);
+        c.withdraw();   // refuses unless SENT, and refuses a fully signed contract
+        contractRepo.save(c);
+
+        int links = 0;
+        int codes = 0;
+        for (ContractParty p : parties) {
+            links += revokeActiveTokens(p.getId());
+            codes += otpService.invalidate(p.getId().toString());
+        }
+        UUID actor = currentUserOrNull();
+        int signed = (int) parties.stream().filter(p -> "SIGNED".equals(p.getSigningStatus())).count();
+        withdrawalRepo.save(ContractWithdrawal.of(tenantId.getValue(), id, actor, why, c.getBodyHash(), links, codes, signed, parties.size()));
+        approvals.consume(tenantId, ApprovalAction.WITHDRAW, id, actor);
+        log.info("Contract {} withdrawn: {} links revoked, {} codes discarded", c.getContractNumber(), links, codes);
+
+        String when = SAST_FMT.format(Instant.now());
+        for (ContractParty p : parties) {
+            if (p.getEmail() != null && !p.getEmail().isBlank())
+                emailService.send(p.getEmail(), "Signing request withdrawn: " + c.getTitle(),
+                        EmailTemplates.contractWithdrawn(p.getFullName(), c.getTitle(), c.getContractNumber(), why, when));
+        }
+        return toContractResponse(c);
+    }
+
+    /**
+     * A new draft made from a withdrawn contract. The withdrawn record is not touched: it keeps its text, hash and signatures. The
+     * draft has a new number, its own history, and goes through approval and signing from the start with new links.
+     */
+    @Transactional
+    public ContractResponse reviseWithdrawn(TenantId tenantId, UUID id) {
+        Contract withdrawn = contractRepo.findForUpdate(tenantId.getValue(), id)
+                .orElseThrow(() -> new ResourceNotFoundException("Contract", id.toString()));
+        if (!withdrawn.isWithdrawn())
+            throw new IllegalStateException("Only a withdrawn contract can be revised into a new draft");
+        if (contractRepo.findRevisionOf(tenantId, id).isPresent())
+            throw new IllegalStateException("A new draft has already been made from this withdrawn contract");
+        UUID actor = currentUserOrNull();
+        Contract draft = Contract.reviseFrom(withdrawn, numberGen.next(tenantId), actor);
+        contractRepo.save(draft);
+        List<ContractParty> copied = new java.util.ArrayList<>();
+        for (ContractParty p : partyRepo.findByContract(id)) {
+            ContractParty n = ContractParty.create(tenantId, draft.getId(), p.getPartyType(), p.getPartyRole(), p.getFullName(),
+                    p.getEmail(), p.getPhone(), p.getCompanyName(), p.getSigningOrder());
+            partyRepo.save(n);
+            copied.add(n);
+        }
+        draft.setParties(copied);
+        redline.snapshot(tenantId, draft, "REVISED_FROM_WITHDRAWN", "Made from " + withdrawn.getContractNumber(), actor);
+        log.info("Contract {} revised from withdrawn {}", draft.getContractNumber(), withdrawn.getContractNumber());
+        return toContractResponse(draft);
+    }
+
+    @Transactional(readOnly = true)
+    public Optional<ContractWithdrawal> getWithdrawal(TenantId tenantId, UUID id) {
+        findActive(tenantId, id);
+        return withdrawalRepo.findByContract(tenantId.getValue(), id);
+    }
+
+    @Transactional(readOnly = true)
+    public Optional<UUID> getRevisionId(TenantId tenantId, UUID id) {
+        return contractRepo.findRevisionOf(tenantId, id).map(Contract::getId);
+    }
+
     // ── Resend signing link ────────────────────────────────────────────────────
 
     @Transactional
@@ -763,6 +844,8 @@ public class ContractingService {
                                          String ipAddress, String userAgent,
                                          UUID witnessedByUserId) {
         Contract c = findActive(tenantId, contractId);
+        if (c.isWithdrawn())
+            throw new IllegalStateException("This signing request was withdrawn. Nothing can be signed on it.");
         signingPolicy.assertCanSign(c);
         List<ContractParty> parties = partyRepo.findByContract(contractId);
         c.setParties(parties);
@@ -953,6 +1036,8 @@ public class ContractingService {
     @Transactional
     public void declineByToken(TenantId tenantId, UUID contractId, UUID partyId, String reason) {
         Contract c = findActive(tenantId, contractId);
+        if (!"SENT".equals(c.getStatus()))
+            throw new IllegalStateException("This contract is no longer open for signing");
         List<ContractParty> parties = partyRepo.findByContract(contractId);
 
         ContractParty party = parties.stream()
@@ -1164,12 +1249,14 @@ public class ContractingService {
         partyRepo.save(party);
     }
 
-    private void revokeActiveTokens(UUID partyId) {
-        signingTokenRepo.findAllActiveByPartyId(partyId).forEach(t -> {
+    private int revokeActiveTokens(UUID partyId) {
+        List<ContractSigningToken> active = signingTokenRepo.findAllActiveByPartyId(partyId);
+        active.forEach(t -> {
             t.setRevokedAt(Instant.now());
             signingTokenRepo.save(t);
         });
         signingTokenRepo.flush();   // the revoke must reach the database before the new token is inserted (one active token per signer)
+        return active.size();
     }
 
     /** A freshly issued link: the stored token record (hash only) and the full URL, which exists only in memory. */

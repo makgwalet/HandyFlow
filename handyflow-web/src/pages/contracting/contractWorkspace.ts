@@ -27,7 +27,9 @@ export interface NextAction {
   /** Tab that holds what they need, if any. */
   tab?: WorkspaceTab
   /** Contract action the banner can trigger directly (the same one the action bar offers). */
-  action?: 'submit-for-review' | 'send-for-signing'
+  action?: 'submit-for-review' | 'send-for-signing' | 'new-revision'
+  /** Button text when it should differ from the title. */
+  actionLabel?: string
   tone: 'todo' | 'waiting' | 'done'
 }
 
@@ -63,6 +65,10 @@ export function nextRequiredAction(c: WorkspaceInput): NextAction {
     }
   }
   if (c.status === 'SIGNED') return { title: 'Fully signed', detail: 'Share the executed copy or download the PDF.', tone: 'done' }
+  if (c.status === 'WITHDRAWN')
+    return c.canManage
+      ? { title: 'Signing was withdrawn', detail: 'Make a new draft from it to revise and send again. The withdrawn version stays on record.', action: 'new-revision', actionLabel: 'Make a new draft', tone: 'todo' }
+      : { title: 'Signing was withdrawn', detail: 'Someone who can manage contracts can make a new draft from it.', tone: 'done' }
   if (c.status === 'TERMINATED') return { title: 'This contract was terminated', tone: 'done' }
   if (c.status === 'EXPIRED') return { title: 'This contract has expired', tone: 'done' }
   return { title: 'No action needed', tone: 'done' }

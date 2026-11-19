@@ -225,6 +225,36 @@ public class ContractingController {
                 contractingService.sendForSigning(TenantContext.getTenantIdAsObject(), id)));
     }
 
+    @PostMapping("/{id}/withdraw")
+    @PreAuthorize("hasAnyAuthority('CONTRACTS_ADMIN','CONTRACTS_MANAGE')")
+    @Operation(summary = "Withdraw a contract that was sent for signing: revokes every signing link, keeps all evidence")
+    public ResponseEntity<ApiResponse<ContractResponse>> withdraw(
+            @PathVariable UUID id,
+            @RequestBody WithdrawContractRequest req) {
+        return ResponseEntity.ok(ApiResponse.success("Signing request withdrawn",
+                contractingService.withdraw(TenantContext.getTenantIdAsObject(), id, req.reason())));
+    }
+
+    @GetMapping("/{id}/withdrawal")
+    @PreAuthorize("hasAnyAuthority('CONTRACTS_READ','CONTRACTS_MANAGE','CONTRACTS_ADMIN')")
+    @Operation(summary = "Who withdrew the contract, when and why (404 if it was not withdrawn)")
+    public ResponseEntity<ApiResponse<WithdrawalResponse>> withdrawal(@PathVariable UUID id) {
+        var tenant = TenantContext.getTenantIdAsObject();
+        return contractingService.getWithdrawal(tenant, id)
+                .map(w -> ResponseEntity.ok(ApiResponse.success("Withdrawal", new WithdrawalResponse(
+                        w.getWithdrawnBy(), w.getWithdrawnAt(), w.getReason(), w.getLinksRevoked(), w.getOtpChallengesCleared(),
+                        w.getPartiesSigned(), w.getPartiesTotal(), contractingService.getRevisionId(tenant, id).orElse(null)))))
+                .orElseGet(() -> ResponseEntity.notFound().build());
+    }
+
+    @PostMapping("/{id}/new-revision")
+    @PreAuthorize("hasAnyAuthority('CONTRACTS_MANAGE')")
+    @Operation(summary = "Make a new draft from a withdrawn contract (the withdrawn record is not changed)")
+    public ResponseEntity<ApiResponse<ContractResponse>> newRevision(@PathVariable UUID id) {
+        return ResponseEntity.ok(ApiResponse.success("New draft created",
+                contractingService.reviseWithdrawn(TenantContext.getTenantIdAsObject(), id)));
+    }
+
     @PostMapping("/{id}/terminate")
     @PreAuthorize("hasAnyAuthority('CONTRACTS_ADMIN')")
     @Operation(summary = "Terminate a SIGNED contract with a reason")

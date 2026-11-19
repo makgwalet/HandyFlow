@@ -47,4 +47,10 @@ describe('nextRequiredAction', () => {
       expect(next({ ...ready, sendApproval: { required: false, state: 'NONE' } }).action).toBe('send-for-signing')
     })
   })
+  describe('withdrawn', () => {
+    it('offers a new draft to someone who can manage, and only describes it to anyone else', () => {
+      expect(next({ status: 'WITHDRAWN', canManage: true, parties: [] })).toMatchObject({ title: 'Signing was withdrawn', action: 'new-revision', actionLabel: 'Make a new draft' })
+      expect(next({ status: 'WITHDRAWN', canManage: false, parties: [] }).action).toBeUndefined()
+    })
+  })
 })

@@ -10,7 +10,7 @@ interface Props {
   tab: WorkspaceTab
   onTab: (t: WorkspaceTab) => void
   busy: boolean
-  onAction: (a: 'submit-for-review' | 'send-for-signing') => void
+  onAction: (a: 'submit-for-review' | 'send-for-signing' | 'new-revision') => void
   sendApproval?: { required: boolean; state: 'NONE' | 'PENDING' | 'APPROVED' }
 }
 
@@ -37,8 +37,8 @@ export function WorkspaceHeader({ contract, parties, unresolvedAmendments, canMa
           </button>
         )}
         {next.action && (
-          <button disabled={busy} onClick={() => onAction(next.action as 'submit-for-review' | 'send-for-signing')} style={{ padding: '6px 12px', borderRadius: 7, border: 'none', background: 'var(--hf-primary)', color: 'var(--hf-text-on-solid)', fontWeight: 600, fontSize: 12, cursor: 'pointer' }}>
-            {next.title}
+          <button disabled={busy} onClick={() => onAction(next.action as 'submit-for-review' | 'send-for-signing' | 'new-revision')} style={{ padding: '6px 12px', borderRadius: 7, border: 'none', background: 'var(--hf-primary)', color: 'var(--hf-text-on-solid)', fontWeight: 600, fontSize: 12, cursor: 'pointer' }}>
+            {next.actionLabel ?? next.title}
           </button>
         )}
       </div>

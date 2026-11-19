@@ -162,6 +162,16 @@ public class OtpService {
     // (verify() removing it after a successful check, or a prior expiry
     // cleanup), so deletion here must be tolerant of "already gone" rather
     // than treating it as an error.
+    /** Discards any code waiting for this party (a withdrawn contract, say). Returns how many were waiting. */
+    @Transactional
+    public int invalidate(String partyId) {
+        UUID partyUuid = UUID.fromString(partyId);
+        boolean existed = otpVerificationRepo.findById(partyUuid).isPresent();
+        deleteIfExists(partyUuid);
+        rawStore.remove(partyId);
+        return existed ? 1 : 0;
+    }
+
     private void deleteIfExists(UUID partyId) {
         otpVerificationRepo.findById(partyId).ifPresent(otpVerificationRepo::delete);
     }

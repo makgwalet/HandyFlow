@@ -15,7 +15,9 @@ public enum ApprovalAction {
     /** Staff accepting a change a counterparty proposed. The subject is the proposal. */
     ACCEPT_COUNTERPARTY_REDLINE(false, "PROPOSAL", Set.of("CONTRACTS_ADMIN", "CONTRACTS_MANAGE")),
     /** Staff recording a signature for a party in person. The subject is the party. */
-    SIGN_ON_BEHALF(false, "PARTY", Set.of("CONTRACTS_ADMIN", "CONTRACTS_MANAGE"));
+    SIGN_ON_BEHALF(false, "PARTY", Set.of("CONTRACTS_ADMIN", "CONTRACTS_MANAGE")),
+    /** Cancelling the signing attempt of a contract that was sent. The subject is the contract. */
+    WITHDRAW(true, "CONTRACT", Set.of("CONTRACTS_ADMIN", "CONTRACTS_MANAGE"));
 
     private final boolean requiredByDefault;
     private final String subjectType;

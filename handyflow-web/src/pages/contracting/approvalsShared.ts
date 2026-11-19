@@ -1,7 +1,7 @@
 // Shared types and rules for the approvals screen.
 
 export type ApprovalAction =
-  | 'SEND_FOR_SIGNING' | 'TERMINATE' | 'PUBLISH_CLAUSE' | 'PUBLISH_TEMPLATE' | 'ACCEPT_COUNTERPARTY_REDLINE' | 'SIGN_ON_BEHALF'
+  | 'SEND_FOR_SIGNING' | 'TERMINATE' | 'PUBLISH_CLAUSE' | 'PUBLISH_TEMPLATE' | 'ACCEPT_COUNTERPARTY_REDLINE' | 'SIGN_ON_BEHALF' | 'WITHDRAW'
 
 export interface Approval {
   id: string
@@ -33,6 +33,7 @@ export const ACTION_LABEL: Record<string, string> = {
   PUBLISH_TEMPLATE: 'Publish template',
   ACCEPT_COUNTERPARTY_REDLINE: 'Accept a counterparty change',
   SIGN_ON_BEHALF: 'Sign on behalf of a party',
+  WITHDRAW: 'Withdraw a contract sent for signing',
 }
 
 /** Pure rule for whether the decision form may be submitted. Exported for tests. */
@@ -64,6 +65,7 @@ export function approvalState(list: Pick<Approval, 'action' | 'subjectId' | 'sta
 export function requestableActions(status: string, list: Pick<Approval, 'action' | 'subjectId' | 'status'>[], contractId: string): ApprovalAction[] {
   const out: ApprovalAction[] = []
   if (status === 'UNDER_REVIEW' && approvalState(list, 'SEND_FOR_SIGNING', contractId) === 'NONE') out.push('SEND_FOR_SIGNING')
+  if (status === 'SENT' && approvalState(list, 'WITHDRAW', contractId) === 'NONE') out.push('WITHDRAW')
   if (status === 'SIGNED' && approvalState(list, 'TERMINATE', contractId) === 'NONE') out.push('TERMINATE')
   return out
 }

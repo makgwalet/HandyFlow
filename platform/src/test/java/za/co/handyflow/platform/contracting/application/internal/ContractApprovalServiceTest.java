@@ -71,7 +71,7 @@ class ContractApprovalServiceTest {
     @Test
     void withNoStoredPolicyTheSafeDefaultsApply() {
         var all = service.policies(tenant);
-        assertEquals(6, all.size());
+        assertEquals(7, all.size());
         assertTrue(all.stream().allMatch(ContractApprovalService.EffectivePolicy::isDefault));
         assertFalse(service.policy(tenant, ApprovalAction.SEND_FOR_SIGNING).required(), "sending for signing needs approval only when the tenant asks");
         assertTrue(service.policy(tenant, ApprovalAction.TERMINATE).required());
@@ -79,6 +79,7 @@ class ContractApprovalServiceTest {
         assertTrue(service.policy(tenant, ApprovalAction.PUBLISH_CLAUSE).required());
         assertFalse(service.policy(tenant, ApprovalAction.ACCEPT_COUNTERPARTY_REDLINE).required(), "accepting a counterparty change needs approval only where configured");
         assertFalse(service.policy(tenant, ApprovalAction.SIGN_ON_BEHALF).required(), "signing on behalf needs approval only where dual authorisation is required");
+        assertTrue(service.policy(tenant, ApprovalAction.WITHDRAW).required(), "withdrawing a contract already sent needs approval by default");
     }
 
     private void switchOn(ApprovalAction a) {

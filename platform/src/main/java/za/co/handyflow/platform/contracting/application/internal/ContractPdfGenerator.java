@@ -210,6 +210,7 @@ public class ContractPdfGenerator {
             case "SENT" -> new Look("AWAITING SIGNATURES", PENDING_CLR, PENDING_BG);
             case "UNDER_REVIEW" -> new Look("UNDER REVIEW", PENDING_CLR, PENDING_BG);
             case "TERMINATED" -> new Look("TERMINATED", DANGER, DANGER_BG);
+            case "WITHDRAWN" -> new Look("WITHDRAWN - NOT EXECUTED", DANGER, DANGER_BG);
             case "EXPIRED", "ARCHIVED" -> new Look(s, MID_GRAY, NEUTRAL_BG);
             default -> new Look(s.isEmpty() ? "DRAFT" : s.replace('_', ' '), MID_GRAY, NEUTRAL_BG);
         };

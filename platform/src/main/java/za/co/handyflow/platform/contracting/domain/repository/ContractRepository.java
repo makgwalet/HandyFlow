@@ -126,4 +126,8 @@ public interface ContractRepository extends JpaRepository<Contract, UUID> {
     @Query("SELECT c.contractNumber, c.title, c.contractType, c.status, c.valueAmount, c.currency, c.startDate, c.endDate, c.autoRenew, "
             + "c.renewalNoticeDays, c.sentAt, c.signedAt FROM Contract c WHERE c.tenantId = :#{#tenantId.value} AND c.deletedAt IS NULL ORDER BY c.createdAt DESC")
     List<Object[]> register(TenantId tenantId, org.springframework.data.domain.Pageable page);
+
+    /** The new draft made from a withdrawn contract, if one exists. */
+    @Query("SELECT c FROM Contract c WHERE c.tenantId = :#{#tenantId.value} AND c.revisionOfContractId = :id AND c.deletedAt IS NULL")
+    Optional<Contract> findRevisionOf(TenantId tenantId, UUID id);
 }

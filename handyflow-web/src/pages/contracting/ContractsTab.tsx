@@ -30,6 +30,8 @@ import { unwrap, fmtR, apiError, type ContractRow, type ContractParty, type Cont
 import { ContractWizard } from './ContractWizard'
 import { WorkspaceHeader } from './WorkspaceHeader'
 import { ContractApprovalsPanel } from './ContractApprovalsPanel'
+import { WithdrawModal } from './WithdrawModal'
+import { withdrawAvailability, canReviseWithdrawn } from './contractWithdraw'
 import { approvalState, listOf, type Approval, type PolicyRow } from './approvalsShared'
 import type { WorkspaceTab } from './contractWorkspace'
 import { ContractSharingSection } from './ContractSharingSection'
@@ -52,6 +54,7 @@ const STATUS_CFG: Record<string, { color: string; bg: string; border: string; la
   UNDER_REVIEW: { color: 'var(--hf-warning-text)', bg: 'var(--hf-warning-soft)', border: 'var(--hf-warning-border)', label: 'Under Review'  },
   SENT:         { color: 'var(--hf-info-text)', bg: 'var(--hf-info-soft)', border: 'var(--hf-info-border)', label: 'Pending Sign'  },
   SIGNED:       { color: 'var(--hf-success-text-strong)', bg: 'var(--hf-success-soft-strong)', border: 'var(--hf-success-border)', label: 'Signed'        },
+  WITHDRAWN:    { color: 'var(--hf-warning-text)', bg: 'var(--hf-warning-soft)', border: 'var(--hf-warning-border)', label: 'Withdrawn'     },
   TERMINATED:   { color: 'var(--hf-danger-text)', bg: 'var(--hf-danger-soft)', border: 'var(--hf-danger-border)', label: 'Terminated'    },
   EXPIRED:      { color: 'var(--hf-text-faint)', bg: 'var(--hf-surface-sunken)', border: 'var(--hf-border)', label: 'Expired'       },
 }
@@ -262,6 +265,7 @@ export default function ContractsTab() {
   const [otpCode,      setOtpCode]      = useState('')
   const [devOtp,       setDevOtp]       = useState(false)
   const [terminateReason, setTerminateReason] = useState('')
+  const [showWithdraw, setShowWithdraw] = useState<string | null>(null)
   const [commentText,  setCommentText]  = useState('')
   const [isAmendment,  setIsAmendment]  = useState(false)
   const [clauseRef,    setClauseRef]    = useState('')
@@ -313,6 +317,25 @@ export default function ContractsTab() {
     onError: (e: unknown) => setError(apiError(e, 'Could not ask for approval')),
   })
 
+  // Withdrawing a contract that was sent for signing can be put behind a second person's approval (on by default).
+  const withdrawGate = {
+    required: approvalPolicy.find(p => p.action === 'WITHDRAW')?.required ?? true,
+    state: approvalState(approvalList, 'WITHDRAW', showWithdraw ?? expanded ?? ''),
+  }
+  const askWithdrawApproval = useMutation({
+    mutationFn: (contractId: string) => apiClient.post('/api/v1/contracts/approvals', { action: 'WITHDRAW', subjectId: contractId, note: null }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['contract-approvals'] }); setError('') },
+    onError: (e: unknown) => setError(apiError(e, 'Could not ask for approval')),
+  })
+  const expandedStatus = contracts.find(c0 => c0.id === expanded)?.status
+  const { data: withdrawal } = useQuery<{ withdrawnAt: string; reason: string; partiesSigned: number; partiesTotal: number; revisionContractId: string | null } | null>({
+    queryKey: ['contract-withdrawal', expanded],
+    queryFn: async () => {
+      try { return (await apiClient.get(`/api/v1/contracts/${expanded}/withdrawal`)).data?.data ?? null } catch { return null }
+    },
+    enabled: !!expanded && expandedStatus === 'WITHDRAWN',
+  })
+
   const { data: templates = [] } = useQuery<ContractTemplateRow[]>({
     queryKey: ['contract-templates'],
     queryFn: async () => unwrap<ContractTemplateRow>(await apiClient.get('/api/v1/contracts/templates')),
@@ -328,7 +351,7 @@ export default function ContractsTab() {
   const contractAction = useMutation({
     mutationFn: ({ id, action, body }: { id: string; action: string; body?: Record<string, unknown> }) =>
       apiClient.post(`/api/v1/contracts/${id}/${action}`, body ?? {}),
-    onSuccess: () => { invalidate(); setShowTerminate(null); setTerminateReason(''); setError('') },
+    onSuccess: () => { invalidate(); setShowTerminate(null); setTerminateReason(''); setShowWithdraw(null); setError('') },
     onError: (e: unknown) => setError(apiError(e, 'Action failed')),
   })
 
@@ -411,6 +434,8 @@ export default function ContractsTab() {
   const getNextActions = (status: string) => {
     if (status === 'DRAFT')        return [{ label: 'Submit for Review', action: 'submit-for-review', color: 'var(--hf-info-text)', bg: 'var(--hf-info-soft)' }]
     if (status === 'UNDER_REVIEW') return [{ label: 'Send for Signing',  action: 'send-for-signing',  color: 'var(--hf-success-text-strong)', bg: 'var(--hf-success-soft-strong)' }]
+    if (status === 'SENT')         return [{ label: 'Withdraw',          action: 'withdraw',           color: 'var(--hf-danger-text)', bg: 'var(--hf-danger-soft)' }]
+    if (canReviseWithdrawn(status, canManage)) return [{ label: 'New draft revision', action: 'new-revision', color: 'var(--hf-info-text)', bg: 'var(--hf-info-soft)' }]
     if (status === 'SIGNED')       return [{ label: 'Terminate',         action: 'terminate',          color: 'var(--hf-danger-text)', bg: 'var(--hf-danger-soft)' }]
     return []
   }
@@ -871,10 +896,14 @@ export default function ContractsTab() {
                           Edit
                         </button>
                       )}
-                      {getNextActions(c.status).filter(a => a.action === 'terminate' ? canTerminate : canManage).map(({ label, action, color, bg }) => (
+                      {getNextActions(c.status)
+                        .filter(a => a.action === 'terminate' ? canTerminate : canManage)
+                        .filter(a => a.action !== 'withdraw' || withdrawAvailability(c.status, (contractDetail?.id === c.id ? contractDetail?.parties : c.parties) ?? []).available)
+                        .map(({ label, action, color, bg }) => (
                         <button key={action}
                           onClick={() => {
                             if (action === 'terminate') { setShowTerminate(c.id); setTerminateReason(''); setError(''); return }
+                            if (action === 'withdraw') { setShowWithdraw(c.id); setError(''); return }
                             contractAction.mutate({ id: c.id, action })
                           }}
                           disabled={contractAction.isPending}
@@ -892,6 +921,13 @@ export default function ContractsTab() {
                         message into a readable field list. */}
                     <ErrBox msg={humanizeActionError(error)} />
 
+                    {c.status === 'WITHDRAWN' && withdrawal && (
+                      <div style={{ marginTop: 10, padding: '9px 12px', background: 'var(--hf-warning-soft)', border: '1px solid var(--hf-warning-border)', borderRadius: 7, fontSize: 12, color: 'var(--hf-warning-text)' }}>
+                        <strong>Signing was withdrawn:</strong> {withdrawal.reason} · {fmtDT(withdrawal.withdrawnAt)}
+                        {withdrawal.partiesSigned > 0 && ` · ${withdrawal.partiesSigned} of ${withdrawal.partiesTotal} had signed (kept on record, not treated as executed)`}
+                        {withdrawal.revisionContractId && ' · A new draft has been made from it.'}
+                      </div>
+                    )}
                     {c.terminationReason && (
                       <div style={{ marginTop: 10, padding: '9px 12px', background: 'var(--hf-danger-soft)', border: '1px solid var(--hf-danger-border)', borderRadius: 7, fontSize: 12, color: 'var(--hf-danger-text)' }}>
                         <strong>Termination reason:</strong> {c.terminationReason}
@@ -1104,6 +1140,25 @@ export default function ContractsTab() {
           </div>
         </div>
       )}
+
+      {showWithdraw && (() => {
+        const wc = contracts.find(x => x.id === showWithdraw)
+        const wp = ((contractDetail?.id === showWithdraw ? contractDetail?.parties : wc?.parties) ?? []).filter(p => p.partyRole !== 'WITNESS')
+        return (
+          <WithdrawModal
+            contractNumber={wc?.contractNumber ?? ''}
+            signedCount={wp.filter(p => p.signingStatus === 'SIGNED').length}
+            totalSigners={wp.length}
+            required={withdrawGate.required}
+            state={withdrawGate.state}
+            busy={contractAction.isPending || askWithdrawApproval.isPending}
+            error={humanizeActionError(error)}
+            onAsk={() => askWithdrawApproval.mutate(showWithdraw)}
+            onWithdraw={reason => contractAction.mutate({ id: showWithdraw, action: 'withdraw', body: { reason } })}
+            onClose={() => { setShowWithdraw(null); setError('') }}
+          />
+        )
+      })()}
 
       {/* Terminate modal */}
       {showTerminate && (
