@@ -107,7 +107,7 @@ export default function RevenuePanel() {
                           <td style={{ padding: '11px 16px', fontWeight: 700 }}>{money(c.revenueCents, cur)}</td>
                           <td style={{ padding: '11px 16px' }}>{c.revenuePerSentCents == null ? '—' : money(c.revenuePerSentCents, cur)}</td>
                           <td style={{ padding: '11px 16px' }}>
-                            {costEdit?.id === c.id ? (
+                            {costEdit && costEdit.id === c.id ? (
                               <span style={{ display: 'inline-flex', gap: 4 }}>
                                 <input autoFocus style={{ ...inp, width: 90, padding: '4px 8px', fontSize: 12 }} value={costEdit.value} placeholder="R"
                                   onChange={e => setCostEdit({ id: c.id, value: e.target.value })}

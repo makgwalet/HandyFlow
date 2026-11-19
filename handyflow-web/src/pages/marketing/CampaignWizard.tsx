@@ -26,7 +26,7 @@ export default function CampaignWizard({ campaign, onClose, onSaved }: Props) {
   const editing = !!campaign
   const [step, setStep] = useState(0)
   const [form, setForm] = useState({
-    name: '', templateId: '', audienceType: 'ALL_OPTED_IN', segmentId: '', fromName: '', replyTo: '',
+    name: '', templateId: '', audienceType: 'ALL_OPTED_IN', segmentId: '', topicId: '', fromName: '', replyTo: '',
     scheduledAt: '', subject: '', htmlBody: '', changeNote: '', mode: 'visual' as 'visual' | 'html', launchNow: false,
   })
   const [loaded, setLoaded] = useState(!editing)
@@ -51,7 +51,7 @@ export default function CampaignWizard({ campaign, onClose, onSaved }: Props) {
   useEffect(() => {
     if (editing && current && !loaded) {
       setForm({
-        name: campaign.name, templateId: campaign.templateId ?? '', audienceType: campaign.audienceType, segmentId: campaign.segmentId ?? '',
+        name: campaign.name, templateId: campaign.templateId ?? '', audienceType: campaign.audienceType, segmentId: campaign.segmentId ?? '', topicId: campaign.topicId ?? '',
         fromName: campaign.fromName ?? '', replyTo: campaign.replyTo ?? '', scheduledAt: toLocalInput(campaign.scheduledAt),
         subject: current.subject ?? '', htmlBody: current.htmlBody ?? '', changeNote: '',
         mode: parseBlocks(current.htmlBody ?? '') ? 'visual' : 'html', launchNow: false,
@@ -128,8 +128,10 @@ export default function CampaignWizard({ campaign, onClose, onSaved }: Props) {
         templateId: form.templateId || null, subject: form.subject, htmlBody: form.htmlBody,
         scheduledAt: form.scheduledAt ? new Date(form.scheduledAt).toISOString() : null,
       }
-      if (editing) { await apiClient.put(`/api/v1/marketing/campaigns/${campaign.id}`, { ...body, changeNote: form.changeNote.trim() || null }); return { launchError: null } }
+      const setTopic = async (id: string, current: string) => { if (form.topicId !== current) await apiClient.put(`/api/v1/marketing/campaigns/${id}/topic`, { topicId: form.topicId || null }) }
+      if (editing) { await apiClient.put(`/api/v1/marketing/campaigns/${campaign.id}`, { ...body, changeNote: form.changeNote.trim() || null }); await setTopic(campaign.id, campaign.topicId ?? ''); return { launchError: null } }
       const r = await apiClient.post('/api/v1/marketing/campaigns', { ...body, channel: 'EMAIL' })
+      await setTopic((r.data?.data ?? r.data).id, '')
       if (form.launchNow && canLaunchNow) {
         try { await apiClient.post(`/api/v1/marketing/campaigns/${(r.data?.data ?? r.data).id}/launch`) }
         catch (e: any) { return { launchError: e.response?.data?.message || 'Launch failed' } }
@@ -235,6 +237,14 @@ export default function CampaignWizard({ campaign, onClose, onSaved }: Props) {
                               <div key={l} style={{ background: bg, borderRadius: 9, padding: '9px 14px', minWidth: 110 }}><div style={{ fontSize: 20, fontWeight: 800, color: c }}>{Number(v).toLocaleString()}</div><div style={{ fontSize: 11, color: c }}>{l}</div></div>))}
                           </div>)}
                       </div>)}
+                    <div style={{ marginTop: 16 }}>
+                      <label style={lbl}>Topic (optional)</label>
+                      <select style={inp} value={form.topicId} onChange={e => f('topicId', e.target.value)}>
+                        <option value="">No topic: everyone eligible receives it</option>
+                        {(topics as any[]).map((t: any) => <option key={t.id} value={t.id}>{t.name}</option>)}
+                      </select>
+                      <div style={{ fontSize: 12, color: C.text, marginTop: 6 }}>Contacts who opted out of this topic are skipped. Changing the topic voids any approval.</div>
+                    </div>
                   </div>)}
 
                 {step === 2 && (

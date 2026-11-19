@@ -298,6 +298,7 @@ function JourneyEditor({ journey, prefill, onClose, onSaved }: any) {
           <div><label style={lbl}>Send window start (SAST hour)</label><input style={inp} type="number" min={0} max={23} value={f.windowStartHour} onChange={e => set('windowStartHour', e.target.value)} /></div>
           <div><label style={lbl}>Send window end (SAST hour)</label><input style={inp} type="number" min={1} max={24} value={f.windowEndHour} onChange={e => set('windowEndHour', e.target.value)} /></div>
         </div>
+        <JourneyFlow trigger={f.triggerType} steps={f.steps} />
         <label style={{ display: 'flex', gap: 8, fontSize: 13, alignItems: 'center', marginBottom: 6 }}><input type="checkbox" checked={f.skipWeekends} onChange={e => set('skipWeekends', e.target.checked)} /> Don’t send on weekends</label>
 
         <div style={sec}>Steps</div>

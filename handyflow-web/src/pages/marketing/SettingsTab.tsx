@@ -1,5 +1,5 @@
 // src/pages/marketing/SettingsTab.tsx
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { apiClient } from '../../api/client'
 import { Mail, MessageSquare, Smartphone, ShieldCheck, Webhook, Link2, ChevronDown, ChevronUp } from 'lucide-react'
@@ -87,6 +87,8 @@ export default function SettingsTab() {
           <Row key={p} icon={<Webhook size={16} />} title={p.charAt(0).toUpperCase() + p.slice(1)} right={<code style={{ fontSize: 11, color: C.text, background: C.bg, padding: '4px 8px', borderRadius: 6 }}>{base}/api/v1/marketing/webhooks/{p}</code>} />))}
         <Row icon={<Link2 size={16} />} title="Provider integrations" text="Only generic SMTP and the webhook parsers above are supported today. Direct Mailchimp and SendGrid integrations aren’t built." />
       </Card>
+
+      <DeliverabilityPanel />
     </div>
   )
 }

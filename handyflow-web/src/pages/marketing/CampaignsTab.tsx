@@ -47,7 +47,7 @@ const ReviewBadge = ({ c, show }: { c: any; show: boolean }) => {
 }
 const audienceLabel = (c: any) => c.audienceType === 'SEGMENT' ? (c.segmentName ?? 'Segment') : 'All opted-in'
 
-export default function CampaignsTab() {
+export default function CampaignsTab({ autoOpenNew, onAutoOpened }: { autoOpenNew?: boolean; onAutoOpened?: () => void } = {}) {
   const qc = useQueryClient()
   const [editor, setEditor] = useState<{ campaign?: any } | null>(null)
   useEffect(() => { if (autoOpenNew) { setEditor({}); onAutoOpened?.() } }, [autoOpenNew]) // eslint-disable-line react-hooks/exhaustive-deps

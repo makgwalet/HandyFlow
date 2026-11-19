@@ -44,7 +44,6 @@ export default function AnalyticsTab(_props: { summary?: any }) {
     queryKey: ['marketing-analytics-compare', selectedIds], enabled: showCompare && selectedIds.length >= 2,
     queryFn: async () => (await apiClient.get('/api/v1/marketing/analytics/compare', { params: { ids: selectedIds.join(',') } })).data?.data ?? [],
   })
-  const { data: dv } = useQuery<any>({ queryKey: ['marketing-deliverability'], queryFn: async () => (await apiClient.get('/api/v1/marketing/deliverability')).data?.data })
 
   const t = overview?.totals
   const items: any[] = overview?.items ?? []
