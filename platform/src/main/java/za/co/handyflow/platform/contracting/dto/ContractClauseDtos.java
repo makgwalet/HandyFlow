@@ -24,7 +24,8 @@ public final class ContractClauseDtos {
     /** legalStatus: NOT_REVIEWED, REVIEWED, REVIEW_EXPIRED, SUPERSEDED or WITHDRAWN. A review is evidence, not a compliance guarantee. */
     public record ClauseResponse(UUID id, UUID familyId, int versionNo, String title, String category, String body, String legalArea, String jurisdiction,
                                  String status, String legalStatus, String reviewerName, String reviewerProfessionalDetails, LocalDate reviewDate,
-                                 LocalDate nextReviewDate, String reviewNotes, Instant publishedAt, String withdrawnReason, boolean usable) {}
+                                 LocalDate nextReviewDate, String reviewNotes, Instant publishedAt, String withdrawnReason, boolean usable,
+                                 UUID evidenceDocumentId, String evidenceFileName) {}
 
     /** state: CURRENT, SUPERSEDED, WITHDRAWN or REVIEW_EXPIRED, judged today against the clause as it stands now. */
     public record ClauseUsageResponse(UUID clauseId, String title, int clauseVersionNo, String state, Integer contractVersionNo, Instant insertedAt) {}

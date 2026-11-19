@@ -12,6 +12,7 @@ import za.co.handyflow.platform.contracting.domain.repository.ContractClauseUsag
 import za.co.handyflow.platform.contracting.domain.repository.ContractRepository;
 import za.co.handyflow.platform.contracting.dto.ContractClauseDtos.*;
 import za.co.handyflow.platform.contracting.dto.ContractRedlineDtos.ProposalView;
+import za.co.handyflow.platform.documents.application.DocumentsFacade;
 import za.co.handyflow.platform.shared.ResourceNotFoundException;
 import za.co.handyflow.platform.shared.TenantId;
 
@@ -34,6 +35,10 @@ public class ContractClauseService {
     private final ContractClauseUsageRepository usageRepo;
     private final ContractRepository contractRepo;
     private final ContractRedlineService redline;
+    private final DocumentsFacade documents;   // the reviewer's signed-off review
+
+    static final String EVIDENCE_OWNER_TYPE = "CONTRACT_CLAUSE_REVIEW";
+    static final String EVIDENCE_CATEGORY = "CLAUSE_REVIEW_EVIDENCE";
 
     @Transactional(readOnly = true)
     public List<ClauseResponse> list(TenantId tenantId, String category, String status) {
@@ -62,6 +67,33 @@ public class ContractClauseService {
         ContractClause c = clause(tenantId, id);
         c.approve(req.reviewerName(), req.reviewerProfessionalDetails(), req.reviewDate(), req.nextReviewDate(), req.notes(), LocalDate.now());
         return toResponse(clauseRepo.save(c), LocalDate.now());
+    }
+
+    /**
+     * Stores the reviewer's signed-off review of this wording. The first file creates the document; later files are added as new
+     * versions so the earlier evidence is kept. Files go through the Documents module's checks and tenant isolation.
+     */
+    @Transactional
+    public ClauseResponse uploadEvidence(TenantId tenantId, UUID id, DocumentsFacade.FileUpload file, UUID by) {
+        ContractClause c = clause(tenantId, id);
+        if (c.getEvidenceDocumentId() != null && documents.find(tenantId, c.getEvidenceDocumentId()).isPresent()) {
+            c.attachEvidence(c.getEvidenceDocumentId());   // state check only: a draft or withdrawn clause takes no evidence
+            documents.addVersion(tenantId, c.getEvidenceDocumentId(), file, "Replacement evidence", null, by);
+        } else {
+            c.attachEvidence(null);                          // state check before anything is stored
+            DocumentsFacade.DocumentInfo d = documents.upload(tenantId, EVIDENCE_OWNER_TYPE, c.getId(), EVIDENCE_CATEGORY,
+                    "Clause review evidence: " + c.getTitle() + " v" + c.getVersionNo(),
+                    "Reviewed by " + c.getReviewerName() + " on " + c.getReviewDate(), null, file, by);
+            c.attachEvidence(d.id());
+        }
+        return toResponse(clauseRepo.save(c), LocalDate.now());
+    }
+
+    @Transactional(readOnly = true)
+    public DocumentsFacade.Download downloadEvidence(TenantId tenantId, UUID id, Integer versionNo, UUID by) {
+        ContractClause c = clause(tenantId, id);
+        if (c.getEvidenceDocumentId() == null) throw new ResourceNotFoundException("Clause review evidence", id.toString());
+        return documents.download(tenantId, c.getEvidenceDocumentId(), versionNo, by);
     }
 
     @Transactional
@@ -153,7 +185,13 @@ public class ContractClauseService {
     private ClauseResponse toResponse(ContractClause c, LocalDate today) {
         return new ClauseResponse(c.getId(), c.getFamilyId(), c.getVersionNo(), c.getTitle(), c.getCategory(), c.getBody(), c.getLegalArea(), c.getJurisdiction(),
                 c.getStatus(), legalStatus(c, today), c.getReviewerName(), c.getReviewerProfessionalDetails(), c.getReviewDate(), c.getNextReviewDate(),
-                c.getReviewNotes(), c.getPublishedAt(), c.getWithdrawnReason(), c.usable(today));
+                c.getReviewNotes(), c.getPublishedAt(), c.getWithdrawnReason(), c.usable(today), c.getEvidenceDocumentId(), evidenceFileName(c));
+    }
+
+    private String evidenceFileName(ContractClause c) {
+        if (c.getEvidenceDocumentId() == null) return null;
+        return documents.find(TenantId.of(c.getTenantId()), c.getEvidenceDocumentId())
+                .map(d -> d.current() == null ? null : d.current().fileName()).orElse(null);
     }
 
     private ContractClause clause(TenantId tenantId, UUID id) {

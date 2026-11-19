@@ -4,15 +4,21 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import za.co.handyflow.platform.contracting.application.internal.ContractClauseService;
 import za.co.handyflow.platform.contracting.dto.ContractClauseDtos.*;
 import za.co.handyflow.platform.contracting.dto.ContractRedlineDtos.ProposalView;
+import za.co.handyflow.platform.documents.application.DocumentsFacade;
 import za.co.handyflow.platform.shared.ApiResponse;
 import za.co.handyflow.platform.shared.TenantContext;
 
+import org.springframework.web.multipart.MultipartFile;
+
+import java.io.IOException;
 import java.util.List;
 import java.util.UUID;
 
@@ -62,6 +68,26 @@ public class ContractClauseController {
     @Operation(summary = "Record the legal reviewer's approval of this exact wording")
     public ResponseEntity<ApiResponse<ClauseResponse>> approve(@PathVariable UUID id, @Valid @RequestBody ApproveClauseRequest req) {
         return ResponseEntity.ok(ApiResponse.success("Clause approved", service.approve(TenantContext.getTenantIdAsObject(), id, req)));
+    }
+
+    @PostMapping(value = "/clauses/{id}/evidence", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize(AUTHOR)
+    @Operation(summary = "Attach the reviewer's signed-off review to an approved or published clause. A second file is stored as a new version")
+    public ResponseEntity<ApiResponse<ClauseResponse>> uploadEvidence(@PathVariable UUID id, @RequestParam("file") MultipartFile file) throws IOException {
+        return ResponseEntity.ok(ApiResponse.success("Evidence stored", service.uploadEvidence(TenantContext.getTenantIdAsObject(), id,
+                new DocumentsFacade.FileUpload(file.getOriginalFilename(), file.getContentType(), file.getBytes()), TenantContext.getCurrentUserId())));
+    }
+
+    @GetMapping("/clauses/{id}/evidence")
+    @PreAuthorize(READ)
+    @Operation(summary = "Download the evidence file of a clause review (the latest version, or the numbered one). The download is audited")
+    public ResponseEntity<byte[]> downloadEvidence(@PathVariable UUID id, @RequestParam(required = false) Integer version) {
+        DocumentsFacade.Download file = service.downloadEvidence(TenantContext.getTenantIdAsObject(), id, version, TenantContext.getCurrentUserId());
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + file.fileName().replace("\"", "") + "\"")
+                .header("X-Content-Type-Options", "nosniff")
+                .contentType(MediaType.parseMediaType(file.contentType()))
+                .body(file.content());
     }
 
     @PostMapping("/clauses/{id}/return-to-draft")

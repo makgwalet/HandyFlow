@@ -38,6 +38,7 @@ public class ContractClause {
     @Column(name = "review_date") private LocalDate reviewDate;
     @Column(name = "next_review_date") private LocalDate nextReviewDate;
     @Column(name = "review_notes", columnDefinition = "TEXT") private String reviewNotes;
+    @Column(name = "evidence_document_id") private UUID evidenceDocumentId;
     @Column(name = "published_at") private Instant publishedAt;
     @Column(name = "withdrawn_at") private Instant withdrawnAt;
     @Column(name = "withdrawn_reason") private String withdrawnReason;
@@ -79,8 +80,17 @@ public class ContractClause {
         this.updatedAt = Instant.now();
     }
 
+    // The evidence belongs to the review that is being cleared, so it is unlinked. The stored document itself is kept for the audit trail.
     private void clearReview() {
-        reviewerName = null; reviewerProfessionalDetails = null; reviewDate = null; nextReviewDate = null; reviewNotes = null;
+        reviewerName = null; reviewerProfessionalDetails = null; reviewDate = null; nextReviewDate = null; reviewNotes = null; evidenceDocumentId = null;
+    }
+
+    /** Links the reviewer's signed-off review. Only an approved or published clause has a review to evidence. */
+    public void attachEvidence(UUID documentId) {
+        if (!"APPROVED".equals(status) && !"PUBLISHED".equals(status))
+            throw new IllegalStateException("Evidence can only be added to an approved or published clause (this one is " + status + ")");
+        this.evidenceDocumentId = documentId;
+        this.updatedAt = Instant.now();
     }
 
     /** Records the legal reviewer's approval of this exact wording. */

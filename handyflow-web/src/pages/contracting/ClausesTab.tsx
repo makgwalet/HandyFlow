@@ -16,6 +16,7 @@ export interface Clause {
   legalStatus: 'NOT_REVIEWED' | 'REVIEWED' | 'REVIEW_EXPIRED' | 'SUPERSEDED' | 'WITHDRAWN'
   reviewerName?: string | null; reviewerProfessionalDetails?: string | null; reviewDate?: string | null; nextReviewDate?: string | null
   reviewNotes?: string | null; withdrawnReason?: string | null; usable: boolean
+  evidenceDocumentId?: string | null; evidenceFileName?: string | null
 }
 
 const CLAUSE_CATEGORIES = [
@@ -50,6 +51,7 @@ export default function ClausesTab() {
   const [form, setForm] = useState(EMPTY)
   const [reviewing, setReviewing] = useState<Clause | null>(null)
   const [review, setReview] = useState(EMPTY_REVIEW)
+  const [reviewFile, setReviewFile] = useState<File | null>(null)
   const [error, setError] = useState('')
 
   const { data: clauses = [], isLoading } = useQuery<Clause[]>({
@@ -68,11 +70,41 @@ export default function ClausesTab() {
     onSuccess: refresh,
     onError: (e: unknown) => setError(errMsg(e, 'That step could not be completed')),
   })
+  const uploadEvidence = (id: string, fl: File) => {
+    const fd = new FormData()
+    fd.append('file', fl)
+    return apiClient.post(`/api/v1/contracts/clauses/${id}/evidence`, fd)
+  }
+  // Records the approval first, then stores the reviewer's file. If only the file fails the approval stays recorded and the file can
+  // be attached again from the clause.
   const approve = useMutation({
-    mutationFn: () => apiClient.post(`/api/v1/contracts/clauses/${reviewing!.id}/approve`, { ...review, nextReviewDate: review.nextReviewDate || null, notes: review.notes || null }),
-    onSuccess: () => { refresh(); setReviewing(null) },
+    mutationFn: async () => {
+      const id = reviewing!.id
+      await apiClient.post(`/api/v1/contracts/clauses/${id}/approve`, { ...review, nextReviewDate: review.nextReviewDate || null, notes: review.notes || null })
+      if (!reviewFile) return { fileError: '' }
+      try { await uploadEvidence(id, reviewFile); return { fileError: '' } }
+      catch (e: unknown) { return { fileError: errMsg(e, 'The file could not be stored') } }
+    },
+    onSuccess: (r) => {
+      refresh(); setReviewing(null); setReviewFile(null)
+      if (r.fileError) setError(`The approval was recorded, but the evidence file was not stored: ${r.fileError}. Attach it from the clause.`)
+    },
     onError: (e: unknown) => setError(errMsg(e, 'Could not record the review')),
   })
+  const attach = useMutation({
+    mutationFn: ({ id, file }: { id: string; file: File }) => uploadEvidence(id, file),
+    onSuccess: refresh,
+    onError: (e: unknown) => setError(errMsg(e, 'The file could not be stored')),
+  })
+  const download = async (c: Clause) => {
+    try {
+      const res = await apiClient.get(`/api/v1/contracts/clauses/${c.id}/evidence`, { responseType: 'blob' })
+      const url = URL.createObjectURL(res.data as Blob)
+      const a = document.createElement('a')
+      a.href = url; a.download = c.evidenceFileName ?? 'clause-review-evidence'; a.click()
+      URL.revokeObjectURL(url)
+    } catch (e: unknown) { setError(errMsg(e, 'The evidence file could not be downloaded')) }
+  }
 
   const openNew = () => { setEditing(null); setForm(EMPTY); setShowForm(true); setError('') }
   const openEdit = (c: Clause) => { setEditing(c); setForm({ title: c.title, category: c.category, body: c.body, legalArea: c.legalArea ?? '', jurisdiction: c.jurisdiction }); setShowForm(true); setError('') }
@@ -112,6 +144,13 @@ export default function ClausesTab() {
                   Reviewed by {c.reviewerName}, {c.reviewerProfessionalDetails} on {c.reviewDate}{c.nextReviewDate ? ` · next review ${c.nextReviewDate}` : ''}
                 </div>
               )}
+              {(c.status === 'APPROVED' || c.status === 'PUBLISHED') && (
+                <div style={{ fontSize: 12, color: 'var(--hf-text-muted)', marginTop: 2 }}>
+                  Evidence: {c.evidenceDocumentId
+                    ? <button style={{ ...btn, padding: '2px 8px' }} onClick={() => download(c)}>Download {c.evidenceFileName ?? 'file'}</button>
+                    : <span style={{ color: 'var(--hf-warning-text)' }}>none attached</span>}
+                </div>
+              )}
               {c.legalStatus === 'REVIEW_EXPIRED' && <div style={{ fontSize: 12, color: 'var(--hf-danger-text)', marginTop: 2 }}>This clause cannot be put into contracts until it has a new review.</div>}
               {c.withdrawnReason && <div style={{ fontSize: 12, color: 'var(--hf-danger-text)', marginTop: 2 }}>Withdrawn: {c.withdrawnReason}</div>}
               <div style={{ marginTop: 8, fontSize: 13, lineHeight: 1.7, color: 'var(--hf-text-secondary)', maxHeight: 140, overflowY: 'auto', border: '1px solid var(--hf-border)', borderRadius: 8, padding: '6px 10px', background: 'var(--hf-surface-muted)' }}
@@ -119,7 +158,14 @@ export default function ClausesTab() {
               {canAuthor && (
                 <div style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
                   {c.status === 'DRAFT' && <button style={btn} disabled={act.isPending} onClick={() => openEdit(c)}>Edit</button>}
-                  {c.status === 'DRAFT' && <button style={btn} disabled={act.isPending} onClick={() => { setReviewing(c); setReview(EMPTY_REVIEW); setError('') }}>Record legal review</button>}
+                  {c.status === 'DRAFT' && <button style={btn} disabled={act.isPending} onClick={() => { setReviewing(c); setReview(EMPTY_REVIEW); setReviewFile(null); setError('') }}>Record legal review</button>}
+                  {(c.status === 'APPROVED' || c.status === 'PUBLISHED') && (
+                    <label style={{ ...btn, display: 'inline-block' }}>
+                      {c.evidenceDocumentId ? 'Upload replacement' : 'Attach evidence'}
+                      <input type="file" accept=".pdf,.png,.jpg,.jpeg,.doc,.docx" style={{ display: 'none' }}
+                        onChange={e => { const fl = e.target.files?.[0]; if (fl) attach.mutate({ id: c.id, file: fl }); e.target.value = '' }} />
+                    </label>
+                  )}
                   {c.status === 'APPROVED' && <button style={btn} disabled={act.isPending} onClick={() => act.mutate({ id: c.id, action: 'publish' })}>Publish</button>}
                   {c.status === 'APPROVED' && <button style={btn} disabled={act.isPending} onClick={() => act.mutate({ id: c.id, action: 'return-to-draft' })}>Return to draft</button>}
                   {c.status === 'PUBLISHED' && <button style={btn} disabled={act.isPending} onClick={() => act.mutate({ id: c.id, action: 'new-version' })}>New version</button>}
@@ -171,6 +217,10 @@ export default function ClausesTab() {
               <div><label style={lbl}>Professional details *</label><input style={inp} value={review.reviewerProfessionalDetails} onChange={e => setReview(p => ({ ...p, reviewerProfessionalDetails: e.target.value }))} placeholder="e.g. admitted attorney, firm" /></div>
               <div><label style={lbl}>Review date *</label><input type="date" style={inp} value={review.reviewDate} onChange={e => setReview(p => ({ ...p, reviewDate: e.target.value }))} /></div>
               <div><label style={lbl}>Next review date</label><input type="date" style={inp} value={review.nextReviewDate} onChange={e => setReview(p => ({ ...p, nextReviewDate: e.target.value }))} /></div>
+              <div style={{ gridColumn: '1/-1' }}>
+                <label style={lbl}>Evidence: the reviewer's signed-off review (PDF or scan, optional)</label>
+                <input type="file" aria-label="Review evidence file" accept=".pdf,.png,.jpg,.jpeg,.doc,.docx" onChange={e => setReviewFile(e.target.files?.[0] ?? null)} />
+              </div>
               <div style={{ gridColumn: '1/-1' }}><label style={lbl}>Notes</label><textarea rows={2} style={inp} value={review.notes} onChange={e => setReview(p => ({ ...p, notes: e.target.value }))} /></div>
             </div>
             {error && <div style={{ marginTop: 12, fontSize: 13, color: 'var(--hf-danger-text)' }}>{error}</div>}
