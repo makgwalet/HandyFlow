@@ -5,6 +5,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Check, Plus, Trash2, X } from 'lucide-react'
 import { apiClient } from '../../api/client'
 import { apiError, unwrapOne, fmtMoney, type ContractTemplateRow } from './contractingApi'
+import { templateUnusableReason } from './templateHealth'
 import {
   WIZARD_STEPS, WIZARD_CONTRACT_TYPES, emptyDraft, emptyParty, termsFor, validateStep, firstInvalidStep, buildContractPayload,
   buildPartyPayload, readinessNotes, unfilledVariables, type WizardDraft, type WizardParty, type WizardStep, type Errors,
@@ -134,9 +135,20 @@ export function ContractWizard({ templates, onClose, onCreated }: Props) {
                   <Field label="Template *" error={shown.templateId} wide>
                     <select aria-label="Template" value={d.templateId} onChange={e => pickTemplate(e.target.value)} style={inp}>
                       <option value="">Choose a template…</option>
-                      {templates.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                      {templates.map(t => {
+                        const why = templateUnusableReason(t)
+                        return <option key={t.id} value={t.id} disabled={!!why}>{t.name}{why ? ` (${why.toLowerCase()})` : ''}</option>
+                      })}
                     </select>
                   </Field>
+                )}
+                {d.source === 'TEMPLATE' && template && (
+                  <div aria-label="Template legal review" style={{ gridColumn: '1/-1', fontSize: 12, color: template.legalStatus === 'APPROVED' || template.legalStatus === 'CONDITIONAL' ? 'var(--hf-success-text-strong)' : 'var(--hf-warning-text)' }}>
+                    {template.legalStatus === 'APPROVED' ? `Legal review recorded${template.legalArea ? ` (${template.legalArea})` : ''}.`
+                      : template.legalStatus === 'CONDITIONAL' ? 'Legal review recorded with conditions.'
+                      : 'No legal review has been recorded for this template.'}
+                    {' '}Evidence is under Templates, Legal reviews.
+                  </div>
                 )}
                 <Field label="Title *" error={shown.title} wide>
                   <input aria-label="Title" autoFocus value={d.title} onChange={e => set('title', e.target.value)} placeholder="Service Agreement — Acme Corp" style={inp} />

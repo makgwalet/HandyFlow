@@ -54,7 +54,10 @@ export interface ContractRow {
   signedPartyCount?: number | null; totalPartyCount?: number | null; parties?: ContractParty[]; comments?: ContractComment[]
 }
 
-export interface ContractTemplateRow { id: string; name: string; contractType: string; variables?: Record<string, string> | null }
+export interface ContractTemplateRow {
+  id: string; name: string; contractType: string; variables?: Record<string, string> | null
+  status?: string; legalStatus?: string; legalArea?: string
+}
 
 export type SignIcon = LucideIcon
 

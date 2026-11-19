@@ -10,7 +10,10 @@ import { wait, click, type, button, hasButton } from './testUtils'
 const post = vi.fn()
 vi.mock('../../api/client', () => ({ apiClient: { post: (...a: unknown[]) => post(...a) } }))
 
-const templates = [{ id: 't1', name: 'Standard NDA', contractType: 'NDA', variables: { client_name: 'text' } }]
+const templates = [
+  { id: 't1', name: 'Standard NDA', contractType: 'NDA', variables: { client_name: 'text' }, status: 'PUBLISHED', legalStatus: 'APPROVED', legalArea: 'Contract law' },
+  { id: 't2', name: 'Old lease', contractType: 'LEASE', status: 'PUBLISHED', legalStatus: 'EXPIRED' },
+]
 
 async function mount(onClose = vi.fn(), onCreated = vi.fn()) {
   const host = document.createElement('div'); document.body.appendChild(host)
@@ -50,6 +53,18 @@ describe('ContractWizard', () => {
     expect(field(host, 'Value')).toBeNull()
     expect(host.textContent).not.toContain('Auto-renew')
     expect(field(host, 'client name')).not.toBeNull()
+  })
+
+  it('disables templates that cannot be used and shows the legal review state', async () => {
+    const { host } = await mount()
+    await click(button(host, 'From template'))
+    const opts = Array.from(host.querySelectorAll('select[aria-label="Template"] option')) as HTMLOptionElement[]
+    expect(opts.find(o => o.value === 't2')?.disabled).toBe(true)
+    expect(opts.find(o => o.value === 't2')?.textContent).toContain('legal review expired')
+    expect(opts.find(o => o.value === 't1')?.disabled).toBe(false)
+    const sel = host.querySelector('select[aria-label="Template"]') as HTMLSelectElement
+    await act(async () => { sel.value = 't1'; sel.dispatchEvent(new Event('change', { bubbles: true })) })
+    expect(host.querySelector('[aria-label="Template legal review"]')?.textContent).toContain('Legal review recorded (Contract law)')
   })
 
   it('creates the draft and its parties, and reports a party that failed', async () => {

@@ -19,6 +19,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { apiClient } from '../../api/client'
 import { Plus, X, Lock, Eye, EyeOff, Copy, Check } from 'lucide-react'
 import { unwrap } from './contractingApi'
+import { listOf, approvalState, type Approval, type PolicyRow } from './approvalsShared'
+import { templateHealth, type PublishApproval } from './templateHealth'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -238,8 +240,10 @@ function HtmlPreview({ html, maxHeight = 280 }: { html: string; maxHeight?: numb
 
 // ─── TemplateCard ─────────────────────────────────────────────────────────────
 
-function TemplateCard({ template, onCopyVar, copied, onAction, onEdit, onRecordReview, onWithdraw, onAttach, onDownload, busy, canAuthor }: {
+function TemplateCard({ template, onCopyVar, copied, onAction, onEdit, onRecordReview, onWithdraw, onAttach, onDownload, onAskApproval, approval, busy, canAuthor }: {
   template: Template
+  approval: PublishApproval
+  onAskApproval: (id: string) => void
   onCopyVar: (v: string) => void
   copied: string | null
   onAction: (id: string, action: string) => void
@@ -255,6 +259,7 @@ function TemplateCard({ template, onCopyVar, copied, onAction, onEdit, onRecordR
   const [showLegal, setShowLegal] = useState(false)
   const status = template.status ?? 'PUBLISHED'
   const legal = template.legalStatus ?? 'NOT_REVIEWED'
+  const health = templateHealth(template, approval)
   const signing = SIGNING_METHODS.find(m => m.value === (template.requiredSigningMethod ?? ''))?.label
   const [mode,     setMode]     = useState<'rendered' | 'source'>('rendered')
 
@@ -297,6 +302,17 @@ function TemplateCard({ template, onCopyVar, copied, onAction, onEdit, onRecordR
           </div>
         )}
 
+        {status === 'APPROVED' && (
+          <ul aria-label="Template health" style={{ listStyle: 'none', margin: '0 0 10px', padding: '8px 10px', border: '1px solid var(--hf-border)', borderRadius: 8, fontSize: 12 }}>
+            {health.items.map(i => (
+              <li key={i.id} style={{ display: 'flex', gap: 6, color: i.state === 'ok' ? 'var(--hf-success-text-strong)' : i.state === 'warn' ? 'var(--hf-warning-text)' : 'var(--hf-danger-text)' }}>
+                <span aria-hidden>{i.state === 'ok' ? '✓' : i.state === 'warn' ? '!' : '✗'}</span>
+                <span><strong>{i.label}</strong>{i.detail ? `: ${i.detail}` : ''}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+
         {template.description && (
           <div style={{ fontSize: 12, color: 'var(--hf-text-muted)', lineHeight: 1.5, marginBottom: 10 }}>
             {template.description}
@@ -332,7 +348,8 @@ function TemplateCard({ template, onCopyVar, copied, onAction, onEdit, onRecordR
           {canAuthor && status === 'DRAFT' && <button style={smallBtn} disabled={busy} onClick={() => onAction(template.id, 'submit-internal-review')}>Submit for internal review</button>}
           {canAuthor && status === 'INTERNAL_REVIEW' && <button style={smallBtn} disabled={busy} onClick={() => onAction(template.id, 'submit-legal-review')}>Submit for legal review</button>}
           {canAuthor && status === 'LEGAL_REVIEW' && <button style={smallBtn} disabled={busy} onClick={() => onRecordReview(template)}>Record legal review</button>}
-          {canAuthor && status === 'APPROVED' && <button style={smallBtn} disabled={busy} onClick={() => onAction(template.id, 'publish')}>Publish</button>}
+          {canAuthor && status === 'APPROVED' && approval.required && approval.state === 'NONE' && <button style={smallBtn} disabled={busy} onClick={() => onAskApproval(template.id)}>Ask for approval to publish</button>}
+          {canAuthor && status === 'APPROVED' && <button style={smallBtn} disabled={busy || !!health.publishBlocker} title={health.publishBlocker ?? undefined} onClick={() => onAction(template.id, 'publish')}>Publish</button>}
           {canAuthor && status === 'PUBLISHED' && <button style={smallBtn} disabled={busy} onClick={() => onAction(template.id, 'new-version')}>New version</button>}
           {canAuthor && status === 'PUBLISHED' && !template.isSystem && <button style={smallBtn} disabled={busy} onClick={() => onAction(template.id, 'archive')}>Archive</button>}
           <button style={smallBtn} onClick={() => setShowLegal(!showLegal)}>{showLegal ? 'Hide legal reviews' : 'Legal reviews'}</button>
@@ -406,6 +423,24 @@ export default function TemplatesTab() {
   const { data: templates = [], isLoading } = useQuery<Template[]>({
     queryKey: ['contract-templates'],
     queryFn: async () => unwrap(await apiClient.get('/api/v1/contracts/templates')),
+  })
+
+  const { data: approvals = [] } = useQuery<Approval[]>({
+    queryKey: ['contract-approvals', 'list'],
+    queryFn: async () => listOf(await apiClient.get('/api/v1/contracts/approvals')),
+  })
+  const { data: policy = [] } = useQuery<PolicyRow[]>({
+    queryKey: ['contract-approvals', 'policy'],
+    queryFn: async () => listOf(await apiClient.get('/api/v1/contracts/approvals/policy')),
+  })
+  const publishApproval = (id: string): PublishApproval => ({
+    required: policy.find(p => p.action === 'PUBLISH_TEMPLATE')?.required ?? false,
+    state: approvalState(approvals, 'PUBLISH_TEMPLATE', id),
+  })
+  const askApproval = useMutation({
+    mutationFn: (id: string) => apiClient.post('/api/v1/contracts/approvals', { action: 'PUBLISH_TEMPLATE', subjectId: id, note: null }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['contract-approvals'] }); setError('Approval requested. Someone else can now review it under Approvals.') },
+    onError: (e: unknown) => setError(errMsg(e, 'Could not ask for approval')),
   })
 
   // ── Mutations ────────────────────────────────────────────────────────────────
@@ -510,6 +545,7 @@ export default function TemplatesTab() {
     onWithdraw: askWithdraw, busy: act.isPending,
     onAttach: (id: string, reviewId: string, file: File) => attachEvidence.mutate({ id, reviewId, file }),
     onDownload: downloadEvidence,
+    onAskApproval: (id: string) => askApproval.mutate(id),
   }
 
   const systemTemplates = templates.filter(t => t.isSystem)
@@ -552,7 +588,7 @@ export default function TemplatesTab() {
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 14 }}>
             {systemTemplates.map(t => (
-              <TemplateCard key={t.id} template={t} {...cardProps} />
+              <TemplateCard key={t.id} template={t} approval={publishApproval(t.id)} {...cardProps} />
             ))}
           </div>
         </div>
@@ -566,7 +602,7 @@ export default function TemplatesTab() {
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 14 }}>
             {customTemplates.map(t => (
-              <TemplateCard key={t.id} template={t} {...cardProps} />
+              <TemplateCard key={t.id} template={t} approval={publishApproval(t.id)} {...cardProps} />
             ))}
           </div>
         </div>
