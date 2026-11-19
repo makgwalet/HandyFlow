@@ -63,10 +63,18 @@ async function mount(granted: string[]) {
 // Exact label match: 'Terminate' must not match the 'Terminated' view tab, nor 'Edit' something like 'Edited'.
 const has = (el: HTMLElement, text: string) => Array.from(el.querySelectorAll('button')).some(b => b.textContent?.trim() === text)
 
+// Party actions live on the Parties tab of the contract workspace.
+async function openPartiesTab(el: HTMLElement) {
+  const tab = Array.from(el.querySelectorAll('[role="tab"]')).find(t => t.textContent === 'Parties & signatures')
+  if (!tab) throw new Error('Parties tab not found')
+  await act(async () => { tab.dispatchEvent(new MouseEvent('click', { bubbles: true })) }); await wait()
+}
+
 describe('Contracts screen permissions', () => {
   it('shows no create or edit actions to a read-only user', async () => {
     const el = await mount(['CONTRACTS_READ'])
     expect(has(el, 'New Contract')).toBe(false)
+    await openPartiesTab(el)
     expect(has(el, 'Add Party')).toBe(false)
     expect(has(el, 'Submit for Review')).toBe(false)
     expect(has(el, 'Edit')).toBe(false)
@@ -76,6 +84,7 @@ describe('Contracts screen permissions', () => {
     const el = await mount(['CONTRACTS_MANAGE'])
     expect(has(el, 'New Contract')).toBe(true)
     // The card is expanded, so the absence checks above are meaningful.
+    await openPartiesTab(el)
     expect(has(el, 'Add Party')).toBe(true)
     expect(has(el, 'Submit for Review')).toBe(true)
     expect(has(el, 'Edit')).toBe(true)

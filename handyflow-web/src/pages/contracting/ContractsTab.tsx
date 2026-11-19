@@ -28,6 +28,8 @@ import {
 } from 'lucide-react'
 import { unwrap, fmtR, apiError, type ContractRow, type ContractParty, type ContractComment, type ContractTemplateRow, type SignIcon } from './contractingApi'
 import { ContractWizard } from './ContractWizard'
+import { WorkspaceHeader } from './WorkspaceHeader'
+import type { WorkspaceTab } from './contractWorkspace'
 import { ContractSharingSection } from './ContractSharingSection'
 import { ContractRedlineSection } from './ContractRedlineSection'
 import { ContractRiskSection } from './ContractRiskSection'
@@ -237,6 +239,7 @@ export default function ContractsTab() {
   const [layout, setLayout] = useState<'table' | 'cards'>('table')
   const [search,       setSearch]       = useState('')
   const [expanded,     setExpanded]     = useState<string | null>(null)
+  const [tabState, setTabState] = useState<{ id: string; tab: WorkspaceTab }>({ id: '', tab: 'overview' })
   const [showBodyId,   setShowBodyId]   = useState<string | null>(null)
   const [showCreate,   setShowCreate]   = useState(false)
   const [showParty,    setShowParty]    = useState<string | null>(null)
@@ -504,6 +507,7 @@ export default function ContractsTab() {
           {detailRows.map(c => {
             const cfg    = STATUS_CFG[c.status] ?? STATUS_CFG.DRAFT
             const isOpen = expanded === c.id
+            const tab: WorkspaceTab = tabState.id === c.id ? tabState.tab : 'overview'
             const canPdf = c.status === 'SIGNED' || c.status === 'TERMINATED'
             const unresolvedAmendments = (c.comments ?? []).filter(cm => cm.isAmendmentRequest && !cm.resolved).length
 
@@ -547,6 +551,17 @@ export default function ContractsTab() {
                 {/* Expanded detail */}
                 {isOpen && (
                   <div style={{ borderTop: `1px solid ${cfg.border}`, padding: '16px 18px', background: 'var(--hf-surface-muted)' }}>
+                    {tab === 'overview' && (<>
+                    <WorkspaceHeader
+                      contract={c}
+                      parties={(contractDetail?.id === c.id ? contractDetail?.parties : c.parties) ?? []}
+                      unresolvedAmendments={unresolvedAmendments}
+                      canManage={canManage}
+                      tab={tab}
+                      onTab={t => setTabState({ id: c.id, tab: t })}
+                      busy={contractAction.isPending}
+                      onAction={a => contractAction.mutate({ id: c.id, action: a })}
+                    />
                     {/* Metadata grid */}
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, marginBottom: 16 }}>
                       {[
@@ -570,6 +585,8 @@ export default function ContractsTab() {
                       </div>
                     )}
 
+                    </>)}
+                    {tab === 'document' && (<>
                     {/* Contract body preview */}
                     <div style={{ marginBottom: 14 }}>
                       <button onClick={() => setShowBodyId(showBodyId === c.id ? null : c.id)}
@@ -585,12 +602,18 @@ export default function ContractsTab() {
                     </div>
 
                     <ContractRedlineSection contractId={c.id} status={c.status} />
+                    </>)}
+                    {tab === 'negotiation' && (<>
                     <ContractNegotiationSection contractId={c.id} status={c.status} parties={(c.parties ?? []).map(p => ({ id: p.id, fullName: p.fullName }))} />
+                    </>)}
+                    {tab === 'overview' && (<>
                     <ContractRiskSection contractId={c.id} />
-
+                    </>)}
+                    {tab === 'overview' && (<>
                     {/* Secure sharing of the signed contract (executed copy) */}
                     {['SIGNED', 'EXPIRED', 'TERMINATED', 'ARCHIVED'].includes(c.status) && <ContractSharingSection contractId={c.id} />}
-
+                    </>)}
+                    {tab === 'parties' && (<>
                     {/* Parties */}
                     <div style={{ marginBottom: 14 }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
@@ -709,6 +732,8 @@ export default function ContractsTab() {
                       })()}
                     </div>
 
+                    </>)}
+                    {tab === 'activity' && (<>
                     {/* Comments thread */}
                     <div style={{ marginBottom: 14 }}>
                       <button onClick={() => { setShowComments(showComments === c.id ? null : c.id); setError('') }}
@@ -787,8 +812,9 @@ export default function ContractsTab() {
                       )}
                     </div>
 
-                    {/* Action buttons */}
-                    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+                    </>)}
+                    {/* Action bar stays in view while scrolling long tabs */}
+                    <div data-testid="action-bar" style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, position: 'sticky', bottom: 0, padding: '10px 0', background: 'var(--hf-surface-muted)', borderTop: '1px solid var(--hf-border)' }}>
                       {/* NEW: previously no way to fill in remaining
                           {{variables}} or edit anything after creation —
                           only visible for DRAFT/UNDER_REVIEW, matching
