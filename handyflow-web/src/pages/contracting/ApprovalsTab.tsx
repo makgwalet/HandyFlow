@@ -96,7 +96,7 @@ function DecisionPanel({ a, allowSole, onDone }: { a: Approval; allowSole: boole
   )
 }
 
-function ApprovalCard({ a, allowSole }: { a: Approval; allowSole: boolean }) {
+export function ApprovalCard({ a, allowSole }: { a: Approval; allowSole: boolean }) {
   const qc = useQueryClient()
   const [open, setOpen] = useState(false)
   const [error, setError] = useState<string | null>(null)

@@ -27,7 +27,7 @@ describe('WorkspaceHeader', () => {
   it('marks the current tab and switches tabs', async () => {
     const { host, onTab } = await mount({ tab: 'document' })
     const tabs = Array.from(host.querySelectorAll('[role="tab"]'))
-    expect(tabs.map(t => t.getAttribute('aria-selected'))).toEqual(['false', 'true', 'false', 'false', 'false'])
+    expect(tabs.map(t => t.getAttribute('aria-selected'))).toEqual(['false', 'true', 'false', 'false', 'false', 'false'])
     await click(tabs[3]); expect(onTab).toHaveBeenCalledWith('negotiation')
   })
 

@@ -1,11 +1,12 @@
 // Pure rules for the contract workspace: which tabs exist and what the person should do next.
 
-export type WorkspaceTab = 'overview' | 'document' | 'parties' | 'negotiation' | 'activity'
+export type WorkspaceTab = 'overview' | 'document' | 'parties' | 'negotiation' | 'approvals' | 'activity'
 export const WORKSPACE_TABS: { id: WorkspaceTab; label: string }[] = [
   { id: 'overview', label: 'Overview' },
   { id: 'document', label: 'Document' },
   { id: 'parties', label: 'Parties & signatures' },
   { id: 'negotiation', label: 'Negotiation' },
+  { id: 'approvals', label: 'Approvals' },
   { id: 'activity', label: 'Activity' },
 ]
 
@@ -15,6 +16,8 @@ export interface WorkspaceInput {
   parties?: WorkspacePartyInput[]
   unresolvedAmendments?: number
   canManage: boolean
+  /** Whether sending needs approval for this tenant, and where that approval stands. */
+  sendApproval?: { required: boolean; state: 'NONE' | 'PENDING' | 'APPROVED' }
 }
 
 export interface NextAction {
@@ -45,6 +48,11 @@ export function nextRequiredAction(c: WorkspaceInput): NextAction {
     if ((c.unresolvedAmendments ?? 0) > 0)
       return { title: `Resolve ${c.unresolvedAmendments} amendment request${c.unresolvedAmendments === 1 ? '' : 's'}`, detail: 'Counterparties have asked for changes.', tab: 'activity', tone: 'todo' }
     if (c.status === 'DRAFT') return { title: 'Submit for review', detail: 'Review the document and parties, then submit.', action: 'submit-for-review', tone: 'todo' }
+    const ap = c.sendApproval
+    if (ap?.required && ap.state === 'NONE')
+      return { title: 'Ask for approval to send', detail: 'Your approval policy needs a second person to approve before this is sent.', tab: 'approvals', tone: 'todo' }
+    if (ap?.required && ap.state === 'PENDING')
+      return { title: 'Waiting for approval to send', detail: 'Someone else needs to approve this under Approvals.', tab: 'approvals', tone: 'waiting' }
     return { title: 'Send for signing', detail: 'Every placeholder must be filled before it can be sent.', action: 'send-for-signing', tone: 'todo' }
   }
   if (c.status === 'SENT') {

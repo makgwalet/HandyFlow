@@ -32,4 +32,19 @@ describe('nextRequiredAction', () => {
   it('reports finished states', () => {
     for (const s of ['SIGNED', 'TERMINATED', 'EXPIRED']) expect(next({ status: s, canManage: true }).tone).toBe('done')
   })
+
+  describe('approval to send', () => {
+    const ready = { status: 'UNDER_REVIEW', canManage: true, parties: [p('A')] }
+    it('asks for approval first when the policy requires it', () => {
+      expect(next({ ...ready, sendApproval: { required: true, state: 'NONE' } })).toMatchObject({ tab: 'approvals', tone: 'todo' })
+    })
+    it('waits while the approval is pending', () => {
+      const r = next({ ...ready, sendApproval: { required: true, state: 'PENDING' } })
+      expect(r).toMatchObject({ tone: 'waiting', tab: 'approvals' }); expect(r.action).toBeUndefined()
+    })
+    it('offers send once approved, or when approval is not required', () => {
+      expect(next({ ...ready, sendApproval: { required: true, state: 'APPROVED' } }).action).toBe('send-for-signing')
+      expect(next({ ...ready, sendApproval: { required: false, state: 'NONE' } }).action).toBe('send-for-signing')
+    })
+  })
 })

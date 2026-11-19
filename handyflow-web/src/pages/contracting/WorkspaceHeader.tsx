@@ -11,6 +11,7 @@ interface Props {
   onTab: (t: WorkspaceTab) => void
   busy: boolean
   onAction: (a: 'submit-for-review' | 'send-for-signing') => void
+  sendApproval?: { required: boolean; state: 'NONE' | 'PENDING' | 'APPROVED' }
 }
 
 const TONE = {
@@ -19,8 +20,8 @@ const TONE = {
   done: { bg: 'var(--hf-success-soft)', border: 'var(--hf-success-border-subtle)', color: 'var(--hf-success-text-strong)', Icon: CheckCircle2 },
 }
 
-export function WorkspaceHeader({ contract, parties, unresolvedAmendments, canManage, tab, onTab, busy, onAction }: Props) {
-  const next = nextRequiredAction({ status: contract.status, parties, unresolvedAmendments, canManage })
+export function WorkspaceHeader({ contract, parties, unresolvedAmendments, canManage, tab, onTab, busy, onAction, sendApproval }: Props) {
+  const next = nextRequiredAction({ status: contract.status, parties, unresolvedAmendments, canManage, sendApproval })
   const t = TONE[next.tone]
   return (
     <div style={{ marginBottom: 14 }}>

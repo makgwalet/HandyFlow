@@ -29,6 +29,8 @@ import {
 import { unwrap, fmtR, apiError, type ContractRow, type ContractParty, type ContractComment, type ContractTemplateRow, type SignIcon } from './contractingApi'
 import { ContractWizard } from './ContractWizard'
 import { WorkspaceHeader } from './WorkspaceHeader'
+import { ContractApprovalsPanel } from './ContractApprovalsPanel'
+import { approvalState, listOf, type Approval, type PolicyRow } from './approvalsShared'
 import type { WorkspaceTab } from './contractWorkspace'
 import { ContractSharingSection } from './ContractSharingSection'
 import { ContractRedlineSection } from './ContractRedlineSection'
@@ -286,6 +288,18 @@ export default function ContractsTab() {
     },
     enabled: !!expanded,
     staleTime: 10_000,
+  })
+
+  // Approvals feed the workspace's next-required-action; same cache keys as the Approvals screen.
+  const { data: approvalList = [] } = useQuery<Approval[]>({
+    queryKey: ['contract-approvals', 'list'],
+    queryFn: async () => listOf(await apiClient.get('/api/v1/contracts/approvals')),
+    enabled: !!expanded,
+  })
+  const { data: approvalPolicy = [] } = useQuery<PolicyRow[]>({
+    queryKey: ['contract-approvals', 'policy'],
+    queryFn: async () => listOf(await apiClient.get('/api/v1/contracts/approvals/policy')),
+    enabled: !!expanded,
   })
 
   const { data: templates = [] } = useQuery<ContractTemplateRow[]>({
@@ -560,6 +574,7 @@ export default function ContractsTab() {
                       tab={tab}
                       onTab={t => setTabState({ id: c.id, tab: t })}
                       busy={contractAction.isPending}
+                      sendApproval={{ required: approvalPolicy.find(p => p.action === 'SEND_FOR_SIGNING')?.required ?? false, state: approvalState(approvalList, 'SEND_FOR_SIGNING', c.id) }}
                       onAction={a => contractAction.mutate({ id: c.id, action: a })}
                     />
                     {/* Metadata grid */}
@@ -733,6 +748,7 @@ export default function ContractsTab() {
                     </div>
 
                     </>)}
+                    {tab === 'approvals' && <ContractApprovalsPanel contractId={c.id} status={c.status} canManage={canManage} />}
                     {tab === 'activity' && (<>
                     {/* Comments thread */}
                     <div style={{ marginBottom: 14 }}>

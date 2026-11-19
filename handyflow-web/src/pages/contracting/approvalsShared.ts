@@ -1,7 +1,7 @@
 // Shared types and rules for the approvals screen.
 
 export type ApprovalAction =
-  | 'SEND_FOR_SIGNING' | 'TERMINATE_CONTRACT' | 'PUBLISH_CLAUSE' | 'PUBLISH_TEMPLATE'
+  | 'SEND_FOR_SIGNING' | 'TERMINATE' | 'PUBLISH_CLAUSE' | 'PUBLISH_TEMPLATE'
 
 export interface Approval {
   id: string
@@ -46,4 +46,22 @@ export function decisionBlocker(a: Pick<Approval, 'mine'>, soleUser: boolean, re
 export function listOf<T>(r: { data?: { data?: unknown } & unknown }): T[] {
   const payload = (r.data as { data?: unknown } | undefined)?.data ?? r.data
   return Array.isArray(payload) ? (payload as T[]) : []
+}
+
+export type ApprovalState = 'NONE' | 'PENDING' | 'APPROVED'
+
+/** Where approval stands for one action on one subject. Rejected, withdrawn, invalidated and used-up requests count as none. */
+export function approvalState(list: Pick<Approval, 'action' | 'subjectId' | 'status'>[], action: ApprovalAction, subjectId: string): ApprovalState {
+  const mine = list.filter(a => a.action === action && a.subjectId === subjectId)
+  if (mine.some(a => a.status === 'APPROVED')) return 'APPROVED'
+  if (mine.some(a => a.status === 'PENDING')) return 'PENDING'
+  return 'NONE'
+}
+
+/** Approvals a person can still ask for on a contract in this status (none already waiting or granted). */
+export function requestableActions(status: string, list: Pick<Approval, 'action' | 'subjectId' | 'status'>[], contractId: string): ApprovalAction[] {
+  const out: ApprovalAction[] = []
+  if (status === 'UNDER_REVIEW' && approvalState(list, 'SEND_FOR_SIGNING', contractId) === 'NONE') out.push('SEND_FOR_SIGNING')
+  if (status === 'SIGNED' && approvalState(list, 'TERMINATE', contractId) === 'NONE') out.push('TERMINATE')
+  return out
 }
