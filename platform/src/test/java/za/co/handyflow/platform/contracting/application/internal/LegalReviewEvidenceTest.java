@@ -33,6 +33,7 @@ class LegalReviewEvidenceTest {
     @Mock ContractTemplateRepository templateRepo;
     @Mock ContractTemplateLegalReviewRepository reviewRepo;
     @Mock DocumentsFacade documents;
+    @Mock ContractApprovalService approvals;
     @InjectMocks ContractingService service;
 
     TenantId tenant = TenantId.generate();

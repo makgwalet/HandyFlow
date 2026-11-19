@@ -33,6 +33,7 @@ class ContractClauseServiceTest {
     @Mock ContractRepository contractRepo;
     @Mock ContractRedlineService redline;
     @Mock za.co.handyflow.platform.documents.application.DocumentsFacade documents;
+    @Mock ContractApprovalService approvals;
     @InjectMocks ContractClauseService service;
 
     TenantId tenant = TenantId.generate();

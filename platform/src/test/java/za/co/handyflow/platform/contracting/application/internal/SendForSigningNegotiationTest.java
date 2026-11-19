@@ -7,6 +7,7 @@ import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import za.co.handyflow.platform.contracting.domain.model.ApprovalAction;
 import za.co.handyflow.platform.contracting.domain.model.Contract;
 import za.co.handyflow.platform.contracting.domain.model.ContractParty;
 import za.co.handyflow.platform.contracting.domain.repository.ContractPartyRepository;
@@ -40,6 +41,7 @@ class SendForSigningNegotiationTest {
     @Mock ContractRiskService riskService;
     @Mock ContractNegotiationService negotiationService;
     @Mock EmailService emailService;
+    @Mock ContractApprovalService approvals;
     @InjectMocks ContractingService service;
 
     TenantId tenant = TenantId.generate();
@@ -97,6 +99,19 @@ class SendForSigningNegotiationTest {
         order.verify(signingPolicy).assertCanSign(contract);
         order.verify(riskService).assertNoBlockingFindings(tenant, contract);
         order.verify(negotiationService).assertReadyForSigning(tenant, contract);
+    }
+
+    @Test
+    void aMissingApprovalBlocksTheSendAfterEveryOtherCheckAndChangesNothing() {
+        doThrow(new IllegalStateException("This needs a second person's approval first")).when(approvals)
+                .assertApproved(eq(tenant), eq(ApprovalAction.SEND_FOR_SIGNING), any());
+        IllegalStateException e = assertThrows(IllegalStateException.class, () -> service.sendForSigning(tenant, id));
+        assertTrue(e.getMessage().contains("second person"));
+        InOrder order = inOrder(negotiationService, approvals);
+        order.verify(negotiationService).assertReadyForSigning(tenant, contract);
+        order.verify(approvals).assertApproved(eq(tenant), eq(ApprovalAction.SEND_FOR_SIGNING), any());
+        verify(approvals, never()).consume(any(), any(), any(), any());
+        assertNothingChanged();
     }
 
     @Test

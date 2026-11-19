@@ -51,6 +51,7 @@ public class ContractingService {
     private final PublicSigningRateLimiter        publicRateLimiter;
     private final ContractTemplateLegalReviewRepository templateReviewRepo;
     private final SigningPolicy                   signingPolicy;
+    private final ContractApprovalService         approvals;
     private final ContractRedlineService         redline;      // body version history
     private final DocumentsFacade                documents;   // legal review evidence
     private final ContractRiskService            riskService;   // risk rules that block sending
@@ -299,6 +300,7 @@ public class ContractingService {
         String legal = legalStatus(t);
         if (!"APPROVED".equals(legal) && !"CONDITIONAL".equals(legal))
             throw new IllegalStateException("A template cannot be published without a current legal approval (status: " + legal + ")");
+        approvals.assertApproved(tenantId, ApprovalAction.PUBLISH_TEMPLATE, id);
         t.publish();
         for (ContractTemplate other : templateRepo.findByFamily(tenantId, t.getFamilyId() != null ? t.getFamilyId() : t.getId())) {
             if (!other.getId().equals(t.getId()) && other.statusEnum() == TemplateStatus.PUBLISHED) {
@@ -306,7 +308,9 @@ public class ContractingService {
                 templateRepo.save(other);
             }
         }
-        return toTemplateResponse(templateRepo.save(t));
+        ContractTemplate saved = templateRepo.save(t);
+        approvals.consume(tenantId, ApprovalAction.PUBLISH_TEMPLATE, id, TenantContext.getCurrentUserId());
+        return toTemplateResponse(saved);
     }
 
     /** Starts a new DRAFT version of a published template. Only one open draft per template at a time. */
@@ -573,11 +577,15 @@ public class ContractingService {
         // Counterparty negotiation (none unless one was opened): nothing pending, final wording pinned
         negotiationService.assertReadyForSigning(tenantId, c);
 
+        // Maker-checker (when the tenant requires it): a second person has approved exactly this wording and these parties
+        approvals.assertApproved(tenantId, ApprovalAction.SEND_FOR_SIGNING, c.getId());
+
         // Lock body — SHA-256 hash prevents tamper after sending
         String bodyHash = signingTokenService.sha256(c.getBody() != null ? c.getBody() : "");
         c.lockBody(bodyHash);
         c.send();
         contractRepo.save(c);
+        approvals.consume(tenantId, ApprovalAction.SEND_FOR_SIGNING, c.getId(), TenantContext.getCurrentUserId());
         negotiationService.freezeOnSend(tenantId, c, TenantContext.getCurrentUserId());
 
         // Issue a signing token and send invitation per party
@@ -630,8 +638,10 @@ public class ContractingService {
     @Transactional
     public ContractResponse terminate(TenantId tenantId, UUID id, String reason) {
         Contract c = findActive(tenantId, id);
+        approvals.assertApproved(tenantId, ApprovalAction.TERMINATE, id);
         c.terminate(reason);
         contractRepo.save(c);
+        approvals.consume(tenantId, ApprovalAction.TERMINATE, id, TenantContext.getCurrentUserId());
         c.setParties(partyRepo.findByContract(id));
         records.contractEnded(tenantId, c);   // the retention clock starts today
         log.info("Contract {} terminated: {}", c.getContractNumber(), reason);

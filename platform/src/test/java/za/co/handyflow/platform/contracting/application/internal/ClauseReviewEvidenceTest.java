@@ -30,6 +30,7 @@ class ClauseReviewEvidenceTest {
     @Mock ContractClauseRepository clauseRepo;
     @Mock DocumentsFacade documents;
     @Mock ContractRedlineService redline;
+    @Mock ContractApprovalService approvals;
     @InjectMocks ContractClauseService service;
 
     TenantId tenant = TenantId.generate();

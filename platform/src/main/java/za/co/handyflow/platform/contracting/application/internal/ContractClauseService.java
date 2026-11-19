@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import za.co.handyflow.platform.contracting.domain.model.ApprovalAction;
 import za.co.handyflow.platform.contracting.domain.model.BodyDiff;
 import za.co.handyflow.platform.contracting.domain.model.Contract;
 import za.co.handyflow.platform.contracting.domain.model.ContractClause;
@@ -14,6 +15,7 @@ import za.co.handyflow.platform.contracting.dto.ContractClauseDtos.*;
 import za.co.handyflow.platform.contracting.dto.ContractRedlineDtos.ProposalView;
 import za.co.handyflow.platform.documents.application.DocumentsFacade;
 import za.co.handyflow.platform.shared.ResourceNotFoundException;
+import za.co.handyflow.platform.shared.TenantContext;
 import za.co.handyflow.platform.shared.TenantId;
 
 import java.time.LocalDate;
@@ -35,6 +37,7 @@ public class ContractClauseService {
     private final ContractClauseUsageRepository usageRepo;
     private final ContractRepository contractRepo;
     private final ContractRedlineService redline;
+    private final ContractApprovalService approvals;
     private final DocumentsFacade documents;   // the reviewer's signed-off review
 
     static final String EVIDENCE_OWNER_TYPE = "CONTRACT_CLAUSE_REVIEW";
@@ -113,12 +116,15 @@ public class ContractClauseService {
         LocalDate today = LocalDate.now();
         // every check first, before the previous version is touched
         c.assertPublishable(today, c.getEvidenceDocumentId() != null && documents.find(tenantId, c.getEvidenceDocumentId()).isPresent());
+        approvals.assertApproved(tenantId, ApprovalAction.PUBLISH_CLAUSE, id);
         clauseRepo.findFirstByTenantIdAndFamilyIdAndStatus(tenantId.getValue(), c.getFamilyId(), "PUBLISHED").ifPresent(prev -> {
             prev.supersede();
             clauseRepo.saveAndFlush(prev);
         });
         c.publish(today, true);   // checked above
-        return toResponse(clauseRepo.save(c), today);
+        ContractClause saved = clauseRepo.save(c);
+        approvals.consume(tenantId, ApprovalAction.PUBLISH_CLAUSE, id, TenantContext.getCurrentUserId());
+        return toResponse(saved, today);
     }
 
     @Transactional
