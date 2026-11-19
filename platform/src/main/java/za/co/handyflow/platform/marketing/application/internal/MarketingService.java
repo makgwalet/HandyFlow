@@ -913,7 +913,8 @@ public class MarketingService {
                 c.getReviewStatus(), c.getContentVersion(), c.getApprovedVersion(), c.getSentVersion(),
                 userName(c.getSubmittedBy()), c.getSubmittedAt(),
                 c.getSubmittedBy() != null && c.getSubmittedBy().equals(currentUserIdOrNull()),
-                userName(c.getReviewedBy()), c.getReviewNote());
+                userName(c.getReviewedBy()), c.getReviewNote(),
+                c.getTopicId(), c.getTopicId() != null ? fetchTopicName(c.getTopicId()) : null);
     }
 
     private String userName(UUID userId) {
@@ -935,6 +936,12 @@ public class MarketingService {
         try {
             return jdbc.queryForObject("SELECT name FROM mkt_templates WHERE id = ?",
                     String.class, templateId);
+        } catch (Exception e) { return null; }
+    }
+
+    private String fetchTopicName(UUID topicId) {
+        try {
+            return jdbc.queryForObject("SELECT name FROM mkt_topics WHERE id = ?", String.class, topicId);
         } catch (Exception e) { return null; }
     }
 

@@ -135,7 +135,7 @@ public class MarketingFormService {
         if (formId != null) {
             Integer n = named.queryForObject("SELECT COUNT(*) FROM mkt_forms WHERE id = :f AND tenant_id = :t",
                     new MapSqlParameterSource("f", formId).addValue("t", t.getValue()), Integer.class);
-            if (n == null || n == 0) throw new ResourceNotFoundException("Form not found");
+            if (n == null || n == 0) throw new ResourceNotFoundException("Form", formId.toString());
             formFilter = " AND r.form_id = :f";
             p.addValue("f", formId);
         }

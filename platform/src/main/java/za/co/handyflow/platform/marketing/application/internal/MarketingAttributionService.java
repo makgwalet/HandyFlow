@@ -66,7 +66,7 @@ public class MarketingAttributionService {
     public void setCost(TenantId t, UUID campaignId, Long costCents) {
         if (costCents != null && costCents > MAX_CENTS) throw bad("That cost is too large.", "COST_INVALID");
         int n = named.update("UPDATE mkt_campaigns SET cost_cents = :c, updated_at = now() WHERE id = :id AND tenant_id = :t AND deleted_at IS NULL",
-                new MapSqlParameterSource("c", costCents, java.sql.Types.BIGINT).addValue("id", campaignId).addValue("t", t.getValue()));
+                new MapSqlParameterSource().addValue("c", costCents, java.sql.Types.BIGINT).addValue("id", campaignId).addValue("t", t.getValue()));
         if (n == 0) throw new ResourceNotFoundException("Campaign", campaignId.toString());
     }
 
