@@ -4,7 +4,7 @@ import { describe, it, expect, afterEach, vi, beforeEach } from 'vitest'
 import { createRoot, type Root } from 'react-dom/client'
 import { act } from 'react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { wait, click, button, hasButton } from './testUtils'
+import { wait, click, button, hasButton, type } from './testUtils'
 
 const state = vi.hoisted(() => ({ granted: ['CONTRACTS_MANAGE'] as string[], clauses: [] as unknown[] }))
 vi.mock('../../hooks/usePermission', () => ({
@@ -143,5 +143,37 @@ describe('clause review evidence', () => {
     await click(button(el, 'Publish'))
     await click(button(el, 'Ask for approval'))
     expect(api.post).toHaveBeenCalledWith('/api/v1/contracts/approvals', { action: 'PUBLISH_CLAUSE', subjectId: 'c1', note: null })
+  })
+})
+
+describe('clause library browsing', () => {
+  const tab = (el: HTMLElement, label: string) => Array.from(el.querySelectorAll('[role="tab"]')).find(t => t.textContent?.startsWith(label)) as HTMLElement
+  const titles = (el: HTMLElement) => Array.from(el.querySelectorAll('div')).map(d => d.firstChild?.textContent ?? '').filter(t => /^(Alpha|Bravo|Charlie|Delta)/.test(t))
+
+  it('hides archived versions by default and shows them under Archived', async () => {
+    state.clauses = [clause({ id: 'a', title: 'Alpha', status: 'PUBLISHED' }), clause({ id: 'b', title: 'Bravo', status: 'SUPERSEDED', legalStatus: 'SUPERSEDED' })]
+    const el = await mount()
+    expect(el.textContent).toContain('Alpha'); expect(el.textContent).not.toContain('Bravo')
+    expect(tab(el, 'Archived').textContent).toContain('1')
+    await click(tab(el, 'Archived'))
+    expect(el.textContent).toContain('Bravo'); expect(el.textContent).not.toContain('Alpha')
+  })
+
+  it('searches the wording', async () => {
+    state.clauses = [clause({ id: 'a', title: 'Alpha', body: '<p>acts of God</p>' }), clause({ id: 'b', title: 'Bravo', body: '<p>payment terms</p>' })]
+    const el = await mount()
+    await type(el.querySelector('[aria-label="Search clauses"]'), 'god')
+    expect(el.textContent).toContain('Alpha'); expect(el.textContent).not.toContain('Bravo')
+    await type(el.querySelector('[aria-label="Search clauses"]'), 'zzz')
+    expect(el.textContent).toContain('No clauses match')
+  })
+
+  it('flags a clause whose review has expired and lists it under Needs attention', async () => {
+    state.clauses = [clause({ id: 'a', title: 'Alpha', status: 'PUBLISHED', legalStatus: 'REVIEW_EXPIRED' }), clause({ id: 'b', title: 'Bravo', status: 'PUBLISHED' })]
+    const el = await mount()
+    expect(el.querySelectorAll('[data-testid="clause-attention"]')).toHaveLength(1)
+    await click(tab(el, 'Needs attention'))
+    expect(el.textContent).toContain('Alpha'); expect(el.textContent).not.toContain('Bravo')
+    expect(titles(el).length).toBeGreaterThan(0)
   })
 })

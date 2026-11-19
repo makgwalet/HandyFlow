@@ -8,6 +8,7 @@ import { Plus, X } from 'lucide-react'
 import { usePermissions } from '../../hooks/usePermission'
 import { sanitizeHtml } from './sanitizeHtml'
 import { clauseFormProblem, publishBlocker, kindLabel, needsApprovalMessage, CLAUSE_KINDS } from './clauseRules'
+import { CLAUSE_VIEWS, clauseAttention, filterClauses, viewCounts, type ClauseView } from './clauseLibrary'
 import { RichTextEditor } from './RichTextEditor'
 import { hasContent } from './richText'
 
@@ -56,6 +57,8 @@ export default function ClausesTab() {
   const [reviewFile, setReviewFile] = useState<File | null>(null)
   const [error, setError] = useState('')
   const [askFor, setAskFor] = useState<string | null>(null)
+  const [view, setView] = useState<ClauseView>('ACTIVE')
+  const [search, setSearch] = useState('')
 
   const { data: clauses = [], isLoading } = useQuery<Clause[]>({
     queryKey: ['contract-clauses', category],
@@ -118,6 +121,9 @@ export default function ClausesTab() {
     } catch (e: unknown) { setError(errMsg(e, 'The evidence file could not be downloaded')) }
   }
 
+  const counts = viewCounts(clauses)
+  const shown = filterClauses(clauses, view, search)
+
   const openNew = () => { setEditing(null); setForm(EMPTY); setShowForm(true); setError('') }
   const openEdit = (c: Clause) => { setEditing(c); setForm({ title: c.title, category: c.category, body: c.body, legalArea: c.legalArea ?? '', jurisdiction: c.jurisdiction, clauseKind: c.clauseKind ?? 'STANDARD', sourceReference: c.sourceReference ?? '' }); setShowForm(true); setError('') }
   const withdraw = (c: Clause) => { const r = window.prompt('Why is this clause being withdrawn?'); if (r && r.trim()) act.mutate({ id: c.id, action: 'withdraw', body: { reason: r.trim() } }) }
@@ -132,19 +138,28 @@ export default function ClausesTab() {
           <option value="">All categories</option>
           {CLAUSE_CATEGORIES.map(([k, l]) => <option key={k} value={k}>{l}</option>)}
         </select>
+        <input aria-label="Search clauses" value={search} onChange={e => setSearch(e.target.value)} placeholder="Search title, wording, area or source" style={{ ...inp, width: 260, fontSize: 13 }} />
         <div style={{ flex: 1 }} />
         {canAuthor && <button onClick={openNew} style={{ ...btn, display: 'flex', gap: 6, alignItems: 'center', background: 'var(--hf-primary)', color: 'var(--hf-text-on-solid)', border: 'none', padding: '8px 14px' }}><Plus size={14} /> Add clause</button>}
+      </div>
+      <div role="tablist" aria-label="Clause views" style={{ display: 'flex', gap: 5, flexWrap: 'wrap', marginBottom: 10 }}>
+        {CLAUSE_VIEWS.map(v => (
+          <button key={v.key} role="tab" aria-selected={view === v.key} title={v.hint} onClick={() => setView(v.key)}
+            style={{ ...btn, fontWeight: view === v.key ? 700 : 500, background: view === v.key ? 'var(--hf-primary)' : 'var(--hf-surface)', color: view === v.key ? 'var(--hf-text-on-solid)' : 'var(--hf-text-secondary)' }}>
+            {v.label} <span style={{ opacity: 0.8 }}>{counts[v.key]}</span>
+          </button>
+        ))}
       </div>
       <div style={{ fontSize: 12, color: 'var(--hf-text-muted)', marginBottom: 12, lineHeight: 1.5 }}>
         No clauses are supplied. Add the wording your legal reviewer provides (for example definitions, force majeure and domicilium), record their review, then publish it. A recorded review is evidence that a review took place on that date, not a guarantee that the clause suits every contract.
       </div>
       {error && !showForm && !reviewing && <div style={{ marginBottom: 10, fontSize: 13, color: 'var(--hf-danger-text)' }}>{error}</div>}
 
-      {isLoading ? <div style={{ color: 'var(--hf-text-muted)' }}>Loading…</div> : clauses.length === 0 ? (
-        <div style={{ color: 'var(--hf-text-faint)', fontSize: 14, padding: '24px 0' }}>The library is empty.</div>
+      {isLoading ? <div style={{ color: 'var(--hf-text-muted)' }}>Loading…</div> : shown.length === 0 ? (
+        <div style={{ color: 'var(--hf-text-faint)', fontSize: 14, padding: '24px 0' }}>{clauses.length === 0 ? 'The library is empty.' : 'No clauses match this view and search.'}</div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          {clauses.map(c => (
+          {shown.map(c => (
             <div key={c.id} style={{ border: '1px solid var(--hf-border)', borderRadius: 10, padding: '12px 14px', background: 'var(--hf-surface)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
                 <div style={{ fontWeight: 700, color: 'var(--hf-text)' }}>{c.title} <span style={{ fontWeight: 400, color: 'var(--hf-text-muted)', fontSize: 12 }}>v{c.versionNo} · {catLabel(c.category)}</span>
@@ -166,6 +181,7 @@ export default function ClausesTab() {
                 </div>
               )}
               {c.sourceReference && <div style={{ fontSize: 12, color: 'var(--hf-text-muted)', marginTop: 2 }}>Source: {c.sourceReference}</div>}
+              {clauseAttention(c) && <div data-testid="clause-attention" style={{ fontSize: 12, fontWeight: 700, color: 'var(--hf-warning-text)', marginTop: 2 }}>Needs attention: {clauseAttention(c)}</div>}
               {c.evidenceRequired && !c.evidenceDocumentId && c.status !== 'DRAFT' && c.status !== 'SUPERSEDED' && c.status !== 'WITHDRAWN' && (
                 <div role="note" style={{ fontSize: 12, color: 'var(--hf-warning-text)', marginTop: 2 }}>{publishBlocker(c)}</div>
               )}
