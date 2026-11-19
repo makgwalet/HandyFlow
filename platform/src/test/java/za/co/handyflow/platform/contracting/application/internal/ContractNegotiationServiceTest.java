@@ -82,7 +82,7 @@ class ContractNegotiationServiceTest {
         when(redline.snapshot(any(), any(), anyString(), any(), any())).thenAnswer(i -> version.incrementAndGet());
 
         linkRepo = mock(ContractNegotiationLinkRepository.class);
-        service = new ContractNegotiationService(contractRepo, partyRepo, nRepo, pRepo, cRepo, eRepo, linkRepo, redline, hashing);
+        service = new ContractNegotiationService(contractRepo, partyRepo, nRepo, pRepo, cRepo, eRepo, linkRepo, redline, hashing, mock(org.springframework.context.ApplicationEventPublisher.class));
     }
 
     UUID cid() { return contract.getId(); }

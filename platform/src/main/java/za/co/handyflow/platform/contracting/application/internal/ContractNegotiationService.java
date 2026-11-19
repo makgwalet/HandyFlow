@@ -2,6 +2,7 @@ package za.co.handyflow.platform.contracting.application.internal;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import za.co.handyflow.platform.contracting.domain.model.*;
@@ -40,6 +41,7 @@ public class ContractNegotiationService {
     private final ContractNegotiationLinkRepository linkRepo;
     private final ContractRedlineService redline;
     private final SigningTokenService hashing;
+    private final ApplicationEventPublisher publisher;   // tells staff, after the transaction commits, that a counterparty acted
 
     // ── Staff: lifecycle ─────────────────────────────────────────────────────
 
@@ -217,6 +219,7 @@ public class ContractNegotiationService {
         proposalRepo.save(p);
         reconcile(n, c);
         event(n, "COUNTERPARTY", null, partyId, "PROPOSAL_SUBMITTED", describe(p), ip);
+        publisher.publishEvent(new NegotiationActivity(tenantId.getValue(), contractId, NegotiationActivity.PROPOSAL, party.getFullName()));
         return proposalView(p, c.getBody(), party.getFullName());
     }
 
@@ -249,6 +252,7 @@ public class ContractNegotiationService {
         ContractNegotiationComment cm = commentRepo.save(ContractNegotiationComment.counterparty(tenantId.getValue(), contractId, n.getId(), partyId, in.blockIndex(),
                 in.blockExcerpt(), in.proposalId(), in.parentId(), in.body()));
         event(n, "COUNTERPARTY", null, partyId, "COUNTERPARTY_COMMENT", null, ip);
+        publisher.publishEvent(new NegotiationActivity(tenantId.getValue(), contractId, NegotiationActivity.COMMENT, nameOf(contractId).get(partyId)));
         return commentView(cm);
     }
 

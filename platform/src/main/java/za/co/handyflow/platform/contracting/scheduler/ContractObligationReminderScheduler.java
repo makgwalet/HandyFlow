@@ -73,7 +73,7 @@ public class ContractObligationReminderScheduler {
     }
 
     /** The entered address wins; otherwise the contract's creator; otherwise the tenant's administrators. */
-    static List<String> recipientEmails(String ownerEmail, java.util.function.Supplier<List<String>> creator, java.util.function.Supplier<List<String>> admins) {
+    public static List<String> recipientEmails(String ownerEmail, java.util.function.Supplier<List<String>> creator, java.util.function.Supplier<List<String>> admins) {
         if (ownerEmail != null && !ownerEmail.isBlank()) return List.of(ownerEmail.trim());
         List<String> c = creator.get();
         if (!c.isEmpty()) return c;

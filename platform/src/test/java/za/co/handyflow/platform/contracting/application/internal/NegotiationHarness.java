@@ -58,6 +58,7 @@ final class NegotiationHarness {
     final EmailService email = mock(EmailService.class);
     final SmsService sms = mock(SmsService.class);
 
+    final org.springframework.context.ApplicationEventPublisher publisher = mock(org.springframework.context.ApplicationEventPublisher.class);
     final SigningTokenService hashing = new SigningTokenService(mock(ContractSigningTokenRepository.class));
     final ContractNegotiationService service;
     final ContractNegotiationAccessService access;
@@ -132,7 +133,7 @@ final class NegotiationHarness {
         when(otp.verify(anyString(), anyString())).thenAnswer(i -> "123456".equals(i.<String>getArgument(1)));
         when(sms.send(anyString(), anyString())).thenReturn(true);
 
-        service = new ContractNegotiationService(contractRepo, partyRepo, negotiationRepo, proposalRepo, commentRepo, eventRepo, linkRepo, redline, hashing);
+        service = new ContractNegotiationService(contractRepo, partyRepo, negotiationRepo, proposalRepo, commentRepo, eventRepo, linkRepo, redline, hashing, publisher);
         access = new ContractNegotiationAccessService(contractRepo, partyRepo, negotiationRepo, linkRepo, sessionRepo, eventRepo, service, otp, limiter, email, sms);
         org.springframework.test.util.ReflectionTestUtils.setField(access, "baseUrl", "https://app.test");
         org.springframework.test.util.ReflectionTestUtils.setField(access, "linkValidityDays", 14);
