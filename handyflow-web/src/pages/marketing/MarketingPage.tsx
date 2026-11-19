@@ -11,6 +11,7 @@ import AudiencesTab from './AudiencesTab'
 import JourneysTab from './JourneysTab'
 import AnalyticsTab from './AnalyticsTab'
 import SettingsTab from './SettingsTab'
+import ApprovalsBell from './ApprovalsBell'
 import { Tabs, C } from './ui'
 
 type Tab = 'dashboard' | 'campaigns' | 'templates' | 'contacts' | 'segments' | 'automation' | 'reports' | 'settings'
@@ -44,6 +45,7 @@ export function MarketingPage() {
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
           <div style={{ width: 36, height: 36, borderRadius: 10, background: C.primary, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Megaphone size={18} color="#fff" /></div>
           <h1 style={{ fontSize: 24, fontWeight: 800, color: C.ink, margin: 0 }}>Marketing</h1>
+          <div style={{ marginLeft: 'auto' }}><ApprovalsBell onOpen={() => setTab('campaigns')} /></div>
         </div>
         <p style={{ fontSize: 13, color: C.mute, margin: 0, paddingLeft: 46 }}>
           Campaigns, segments and automation, built on opt-in consent and a suppression list that is checked before every send.

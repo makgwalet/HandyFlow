@@ -12,6 +12,7 @@ public class MarketingScheduler {
 
     private final MarketingService         marketingService;
     private final MarketingDeliveryService deliveryService;
+    private final MarketingFormService     formService;
 
     // Batch size is marketing.send.batch-size (default 50) per run. Safe on multiple instances:
     // the queue is claimed with FOR UPDATE SKIP LOCKED, and a run already in progress on this
@@ -19,6 +20,17 @@ public class MarketingScheduler {
     @Scheduled(cron = "0 */2 * * * *", zone = "Africa/Johannesburg")
     void processSendQueue() {
         deliveryService.processQueue();   // never throws; logs its own failures
+    }
+
+    // Unconfirmed double-opt-in requests are personal data with no purpose once the link has expired: purge after a 30-day grace.
+    @Scheduled(cron = "0 30 2 * * *", zone = "Africa/Johannesburg")
+    void purgeExpiredOptInRequests() {
+        try {
+            int n = formService.purgeExpiredOptInRequests(30);
+            if (n > 0) log.info("MarketingScheduler: purged {} expired unconfirmed opt-in request(s)", n);
+        } catch (Exception e) {
+            log.error("MarketingScheduler: opt-in purge failed", e);
+        }
     }
 
     // Each due campaign launches in its own transaction (via the service proxy), so one

@@ -3,12 +3,14 @@ import { useMemo, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { apiClient } from '../../api/client'
 import {
-  Plus, X, Workflow, Play, Pause, Archive, Copy, Pencil, Mail, Clock, Flag, ChevronUp, ChevronDown,
+  Plus, X, Workflow, Play, Pause, Archive, Copy, Pencil, Mail, Clock, Flag, GitBranch, ChevronUp, ChevronDown,
   Trash2, AlertTriangle, CheckCircle, Info, ChevronLeft, ChevronRight,
 } from 'lucide-react'
 import JourneyFlow from './JourneyFlow'
+import { money } from './RevenuePanel'
 
 const fmtDT = (d: any) => d ? new Date(d).toLocaleString('en-ZA', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '—'
+const fmtN = (n: number | null | undefined) => (n ?? 0).toLocaleString('en-ZA')
 const pct = (r: number | null | undefined) => r == null ? '—' : `${(r * 100).toFixed(1)}%`
 const inp: React.CSSProperties = { width: '100%', padding: '8px 11px', border: '1.5px solid #E2E8F0', borderRadius: 8, fontSize: 13, boxSizing: 'border-box', background: '#fff', outline: 'none' }
 const lbl: React.CSSProperties = { display: 'block', fontSize: 11, fontWeight: 700, color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 5 }
@@ -24,6 +26,9 @@ const TRIGGERS: Record<string, string> = {
 const E = (name: string, subject: string, htmlBody: string) => ({ type: 'EMAIL', name, subject, htmlBody, fromName: '', replyTo: '' })
 const W = (amount: number, unit = 'DAYS') => ({ type: 'WAIT', amount, unit })
 const X_IF = (condition: string) => ({ type: 'EXIT_IF', condition })
+const BR = () => ({ type: 'BRANCH', condition: 'CLICKED', yesTo: null as number | null, noTo: null as number | null })
+// Branch targets are step positions, so any reorder/delete clears them rather than leaving them pointing at the wrong step.
+const clearTargets = (steps: any[]) => steps.map(s => s.type === 'BRANCH' ? { ...s, yesTo: null, noTo: null } : s)
 const STARTERS: Record<string, any> = {
   welcome: { name: 'Welcome series', triggerType: 'OPTED_IN', reentryDays: '', steps: [
     E('Welcome', 'Welcome to {{company_name}}, {{first_name}}', '<h2>Hi {{first_name}},</h2><p>Thanks for joining us. Here is what you can expect from {{company_name}}.</p>'),
@@ -34,7 +39,7 @@ const STARTERS: Record<string, any> = {
   anniversary: { name: 'Anniversary thank-you', triggerType: 'OPT_IN_ANNIVERSARY', reentryDays: '', steps: [
     E('Thank you', 'A year together, {{first_name}}', '<h2>Thank you, {{first_name}}</h2><p>You joined our list a year ago today. Thanks for being with {{company_name}}.</p>')] },
 }
-const blank = () => ({ name: '', description: '', triggerType: 'OPTED_IN', segmentId: '', reentryDays: '', minGapHours: '24', windowStartHour: '8', windowEndHour: '17', skipWeekends: true, steps: [E('Email 1', '', '')] as any[] })
+const blank = () => ({ name: '', description: '', triggerType: 'OPTED_IN', segmentId: '', reentryDays: '', minGapHours: '24', windowStartHour: '8', windowEndHour: '17', skipWeekends: true, topicId: '', steps: [E('Email 1', '', '')] as any[] })
 
 export default function JourneysTab() {
   const qc = useQueryClient()
@@ -116,6 +121,7 @@ function JourneyDetail({ journey: j, onClose, onEdit, onCloned, say, refresh }: 
   const [confirm, setConfirm] = useState<any>(null)
   const err = (e: any, d: string) => say(e.response?.status === 403 ? 'That action needs the Marketing admin permission.' : (e.response?.data?.message || d), false)
 
+  const { data: conv } = useQuery<any>({ queryKey: ['marketing-journey-conversions', j.id], queryFn: async () => (await apiClient.get(`/api/v1/marketing/journeys/${j.id}/conversions`)).data?.data, refetchInterval: 60_000 })
   const { data: stats } = useQuery<any>({ queryKey: ['marketing-journey-stats', j.id], queryFn: async () => (await apiClient.get(`/api/v1/marketing/journeys/${j.id}/stats`)).data?.data, refetchInterval: 30_000 })
   const { data: enr } = useQuery<any>({
     queryKey: ['marketing-journey-enrollments', j.id, status, page], placeholderData: (p: any) => p,
@@ -169,6 +175,23 @@ function JourneyDetail({ journey: j, onClose, onEdit, onCloned, say, refresh }: 
             <strong>{pausedSteps.length} email step(s) were auto-paused</strong> because of delivery problems: {pausedSteps[0].pauseReason ?? 'high bounce or complaint rate'}.
             Contacts are held at those steps. Fix the list or content, then resume.
             <div style={{ marginTop: 8 }}><button onClick={() => act.mutate('resume-steps')} style={btn('#991B1B')}>Resume paused steps (admin)</button></div>
+          </div>)}
+
+        <div style={sec}>Revenue from this journey</div>
+        {conv && (
+          <div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8 }}>
+              {[['Enrolled', fmtN(conv.enrolled)], ['Paid', `${fmtN(conv.converted)}${conv.conversionRate == null ? '' : ` (${pct(conv.conversionRate)})`}`],
+                ['Revenue', money(conv.revenueCents)], ['Net of refunds', money(conv.netCents)]].map(([k, v]) => (
+                <div key={k} style={{ border: '1px solid #E2E8F0', borderRadius: 10, padding: '10px 12px' }}>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: '#94A3B8', textTransform: 'uppercase' }}>{k}</div>
+                  <div style={{ fontSize: 15, fontWeight: 800, color: '#0F172A', marginTop: 3 }}>{v}</div></div>))}
+            </div>
+            <div style={{ fontSize: 11, color: '#94A3B8', marginTop: 6, lineHeight: 1.5 }}>
+              A payment counts when an enrolled contact pays after joining, up to {conv.windowDays} days after their last journey email. Percentages are of contacts who were emailed ({fmtN(conv.emailed)}).
+              {conv.avgDaysToPay != null && ` Average time to first payment: ${conv.avgDaysToPay.toFixed(1)} days.`}
+              {conv.otherCurrencyPayments > 0 && ` ${fmtN(conv.otherCurrencyPayments)} payment(s) in other currencies are not included in the totals.`}
+            </div>
           </div>)}
 
         <div style={sec}>Steps</div>
@@ -245,15 +268,16 @@ function JourneyEditor({ journey, prefill, onClose, onSaved }: any) {
   const init = useMemo(() => {
     if (journey) return { name: journey.name, description: journey.description ?? '', triggerType: journey.triggerType, segmentId: journey.segmentId ?? '',
       reentryDays: journey.reentryDays?.toString() ?? '', minGapHours: String(journey.minGapHours), windowStartHour: String(journey.windowStartHour),
-      windowEndHour: String(journey.windowEndHour), skipWeekends: journey.skipWeekends, steps: journey.steps.map((s: any) => ({ ...s })) }
+      windowEndHour: String(journey.windowEndHour), skipWeekends: journey.skipWeekends, topicId: journey.topicId ?? '', steps: journey.steps.map((s: any) => ({ ...s })) }
     return { ...blank(), ...(prefill ?? {}), steps: (prefill?.steps ?? blank().steps).map((s: any) => ({ ...s })) }
   }, [journey, prefill])
   const [f, setF] = useState<any>(init)
   const [error, setError] = useState('')
   const set = (k: string, v: any) => setF((p: any) => ({ ...p, [k]: v }))
   const setStep = (i: number, patch: any) => setF((p: any) => ({ ...p, steps: p.steps.map((s: any, k: number) => k === i ? { ...s, ...patch } : s) }))
-  const move = (i: number, d: number) => setF((p: any) => { const a = [...p.steps]; const j = i + d; if (j < 0 || j >= a.length) return p; [a[i], a[j]] = [a[j], a[i]]; return { ...p, steps: a } })
+  const move = (i: number, d: number) => setF((p: any) => { const a = [...p.steps]; const j = i + d; if (j < 0 || j >= a.length) return p; [a[i], a[j]] = [a[j], a[i]]; return { ...p, steps: clearTargets(a) } })
 
+  const { data: topics = [] } = useQuery<any[]>({ queryKey: ['marketing-topics'], queryFn: async () => (await apiClient.get('/api/v1/marketing/topics')).data?.data ?? [] })
   const { data: segments = [] } = useQuery<any[]>({ queryKey: ['marketing-segments'], queryFn: async () => (await apiClient.get('/api/v1/marketing/segments')).data?.data ?? [] })
 
   const save = useMutation({
@@ -262,9 +286,10 @@ function JourneyEditor({ journey, prefill, onClose, onSaved }: any) {
       if (locked) return apiClient.put(`/api/v1/marketing/journeys/${journey.id}/settings`, { name: f.name.trim(), description: f.description.trim() || null,
         minGapHours: num(f.minGapHours), windowStartHour: num(f.windowStartHour), windowEndHour: num(f.windowEndHour), skipWeekends: f.skipWeekends })
       const body = { name: f.name.trim(), description: f.description.trim() || null, triggerType: f.triggerType,
-        segmentId: f.triggerType === 'SEGMENT_ENTRY' ? f.segmentId || null : null, reentryDays: num(f.reentryDays),
+        segmentId: f.triggerType === 'SEGMENT_ENTRY' ? f.segmentId || null : null, reentryDays: num(f.reentryDays), topicId: f.topicId || null,
         minGapHours: num(f.minGapHours), windowStartHour: num(f.windowStartHour), windowEndHour: num(f.windowEndHour), skipWeekends: f.skipWeekends,
         steps: f.steps.map((s: any) => s.type === 'WAIT' ? { type: 'WAIT', amount: Number(s.amount), unit: s.unit } : s.type === 'EXIT_IF' ? { type: 'EXIT_IF', condition: s.condition }
+          : s.type === 'BRANCH' ? { type: 'BRANCH', condition: s.condition, yesTo: s.yesTo ?? null, noTo: s.noTo ?? null }
           : { type: 'EMAIL', name: s.name, subject: s.subject, htmlBody: s.htmlBody, fromName: s.fromName || null, replyTo: s.replyTo || null }) }
       return journey ? apiClient.put(`/api/v1/marketing/journeys/${journey.id}`, body) : apiClient.post('/api/v1/marketing/journeys', body)
     },
@@ -294,6 +319,9 @@ function JourneyEditor({ journey, prefill, onClose, onSaved }: any) {
               <option value="">Select…</option>{segments.map((s: any) => <option key={s.id} value={s.id}>{s.name}{s.lastCount != null ? ` (~${s.lastCount})` : ''}</option>)}</select></div>
           ) : <div style={{ fontSize: 11, color: '#94A3B8', alignSelf: 'end', paddingBottom: 9 }}>{f.triggerType === 'OPTED_IN' ? 'Only contacts who opt in after activation are enrolled.' : 'Enrols contacts on the yearly anniversary of their opt-in.'}</div>}
           <div><label style={lbl}>Allow re-entry after (days)</label><input style={inp} type="number" min={1} disabled={locked} value={f.reentryDays} placeholder="never" onChange={e => set('reentryDays', e.target.value)} /></div>
+          <div><label style={lbl}>Topic (optional)</label><select style={inp} disabled={locked} value={f.topicId} onChange={e => set('topicId', e.target.value)}>
+            <option value="">No topic</option>{(topics as any[]).map((t: any) => <option key={t.id} value={t.id}>{t.name}</option>)}</select>
+            <div style={{ fontSize: 10, color: '#94A3B8', marginTop: 3 }}>Contacts who opted out of this topic skip the journey’s emails.</div></div>
           <div><label style={lbl}>Min. hours between journey emails</label><input style={inp} type="number" min={0} max={720} value={f.minGapHours} onChange={e => set('minGapHours', e.target.value)} /></div>
           <div><label style={lbl}>Send window start (SAST hour)</label><input style={inp} type="number" min={0} max={23} value={f.windowStartHour} onChange={e => set('windowStartHour', e.target.value)} /></div>
           <div><label style={lbl}>Send window end (SAST hour)</label><input style={inp} type="number" min={1} max={24} value={f.windowEndHour} onChange={e => set('windowEndHour', e.target.value)} /></div>
@@ -305,16 +333,26 @@ function JourneyEditor({ journey, prefill, onClose, onSaved }: any) {
         {f.steps.map((s: any, i: number) => (
           <div key={i} style={{ border: '1px solid #E2E8F0', borderRadius: 10, padding: 12, marginBottom: 10, background: '#FAFAFA' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: s.type === 'EMAIL' ? 8 : 0 }}>
-              {s.type === 'EMAIL' ? <Mail size={14} color="#1B3A6B" /> : s.type === 'WAIT' ? <Clock size={14} /> : <Flag size={14} color="#7C3AED" />}
-              <span style={{ fontSize: 12, fontWeight: 700 }}>{i + 1}. {s.type === 'EMAIL' ? 'Email' : s.type === 'WAIT' ? 'Wait' : 'Exit if'}</span>
+              {s.type === 'EMAIL' ? <Mail size={14} color="#1B3A6B" /> : s.type === 'WAIT' ? <Clock size={14} /> : s.type === 'BRANCH' ? <GitBranch size={14} color="#0E7490" /> : <Flag size={14} color="#7C3AED" />}
+              <span style={{ fontSize: 12, fontWeight: 700 }}>{i + 1}. {s.type === 'EMAIL' ? 'Email' : s.type === 'WAIT' ? 'Wait' : s.type === 'BRANCH' ? 'Branch: if' : 'Exit if'}</span>
               {s.type === 'WAIT' && <><input style={{ ...inp, width: 70 }} type="number" min={1} disabled={locked} value={s.amount ?? ''} onChange={e => setStep(i, { amount: e.target.value })} />
                 <select style={{ ...inp, width: 100 }} disabled={locked} value={s.unit} onChange={e => setStep(i, { unit: e.target.value })}><option value="DAYS">days</option><option value="HOURS">hours</option></select></>}
-              {s.type === 'EXIT_IF' && <><span style={{ fontSize: 12 }}>the contact</span><select style={{ ...inp, width: 120 }} disabled={locked} value={s.condition} onChange={e => setStep(i, { condition: e.target.value })}><option value="CLICKED">clicked</option><option value="OPENED">opened</option></select><span style={{ fontSize: 12 }}>an earlier email</span></>}
+              {s.type === 'EXIT_IF' && <><span style={{ fontSize: 12 }}>the contact</span><select style={{ ...inp, width: 120 }} disabled={locked} value={s.condition} onChange={e => setStep(i, { condition: e.target.value })}><option value="CLICKED">clicked</option><option value="OPENED">opened</option><option value="PURCHASED">paid</option></select><span style={{ fontSize: 12 }}>{s.condition === 'PURCHASED' ? 'since joining' : 'an earlier email'}</span></>}
+              {s.type === 'BRANCH' && <><span style={{ fontSize: 12 }}>the contact</span><select style={{ ...inp, width: 120 }} disabled={locked} value={s.condition} onChange={e => setStep(i, { condition: e.target.value })}><option value="CLICKED">clicked</option><option value="OPENED">opened</option><option value="PURCHASED">paid</option></select><span style={{ fontSize: 12 }}>{s.condition === 'PURCHASED' ? 'since joining' : 'an earlier email'}</span></>}
               {s.type === 'EMAIL' && <input style={{ ...inp, flex: 1 }} placeholder="Step name" disabled={locked} value={s.name ?? ''} onChange={e => setStep(i, { name: e.target.value })} />}
               {!locked && <div style={{ marginLeft: 'auto', display: 'flex' }}>
                 <button style={stepBtn} onClick={() => move(i, -1)}><ChevronUp size={15} /></button><button style={stepBtn} onClick={() => move(i, 1)}><ChevronDown size={15} /></button>
-                <button style={stepBtn} disabled={f.steps.length <= 1} onClick={() => setF((p: any) => ({ ...p, steps: p.steps.filter((_: any, k: number) => k !== i) }))}><Trash2 size={14} /></button></div>}
+                <button style={stepBtn} disabled={f.steps.length <= 1} onClick={() => setF((p: any) => ({ ...p, steps: clearTargets(p.steps.filter((_: any, k: number) => k !== i)) }))}><Trash2 size={14} /></button></div>}
             </div>
+            {s.type === 'BRANCH' && (
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 8 }}>
+                {([['yesTo', 'If yes'], ['noTo', 'Otherwise']] as const).map(([key, label]) => (
+                  <div key={key}><label style={lbl}>{label}</label>
+                    <select style={inp} disabled={locked} value={s[key] == null ? '' : String(s[key])} onChange={e => setStep(i, { [key]: e.target.value === '' ? null : Number(e.target.value) })}>
+                      <option value="">Continue with the next step</option><option value="-1">End the journey</option>
+                      {f.steps.map((t: any, k: number) => k > i ? <option key={k} value={k}>Go to step {k + 1} ({t.type === 'EMAIL' ? t.name || 'Email' : t.type === 'WAIT' ? 'Wait' : t.type === 'BRANCH' ? 'Branch' : 'Exit check'})</option> : null)}
+                    </select></div>))}
+              </div>)}
             {s.type === 'EMAIL' && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 <input style={inp} placeholder="Subject — e.g. Welcome, {{first_name}}" disabled={locked} value={s.subject ?? ''} onChange={e => setStep(i, { subject: e.target.value })} />
@@ -326,10 +364,10 @@ function JourneyEditor({ journey, prefill, onClose, onSaved }: any) {
               </div>)}
           </div>))}
         {!locked && <div style={{ display: 'flex', gap: 8 }}>
-          {[['EMAIL', 'Email', E(`Email ${f.steps.filter((s: any) => s.type === 'EMAIL').length + 1}`, '', '')], ['WAIT', 'Wait', W(2)], ['EXIT_IF', 'Exit check', X_IF('CLICKED')]].map(([k, l, v]: any) => (
+          {[['EMAIL', 'Email', E(`Email ${f.steps.filter((s: any) => s.type === 'EMAIL').length + 1}`, '', '')], ['WAIT', 'Wait', W(2)], ['EXIT_IF', 'Exit check', X_IF('CLICKED')], ['BRANCH', 'Branch', BR()]].map(([k, l, v]: any) => (
             <button key={k} onClick={() => setF((p: any) => ({ ...p, steps: [...p.steps, { ...v }] }))} style={{ padding: '6px 12px', background: '#fff', border: '1px dashed #CBD5E1', borderRadius: 8, fontSize: 12, cursor: 'pointer' }}>+ {l}</button>))}
         </div>}
-        {!locked && <div style={{ fontSize: 11, color: '#94A3B8', marginTop: 8 }}>The last step must be an email. Content is checked when you activate; errors such as broken links block activation. Placeholders: {'{{first_name}} {{name}} {{email}} {{company_name}}'}. An unsubscribe footer is added automatically.</div>}
+        {!locked && <div style={{ fontSize: 11, color: '#94A3B8', marginTop: 8 }}>The last step must be an email. A branch can only jump forward; moving or deleting a step resets branch targets. Content is checked when you activate; errors such as broken links block activation. Placeholders: {'{{first_name}} {{name}} {{email}} {{company_name}}'}. An unsubscribe footer is added automatically.</div>}
 
         {error && <div style={{ marginTop: 12, padding: '9px 12px', background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: 8, fontSize: 13, color: '#DC2626' }}>{error}</div>}
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 18 }}>

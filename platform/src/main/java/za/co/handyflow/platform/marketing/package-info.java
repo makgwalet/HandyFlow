@@ -6,7 +6,7 @@
 // buildUnsubscribeConfirmationEmail as coming from the tenant, not a
 // brand-neutral document — same fix already applied to ap for the
 // equivalent reason (ApRemittanceEmailService).
-@ApplicationModule(allowedDependencies = {"shared", "identity", "crm"})
+@ApplicationModule(allowedDependencies = {"shared", "identity", "crm", "invoicing"})
 package za.co.handyflow.platform.marketing;
 
 import org.springframework.modulith.ApplicationModule;

@@ -290,7 +290,7 @@ public class MarketingAudienceService {
     private static String iso(java.time.Instant i) { return i == null ? "" : i.toString(); }
 
     /** CSV cell: always quoted, and spreadsheet-formula prefixes neutralised. */
-    private static String cell(String v) {
+    static String cell(String v) {
         String s = v == null ? "" : v;
         if (!s.isEmpty() && "=+-@\t\r".indexOf(s.charAt(0)) >= 0) s = "'" + s;
         return "\"" + s.replace("\"", "\"\"") + "\"";

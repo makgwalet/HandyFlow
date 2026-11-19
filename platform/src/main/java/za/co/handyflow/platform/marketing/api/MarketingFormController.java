@@ -84,6 +84,18 @@ public class MarketingFormController {
         return ResponseEntity.ok(ApiResponse.success("Form disabled", forms.setFormStatus(TenantContext.getTenantIdAsObject(), id, "DISABLED")));
     }
 
+    @GetMapping("/forms/submissions/export")
+    @PreAuthorize("hasAuthority('MARKETING_ADMIN')")
+    @Operation(summary = "Export signup-form submissions as CSV (optionally one form). Admin only.")
+    public ResponseEntity<byte[]> exportSubmissions(@RequestParam(required = false) UUID formId) {
+        String csv = forms.exportSubmissionsCsv(TenantContext.getTenantIdAsObject(), formId);
+        return ResponseEntity.ok()
+                .header(org.springframework.http.HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"form-submissions.csv\"")
+                .header(org.springframework.http.HttpHeaders.CACHE_CONTROL, "no-store")
+                .contentType(new org.springframework.http.MediaType("text", "csv", java.nio.charset.StandardCharsets.UTF_8))
+                .body(("\uFEFF" + csv).getBytes(java.nio.charset.StandardCharsets.UTF_8));
+    }
+
     @PutMapping("/campaigns/{id}/topic")
     @PreAuthorize("hasAuthority('MARKETING_MANAGE')")
     @Operation(summary = "Set or clear a DRAFT/SCHEDULED campaign's topic. Voids any approval if it changes.")

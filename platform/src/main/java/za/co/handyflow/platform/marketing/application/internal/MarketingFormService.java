@@ -127,6 +127,46 @@ public class MarketingFormService {
         FROM mkt_forms f
         """;
 
+    /** Signup-form submissions as CSV (admin export): who signed up, via which form, when, whether confirmed, and the consent wording shown. Max 50,000 rows. */
+    @Transactional(readOnly = true)
+    public String exportSubmissionsCsv(TenantId t, UUID formId) {
+        MapSqlParameterSource p = new MapSqlParameterSource("t", t.getValue());
+        String formFilter = "";
+        if (formId != null) {
+            Integer n = named.queryForObject("SELECT COUNT(*) FROM mkt_forms WHERE id = :f AND tenant_id = :t",
+                    new MapSqlParameterSource("f", formId).addValue("t", t.getValue()), Integer.class);
+            if (n == null || n == 0) throw new ResourceNotFoundException("Form not found");
+            formFilter = " AND r.form_id = :f";
+            p.addValue("f", formId);
+        }
+        StringBuilder sb = new StringBuilder("Form,Email,Name,Submitted at,Confirmed at,Status,Consent text\r\n");
+        named.query("SELECT f.name AS form_name, r.email, r.name, r.created_at, r.confirmed_at, r.expires_at, r.consent_text "
+                        + "FROM mkt_optin_requests r JOIN mkt_forms f ON f.id = r.form_id AND f.tenant_id = r.tenant_id "
+                        + "WHERE r.tenant_id = :t" + formFilter + " ORDER BY r.created_at DESC, r.id LIMIT 50000", p,
+                rs -> {
+                    java.sql.Timestamp conf = rs.getTimestamp("confirmed_at");
+                    java.sql.Timestamp exp = rs.getTimestamp("expires_at");
+                    String status = conf != null ? "CONFIRMED"
+                            : exp != null && exp.toInstant().isBefore(java.time.Instant.now()) ? "EXPIRED" : "PENDING";
+                    java.sql.Timestamp created = rs.getTimestamp("created_at");
+                    sb.append(String.join(",",
+                            MarketingAudienceService.cell(rs.getString("form_name")), MarketingAudienceService.cell(rs.getString("email")),
+                            MarketingAudienceService.cell(rs.getString("name")),
+                            MarketingAudienceService.cell(created == null ? "" : created.toInstant().toString()),
+                            MarketingAudienceService.cell(conf == null ? "" : conf.toInstant().toString()),
+                            MarketingAudienceService.cell(status), MarketingAudienceService.cell(rs.getString("consent_text"))))
+                            .append("\r\n");
+                });
+        return sb.toString();
+    }
+
+    /** Deletes opt-in requests that were never confirmed and expired more than {@code graceDays} ago. Returns the number removed. */
+    @Transactional
+    public int purgeExpiredOptInRequests(int graceDays) {
+        return named.update("DELETE FROM mkt_optin_requests WHERE confirmed_at IS NULL AND expires_at < NOW() - make_interval(days => :d)",
+                new MapSqlParameterSource("d", Math.max(graceDays, 1)));
+    }
+
     @Transactional(readOnly = true)
     public List<FormResponse> forms(TenantId t) {
         return named.query(FORM_SELECT + " WHERE f.tenant_id = :t AND f.deleted_at IS NULL ORDER BY f.created_at DESC",

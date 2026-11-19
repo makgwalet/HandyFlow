@@ -46,15 +46,17 @@ public class MarketingJourneyService {
 
     private record Row(UUID id, String name, String description, String trigger, UUID segmentId, String segmentName,
                        String status, String stepsJson, Integer reentryDays, int gap, int ws, int we, boolean sw,
-                       Instant activatedAt, Instant createdAt, Instant updatedAt, long active, long completed, long exited) {}
+                       Instant activatedAt, Instant createdAt, Instant updatedAt, long active, long completed, long exited,
+                       UUID topicId, String topicName) {}
 
     private record Prepared(String trigger, UUID segmentId, String segmentName, String stepsJson,
-                            Integer reentry, int gap, int ws, int we, boolean sw) {}
+                            Integer reentry, int gap, int ws, int we, boolean sw, UUID topicId) {}
 
     private static final String SELECT = """
         SELECT j.id, j.name, j.description, j.trigger_type, j.segment_id, j.segment_name, j.status,
                CAST(j.steps AS text) AS steps_json, j.reentry_days, j.min_gap_hours, j.window_start_hour,
-               j.window_end_hour, j.skip_weekends, j.activated_at, j.created_at, j.updated_at,
+               j.window_end_hour, j.skip_weekends, j.activated_at, j.created_at, j.updated_at, j.topic_id,
+               (SELECT tp.name FROM mkt_topics tp WHERE tp.id = j.topic_id) AS topic_name,
                (SELECT COUNT(*) FROM mkt_journey_enrollments e WHERE e.journey_id = j.id AND e.status = 'ACTIVE') AS n_active,
                (SELECT COUNT(*) FROM mkt_journey_enrollments e WHERE e.journey_id = j.id AND e.status = 'COMPLETED') AS n_completed,
                (SELECT COUNT(*) FROM mkt_journey_enrollments e WHERE e.journey_id = j.id AND e.status IN ('EXITED','CANCELLED')) AS n_exited
@@ -80,9 +82,9 @@ public class MarketingJourneyService {
         UUID id = UUID.randomUUID();
         named.update("""
             INSERT INTO mkt_journeys (id, tenant_id, name, description, trigger_type, segment_id, segment_name, status, steps,
-                reentry_days, min_gap_hours, window_start_hour, window_end_hour, skip_weekends, created_by, updated_by)
+                reentry_days, min_gap_hours, window_start_hour, window_end_hour, skip_weekends, topic_id, created_by, updated_by)
             VALUES (:id, :t, :n, CAST(:d AS text), :tt, :sid, CAST(:sn AS text), 'DRAFT', CAST(:steps AS jsonb),
-                :rd, :gap, :ws, :we, :sw, CAST(:u AS uuid), CAST(:u AS uuid))
+                :rd, :gap, :ws, :we, :sw, :tp, CAST(:u AS uuid), CAST(:u AS uuid))
             """, params(t, id, req.name(), req.description(), p).addValue("u", user == null ? null : user.toString()));
         return get(t, id);
     }
@@ -99,7 +101,7 @@ public class MarketingJourneyService {
         named.update("""
             UPDATE mkt_journeys SET name = :n, description = CAST(:d AS text), trigger_type = :tt, segment_id = :sid,
                 segment_name = CAST(:sn AS text), steps = CAST(:steps AS jsonb), reentry_days = :rd, min_gap_hours = :gap,
-                window_start_hour = :ws, window_end_hour = :we, skip_weekends = :sw, updated_by = CAST(:u AS uuid), updated_at = now()
+                window_start_hour = :ws, window_end_hour = :we, skip_weekends = :sw, topic_id = :tp, updated_by = CAST(:u AS uuid), updated_at = now()
             WHERE id = :id AND tenant_id = :t
             """, params(t, id, req.name(), req.description(), p).addValue("u", user == null ? null : user.toString()));
         return get(t, id);
@@ -197,17 +199,18 @@ public class MarketingJourneyService {
     public JourneyResponse clone(TenantId t, UUID user, UUID id) {
         Row j = load(t, id);
         List<StepDto> fresh = parse(j.stepsJson()).stream()
-                .map(s -> new StepDto(s.type(), s.name(), s.subject(), s.htmlBody(), s.fromName(), s.replyTo(), s.amount(), s.unit(), s.condition(), null)).toList();
+                .map(s -> new StepDto(s.type(), s.name(), s.subject(), s.htmlBody(), s.fromName(), s.replyTo(), s.amount(), s.unit(),
+                        s.condition(), null, s.yesTo(), s.noTo())).toList();
         UUID nid = UUID.randomUUID();
         named.update("""
             INSERT INTO mkt_journeys (id, tenant_id, name, description, trigger_type, segment_id, segment_name, status, steps,
-                reentry_days, min_gap_hours, window_start_hour, window_end_hour, skip_weekends, created_by, updated_by)
+                reentry_days, min_gap_hours, window_start_hour, window_end_hour, skip_weekends, topic_id, created_by, updated_by)
             VALUES (:id, :t, :n, CAST(:d AS text), :tt, :sid, CAST(:sn AS text), 'DRAFT', CAST(:steps AS jsonb),
-                :rd, :gap, :ws, :we, :sw, CAST(:u AS uuid), CAST(:u AS uuid))
+                :rd, :gap, :ws, :we, :sw, :tp, CAST(:u AS uuid), CAST(:u AS uuid))
             """, new MapSqlParameterSource("id", nid).addValue("t", t.getValue()).addValue("n", trunc("Copy of " + j.name(), 150))
                 .addValue("d", j.description()).addValue("tt", j.trigger()).addValue("sid", j.segmentId()).addValue("sn", j.segmentName())
                 .addValue("steps", write(fresh)).addValue("rd", j.reentryDays(), java.sql.Types.INTEGER).addValue("gap", j.gap())
-                .addValue("ws", j.ws()).addValue("we", j.we()).addValue("sw", j.sw())
+                .addValue("ws", j.ws()).addValue("we", j.we()).addValue("sw", j.sw()).addValue("tp", j.topicId())
                 .addValue("u", user == null ? null : user.toString()));
         return get(t, nid);
     }
@@ -318,7 +321,8 @@ public class MarketingJourneyService {
         int ws = r.windowStartHour() == null ? 8 : r.windowStartHour();
         int we = r.windowEndHour() == null ? 17 : r.windowEndHour();
         checkPacing(gap, ws, we);
-        return new Prepared(trigger, segId, segName, write(steps), re, gap, ws, we, r.skipWeekends() == null || r.skipWeekends());
+        requireTopic(t, r.topicId());
+        return new Prepared(trigger, segId, segName, write(steps), re, gap, ws, we, r.skipWeekends() == null || r.skipWeekends(), r.topicId());
     }
 
     private static void checkPacing(int gap, int ws, int we) {
@@ -352,10 +356,14 @@ public class MarketingJourneyService {
                     out.add(new StepDto("WAIT", null, null, null, null, null, s.amount(), unit, null, null));
                 }
                 case "EXIT_IF" -> {
-                    String c = s.condition() == null ? "" : s.condition().trim().toUpperCase();
-                    if (!Set.of("CLICKED", "OPENED").contains(c)) throw bad(at + "exit condition must be CLICKED or OPENED.");
+                    String c = condition(s.condition(), at);
                     if (emails == 0) throw bad(at + "an exit check must come after at least one email.");
                     out.add(new StepDto("EXIT_IF", null, null, null, null, null, null, null, c, null));
+                }
+                case "BRANCH" -> {
+                    String c = condition(s.condition(), at);
+                    if (emails == 0) throw bad(at + "a branch must come after at least one email.");
+                    out.add(new StepDto("BRANCH", null, null, null, null, null, null, null, c, null, s.yesTo(), s.noTo()));
                 }
                 default -> throw bad(at + "unknown step type '" + s.type() + "'.");
             }
@@ -363,6 +371,12 @@ public class MarketingJourneyService {
         if (emails == 0) throw bad("A journey needs at least one email.");
         if (emails > MAX_EMAILS) throw bad("A journey can have at most " + MAX_EMAILS + " emails.");
         if (!"EMAIL".equals(out.get(out.size() - 1).type())) throw bad("The last step must be an email.");
+        for (int i = 0; i < out.size(); i++) {      // branches only jump FORWARD (or end the journey), so a journey always finishes
+            StepDto b = out.get(i);
+            if (!"BRANCH".equals(b.type())) continue;
+            checkTarget(b.yesTo(), i, out.size());
+            checkTarget(b.noTo(), i, out.size());
+        }
         return out;
     }
 
@@ -400,7 +414,7 @@ public class MarketingJourneyService {
         return new MapSqlParameterSource("id", id).addValue("t", t.getValue()).addValue("n", name.trim()).addValue("d", blank(desc))
                 .addValue("tt", p.trigger()).addValue("sid", p.segmentId()).addValue("sn", p.segmentName()).addValue("steps", p.stepsJson())
                 .addValue("rd", p.reentry(), java.sql.Types.INTEGER).addValue("gap", p.gap()).addValue("ws", p.ws())
-                .addValue("we", p.we()).addValue("sw", p.sw());
+                .addValue("we", p.we()).addValue("sw", p.sw()).addValue("tp", p.topicId());
     }
 
     private Row load(TenantId t, UUID id) {
@@ -415,13 +429,14 @@ public class MarketingJourneyService {
                 (UUID) rs.getObject("segment_id"), rs.getString("segment_name"), rs.getString("status"), rs.getString("steps_json"),
                 (Integer) rs.getObject("reentry_days"), rs.getInt("min_gap_hours"), rs.getInt("window_start_hour"), rs.getInt("window_end_hour"),
                 rs.getBoolean("skip_weekends"), ts(rs.getTimestamp("activated_at")), ts(rs.getTimestamp("created_at")),
-                ts(rs.getTimestamp("updated_at")), rs.getLong("n_active"), rs.getLong("n_completed"), rs.getLong("n_exited"));
+                ts(rs.getTimestamp("updated_at")), rs.getLong("n_active"), rs.getLong("n_completed"), rs.getLong("n_exited"),
+                (UUID) rs.getObject("topic_id"), rs.getString("topic_name"));
     }
 
     private JourneyResponse toResponse(Row r) {
         return new JourneyResponse(r.id(), r.name(), r.description(), r.trigger(), r.segmentId(), r.segmentName(), r.status(),
                 parse(r.stepsJson()), r.reentryDays(), r.gap(), r.ws(), r.we(), r.sw(), r.activatedAt(),
-                r.active(), r.completed(), r.exited(), r.createdAt(), r.updatedAt());
+                r.active(), r.completed(), r.exited(), r.createdAt(), r.updatedAt(), r.topicId(), r.topicName());
     }
 
     List<StepDto> parse(String json) {
@@ -437,9 +452,43 @@ public class MarketingJourneyService {
     private static String summary(StepDto s) {
         return switch (s.type()) {
             case "WAIT" -> "Wait " + s.amount() + " " + s.unit().toLowerCase();
-            case "EXIT_IF" -> "Exit if the contact " + s.condition().toLowerCase() + " an earlier email";
+            case "EXIT_IF" -> "Exit if the contact " + conditionText(s.condition());
+            case "BRANCH" -> "If the contact " + conditionText(s.condition()) + ": " + target(s.yesTo(), "continue") + "; otherwise " + target(s.noTo(), "continue");
             default -> s.name() + " — " + s.subject();
         };
+    }
+
+    private static void checkTarget(Integer to, int from, int size) {
+        if (to == null || to == -1) return;
+        if (to <= from || to >= size) {
+            throw bad("Step " + (from + 1) + ": a branch can only jump forward to a later step, or end the journey.");
+        }
+    }
+
+    private static String condition(String raw, String at) {
+        String c = raw == null ? "" : raw.trim().toUpperCase();
+        if (!Set.of("CLICKED", "OPENED", "PURCHASED").contains(c)) throw bad(at + "condition must be CLICKED, OPENED or PURCHASED.");
+        return c;
+    }
+
+    static String conditionText(String c) {
+        return switch (c == null ? "" : c) {
+            case "PURCHASED" -> "has paid since joining";
+            case "CLICKED"   -> "clicked an earlier email";
+            default          -> "opened an earlier email";
+        };
+    }
+
+    private static String target(Integer to, String otherwise) {
+        return to == null ? otherwise : to == -1 ? "end the journey" : "go to step " + (to + 1);
+    }
+
+    /** The topic must be one of THIS tenant's live topics. */
+    private void requireTopic(TenantId t, UUID topicId) {
+        if (topicId == null) return;
+        Long n = named.queryForObject("SELECT COUNT(*) FROM mkt_topics WHERE id = :id AND tenant_id = :t AND deleted_at IS NULL",
+                new MapSqlParameterSource("id", topicId).addValue("t", t.getValue()), Long.class);
+        if (n == null || n == 0) throw bad("That topic no longer exists.");
     }
 
     private static HandyFlowException bad(String m) { return new HandyFlowException(m, HttpStatus.BAD_REQUEST, "JOURNEY_INVALID"); }

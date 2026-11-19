@@ -23,7 +23,9 @@ public final class JourneyDtos {
             UUID segmentId,
             @NotNull @Size(min = 1, max = 20) List<@Valid StepDto> steps,
             Integer reentryDays, Integer minGapHours, Integer windowStartHour, Integer windowEndHour,
-            Boolean skipWeekends) {}
+            Boolean skipWeekends,
+            /** Optional: contacts who opted out of this topic are skipped (not emailed) by the journey's email steps. */
+            UUID topicId) {}
 
     public record JourneySettingsRequest(
             @NotBlank @Size(max = 150) String name,
@@ -34,7 +36,8 @@ public final class JourneyDtos {
             UUID id, String name, String description, String triggerType, UUID segmentId, String segmentName,
             String status, List<StepDto> steps, Integer reentryDays, int minGapHours, int windowStartHour,
             int windowEndHour, boolean skipWeekends, Instant activatedAt,
-            long activeCount, long completedCount, long exitedCount, Instant createdAt, Instant updatedAt) {}
+            long activeCount, long completedCount, long exitedCount, Instant createdAt, Instant updatedAt,
+            UUID topicId, String topicName) {}
 
     public record EnrollmentRow(UUID id, UUID preferenceId, String email, String name, String status, int currentStep,
                                 Instant nextRunAt, Instant enrolledAt, Instant completedAt, String exitReason, String lastError) {}
@@ -49,11 +52,12 @@ public final class JourneyDtos {
     public record ActivationPreview(long enrollNow, String note, List<LintIssue> issues) {}
 
     /**
-     * type: EMAIL | WAIT | EXIT_IF (| BRANCH once the engine supports it). Only the fields relevant to the type are used.
-     * yesTo/noTo (BRANCH only): index of a LATER step, -1 = end journey, null = next step.
+     * type: EMAIL | WAIT | EXIT_IF | BRANCH. Only the fields relevant to the type are used.
+     * condition (EXIT_IF and BRANCH): CLICKED | OPENED | PURCHASED.
+     * yesTo/noTo (BRANCH only): index of a LATER step, -1 = end the journey, null = continue with the next step.
      */
     public record StepDto(String type, String name, String subject, String htmlBody, String fromName, String replyTo,
-                          Integer amount, String unit /* HOURS|DAYS */, String condition /* CLICKED|OPENED */,
+                          Integer amount, String unit /* HOURS|DAYS */, String condition /* CLICKED|OPENED|PURCHASED */,
                           UUID campaignId /* set by the server at activation */,
                           Integer yesTo, Integer noTo) {
         @JsonCreator public StepDto {}

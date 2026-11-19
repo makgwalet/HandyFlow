@@ -1,5 +1,5 @@
 // src/pages/marketing/JourneyFlow.tsx
-import { Mail, Clock, Flag, Zap, CheckCircle2 } from 'lucide-react'
+import { Mail, Clock, Flag, Zap, CheckCircle2, GitBranch } from 'lucide-react'
 import { C, pct, fmtN } from './ui'
 
 const connector = <div style={{ width: 2, height: 22, background: '#CBD5E1', margin: '0 auto' }} />
@@ -30,6 +30,8 @@ export default function JourneyFlow({ trigger, steps }: { trigger: string; steps
               sub={s.metrics ? `${fmtN(s.metrics.sent)} sent · click ${pct(s.metrics.clickRate)} · open (approx.) ${pct(s.metrics.openRate)}` : 'Not sent yet'}
               badge={s.campaignStatus === 'PAUSED' ? <span style={{ fontSize: 10, fontWeight: 700, color: '#991B1B', background: '#FEE2E2', padding: '2px 8px', borderRadius: 20 }}>Paused</span> : waitingBadge(s.waiting)} />)}
           {s.type === 'WAIT' && <Node icon={<Clock size={17} />} color="#64748B" bg="#F1F5F9" title={s.summary} badge={waitingBadge(s.waiting)} />}
+          {s.type === 'BRANCH' && (
+            <Node icon={<GitBranch size={17} />} color="#0E7490" bg="#ECFEFF" title={s.summary ?? 'Branch'} sub="Decision: yes and no paths can jump forward" dashed badge={waitingBadge(s.waiting)} />)}
           {s.type === 'EXIT_IF' && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, maxWidth: '100%' }}>
               <Node icon={<Flag size={17} />} color={C.purple} bg="#F5F3FF" title={s.summary} sub="Goal check" dashed badge={waitingBadge(s.waiting)} />

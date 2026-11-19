@@ -2,7 +2,7 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { apiClient } from '../../api/client'
-import { Plus, X, Copy, Pencil, Trash2, ClipboardList, Tag, ExternalLink, Check } from 'lucide-react'
+import { Plus, X, Copy, Pencil, Trash2, ClipboardList, Tag, ExternalLink, Check, Download } from 'lucide-react'
 import { C, Card, Btn, Pill, Tabs, Empty, Switch, inp, lbl, fmtN } from './ui'
 
 const DEFAULT_CONSENT = 'I agree to receive marketing emails from this business. I can unsubscribe at any time.'
@@ -48,6 +48,16 @@ function Forms() {
     mutationFn: (f: any) => apiClient.post(`/api/v1/marketing/forms/${f.id}/${f.status === 'ACTIVE' ? 'disable' : 'enable'}`),
     onSuccess: refresh,
   })
+  const exportSubmissions = useMutation({
+    mutationFn: async () => {
+      const r = await apiClient.get('/api/v1/marketing/forms/submissions/export', { responseType: 'blob' })
+      const href = URL.createObjectURL(r.data as Blob)
+      const a = document.createElement('a')
+      a.href = href; a.download = 'form-submissions.csv'; a.click()
+      URL.revokeObjectURL(href)
+    },
+    onError: (e: any) => setError(e.response?.status === 403 ? 'Exporting submissions needs the Marketing admin permission.' : 'Export failed'),
+  })
   const url = (slug: string) => `${window.location.origin}/subscribe/${slug}`
   const copy = (key: string, text: string) => { navigator.clipboard?.writeText(text); setCopied(key); setTimeout(() => setCopied(null), 1800) }
   const ok = form.name.trim() && form.title.trim() && form.consentText.trim().length >= 20
@@ -58,7 +68,10 @@ function Forms() {
         Forms use <strong>double opt-in</strong>: submitting only sends a confirmation email, and the contact is opted in when they confirm. The exact consent wording, time and IP are stored as proof of permission.
         People already subscribed or on your suppression list get the same “check your inbox” reply, so the form can’t be used to probe your list.
       </div>
-      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 14 }}><Btn variant="primary" onClick={() => open()}><Plus size={14} /> New form</Btn></div>
+      {error && !editing && <div style={{ marginBottom: 10, padding: '9px 12px', background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: 8, fontSize: 13, color: '#DC2626' }}>{error}</div>}
+      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginBottom: 14 }}>
+        <Btn onClick={() => { setError(''); exportSubmissions.mutate() }} disabled={exportSubmissions.isPending}><Download size={14} /> Export submissions</Btn>
+        <Btn variant="primary" onClick={() => open()}><Plus size={14} /> New form</Btn></div>
 
       {isLoading ? <div style={{ textAlign: 'center', padding: 40, color: C.mute }}>Loading…</div>
         : forms.length === 0 ? <Empty icon={<ClipboardList size={36} />} title="No signup forms yet" text="Create a form to collect opted-in subscribers from your website or social media." />

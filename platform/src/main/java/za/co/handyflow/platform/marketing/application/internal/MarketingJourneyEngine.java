@@ -150,17 +150,19 @@ public class MarketingJourneyEngine {
         log.info("Journey processing: {} ok, {} failed", ok, failed);
     }
 
-    private record Enr(UUID id, UUID tenant, UUID journeyId, UUID prefId, int step, String stepsJson, int gap, int ws, int we, boolean sw) {}
+    private record Enr(UUID id, UUID tenant, UUID journeyId, UUID prefId, int step, String stepsJson, int gap, int ws, int we, boolean sw,
+                       UUID topicId) {}
 
     private void processOne(UUID enrollmentId, Map<UUID, String> tenantNames) {
         Enr e = named.queryForObject("""
             SELECT e.id, e.tenant_id, e.journey_id, e.preference_id, e.current_step, CAST(j.steps AS text) AS steps,
-                   j.min_gap_hours, j.window_start_hour, j.window_end_hour, j.skip_weekends
+                   j.min_gap_hours, j.window_start_hour, j.window_end_hour, j.skip_weekends, j.topic_id
             FROM mkt_journey_enrollments e JOIN mkt_journeys j ON j.id = e.journey_id
             WHERE e.id = :id AND e.status = 'ACTIVE'
             """, new MapSqlParameterSource("id", enrollmentId),
                 (rs, i) -> new Enr((UUID) rs.getObject(1), (UUID) rs.getObject(2), (UUID) rs.getObject(3), (UUID) rs.getObject(4),
-                        rs.getInt(5), rs.getString(6), rs.getInt(7), rs.getInt(8), rs.getInt(9), rs.getBoolean(10)));
+                        rs.getInt(5), rs.getString(6), rs.getInt(7), rs.getInt(8), rs.getInt(9), rs.getBoolean(10),
+                        (UUID) rs.getObject(11)));
         if (e == null) return;
 
         List<StepDto> steps;
@@ -185,14 +187,32 @@ public class MarketingJourneyEngine {
             }
 
             if ("EXIT_IF".equals(s.type())) {
-                if (engaged(e.id(), s.condition())) {
-                    addLog(e, idx, "EXIT_IF", "GOAL_REACHED", null, "Contact " + s.condition().toLowerCase() + " an earlier email");
+                String what = MarketingJourneyService.conditionText(s.condition());
+                if (engaged(e, s.condition())) {
+                    addLog(e, idx, "EXIT_IF", "GOAL_REACHED", null, "Contact " + what);
                     finalStatus = "COMPLETED"; reason = "Goal reached: " + s.condition().toLowerCase();
                     idx++;
                     break;
                 }
-                addLog(e, idx, "EXIT_IF", "GOAL_CHECKED", null, "Not " + s.condition().toLowerCase() + " yet; continuing");
+                addLog(e, idx, "EXIT_IF", "GOAL_CHECKED", null, "Contact has not yet " + what.replaceFirst("^has ", "") + "; continuing");
                 idx++;
+                continue;
+            }
+
+            if ("BRANCH".equals(s.type())) {
+                boolean yes = engaged(e, s.condition());
+                Integer to = yes ? s.yesTo() : s.noTo();
+                String outcome = yes ? "BRANCH_YES" : "BRANCH_NO";
+                String what = "Contact " + (yes ? "meets" : "does not meet") + " the condition (" + s.condition().toLowerCase() + ")";
+                if (to != null && to == -1) {
+                    addLog(e, idx, "BRANCH", outcome, null, what + "; ending the journey");
+                    finalStatus = "COMPLETED"; reason = "Branch ended the journey";
+                    idx = steps.size();
+                    break;
+                }
+                int nextIdx = to == null || to <= idx ? idx + 1 : to;   // forward-only, even if stored data says otherwise
+                addLog(e, idx, "BRANCH", outcome, null, what + "; continuing at step " + (nextIdx + 1));
+                idx = nextIdx;
                 continue;
             }
 
@@ -203,6 +223,11 @@ public class MarketingJourneyEngine {
                 addLog(e, idx, "EMAIL", "CONSENT_EXIT", null, "Opted out or suppressed");
                 finalStatus = "EXITED"; reason = "Opted out or suppressed";
                 break;
+            }
+            if (e.topicId() != null && topicOptedOut(e)) {   // the contact opted out of this journey's topic: skip, don't exit
+                addLog(e, idx, "EMAIL", "TOPIC_SKIP", null, "Skipped: contact opted out of this journey's topic");
+                idx++;
+                continue;
             }
             Instant allowed = nextAllowed(now, e.ws(), e.we(), e.sw());
             if (allowed.isAfter(now)) { next = allowed; break; }
@@ -272,11 +297,29 @@ public class MarketingJourneyEngine {
         return from;
     }
 
-    private boolean engaged(UUID enrollmentId, String condition) {
-        String col = "OPENED".equals(condition) ? "opened_at" : "clicked_at";
-        Boolean b = named.queryForObject("SELECT EXISTS (SELECT 1 FROM mkt_journey_step_log l JOIN mkt_campaign_contacts cc ON cc.id = l.campaign_contact_id "
-                        + "WHERE l.enrollment_id = :e AND l.outcome = 'SENT' AND cc." + col + " IS NOT NULL)",
-                new MapSqlParameterSource("e", enrollmentId), Boolean.class);
+    /**
+     * Has this enrolment met the condition? OPENED / CLICKED look at the emails this enrolment was sent;
+     * PURCHASED looks for a payment recorded for the same address on or after the day the contact was enrolled.
+     */
+    private boolean engaged(Enr e, String condition) {
+        String sql;
+        if ("PURCHASED".equals(condition)) {
+            sql = "SELECT EXISTS (SELECT 1 FROM mkt_journey_enrollments en JOIN mkt_conversions c "
+                    + "ON c.tenant_id = en.tenant_id AND LOWER(c.email) = LOWER(en.email) "
+                    + "WHERE en.id = :e AND en.tenant_id = :t AND c.kind = 'PAYMENT' AND c.paid_at >= en.enrolled_at)";
+        } else {
+            String col = "OPENED".equals(condition) ? "opened_at" : "clicked_at";
+            sql = "SELECT EXISTS (SELECT 1 FROM mkt_journey_step_log l JOIN mkt_campaign_contacts cc ON cc.id = l.campaign_contact_id "
+                    + "WHERE l.enrollment_id = :e AND l.tenant_id = :t AND l.outcome = 'SENT' AND cc." + col + " IS NOT NULL)";
+        }
+        Boolean b = named.queryForObject(sql, new MapSqlParameterSource("e", e.id()).addValue("t", e.tenant()), Boolean.class);
+        return Boolean.TRUE.equals(b);
+    }
+
+    private boolean topicOptedOut(Enr e) {
+        Boolean b = named.queryForObject("SELECT EXISTS (SELECT 1 FROM mkt_contact_topic_prefs WHERE tenant_id = :t AND topic_id = :tp "
+                        + "AND preference_id = :p AND subscribed = false)",
+                new MapSqlParameterSource("t", e.tenant()).addValue("tp", e.topicId()).addValue("p", e.prefId()), Boolean.class);
         return Boolean.TRUE.equals(b);
     }
 
