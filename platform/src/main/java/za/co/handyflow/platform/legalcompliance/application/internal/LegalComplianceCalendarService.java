@@ -8,7 +8,14 @@ import za.co.handyflow.platform.contracting.application.ContractingFacade;
 import za.co.handyflow.platform.legalcompliance.domain.model.LitigationMatter;
 import za.co.handyflow.platform.legalcompliance.domain.model.RegulatoryObligation;
 import za.co.handyflow.platform.legalcompliance.domain.repository.LitigationMatterRepository;
+import za.co.handyflow.platform.legalcompliance.domain.repository.RegulatoryChangeRepository;
+import za.co.handyflow.platform.legalcompliance.domain.repository.RegulatoryImpactRepository;
 import za.co.handyflow.platform.legalcompliance.domain.repository.RegulatoryObligationRepository;
+import za.co.handyflow.platform.legalcompliance.domain.model.RegulatoryChange;
+import za.co.handyflow.platform.legalcompliance.domain.model.RegulatoryImpact;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.UUID;
 import za.co.handyflow.platform.legalcompliance.dto.CalendarEntryResponse;
 import za.co.handyflow.platform.shared.TenantId;
 
@@ -37,6 +44,8 @@ public class LegalComplianceCalendarService {
     private final RegulatoryObligationRepository obligationRepository;
     private final LitigationMatterRepository matterRepository;
     private final ContractingFacade contractingFacade;
+    private final RegulatoryImpactRepository impactRepository;
+    private final RegulatoryChangeRepository changeRepository;
 
     @Transactional(readOnly = true)
     public List<CalendarEntryResponse> upcoming(TenantId tenantId, int days) {
@@ -55,6 +64,14 @@ public class LegalComplianceCalendarService {
             entries.add(new CalendarEntryResponse(m.getNextKeyDate(), "LITIGATION", m.getId(),
                     m.getMatterNumber() + " — " + m.getTitle(),
                     "Key date — " + m.getMatterType() + " vs. " + m.getOpposingParty()));
+        }
+
+        // Regulatory change impacts still awaiting a decision (due dates are set when the change is detected)
+        Map<UUID, RegulatoryChange> changeCache = new HashMap<>();
+        for (RegulatoryImpact i : impactRepository.findPendingDueWithin(tenantId, today, to)) {
+            RegulatoryChange c = changeCache.computeIfAbsent(i.getChangeId(), id -> changeRepository.findOneForTenant(tenantId, id).orElse(null));
+            entries.add(new CalendarEntryResponse(i.getDueDate(), "REGULATORY_CHANGE", i.getId(), i.getReference() + " — " + i.getTitle(),
+                    "Regulatory change " + i.getImpactType() + (c == null ? "" : " — " + c.getInstrumentTitle() + " " + c.getToLabel())));
         }
 
         List<ContractSummary> contracts = contractingFacade.listExpiringWithin(tenantId, days);

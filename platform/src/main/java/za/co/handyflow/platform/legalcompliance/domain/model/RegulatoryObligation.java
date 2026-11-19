@@ -68,6 +68,24 @@ public class RegulatoryObligation extends AggregateRoot<RegulatoryObligation> {
     @Column(name = "linked_contract_id")
     private UUID linkedContractId;
 
+    /** Phase 1 traceability: the library requirement this obligation was generated from (null for hand-entered obligations). */
+    @Column(name = "requirement_id")
+    private UUID requirementId;
+
+    /** The approved APPLICABLE assessment that justified generating it. */
+    @Column(name = "assessment_id")
+    private UUID assessmentId;
+
+    /** The exact regulatory version whose text this obligation was generated from. */
+    @Column(name = "source_version_id")
+    private UUID sourceVersionId;
+
+    @Column(name = "department_name", length = 150)
+    private String departmentName;
+
+    @Column(name = "evidence_requirement", columnDefinition = "TEXT")
+    private String evidenceRequirement;
+
     @Column(columnDefinition = "TEXT")
     private String notes;
 
@@ -107,6 +125,52 @@ public class RegulatoryObligation extends AggregateRoot<RegulatoryObligation> {
         o.status = ObligationStatus.COMPLIANT;
         o.createdBy = createdBy;
         return o;
+    }
+
+    /**
+     * Phase 1: an obligation that exists BECAUSE a requirement was assessed as applicable. Owner (name; the ID is optional
+     * until the UI has a user picker) and first review date are mandatory — an obligation nobody owns is just a note.
+     */
+    public static RegulatoryObligation createFromRequirement(TenantId tenantId, String title, ObligationCategory category,
+                                                             String regulationReference, String description,
+                                                             UUID responsibleUserId, String responsibleUserName,
+                                                             LocalDate reviewDate, RecurrenceInterval recurrence,
+                                                             UUID requirementId, UUID assessmentId, UUID sourceVersionId,
+                                                             String departmentName, String evidenceRequirement, UUID createdBy) {
+        if (responsibleUserName == null || responsibleUserName.isBlank()) throw new IllegalArgumentException("A responsible owner is required");
+        if (reviewDate == null) throw new IllegalArgumentException("A first review/due date is required");
+        RegulatoryObligation o = create(tenantId, title, category, regulationReference, description,
+                responsibleUserId, responsibleUserName, reviewDate, recurrence, createdBy);
+        o.requirementId = requirementId;
+        o.assessmentId = assessmentId;
+        o.sourceVersionId = sourceVersionId;
+        o.departmentName = departmentName;
+        o.evidenceRequirement = evidenceRequirement;
+        return o;
+    }
+
+    /**
+     * Regulatory change: the requirement this obligation came from now lives in a newer version. Re-point the link.
+     * newAssessmentId may be null to keep the existing justification reference.
+     */
+    public void relinkRequirement(UUID newRequirementId, UUID newVersionId, UUID newAssessmentId) {
+        this.requirementId = newRequirementId;
+        this.sourceVersionId = newVersionId;
+        if (newAssessmentId != null) this.assessmentId = newAssessmentId;
+    }
+
+    /** Refresh the obligation's wording and evidence expectation from the amended requirement (owner, dates and status untouched). */
+    public void refreshFromRequirement(String title, String regulationReference, String description, String evidenceRequirement) {
+        this.title = title;
+        this.regulationReference = regulationReference;
+        this.description = description;
+        this.evidenceRequirement = evidenceRequirement;
+    }
+
+    /** The requirement was removed from the regulation but the business keeps the obligation: it becomes a hand-managed one. */
+    public void detachRequirement() {
+        this.requirementId = null;
+        this.assessmentId = null;
     }
 
     public void update(String title, String regulationReference, String description,

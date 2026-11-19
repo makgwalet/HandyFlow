@@ -330,6 +330,8 @@ public enum NotificationType {
     LEGALCOMPLIANCE_OBLIGATION_OVERDUE(CRITICAL, Set.of(IN_APP, EMAIL)),
     LEGALCOMPLIANCE_DSAR_DUE_SOON(WARNING, Set.of(IN_APP, EMAIL)),
     LEGALCOMPLIANCE_DSAR_OVERDUE(CRITICAL, Set.of(IN_APP, EMAIL)),
+    LEGALCOMPLIANCE_CHANGE_IMPACT_DUE_SOON(WARNING, Set.of(IN_APP, EMAIL)),
+    LEGALCOMPLIANCE_CHANGE_IMPACT_OVERDUE(CRITICAL, Set.of(IN_APP, EMAIL)),
 
     // ── Legal Practice ───────────────────────────────────────────────────────
 // LpNotificationScheduler's daily 10:00 SAST sweep of LpMatterKeyDate rows
