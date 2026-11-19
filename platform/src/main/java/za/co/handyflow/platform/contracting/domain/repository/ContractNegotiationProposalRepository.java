@@ -13,4 +13,6 @@ public interface ContractNegotiationProposalRepository extends JpaRepository<Con
     List<ContractNegotiationProposal> findByTenantIdAndContractIdOrderByCreatedAtAsc(UUID tenantId, UUID contractId);
 
     List<ContractNegotiationProposal> findByTenantIdAndContractIdAndPartyIdOrderByCreatedAtAsc(UUID tenantId, UUID contractId, UUID partyId);
+
+    List<ContractNegotiationProposal> findByTenantIdAndContractIdAndStatus(UUID tenantId, UUID contractId, String status);
 }

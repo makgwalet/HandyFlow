@@ -6,6 +6,8 @@ import org.springframework.data.jpa.repository.Query;
 import jakarta.persistence.LockModeType;
 import za.co.handyflow.platform.contracting.domain.model.ContractNegotiation;
 
+import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -15,4 +17,6 @@ public interface ContractNegotiationRepository extends JpaRepository<ContractNeg
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT n FROM ContractNegotiation n WHERE n.tenantId = :tenantId AND n.contractId = :contractId")
     Optional<ContractNegotiation> findForUpdate(UUID tenantId, UUID contractId);
+
+    List<ContractNegotiation> findByStatusIn(Collection<String> statuses);
 }

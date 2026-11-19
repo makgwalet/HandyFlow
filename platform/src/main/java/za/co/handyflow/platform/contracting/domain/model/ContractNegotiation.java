@@ -7,6 +7,8 @@ import lombok.NoArgsConstructor;
 
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.ZoneId;
+import java.time.temporal.ChronoUnit;
 import java.util.UUID;
 
 /**
@@ -37,6 +39,7 @@ public class ContractNegotiation {
     @Column(name = "closed_by") private UUID closedBy;
     @Column(name = "closed_at") private Instant closedAt;
     @Column(name = "close_reason") private String closeReason;
+    @Column(name = "last_reminded_on") private LocalDate lastRemindedOn;
     @Column(name = "updated_at") private Instant updatedAt;
 
     public static ContractNegotiation open(UUID tenantId, UUID contractId, int baseVersionNo, LocalDate deadline, UUID by, LocalDate today) {
@@ -59,6 +62,27 @@ public class ContractNegotiation {
         return (OPEN.equals(status) || STAFF_REVIEW.equals(status) || CHANGES_REQUIRED.equals(status))
                 && (responseDeadline == null || !today.isAfter(responseDeadline));
     }
+
+    public static final String REMIND_DEADLINE_SOON = "DEADLINE_SOON", REMIND_DEADLINE_PASSED = "DEADLINE_PASSED", REMIND_PENDING = "PENDING";
+
+    /**
+     * Why staff should be reminded today, or null. Deadline within two days: once a day. Deadline passed: once a week. Proposals
+     * that have waited since before today for a decision: once a day. A deadline reason wins over the waiting one. Never for a
+     * negotiation that is ready or closed.
+     */
+    public String reminderReason(LocalDate today, Instant oldestPendingProposal, ZoneId zone) {
+        if (!isActive()) return null;
+        boolean remindedToday = today.equals(lastRemindedOn);
+        if (responseDeadline != null) {
+            long days = ChronoUnit.DAYS.between(today, responseDeadline);
+            if (days < 0) return lastRemindedOn == null || ChronoUnit.DAYS.between(lastRemindedOn, today) >= 7 ? REMIND_DEADLINE_PASSED : null;
+            if (days <= 2 && !remindedToday) return REMIND_DEADLINE_SOON;
+        }
+        if (oldestPendingProposal != null && !remindedToday && oldestPendingProposal.isBefore(today.atStartOfDay(zone).toInstant())) return REMIND_PENDING;
+        return null;
+    }
+
+    public void markReminded(LocalDate today) { this.lastRemindedOn = today; }
 
     public boolean isActive() { return OPEN.equals(status) || STAFF_REVIEW.equals(status) || CHANGES_REQUIRED.equals(status); }
 
