@@ -92,6 +92,10 @@ public class SecurityConfig {
                                 "/api/v1/creative/approve/**",   // public proof approval — no login required
                                 "/api/v1/desk/portal/**",
                                 "/api/v1/marketing/unsubscribe/**",
+                                // Marketing public surfaces — each is protected by its own token / signature / shared secret:
+                                "/api/v1/marketing/public/**",    // double opt-in forms, confirm, preferences (token-based)
+                                "/api/v1/marketing/webhooks/**",  // provider callbacks (SES SNS signature, SendGrid ECDSA, X-Webhook-Secret)
+                                "/api/v1/marketing/track/**",     // open pixel + click redirect from recipients' mail clients
                                 "/api/v1/recruiter/careers/**",
                                 "/api/v1/recruiter/portal/**",
                                 "/api/v1/admin/auth/login",

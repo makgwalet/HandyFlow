@@ -64,6 +64,7 @@ import { DeskPage }                     from './pages/desk/DeskPage'
 import { TasksPage }                    from './pages/tasks/TasksPage'
 import { MarketingPage }                from './pages/marketing/MarketingPage'
 import UnsubscribePage                  from './pages/marketing/UnsubscribePage'
+import { SubscribePage, ConfirmPage, PreferencesPage } from './pages/marketing/PublicMarketingPages'
 import { RecruiterPage }                from './pages/recruiter/RecruiterPage'
 import { PosPage }                      from './pages/pos/PosPage'
 import { AccountantPage }               from "./pages/accountant/AccountantPage"
@@ -373,6 +374,9 @@ export default function App() {
           <Route path="/negotiate/:token"              element={<NegotiationPage />} />
           <Route path="/creative/approve/:token"       element={<CreativeApprovePage />} />
           <Route path="/unsubscribe/:token"            element={<UnsubscribePage />} />
+          <Route path="/subscribe/:slug"               element={<SubscribePage />} />
+          <Route path="/confirm/:token"                element={<ConfirmPage />} />
+          <Route path="/preferences/:token"            element={<PreferencesPage />} />
 
           <Route path="/careers/:tenantSlug"                element={<CareersListPage />} />
           <Route path="/careers/:tenantSlug/:jobSlug"       element={<JobApplyPage />} />

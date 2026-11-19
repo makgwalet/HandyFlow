@@ -2,277 +2,200 @@ package za.co.handyflow.platform.marketing.application.internal;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.dao.DuplicateKeyException;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
-import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
-import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Service;
-import org.springframework.web.util.HtmlUtils;
-import za.co.handyflow.platform.marketing.domain.model.MktCampaign;
-import za.co.handyflow.platform.marketing.domain.repository.MktCampaignRepository;
-import za.co.handyflow.platform.marketing.dto.StudioDtos.*;
-import za.co.handyflow.platform.shared.*;
+import org.springframework.transaction.annotation.Transactional;
+import za.co.handyflow.platform.marketing.domain.model.MktConsentEvidence;
+import za.co.handyflow.platform.marketing.domain.model.MktContactPreference;
+import za.co.handyflow.platform.marketing.domain.model.MktSuppressionEntry;
+import za.co.handyflow.platform.marketing.domain.repository.MktConsentEvidenceRepository;
+import za.co.handyflow.platform.marketing.domain.repository.MktSuppressionEntryRepository;
+import za.co.handyflow.platform.shared.HandyFlowException;
+import za.co.handyflow.platform.shared.ResourceNotFoundException;
+import za.co.handyflow.platform.shared.TenantId;
 
-import java.net.URI;
-import java.nio.charset.StandardCharsets;
-import java.util.*;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
+import java.util.Collection;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Locale;
+import java.util.Set;
+import java.util.UUID;
 
-/** Content checker, server-side preview, test sends and the reusable block library. */
+/**
+ * POPIA / Section 69 consent and suppression: the single place that decides whether an address may be mailed.
+ *
+ * - {@link #evaluate} is the ONE eligibility decision, used at launch, again before every send, and by journeys.
+ * - Suppression is per tenant + address; the unique active-row index makes concurrent suppressions harmless.
+ * - Lifting a suppression never re-opts the contact in: they must opt in again, with fresh evidence.
+ * - {@code mkt_consent_evidence} is append-only: every opt-in, opt-out, import declaration and
+ *   suppression change adds a row, and rows are never updated or deleted.
+ */
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class MarketingContentService {
+public class MarketingConsentService {
 
-    private final NamedParameterJdbcTemplate named;
-    private final MarketingConsentService    consentService;
-    private final EmailService               emailService;
-    private final RateLimiter                rateLimiter;
-    private final MktCampaignRepository      campaignRepo;
+    /** Human-readable reasons carried on blocked sends. */
+    public static final String BLOCKED_SUPPRESSED   = "address is on the suppression list";
+    public static final String BLOCKED_NOT_OPTED_IN = "contact has not opted in to email marketing";
+    public static final String BLOCKED_NO_CONTACT   = "contact record not found";
+    public static final String BLOCKED_BAD_ADDRESS  = "invalid email address";
 
-    private static final Set<String> KNOWN_TOKENS = Set.of(
-            "{{first_name}}", "{{name}}", "{{email}}", "{{company_name}}", "{{unsubscribe_url}}");
-    private static final Pattern TOKEN    = Pattern.compile("\\{\\{[^}]*\\}\\}");
-    private static final Pattern HREF     = Pattern.compile("(?i)href\\s*=\\s*([\"'])(.*?)\\1");
-    private static final Pattern IMG      = Pattern.compile("(?i)<img\\b[^>]*>");
-    private static final Pattern ALT      = Pattern.compile("(?i)\\balt\\s*=");
-    private static final Pattern IMG_SRC  = Pattern.compile("(?i)\\bsrc\\s*=\\s*[\"']([^\"']*)[\"']");
-    private static final Pattern BAD_TAGS = Pattern.compile("(?i)<\\s*(script|form|iframe|object|embed)\\b");
-    private static final Pattern EMAIL    = Pattern.compile("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$");
-    private static final List<String> SPAM_WORDS = List.of(
-            "100% free", "act now", "buy now", "click here", "guarantee", "winner", "urgent", "risk free",
-            "no obligation", "cash bonus", "$$$", "make money");
+    private static final int MAX_EVIDENCE_CHARS = 2000;
+    private static final Set<String> SUPPRESSION_REASONS = Set.of(
+            MktSuppressionEntry.REASON_UNSUBSCRIBED, MktSuppressionEntry.REASON_COMPLAINT,
+            MktSuppressionEntry.REASON_HARD_BOUNCE,  MktSuppressionEntry.REASON_MANUAL);
 
-    private static final int MAX_TEST_RECIPIENTS = 5;
-    private static final Map<String, Integer> ORDER = Map.of("ERROR", 0, "WARN", 1, "INFO", 2);
+    private final MktSuppressionEntryRepository suppressionRepo;
+    private final MktConsentEvidenceRepository  evidenceRepo;
 
-    // ── Token substitution (shared with MarketingService.personalise) ────────
-
-    public static String applyTokens(String template, String firstName, String fullName, String email,
-                                     String company, String unsubscribeUrl, boolean html) {
-        if (template == null) return "";
-        return template
-                .replace("{{first_name}}",      esc(html, firstName))
-                .replace("{{name}}",            esc(html, fullName))
-                .replace("{{email}}",           esc(html, email))
-                .replace("{{company_name}}",    esc(html, company))
-                .replace("{{unsubscribe_url}}", unsubscribeUrl == null ? "" : unsubscribeUrl);
+    /** Outcome of an eligibility check. {@code reason} is null when eligible. */
+    public record Decision(boolean eligible, String reason) {
+        public static Decision ok()                  { return new Decision(true, null); }
+        public static Decision blocked(String why)   { return new Decision(false, why); }
     }
 
-    private static String esc(boolean html, String s) {
-        String v = s == null ? "" : s;
-        return html ? HtmlUtils.htmlEscape(v) : v;
+    // ── Eligibility ───────────────────────────────────────────────────────────
+
+    /**
+     * Pure decision (no database access): may {@code email} be mailed given this contact record and the
+     * set of actively suppressed addresses? Fails closed: a missing contact, a missing opt-in or a
+     * suppressed address is never eligible.
+     *
+     * @param suppressed lower-case suppressed addresses, as returned by {@link #activeSuppressedEmails}
+     */
+    public Decision evaluate(MktContactPreference pref, String email, Set<String> suppressed) {
+        String e = normalise(email);
+        if (pref == null)                                    return Decision.blocked(BLOCKED_NO_CONTACT);
+        if (e == null || !e.contains("@"))                   return Decision.blocked(BLOCKED_BAD_ADDRESS);
+        if (suppressed != null && suppressed.contains(e))    return Decision.blocked(BLOCKED_SUPPRESSED);
+        if (!pref.isEmailOptedIn())                          return Decision.blocked(BLOCKED_NOT_OPTED_IN);
+        return Decision.ok();
     }
 
-    // ── Lint ─────────────────────────────────────────────────────────────────
+    @Transactional(readOnly = true)
+    public boolean isSuppressed(TenantId tenantId, String email) {
+        String e = normalise(email);
+        return e != null && suppressionRepo.findActive(tenantId, e).isPresent();
+    }
 
-    public List<LintIssue> lint(String subject, String html) {
-        List<LintIssue> out = new ArrayList<>();
-        String s = subject == null ? "" : subject.trim();
-        String h = html == null ? "" : html;
+    @Transactional(readOnly = true)
+    public Set<String> activeSuppressedEmails(TenantId tenantId) {
+        return new HashSet<>(suppressionRepo.findAllActiveEmails(tenantId));
+    }
 
-        if (s.isEmpty()) out.add(i("ERROR", "SUBJECT_EMPTY", "The subject line is empty."));
-        else {
-            if (s.length() > 100) out.add(i("WARN", "SUBJECT_LONG", "Subject is " + s.length() + " characters; most inboxes cut it off around 60–70."));
-            else if (s.length() > 70) out.add(i("INFO", "SUBJECT_LONG", "Subject is " + s.length() + " characters and may be truncated on mobile."));
-            long letters = s.chars().filter(Character::isLetter).count();
-            long upper = s.chars().filter(Character::isUpperCase).count();
-            if (letters >= 8 && upper * 10 > letters * 7) out.add(i("WARN", "SUBJECT_CAPS", "The subject is mostly capital letters, which spam filters penalise."));
-            if (s.chars().filter(ch -> ch == '!').count() > 1) out.add(i("WARN", "SUBJECT_EXCLAIM", "Multiple exclamation marks in the subject can trigger spam filters."));
-            String lower = (s + " " + stripTags(h)).toLowerCase();
-            List<String> found = SPAM_WORDS.stream().filter(lower::contains).toList();
-            if (!found.isEmpty()) out.add(i("WARN", "SPAM_WORDS", "Wording that often triggers spam filters: " + String.join(", ", found) + "."));
-            if (s.contains("{{unsubscribe_url}}")) out.add(i("WARN", "TOKEN_IN_SUBJECT", "{{unsubscribe_url}} only makes sense in the email body."));
+    /** The subset of {@code emails} that is actively suppressed (batched, so large sends stay cheap). */
+    @Transactional(readOnly = true)
+    public Set<String> activeSuppressedAmong(TenantId tenantId, Collection<String> emails) {
+        Set<String> out = new HashSet<>();
+        if (emails == null || emails.isEmpty()) return out;
+        List<String> lower = emails.stream().map(MarketingConsentService::normalise)
+                .filter(x -> x != null).distinct().toList();
+        for (int i = 0; i < lower.size(); i += 1000) {     // keep each IN list well under driver limits
+            out.addAll(suppressionRepo.findActiveEmailsAmong(tenantId, lower.subList(i, Math.min(i + 1000, lower.size()))));
         }
+        return out;
+    }
 
-        Set<String> tokens = new LinkedHashSet<>();
-        Matcher tm = TOKEN.matcher(s + " " + h);
-        while (tm.find()) tokens.add(tm.group());
-        List<String> unknown = tokens.stream().filter(t -> !KNOWN_TOKENS.contains(t)).toList();
-        if (!unknown.isEmpty()) out.add(i("WARN", "TOKEN_UNKNOWN", "Unrecognised placeholder(s) will be sent as literal text: " + String.join(", ", unknown) + "."));
+    @Transactional(readOnly = true)
+    public long countActiveSuppressions(TenantId tenantId) {
+        return suppressionRepo.countActive(tenantId);
+    }
 
-        if (h.isBlank()) { out.add(i("ERROR", "BODY_EMPTY", "The email body is empty.")); return sort(out); }
+    @Transactional(readOnly = true)
+    public Page<MktSuppressionEntry> list(TenantId tenantId, boolean activeOnly, Pageable pageable) {
+        return activeOnly ? suppressionRepo.findActiveForTenant(tenantId, pageable)
+                          : suppressionRepo.findAllForTenant(tenantId, pageable);
+    }
 
-        int bytes = h.getBytes(StandardCharsets.UTF_8).length;
-        if (bytes > 102_400) out.add(i("WARN", "BODY_LARGE", "The HTML is " + (bytes / 1024) + " KB. Gmail clips messages over ~102 KB, hiding the unsubscribe link behind “View entire message”."));
+    // ── Suppression ───────────────────────────────────────────────────────────
 
-        Matcher bad = BAD_TAGS.matcher(h);
-        Set<String> badTags = new LinkedHashSet<>();
-        while (bad.find()) badTags.add(bad.group(1).toLowerCase());
-        if (!badTags.isEmpty()) out.add(i("WARN", "BLOCKED_TAGS", "Email clients strip or block: <" + String.join(">, <", badTags) + ">."));
-
-        // Images
-        int noAlt = 0; Set<String> httpImg = new LinkedHashSet<>();
-        Matcher im = IMG.matcher(h);
-        while (im.find()) {
-            String tag = im.group();
-            if (!ALT.matcher(tag).find()) noAlt++;
-            Matcher src = IMG_SRC.matcher(tag);
-            if (src.find() && src.group(1).toLowerCase().startsWith("http://")) httpImg.add(shorten(src.group(1)));
+    /**
+     * Idempotent: suppressing an address that is already actively suppressed returns the existing entry
+     * and writes no second evidence row.
+     */
+    @Transactional
+    public MktSuppressionEntry suppress(TenantId tenantId, String email, String reason,
+                                        String source, String note, UUID by) {
+        String e = normalise(email);
+        if (e == null || !e.contains("@")) {
+            throw new HandyFlowException("Invalid email address", HttpStatus.BAD_REQUEST, "INVALID_EMAIL");
         }
-        if (noAlt > 0) out.add(i("WARN", "IMG_ALT", noAlt + " image(s) have no alt text; many clients block images by default."));
-        if (!httpImg.isEmpty()) out.add(i("WARN", "IMG_INSECURE", "Image(s) loaded over http://: " + String.join(", ", httpImg)));
-
-        // Links
-        int total = 0, untracked = 0;
-        Set<String> seen = new HashSet<>();
-        Matcher lm = HREF.matcher(h);
-        while (lm.find()) {
-            total++;
-            String raw = lm.group(0);
-            String v = lm.group(2).trim();
-            if (!raw.startsWith("href=\"")) untracked++;
-            if (v.equals("{{unsubscribe_url}}")) continue;
-            String key = v.toLowerCase();
-            if (!seen.add(key)) continue;
-
-            String lower = v.toLowerCase();
-            if (v.isEmpty() || v.equals("#")) { out.add(i("WARN", "LINK_EMPTY", "A link has an empty or “#” destination.")); continue; }
-            if (lower.startsWith("javascript:")) { out.add(i("ERROR", "LINK_JS", "A javascript: link will not work in email and is treated as unsafe.")); continue; }
-            if (lower.startsWith("mailto:") || lower.startsWith("tel:")) continue;
-            if (v.contains("{{")) { out.add(i("WARN", "LINK_TOKEN", "A link contains a placeholder (" + shorten(v) + "). Values are inserted without URL-encoding.")); continue; }
-            try {
-                URI u = URI.create(v);
-                if (u.getScheme() == null) out.add(i("ERROR", "LINK_RELATIVE", "Relative link “" + shorten(v) + "” will break in email. Use the full https:// address."));
-                else if (u.getScheme().equalsIgnoreCase("http")) out.add(i("WARN", "LINK_INSECURE", "Insecure link: " + shorten(v)));
-                else if (!u.getScheme().equalsIgnoreCase("https")) out.add(i("WARN", "LINK_SCHEME", "Unusual link scheme: " + shorten(v)));
-            } catch (IllegalArgumentException e) {
-                out.add(i("ERROR", "LINK_MALFORMED", "Malformed link: " + shorten(v)));
-            }
+        if (reason == null || !SUPPRESSION_REASONS.contains(reason)) {
+            throw new HandyFlowException("Unknown suppression reason '" + reason + "'",
+                    HttpStatus.BAD_REQUEST, "INVALID_SUPPRESSION_REASON");
         }
-        if (total > 30) out.add(i("WARN", "LINK_MANY", "The email has " + total + " links; very link-heavy emails are more likely to be filtered."));
-        if (untracked > 0) out.add(i("INFO", "LINK_UNTRACKED", untracked + " link(s) don't use the standard href=\"…\" format and won't be click-tracked (they still work)."));
-        if (!h.contains("{{unsubscribe_url}}")) out.add(i("INFO", "FOOTER_AUTO", "No unsubscribe placeholder found. A sender-identification and unsubscribe footer is added automatically."));
-        out.add(i("INFO", "LINKS_NOT_FETCHED", "Links are checked for format only. They are not opened, so a dead page will not be detected."));
-        return sort(out);
-    }
-
-    // ── Preview ──────────────────────────────────────────────────────────────
-
-    public ContentPreviewResponse preview(TenantId tenantId, ContentPreviewRequest req) {
-        String name = req.sampleName() != null && !req.sampleName().isBlank() ? req.sampleName().trim() : "Thabo Modise";
-        String first = name.split("\\s+")[0];
-        String company = tenantName(tenantId);
-        String email = "thabo@example.co.za";
-
-        String subject = applyTokens(req.subject(), first, name, email, company, "#", false);
-        String html = applyTokens(req.htmlBody(), first, name, email, company, "#", true);
-        if (req.htmlBody() != null && !req.htmlBody().contains("{{unsubscribe_url}}")) {
-            String contact = req.replyTo() != null && !req.replyTo().isBlank()
-                    ? " Contact: " + HtmlUtils.htmlEscape(req.replyTo()) + "." : "";
-            html += "<br><hr><p style=\"font-size:11px;color:#94A3B8;text-align:center\">Sent by "
-                    + HtmlUtils.htmlEscape(company) + "." + contact
-                    + " You received this because you opted in to receive marketing emails. <a href=\"#\">Unsubscribe</a></p>";
+        int inserted = suppressionRepo.insertIfAbsent(UUID.randomUUID(), tenantId.getValue(), e,
+                reason, source, note, by);
+        MktSuppressionEntry entry = suppressionRepo.findActive(tenantId, e)
+                .orElseThrow(() -> new IllegalStateException("Suppression for " + e + " vanished after insert"));
+        if (inserted > 0) {
+            evidenceRepo.save(MktConsentEvidence.record(tenantId, null, e, MktConsentEvidence.SUPPRESSION_ADDED,
+                    source, clip(reason + (note == null || note.isBlank() ? "" : ": " + note)), by));
+            log.info("Suppressed {} (tenant={}, reason={}, source={})", e, tenantId, reason, source);
         }
-        return new ContentPreviewResponse(subject, html);
+        return entry;
     }
 
-    // ── Test send ────────────────────────────────────────────────────────────
-
-    public TestSendResult testSend(TenantId tenantId, UUID userId, UUID campaignId, List<String> emails) {
-        MktCampaign c = campaignRepo.findByIdAndTenantId(campaignId, tenantId)
-                .orElseThrow(() -> new ResourceNotFoundException("Campaign", campaignId.toString()));
-
-        Set<String> targets = new LinkedHashSet<>();
-        if (emails != null) for (String e : emails) {
-            if (e == null) continue;
-            String n = e.toLowerCase().trim();
-            if (!EMAIL.matcher(n).matches()) throw new HandyFlowException("'" + e.trim() + "' is not a valid email address.", HttpStatus.BAD_REQUEST, "INVALID_EMAIL");
-            targets.add(n);
+    /** Lifts one suppression with a documented reason. The contact is NOT re-opted-in. */
+    @Transactional
+    public MktSuppressionEntry lift(TenantId tenantId, UUID suppressionId, String reason, UUID by) {
+        if (reason == null || reason.trim().length() < 10) {
+            throw new HandyFlowException("A documented reason of at least 10 characters is required",
+                    HttpStatus.BAD_REQUEST, "LIFT_REASON_REQUIRED");
         }
-        if (targets.isEmpty()) throw new HandyFlowException("Enter at least one email address.", HttpStatus.BAD_REQUEST, "NO_RECIPIENTS");
-        if (targets.size() > MAX_TEST_RECIPIENTS) throw new HandyFlowException("Send tests to at most " + MAX_TEST_RECIPIENTS + " addresses at a time.", HttpStatus.BAD_REQUEST, "TOO_MANY_RECIPIENTS");
-
-        if (!rateLimiter.tryConsume("mkt:testsend:" + tenantId.getValue() + ":" + userId, 10, 3_600_000L)) {
-            throw new HandyFlowException("Too many test sends. Try again in a while.", HttpStatus.TOO_MANY_REQUESTS, "TEST_SEND_RATE_LIMIT");
+        MktSuppressionEntry entry = suppressionRepo.findByIdAndTenantId(suppressionId, tenantId)
+                .orElseThrow(() -> new ResourceNotFoundException("Suppression", suppressionId.toString()));
+        if (!entry.isActive()) {
+            throw new HandyFlowException("This suppression has already been lifted",
+                    HttpStatus.CONFLICT, "SUPPRESSION_ALREADY_LIFTED");
         }
-
-        String company = tenantName(tenantId);
-        String banner = "<div style=\"background:#FEF3C7;border:1px solid #FDE68A;color:#92400E;padding:10px 14px;"
-                + "font:13px Arial,sans-serif;margin-bottom:16px\"><strong>TEST SEND</strong> — campaign “"
-                + HtmlUtils.htmlEscape(c.getName()) + "”, version " + c.getContentVersion()
-                + ". Links are not tracked and the unsubscribe link is disabled.</div>";
-
-        List<String> sent = new ArrayList<>();
-        List<Refused> refused = new ArrayList<>();
-        for (String to : targets) {
-            if (consentService.isSuppressed(tenantId, to)) {
-                refused.add(new Refused(to, "On the suppression list"));
-                continue;
-            }
-            String subject = "[TEST] " + applyTokens(c.getSubject(), "Thabo", "Thabo Modise", to, company, "#", false);
-            String body = banner + applyTokens(c.getHtmlBody(), "Thabo", "Thabo Modise", to, company, "#", true);
-            emailService.send(to, subject, body);    // async; failures are logged, not reported here
-            sent.add(to);
-        }
-        log.info("Test send campaign={} tenant={} by={} sent={} refused={}", campaignId, tenantId, userId, sent.size(), refused.size());
-        return new TestSendResult(sent, refused);
+        entry.lift(by, reason.trim());
+        suppressionRepo.save(entry);
+        evidenceRepo.save(MktConsentEvidence.record(tenantId, null, entry.getEmail(),
+                MktConsentEvidence.SUPPRESSION_LIFTED, "STAFF", clip(reason.trim()), by));
+        log.warn("Suppression lifted for {} (tenant={}, by={})", entry.getEmail(), tenantId, by);
+        return entry;
     }
 
-    // ── Content blocks ───────────────────────────────────────────────────────
+    // ── Consent evidence ──────────────────────────────────────────────────────
 
-    public List<BlockResponse> listBlocks(TenantId tenantId) {
-        return named.query("SELECT id, name, category, html, updated_at FROM mkt_content_blocks "
-                        + "WHERE tenant_id = :t AND deleted_at IS NULL ORDER BY lower(name)",
-                new MapSqlParameterSource("t", tenantId.getValue()),
-                (rs, n) -> new BlockResponse((UUID) rs.getObject("id"), rs.getString("name"), rs.getString("category"),
-                        rs.getString("html"), rs.getTimestamp("updated_at").toInstant()));
+    @Transactional
+    public void recordOptIn(TenantId tenantId, MktContactPreference pref, String source, String evidence, UUID by) {
+        evidenceRepo.save(MktConsentEvidence.record(tenantId, pref.getId(), pref.getEmail(),
+                MktConsentEvidence.OPT_IN, source, clip(evidence), by));
     }
 
-    public BlockResponse createBlock(TenantId tenantId, UUID user, BlockRequest req) {
-        UUID id = UUID.randomUUID();
-        try {
-            named.update("INSERT INTO mkt_content_blocks (id, tenant_id, name, category, html, created_by) "
-                            + "VALUES (:id, :t, :n, :c, :h, CAST(:u AS uuid))",
-                    new MapSqlParameterSource("id", id).addValue("t", tenantId.getValue()).addValue("n", req.name().trim())
-                            .addValue("c", blank(req.category())).addValue("h", req.html())
-                            .addValue("u", user == null ? null : user.toString()));
-        } catch (DuplicateKeyException e) { throw nameTaken(); }
-        return getBlock(tenantId, id);
+    /** Bulk import where the uploader declares they hold permission; the declaration itself is the evidence. */
+    @Transactional
+    public void recordImportDeclaration(TenantId tenantId, MktContactPreference pref, String source, UUID by) {
+        evidenceRepo.save(MktConsentEvidence.record(tenantId, pref.getId(), pref.getEmail(),
+                MktConsentEvidence.IMPORT_DECLARATION, source,
+                "Uploader declared that this contact has given permission to receive marketing email.", by));
     }
 
-    public BlockResponse updateBlock(TenantId tenantId, UUID id, BlockRequest req) {
-        int n;
-        try {
-            n = named.update("UPDATE mkt_content_blocks SET name = :n, category = :c, html = :h, updated_at = now() "
-                            + "WHERE id = :id AND tenant_id = :t AND deleted_at IS NULL",
-                    new MapSqlParameterSource("id", id).addValue("t", tenantId.getValue()).addValue("n", req.name().trim())
-                            .addValue("c", blank(req.category())).addValue("h", req.html()));
-        } catch (DuplicateKeyException e) { throw nameTaken(); }
-        if (n == 0) throw new ResourceNotFoundException("Block", id.toString());
-        return getBlock(tenantId, id);
+    @Transactional
+    public void recordOptOut(TenantId tenantId, MktContactPreference pref, String source) {
+        evidenceRepo.save(MktConsentEvidence.record(tenantId, pref.getId(), pref.getEmail(),
+                MktConsentEvidence.OPT_OUT, source, null, null));
     }
 
-    public void deleteBlock(TenantId tenantId, UUID id) {
-        int n = named.update("UPDATE mkt_content_blocks SET deleted_at = now() WHERE id = :id AND tenant_id = :t AND deleted_at IS NULL",
-                new MapSqlParameterSource("id", id).addValue("t", tenantId.getValue()));
-        if (n == 0) throw new ResourceNotFoundException("Block", id.toString());
+    @Transactional(readOnly = true)
+    public List<MktConsentEvidence> history(TenantId tenantId, String email) {
+        String e = normalise(email);
+        return e == null ? List.of() : evidenceRepo.findByTenantIdAndEmailOrderByCreatedAtDesc(tenantId, e);
     }
 
-    private BlockResponse getBlock(TenantId tenantId, UUID id) {
-        return listBlocks(tenantId).stream().filter(b -> b.id().equals(id)).findFirst()
-                .orElseThrow(() -> new ResourceNotFoundException("Block", id.toString()));
+    // ── Helpers ───────────────────────────────────────────────────────────────
+
+    static String normalise(String email) {
+        return email == null ? null : email.trim().toLowerCase(Locale.ROOT);
     }
 
-    // ── Helpers ──────────────────────────────────────────────────────────────
-
-    private String tenantName(TenantId tenantId) {
-        try {
-            return named.queryForObject("SELECT name FROM tenants WHERE id = :t",
-                    new MapSqlParameterSource("t", tenantId.getValue()), String.class);
-        } catch (Exception e) { return "Your Business"; }
-    }
-
-    private static List<LintIssue> sort(List<LintIssue> l) {
-        l.sort(Comparator.comparingInt(x -> ORDER.getOrDefault(x.level(), 3)));
-        return l;
-    }
-    private static LintIssue i(String level, String code, String msg) { return new LintIssue(level, code, msg); }
-    private static String shorten(String s) { return s.length() > 80 ? s.substring(0, 77) + "…" : s; }
-    private static String stripTags(String s) { return s.replaceAll("(?s)<[^>]*>", " "); }
-    private static String blank(String s) { return s == null || s.isBlank() ? null : s.trim(); }
-    private static HandyFlowException nameTaken() {
-        return new HandyFlowException("A block with this name already exists.", HttpStatus.CONFLICT, "BLOCK_NAME_EXISTS");
+    private static String clip(String s) {
+        if (s == null) return null;
+        return s.length() > MAX_EVIDENCE_CHARS ? s.substring(0, MAX_EVIDENCE_CHARS) : s;
     }
 }

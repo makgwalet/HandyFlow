@@ -55,13 +55,19 @@ class MarketingServiceEscapingTest {
     @Mock private JdbcTemplate jdbc;
     @Mock private CrmFacade crmFacade;
     @Mock private TenantFacade tenantFacade;
+    @Mock private MarketingConsentService consentService;
+    @Mock private MarketingAudienceService audienceService;
+    @Mock private MarketingSegmentService segmentService;
+    @Mock private MarketingLifecycleService lifecycle;
+    @Mock private MarketingFormService formService;
 
     private static final String PAYLOAD = "<script>alert(1)</script>";
     private static final String ESCAPED = "&lt;script&gt;alert(1)&lt;/script&gt;";
 
     private MarketingService service() {
         return new MarketingService(preferenceRepo, templateRepo, campaignRepo,
-                campaignContactRepo, sendQueueRepo, emailService, jdbc, crmFacade, tenantFacade);
+                campaignContactRepo, sendQueueRepo, emailService, jdbc, crmFacade,
+                consentService, audienceService, segmentService, lifecycle, formService, tenantFacade);
     }
 
     private static TenantDetails detailsWithCompanyName(String name) {
@@ -131,5 +137,28 @@ class MarketingServiceEscapingTest {
         assertThat(result).isNotEqualTo("HandyFlow");
         assertThat(result).isEqualTo("Our Team");
     }
-}
 
+    @Test
+    @DisplayName("fetchTenantName falls back to the neutral label when the company name is blank")
+    void fetchTenantName_blankName_fallsBackNeutrally() {
+        TenantId tenantId = TenantId.generate();
+        when(tenantFacade.findTenantDetails(tenantId))
+                .thenReturn(Optional.of(detailsWithCompanyName("   ")));
+
+        assertThat(service().fetchTenantName(tenantId)).isEqualTo("Our Team");
+    }
+
+    @Test
+    @DisplayName("a body rendered without a campaign still gets a compliant, escaped unsubscribe footer")
+    void personalise_bodyWithoutCampaign_addsEscapedFooter() {
+        MktContactPreference pref = MktContactPreference.create(
+                TenantId.generate(), "CUSTOMER", UUID.randomUUID(), "test@example.com", "Jane Doe",
+                true, "signup form");
+
+        String result = service().personalise("<p>Hello</p>", pref, PAYLOAD, true, null);
+
+        assertThat(result).contains("Unsubscribe");
+        assertThat(result).contains(ESCAPED);
+        assertThat(result).doesNotContain(PAYLOAD);
+    }
+}

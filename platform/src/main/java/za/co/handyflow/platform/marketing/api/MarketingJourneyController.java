@@ -73,77 +73,69 @@ public class MarketingJourneyController {
     @Operation(summary = "Activate a draft (admin): runs the content checker, creates the step campaigns, freezes the steps")
     public ResponseEntity<ApiResponse<JourneyResponse>> activate(@PathVariable UUID id) {
         return ResponseEntity.ok(ApiResponse.success("Journey activated",
-                journeys.activate(TenantContext.getTenantIdAsObject(),
-
-
-        @PostMapping("/{id}/activate")
-        @PreAuthorize("hasAuthority('MARKETING_ADMIN')")
-        @Operation(summary = "Activate a draft (admin): runs the content checker, creates the step campaigns, freezes the steps")
-        public ResponseEntity<ApiResponse<JourneyResponse>> activate(@PathVariable UUID id) {
-            return ResponseEntity.ok(ApiResponse.success("Journey activated",
-                    journeys.activate(TenantContext.getTenantIdAsObject(), TenantContext.getCurrentUserId(), id)));
-        }
-
-        @PostMapping("/{id}/pause")
-        @PreAuthorize("hasAuthority('MARKETING_MANAGE')")
-        public ResponseEntity<ApiResponse<JourneyResponse>> pause(@PathVariable UUID id) {
-            return ResponseEntity.ok(ApiResponse.success("Journey paused", journeys.pause(TenantContext.getTenantIdAsObject(), id)));
-        }
-
-        @PostMapping("/{id}/resume")
-        @PreAuthorize("hasAuthority('MARKETING_MANAGE')")
-        public ResponseEntity<ApiResponse<JourneyResponse>> resume(@PathVariable UUID id) {
-            return ResponseEntity.ok(ApiResponse.success("Journey resumed", journeys.resume(TenantContext.getTenantIdAsObject(), id)));
-        }
-
-        @PostMapping("/{id}/archive")
-        @PreAuthorize("hasAuthority('MARKETING_MANAGE')")
-        @Operation(summary = "Archive a journey and cancel its active enrolments")
-        public ResponseEntity<ApiResponse<JourneyResponse>> archive(@PathVariable UUID id) {
-            return ResponseEntity.ok(ApiResponse.success("Journey archived", journeys.archive(TenantContext.getTenantIdAsObject(), id)));
-        }
-
-        @PostMapping("/{id}/clone")
-        @PreAuthorize("hasAuthority('MARKETING_MANAGE')")
-        public ResponseEntity<ApiResponse<JourneyResponse>> clone(@PathVariable UUID id) {
-            return ResponseEntity.status(201).body(ApiResponse.success("Journey cloned as a draft",
-                    journeys.clone(TenantContext.getTenantIdAsObject(), TenantContext.getCurrentUserId(), id)));
-        }
-
-        @PostMapping("/{id}/resume-steps")
-        @PreAuthorize("hasAuthority('MARKETING_ADMIN')")
-        @Operation(summary = "Resume step campaigns the delivery engine auto-paused (bounce/complaint thresholds)")
-        public ResponseEntity<ApiResponse<Map<String, Integer>>> resumeSteps(@PathVariable UUID id) {
-            return ResponseEntity.ok(ApiResponse.success(
-                    Map.of("resumed", journeys.resumePausedSteps(TenantContext.getTenantIdAsObject(), id))));
-        }
-
-        @GetMapping("/{id}/stats")
-        @PreAuthorize("hasAuthority('MARKETING_READ')")
-        public ResponseEntity<ApiResponse<JourneyStats>> stats(@PathVariable UUID id) {
-            return ResponseEntity.ok(ApiResponse.success(journeys.stats(TenantContext.getTenantIdAsObject(), id)));
-        }
-
-        @GetMapping("/{id}/enrollments")
-        @PreAuthorize("hasAuthority('MARKETING_READ')")
-        public ResponseEntity<ApiResponse<Page<EnrollmentRow>>> enrollments(
-                @PathVariable UUID id, @RequestParam(defaultValue = "ALL") String status,
-                @RequestParam(required = false) String search, Pageable pageable) {
-            return ResponseEntity.ok(ApiResponse.success(
-                    journeys.enrollments(TenantContext.getTenantIdAsObject(), id, status, search, pageable)));
-        }
-
-        @GetMapping("/{id}/enrollments/{enrollmentId}/log")
-        @PreAuthorize("hasAuthority('MARKETING_READ')")
-        public ResponseEntity<ApiResponse<List<LogEntry>>> log(@PathVariable UUID id, @PathVariable UUID enrollmentId) {
-            return ResponseEntity.ok(ApiResponse.success(journeys.log(TenantContext.getTenantIdAsObject(), id, enrollmentId)));
-        }
-
-        @PostMapping("/{id}/enrollments/{enrollmentId}/cancel")
-        @PreAuthorize("hasAuthority('MARKETING_MANAGE')")
-        @Operation(summary = "Remove one contact from the journey")
-        public ResponseEntity<ApiResponse<Void>> cancelEnrollment(@PathVariable UUID id, @PathVariable UUID enrollmentId) {
-            journeys.cancelEnrollment(TenantContext.getTenantIdAsObject(), id, enrollmentId);
-            return ResponseEntity.ok(ApiResponse.success("Contact removed from journey", null));
-        }
+                journeys.activate(TenantContext.getTenantIdAsObject(), TenantContext.getCurrentUserId(), id)));
     }
+
+    @PostMapping("/{id}/pause")
+    @PreAuthorize("hasAuthority('MARKETING_MANAGE')")
+    public ResponseEntity<ApiResponse<JourneyResponse>> pause(@PathVariable UUID id) {
+        return ResponseEntity.ok(ApiResponse.success("Journey paused", journeys.pause(TenantContext.getTenantIdAsObject(), id)));
+    }
+
+    @PostMapping("/{id}/resume")
+    @PreAuthorize("hasAuthority('MARKETING_MANAGE')")
+    public ResponseEntity<ApiResponse<JourneyResponse>> resume(@PathVariable UUID id) {
+        return ResponseEntity.ok(ApiResponse.success("Journey resumed", journeys.resume(TenantContext.getTenantIdAsObject(), id)));
+    }
+
+    @PostMapping("/{id}/archive")
+    @PreAuthorize("hasAuthority('MARKETING_MANAGE')")
+    @Operation(summary = "Archive a journey and cancel its active enrolments")
+    public ResponseEntity<ApiResponse<JourneyResponse>> archive(@PathVariable UUID id) {
+        return ResponseEntity.ok(ApiResponse.success("Journey archived", journeys.archive(TenantContext.getTenantIdAsObject(), id)));
+    }
+
+    @PostMapping("/{id}/clone")
+    @PreAuthorize("hasAuthority('MARKETING_MANAGE')")
+    public ResponseEntity<ApiResponse<JourneyResponse>> clone(@PathVariable UUID id) {
+        return ResponseEntity.status(201).body(ApiResponse.success("Journey cloned as a draft",
+                journeys.clone(TenantContext.getTenantIdAsObject(), TenantContext.getCurrentUserId(), id)));
+    }
+
+    @PostMapping("/{id}/resume-steps")
+    @PreAuthorize("hasAuthority('MARKETING_ADMIN')")
+    @Operation(summary = "Resume step campaigns the delivery engine auto-paused (bounce/complaint thresholds)")
+    public ResponseEntity<ApiResponse<Map<String, Integer>>> resumeSteps(@PathVariable UUID id) {
+        return ResponseEntity.ok(ApiResponse.success(
+                Map.of("resumed", journeys.resumePausedSteps(TenantContext.getTenantIdAsObject(), id))));
+    }
+
+    @GetMapping("/{id}/stats")
+    @PreAuthorize("hasAuthority('MARKETING_READ')")
+    public ResponseEntity<ApiResponse<JourneyStats>> stats(@PathVariable UUID id) {
+        return ResponseEntity.ok(ApiResponse.success(journeys.stats(TenantContext.getTenantIdAsObject(), id)));
+    }
+
+    @GetMapping("/{id}/enrollments")
+    @PreAuthorize("hasAuthority('MARKETING_READ')")
+    public ResponseEntity<ApiResponse<Page<EnrollmentRow>>> enrollments(
+            @PathVariable UUID id, @RequestParam(defaultValue = "ALL") String status,
+            @RequestParam(required = false) String search, Pageable pageable) {
+        return ResponseEntity.ok(ApiResponse.success(
+                journeys.enrollments(TenantContext.getTenantIdAsObject(), id, status, search, pageable)));
+    }
+
+    @GetMapping("/{id}/enrollments/{enrollmentId}/log")
+    @PreAuthorize("hasAuthority('MARKETING_READ')")
+    public ResponseEntity<ApiResponse<List<LogEntry>>> log(@PathVariable UUID id, @PathVariable UUID enrollmentId) {
+        return ResponseEntity.ok(ApiResponse.success(journeys.log(TenantContext.getTenantIdAsObject(), id, enrollmentId)));
+    }
+
+    @PostMapping("/{id}/enrollments/{enrollmentId}/cancel")
+    @PreAuthorize("hasAuthority('MARKETING_MANAGE')")
+    @Operation(summary = "Remove one contact from the journey")
+    public ResponseEntity<ApiResponse<Void>> cancelEnrollment(@PathVariable UUID id, @PathVariable UUID enrollmentId) {
+        journeys.cancelEnrollment(TenantContext.getTenantIdAsObject(), id, enrollmentId);
+        return ResponseEntity.ok(ApiResponse.success("Contact removed from journey", null));
+    }
+}

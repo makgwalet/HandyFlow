@@ -30,7 +30,7 @@ public record CampaignResponse(
         String  replyTo,
         String  pauseReason,      // also holds the reason for a FAILED campaign
         Instant createdAt,
-        // ── Chunk 5 ──
+        // ── Chunk 5 (review / approval) ──
         String  reviewStatus,     // NOT_SUBMITTED | IN_REVIEW | APPROVED | CHANGES_REQUESTED
         int     contentVersion,
         Integer approvedVersion,
@@ -39,7 +39,8 @@ public record CampaignResponse(
         Instant submittedAt,
         boolean submittedByMe,
         String  reviewedByName,
-        String  reviewNote
+        String  reviewNote,
+        // ── Chunk 9 (topic) ──
         UUID    topicId,
         String  topicName
 ) {}

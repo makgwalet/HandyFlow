@@ -295,8 +295,7 @@ public class MarketingJourneyEngine {
     }
 
     private String tenantName(UUID tenant) {
-        try { return named.queryForObject("SELECT name FROM tenants WHERE id = :t", new MapSqlParameterSource("t", tenant), String.class); }
-        catch (Exception ex) { return "HandyFlow"; }
+        return marketing.fetchTenantName(TenantId.of(tenant));   // neutral "Our Team" fallback, never the platform brand
     }
 
     private static String trunc(String s, int n) { return s == null ? "" : s.length() > n ? s.substring(0, n) : s; }

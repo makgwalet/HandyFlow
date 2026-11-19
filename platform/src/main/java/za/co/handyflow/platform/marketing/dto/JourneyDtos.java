@@ -1,5 +1,6 @@
 package za.co.handyflow.platform.marketing.dto;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -14,11 +15,6 @@ import java.util.UUID;
 
 public final class JourneyDtos {
     private JourneyDtos() {}
-
-    /** type: EMAIL | WAIT | EXIT_IF. Only the fields relevant to the type are used. */
-    public record StepDto(String type, String name, String subject, String htmlBody, String fromName, String replyTo,
-                          Integer amount, String unit /* HOURS|DAYS */, String condition /* CLICKED|OPENED */,
-                          UUID campaignId /* set by the server at activation */) {}
 
     public record JourneyRequest(
             @NotBlank @Size(max = 150) String name,
@@ -52,7 +48,10 @@ public final class JourneyDtos {
 
     public record ActivationPreview(long enrollNow, String note, List<LintIssue> issues) {}
 
-    /** type: EMAIL | WAIT | EXIT_IF | BRANCH. yesTo/noTo (BRANCH only): index of a LATER step, -1 = end journey, null = next step. */
+    /**
+     * type: EMAIL | WAIT | EXIT_IF (| BRANCH once the engine supports it). Only the fields relevant to the type are used.
+     * yesTo/noTo (BRANCH only): index of a LATER step, -1 = end journey, null = next step.
+     */
     public record StepDto(String type, String name, String subject, String htmlBody, String fromName, String replyTo,
                           Integer amount, String unit /* HOURS|DAYS */, String condition /* CLICKED|OPENED */,
                           UUID campaignId /* set by the server at activation */,

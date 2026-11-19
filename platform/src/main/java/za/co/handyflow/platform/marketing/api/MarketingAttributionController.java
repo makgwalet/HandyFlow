@@ -49,7 +49,7 @@ public class MarketingAttributionController {
     @GetMapping("/settings")
     @PreAuthorize("hasAuthority('MARKETING_READ')")
     public ResponseEntity<ApiResponse<AttributionSettings>> settings() {
-        return ResponseEntity.ok(ApiResponse.success(new AttributionSettings(service.windowDays(TenantContext.getTenantId()))));
+        return ResponseEntity.ok(ApiResponse.success(new AttributionSettings(service.windowDays(TenantContext.getTenantIdAsObject().getValue()))));
     }
 
     @PutMapping("/settings")

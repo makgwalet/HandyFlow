@@ -14,6 +14,8 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 import org.springframework.web.util.HtmlUtils;
 import za.co.handyflow.platform.crm.CrmFacade;
 import za.co.handyflow.platform.crm.CustomerSummary;
+import za.co.handyflow.platform.identity.TenantDetails;
+import za.co.handyflow.platform.identity.TenantFacade;
 import za.co.handyflow.platform.marketing.domain.model.*;
 import za.co.handyflow.platform.marketing.domain.repository.*;
 import za.co.handyflow.platform.marketing.dto.*;
@@ -46,6 +48,7 @@ public class MarketingService {
     private final MarketingSegmentService        segmentService;
     private final MarketingLifecycleService     lifecycle;
     private final MarketingFormService          formService;
+    private final TenantFacade                   tenantFacade;
 
     @Value("${app.frontend.url:https://app.handyflow.co.za}")
     private String frontendUrl;
@@ -777,8 +780,14 @@ public class MarketingService {
         return html ? HtmlUtils.htmlEscape(s) : s;
     }
 
-    private String personalise(String template, MktContactPreference pref, String tenantName,
-                               boolean isBody, UUID campaignContactId, MktCampaign campaign) {
+    /** Convenience overload without a campaign (no reply-to line in the footer). */
+    String personalise(String template, MktContactPreference pref, String tenantName,
+                       boolean isBody, UUID campaignContactId) {
+        return personalise(template, pref, tenantName, isBody, campaignContactId, null);
+    }
+
+    String personalise(String template, MktContactPreference pref, String tenantName,
+                       boolean isBody, UUID campaignContactId, MktCampaign campaign) {
         if (template == null) return "";
         String fullName  = pref.getName() != null ? pref.getName() : "";
         String firstName = !fullName.isBlank() ? fullName.trim().split("\\s+")[0] : "there";
@@ -793,7 +802,7 @@ public class MarketingService {
             }
 
             if (!result.contains(unsubscribeUrl)) {
-                String contact = campaign.getReplyTo() != null && !campaign.getReplyTo().isBlank()
+                String contact = campaign != null && campaign.getReplyTo() != null && !campaign.getReplyTo().isBlank()
                         ? " Contact: " + HtmlUtils.htmlEscape(campaign.getReplyTo()) + "." : "";
                 result += "<br><hr><p style=\"font-size:11px;color:#94A3B8;text-align:center\">"
                         + "Sent by " + HtmlUtils.htmlEscape(tenantName) + "." + contact
@@ -878,11 +887,16 @@ public class MarketingService {
         } catch (Exception e) { return 0; }
     }
 
-    private String fetchTenantName(TenantId tenantId) {
-        try {
-            return jdbc.queryForObject("SELECT name FROM tenants WHERE id = ?",
-                    String.class, tenantId.getValue());
-        } catch (Exception e) { return "HandyFlow"; }
+    /**
+     * The tenant's own company name, used in {{company_name}} and the email footer. Falls back to a NEUTRAL label,
+     * never the platform's own brand: a campaign email must not appear to come from HandyFlow itself.
+     * Package-private so MarketingServiceEscapingTest can exercise it directly.
+     */
+    String fetchTenantName(TenantId tenantId) {
+        return tenantFacade.findTenantDetails(tenantId)
+                .map(TenantDetails::companyName)
+                .filter(name -> name != null && !name.isBlank())
+                .orElse("Our Team");
     }
 
     private CampaignResponse toCampaignResponse(MktCampaign c) {
