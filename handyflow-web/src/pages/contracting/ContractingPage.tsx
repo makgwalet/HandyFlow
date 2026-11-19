@@ -5,6 +5,7 @@ import { unwrap, fmtR } from './contractingApi'
 import ContractsDashboard from './ContractsDashboard'
 import ContractsTab       from './ContractsTab'
 import TemplatesTab       from './TemplatesTab'
+import ApprovalsTab       from './ApprovalsTab'
 import ClausesTab         from './ClausesTab'
 import RiskRulesTab       from './RiskRulesTab'
 import ObligationsTab     from './ObligationsTab'
@@ -52,6 +53,7 @@ export default function ContractingPage() {
           case 'dashboard': return <ContractsDashboard onNavigate={goTo} />
           case 'contracts': return <ContractsTab />
           case 'templates': return <TemplatesTab />
+          case 'approvals': return <ApprovalsTab />
           case 'clauses':     return <ClausesTab />
           case 'risk-rules':  return <RiskRulesTab />
           case 'obligations': return <ObligationsTab />
