@@ -202,4 +202,16 @@ class TwoWayNegotiationTest {
                 ? service.staffCounter(tenant, c.getId(), last.id(), new CounterInput("<p>one more</p>", null), staff)
                 : service.counterpartyCounter(tenant, c.getId(), a, last.id(), new CounterInput("<p>one more</p>", null), "1.1.1.1")));
     }
+
+    @Test
+    void internalNotesAndCommentsForAnotherPartyNeverReachACounterparty() {
+        h.inTx(() -> service.staffComment(tenant, c.getId(), new StaffCommentRequest("Our fallback is 60 days", null, null, null, null, null, true), staff));
+        h.inTx(() -> service.staffComment(tenant, c.getId(), new StaffCommentRequest("For Acme only", null, null, null, null, a, false), staff));
+        h.inTx(() -> service.staffComment(tenant, c.getId(), new StaffCommentRequest("For Beta only", null, null, null, null, b, false), staff));
+        List<String> seenByA = h.inTx(() -> service.counterpartyView(tenant, c.getId(), a)).comments().stream().map(CommentView::body).toList();
+        assertEquals(List.of("For Acme only"), seenByA);
+        assertTrue(h.inTx(() -> service.counterpartyView(tenant, c.getId(), a)).comments().stream().noneMatch(CommentView::internalOnly));
+        List<String> seenByB = h.inTx(() -> service.counterpartyView(tenant, c.getId(), b)).comments().stream().map(CommentView::body).toList();
+        assertEquals(List.of("For Beta only"), seenByB);
+    }
 }

@@ -48,7 +48,13 @@ class ContractClauseServiceTest {
     }
 
     @BeforeEach
-    void setUp() { lenient().when(clauseRepo.save(any())).thenAnswer(i -> i.getArgument(0)); }
+    void setUp() {
+        lenient().when(clauseRepo.save(any())).thenAnswer(i -> i.getArgument(0));
+        za.co.handyflow.platform.shared.TenantContext.setUserId(java.util.UUID.randomUUID().toString());   // publishing records who used up the approval
+    }
+
+    @org.junit.jupiter.api.AfterEach
+    void clearContext() { za.co.handyflow.platform.shared.TenantContext.setUserId(null); }
 
     @Test
     void withClauseInsertsAtEndStartOrAfterABlock() {

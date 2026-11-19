@@ -106,14 +106,13 @@ class ContractNegotiationConcurrencyTest {
     void aProposalCannotSlipInAfterTheNegotiationIsClosed() throws Exception {
         int ok = race(() -> h.inTx(() -> service.close(tenant, c.getId(), "done", staff)),
                 () -> propose(0, "DELETE", 0, P1, null));
-        // Either order is valid; what is not valid is a proposal stored against a closed negotiation.
+        // Either order is valid, and exactly one of them wins: if the proposal got in first the close is refused (a proposal is waiting),
+        // and if the close came first the proposal is refused. What must never happen is a proposal stored against a closed negotiation.
         boolean closed = "CLOSED".equals(h.negotiations.get(0).getStatus());
-        assertTrue(closed);
-        if (!h.proposalsOf(c).isEmpty()) {
-            assertEquals(2, ok, "it was submitted before the close took the lock");
-        } else {
-            assertEquals(1, ok, "it was refused because the close came first");
-        }
+        boolean stored = !h.proposalsOf(c).isEmpty();
+        assertFalse(closed && stored, "a proposal must never be stored against a closed negotiation");
+        assertTrue(closed || stored);
+        assertEquals(1, ok);
     }
 
     // ── Lock order ───────────────────────────────────────────────────────────

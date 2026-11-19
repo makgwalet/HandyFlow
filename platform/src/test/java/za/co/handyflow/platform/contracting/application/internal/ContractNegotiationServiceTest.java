@@ -273,7 +273,8 @@ class ContractNegotiationServiceTest {
         open();
         service.markReady(tenant, cid(), staff);
         service.freezeOnSend(tenant, contract, staff);
-        verify(linkRepo).revokeAllActive(eq(tenant.getValue()), eq(cid()), anyString(), any());
+        // links are revoked when the negotiation is marked ready and again when the send freezes it (the second finds none left)
+        verify(linkRepo, org.mockito.Mockito.times(2)).revokeAllActive(eq(tenant.getValue()), eq(cid()), anyString(), any());
         assertEquals("CLOSED", negotiations.get(0).getStatus());
         assertEquals("Contract sent for signature", negotiations.get(0).getCloseReason());
         contract.send();

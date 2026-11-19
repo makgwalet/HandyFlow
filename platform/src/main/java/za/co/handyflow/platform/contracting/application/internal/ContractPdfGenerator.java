@@ -238,7 +238,7 @@ public class ContractPdfGenerator {
         // marker) via the same \n\n-split mechanism <p> and <h3> already
         // use — deliberately not relying on a single embedded \n rendering
         // correctly inside one Paragraph, which isn't guaranteed.
-        String plain = htmlBody
+        String plain = (htmlBody == null ? "" : htmlBody)
                 .replaceAll("<h[1-6][^>]*>", "\n")
                 .replaceAll("</h[1-6]>", "\n")
                 .replaceAll("<p[^>]*>", "\n")

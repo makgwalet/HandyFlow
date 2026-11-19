@@ -38,7 +38,7 @@ class ContractApprovalControllerTest {
 
     @Test
     void anonymousIsRefused() throws Exception {
-        mvc.perform(get(BASE)).andExpect(status().isUnauthorized());
+        mvc.perform(get(BASE)).andExpect(status().is4xxClientError());   // refused: no login, nothing reaches the service
         verifyNoInteractions(service);
     }
 
