@@ -25,7 +25,7 @@ import java.util.UUID;
  * assessor's decision and refuses to close an incident that involves personal information until that decision, and any notification it requires,
  * has been recorded. Closing also needs every corrective action on the incident verified or cancelled, and a closer who did not investigate it.
  */
-@Service
+@Service("legalComplianceIncidentService")
 @RequiredArgsConstructor
 public class IncidentService {
 

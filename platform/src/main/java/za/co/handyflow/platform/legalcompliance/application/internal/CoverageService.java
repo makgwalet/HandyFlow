@@ -7,7 +7,7 @@ import org.springframework.transaction.annotation.Transactional;
 import za.co.handyflow.platform.legalcompliance.domain.model.*;
 import za.co.handyflow.platform.legalcompliance.domain.repository.*;
 import za.co.handyflow.platform.legalcompliance.dto.GrcDtos.*;
-import za.co.handyflow.platform.notifications.domain.repository.RiskRepository;
+import za.co.handyflow.platform.legalcompliance.domain.repository.RiskRepository;
 import za.co.handyflow.platform.shared.TenantId;
 
 import java.util.*;

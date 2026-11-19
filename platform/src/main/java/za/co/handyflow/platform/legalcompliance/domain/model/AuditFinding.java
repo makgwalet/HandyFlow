@@ -16,7 +16,7 @@ import java.util.UUID;
  * Whether closure is allowed also depends on its corrective actions; that is checked by AssuranceRules in the service because the
  * actions are separate aggregates. The closer must not be the owner or the person who gave the management response.
  */
-@Entity
+@Entity(name = "LcAuditFinding")
 @Table(name = "legalcompliance_audit_findings")
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)

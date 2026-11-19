@@ -16,7 +16,7 @@ import za.co.handyflow.platform.shared.TenantId;
 import java.util.List;
 
 /** Standard reports: view on screen, download as CSV (audited) */
-@RestController
+@RestController("legalComplianceReportController")
 @RequestMapping("/api/v1/legalcompliance/reports")
 @RequiredArgsConstructor
 @Tag(name = "Legal/Compliance - Reports", description = "Standard reports: view on screen, download as CSV (audited)")

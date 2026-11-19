@@ -10,7 +10,7 @@ import za.co.handyflow.platform.legalcompliance.domain.model.ControlStatus;
 import za.co.handyflow.platform.legalcompliance.domain.model.GrcLinkType;
 import za.co.handyflow.platform.legalcompliance.domain.repository.ControlRepository;
 import za.co.handyflow.platform.legalcompliance.dto.GrcDtos.*;
-import za.co.handyflow.platform.notifications.domain.repository.GrcLinkRepository;
+import za.co.handyflow.platform.legalcompliance.domain.repository.GrcLinkRepository;
 import za.co.handyflow.platform.shared.HandyFlowException;
 import za.co.handyflow.platform.shared.ResourceNotFoundException;
 import za.co.handyflow.platform.shared.TenantId;

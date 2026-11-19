@@ -29,7 +29,7 @@ import static za.co.handyflow.platform.legalcompliance.application.internal.Repo
  *  - downloading is a separate act (exportCsv) which is written to the regulatory audit trail with the report, the row count and who did it.
  * Output is capped at ReportRules.MAX_ROWS rows and says so when cut.
  */
-@Service
+@Service("legalComplianceReportService")
 @RequiredArgsConstructor
 public class ReportService {
 

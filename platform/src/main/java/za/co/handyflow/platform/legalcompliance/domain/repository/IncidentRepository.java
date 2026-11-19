@@ -1,5 +1,6 @@
 package za.co.handyflow.platform.legalcompliance.domain.repository;
 
+import org.springframework.stereotype.Repository;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import za.co.handyflow.platform.legalcompliance.domain.model.*;
@@ -9,13 +10,14 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
+@Repository("legalComplianceIncidentRepository")
 public interface IncidentRepository extends JpaRepository<Incident, UUID> {
 
-    @Query("SELECT i FROM Incident i WHERE i.tenantId = :tenantId AND i.id = :id")
+    @Query("SELECT i FROM LcIncident i WHERE i.tenantId = :tenantId AND i.id = :id")
     Optional<Incident> findForTenant(TenantId tenantId, UUID id);
 
     @Query("""
-        SELECT i FROM Incident i WHERE i.tenantId = :tenantId
+        SELECT i FROM LcIncident i WHERE i.tenantId = :tenantId
         AND (:status IS NULL OR i.status = :status)
         AND (:includeClosed = TRUE OR i.status <> za.co.handyflow.platform.legalcompliance.domain.model.IncidentStatus.CLOSED)
         ORDER BY i.discoveredAt DESC
@@ -23,7 +25,7 @@ public interface IncidentRepository extends JpaRepository<Incident, UUID> {
     List<Incident> search(TenantId tenantId, IncidentStatus status, boolean includeClosed);
 
     /** Cross-tenant — daily sweep: personal-information incidents still awaiting a notification assessment. */
-    @Query("SELECT i FROM Incident i WHERE i.personalInfoInvolved = TRUE AND i.notificationAssessedAt IS NULL AND i.status <> za.co.handyflow.platform.legalcompliance.domain.model.IncidentStatus.CLOSED")
+    @Query("SELECT i FROM LcIncident i WHERE i.personalInfoInvolved = TRUE AND i.notificationAssessedAt IS NULL AND i.status <> za.co.handyflow.platform.legalcompliance.domain.model.IncidentStatus.CLOSED")
     List<Incident> findUnassessedAcrossTenants();
 
     @Query(value = "SELECT nextval('legalcompliance_ref_seq')", nativeQuery = true)

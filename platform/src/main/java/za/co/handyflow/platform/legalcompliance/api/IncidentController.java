@@ -20,7 +20,7 @@ import java.util.List;
 import java.util.UUID;
 
 /** Compliance incidents and breaches. Reporting is open to any signed-in user; handling needs LEGALCOMPLIANCE_INCIDENT_MANAGE. */
-@RestController
+@RestController("legalComplianceIncidentController")
 @RequestMapping("/api/v1/legalcompliance/incidents")
 @RequiredArgsConstructor
 @Tag(name = "Legal/Compliance - Incidents", description = "Report, investigate, assess notification duties for, and close incidents")

@@ -18,7 +18,7 @@ import za.co.handyflow.platform.legalcompliance.application.internal.RiskScoring
  * Residual is what remains after existing controls; it can never exceed inherent. It is the assessor's judgement and is not yet
  * verified against control test results.
  */
-@Entity
+@Entity(name = "LcRiskAssessment")
 @Table(name = "legalcompliance_risk_assessments")
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)

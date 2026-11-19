@@ -27,7 +27,7 @@ import java.util.UUID;
  * expire after {@value ProviderRules#INVITE_DAYS} days and only their hash is stored; a wrong, used or expired code all give the same generic answer so codes cannot be probed.
  * The provider's own notes, contract, team and reviews are never shown here.
  */
-@Service
+@Service("legalComplianceClientAccessService")
 @RequiredArgsConstructor
 public class ClientAccessService {
 

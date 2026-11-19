@@ -19,7 +19,7 @@ import java.util.UUID;
  * does not impose a statutory deadline: that judgement belongs to the person assessing, and POPIA s22 says "as soon as reasonably possible".
  * The closer must not be the investigator (unconditional).
  */
-@Entity
+@Entity(name = "LcIncident")
 @Table(name = "legalcompliance_incidents")
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
