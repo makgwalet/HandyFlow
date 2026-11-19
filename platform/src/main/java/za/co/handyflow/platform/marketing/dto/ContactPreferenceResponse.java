@@ -13,5 +13,6 @@ public record ContactPreferenceResponse(
         Instant emailOptedInAt,
         Instant emailOptedOutAt,
         String  optInSource,
-        Instant createdAt
+        Instant createdAt,
+        boolean suppressed      // on the active suppression list (blocked from every send)
 ) {}

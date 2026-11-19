@@ -10,21 +10,31 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class MarketingScheduler {
 
-    private final MarketingService marketingService;
+    private final MarketingService         marketingService;
+    private final MarketingDeliveryService deliveryService;
 
-    // Process send queue every 2 minutes — 50 emails per run
-    // WHY 50 per run? Prevents hammering the SMTP server.
-    // At 50/2min = 1,500/hour which is well within Gmail SMTP limits.
+    // Batch size is marketing.send.batch-size (default 50) per run. Safe on multiple instances:
+    // the queue is claimed with FOR UPDATE SKIP LOCKED, and a run already in progress on this
+    // instance is skipped rather than overlapped.
     @Scheduled(cron = "0 */2 * * * *", zone = "Africa/Johannesburg")
     void processSendQueue() {
-        log.debug("MarketingScheduler: processing send queue");
-        marketingService.processSendQueue();
+        deliveryService.processQueue();   // never throws; logs its own failures
     }
 
-    // Check for scheduled campaigns ready to launch — every 5 minutes
+    // Each due campaign launches in its own transaction (via the service proxy), so one
+    // failing campaign can't roll back or block the others.
     @Scheduled(cron = "0 */5 * * * *", zone = "Africa/Johannesburg")
     void launchScheduledCampaigns() {
-        log.debug("MarketingScheduler: checking scheduled campaigns");
-        marketingService.launchScheduledCampaigns();
+        try {
+            for (MarketingService.DueCampaign due : marketingService.findDueScheduledCampaigns()) {
+                try {
+                    marketingService.launchDueCampaign(due);
+                } catch (Exception e) {
+                    log.error("MarketingScheduler: failed to launch scheduled campaign={}", due.campaignId(), e);
+                }
+            }
+        } catch (Exception e) {
+            log.error("MarketingScheduler: scheduled-campaign sweep failed", e);
+        }
     }
 }

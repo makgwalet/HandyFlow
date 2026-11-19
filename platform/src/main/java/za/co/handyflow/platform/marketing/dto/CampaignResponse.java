@@ -11,6 +11,8 @@ public record CampaignResponse(
         String  templateName,
         String  subject,
         String  audienceType,
+        UUID    segmentId,
+        String  segmentName,
         String  status,
         Instant scheduledAt,
         Instant sentAt,
@@ -18,11 +20,26 @@ public record CampaignResponse(
         int     sentCount,
         int     bouncedCount,
         int     unsubscribedCount,
-        // NEW: the fields the frontend already expected — see MktCampaign's
-        // own comment on why these didn't exist until now.
         int     openCount,
         int     clickCount,
+        int     suppressedCount,
+        int     deliveredCount,
+        int     complainedCount,
+        int     failedCount,
         String  fromName,
         String  replyTo,
-        Instant createdAt
+        String  pauseReason,      // also holds the reason for a FAILED campaign
+        Instant createdAt,
+        // ── Chunk 5 ──
+        String  reviewStatus,     // NOT_SUBMITTED | IN_REVIEW | APPROVED | CHANGES_REQUESTED
+        int     contentVersion,
+        Integer approvedVersion,
+        Integer sentVersion,
+        String  submittedByName,
+        Instant submittedAt,
+        boolean submittedByMe,
+        String  reviewedByName,
+        String  reviewNote
+        UUID    topicId,
+        String  topicName
 ) {}

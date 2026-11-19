@@ -7,6 +7,10 @@ import lombok.NoArgsConstructor;
 import java.time.Instant;
 import java.util.UUID;
 
+/**
+ * Queue lifecycle: PENDING → SENDING (claimed) → SENT | DEAD, or back to PENDING for a retry.
+ * Result recording (SENT / retry / DEAD) is done with atomic SQL in MarketingDeliveryService.
+ */
 @Entity
 @Table(name = "mkt_send_queue")
 @Getter
@@ -28,10 +32,12 @@ public class MktSendQueue {
     @Column(name = "scheduled_at",        nullable = false) private Instant scheduledAt;
     @Column(name = "processed_at")                           private Instant processedAt;
     @Column(name = "created_at")                             private Instant createdAt;
+    @Column(name = "locked_at")                              private Instant lockedAt;
+    @Column(name = "provider_message_id")                    private String  providerMessageId;
 
     public static MktSendQueue create(UUID campaignId, UUID campaignContactId,
-                                       UUID tenantId, String toEmail, String toName,
-                                       String subject, String htmlBody, Instant scheduledAt) {
+                                      UUID tenantId, String toEmail, String toName,
+                                      String subject, String htmlBody, Instant scheduledAt) {
         MktSendQueue q       = new MktSendQueue();
         q.campaignId         = campaignId;
         q.campaignContactId  = campaignContactId;
@@ -46,14 +52,19 @@ public class MktSendQueue {
         return q;
     }
 
-    public void markSent()             { this.status = "SENT";  this.processedAt = Instant.now(); }
-    public void markFailed(String msg) {
-        this.retryCount++;
-        this.errorMessage = msg;
-        this.status = retryCount >= 3 ? "DEAD" : "FAILED";
-        this.processedAt = Instant.now();
+    /** Claimed for sending; the send happens outside the claiming transaction. */
+    public void markClaimed() {
+        this.status   = "SENDING";
+        this.lockedAt = Instant.now();
     }
-    public void resetForRetry()        { this.status = "PENDING"; }
+
+    /** Removed from the queue without sending (suppressed, cancelled, already processed). */
+    public void markSuppressed(String reason) {
+        this.status       = "DEAD";
+        this.errorMessage = reason;
+        this.processedAt  = Instant.now();
+        this.lockedAt     = null;
+    }
 
     public boolean isDead() { return "DEAD".equals(status); }
 }

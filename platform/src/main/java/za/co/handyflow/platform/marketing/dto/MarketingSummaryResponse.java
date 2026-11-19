@@ -7,5 +7,7 @@ public record MarketingSummaryResponse(
         long draftCampaigns,
         long sentCampaigns,
         long scheduledCampaigns,
-        long queuePending
+        long queuePending,
+        long activeSuppressions,
+        long consentExceptions   // marked opted in but on the suppression list
 ) {}

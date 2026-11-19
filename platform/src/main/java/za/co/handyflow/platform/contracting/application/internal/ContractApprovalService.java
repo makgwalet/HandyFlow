@@ -254,7 +254,7 @@ public class ContractApprovalService {
                         contractRepo.findActiveById(tenantId, party.getContractId()).map(c ->
                                 new Subject(c.getContractNumber() + " — signing for " + nz(party.getFullName()),
                                         sha256(List.of(party.getId().toString(), c.getId().toString(), nz(c.getBodyHash()), nz(party.getFullName()),
-                                                nz(party.getEmail()), nz(party.getIdNumber())))))));
+                                                nz(party.getEmail()), nz(party.getIdNumber()))))));
             default:
                 return Optional.empty();
         }

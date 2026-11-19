@@ -1,237 +1,129 @@
 // src/pages/marketing/TemplatesTab.tsx
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { apiClient } from '../../api/client'
-import { Plus, X, FileText, Edit3, Eye } from 'lucide-react'
+import { Plus, X, Search, FileText, Pencil, MessageSquare } from 'lucide-react'
+import BlocksTab from './BlocksTab'
+import { C, Card, Btn, Pill, Tabs, Empty, inp, lbl, fmtDate } from './ui'
 
-const inp: React.CSSProperties = { width: '100%', padding: '9px 12px', border: '1.5px solid var(--hf-border)', borderRadius: 8, fontSize: 14, boxSizing: 'border-box' as const, background: 'var(--hf-surface)', outline: 'none' }
-const lbl: React.CSSProperties = { display: 'block', fontSize: 11, fontWeight: 700, color: 'var(--hf-text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }
-
-const CATEGORIES = ['NEWSLETTER','PROMOTIONAL','TRANSACTIONAL','ANNOUNCEMENT','REENGAGEMENT']
-const CAT_COLOR: Record<string, string> = {
-  NEWSLETTER: 'var(--hf-primary-text)', PROMOTIONAL: 'var(--hf-warning-text)', TRANSACTIONAL: 'var(--hf-success-text-strong)',
-  ANNOUNCEMENT: 'var(--hf-sky-text)', REENGAGEMENT: 'var(--hf-violet-text)',
-}
-const TOKENS = ['{{first_name}}','{{name}}','{{email}}','{{company_name}}','{{unsubscribe_url}}']
-
-// Sample email HTML shown as the editor placeholder. It deliberately uses a real hex
-// colour: email clients cannot resolve CSS variables, so email markup must never use
-// the app's theme tokens.
-const EXAMPLE_EMAIL_HTML =
-  '<h2 style="color:#1B3A6B">Hi {{first_name}},</h2>\n<p>Your message here.</p>\n<p><a href="{{unsubscribe_url}}">Unsubscribe</a></p>'
+const CATEGORIES = ['Newsletter', 'Promotional', 'Onboarding', 'Event', 'Re-engagement', 'Announcement']
 
 export default function TemplatesTab() {
   const qc = useQueryClient()
-  const [showCreate, setShowCreate] = useState(false)
-  const [editTemplate, setEditTemplate] = useState<any>(null)
-  const [previewTemplate, setPreviewTemplate] = useState<any>(null)
+  const [sub, setSub] = useState('email')
+  const [search, setSearch] = useState('')
+  const [cat, setCat] = useState('')
+  const [editing, setEditing] = useState<any>(null)   // {} = new
+  const [form, setForm] = useState({ name: '', subject: '', previewText: '', category: '', htmlBody: '' })
   const [error, setError] = useState('')
-  const [previewTab, setPreviewTab] = useState<'desktop'|'mobile'>('desktop')
-
-  const INIT = () => ({ name: '', subject: '', htmlBody: '', category: 'NEWSLETTER', previewText: '' })
-  const [form, setForm] = useState(INIT())
-  const f = (k: string, v: string) => setForm(p => ({ ...p, [k]: v }))
 
   const { data: templates = [], isLoading } = useQuery<any[]>({
     queryKey: ['marketing-templates'],
-    queryFn: async () => {
-      const r = await apiClient.get('/api/v1/marketing/templates')
-      return r.data?.data ?? r.data ?? []
+    queryFn: async () => { const r = await apiClient.get('/api/v1/marketing/templates'); return r.data?.data ?? r.data ?? [] },
+  })
+
+  const cats = useMemo(() => Array.from(new Set([...(templates as any[]).map(t => t.category).filter(Boolean), ...CATEGORIES])).sort(), [templates])
+  const shown = (templates as any[]).filter(t =>
+    (!cat || t.category === cat) && (!search.trim() || `${t.name} ${t.subject}`.toLowerCase().includes(search.trim().toLowerCase())))
+
+  const open = (t?: any) => {
+    setEditing(t ?? {}); setError('')
+    setForm({ name: t?.name ?? '', subject: t?.subject ?? '', previewText: t?.previewText ?? '', category: t?.category ?? '', htmlBody: t?.htmlBody ?? '' })
+  }
+
+  const save = useMutation({
+    mutationFn: () => {
+      const body = { name: form.name.trim(), subject: form.subject.trim(), previewText: form.previewText.trim() || null, category: form.category.trim() || null, htmlBody: form.htmlBody }
+      return editing?.id ? apiClient.put(`/api/v1/marketing/templates/${editing.id}`, body) : apiClient.post('/api/v1/marketing/templates', body)
     },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['marketing-templates'] }); setEditing(null) },
+    onError: (e: any) => setError(e.response?.status === 403 ? 'Saving templates needs the Marketing admin permission.' : (e.response?.data?.message || 'Failed to save template')),
   })
-
-  const createTemplate = useMutation({
-    mutationFn: (body: any) => apiClient.post('/api/v1/marketing/templates', body),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['marketing-templates'] }); setShowCreate(false); setForm(INIT()); setError('') },
-    onError: (e: any) => setError(e.response?.data?.message || 'Failed to create template'),
-  })
-
-  const updateTemplate = useMutation({
-    mutationFn: ({ id, body }: { id: string; body: any }) => apiClient.put(`/api/v1/marketing/templates/${id}`, body),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['marketing-templates'] }); setEditTemplate(null); setError('') },
-    onError: (e: any) => setError(e.response?.data?.message || 'Failed to update template'),
-  })
-
-  const openEdit = (t: any) => { setForm({ name: t.name, subject: t.subject, htmlBody: t.htmlBody || '', category: t.category || 'NEWSLETTER', previewText: t.previewText || '' }); setEditTemplate(t); setError('') }
-
-  const TemplateForm = ({ title, onSave, onClose, saving }: { title: string; onSave: () => void; onClose: () => void; saving: boolean }) => (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, backdropFilter: 'blur(2px)' }}>
-      <div style={{ background: 'var(--hf-surface)', borderRadius: 16, padding: 28, width: 660, maxHeight: '92vh', overflowY: 'auto', boxShadow: '0 20px 60px rgba(0,0,0,0.22)' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 22 }}>
-          <h3 style={{ margin: 0, fontSize: 17, fontWeight: 800 }}>{title}</h3>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--hf-text-faint)', display: 'flex' }}><X size={20} /></button>
-        </div>
-
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-            <div>
-              <label style={lbl}>Template name *</label>
-              <input value={form.name} onChange={e => f('name', e.target.value)} placeholder="May 2026 Newsletter" style={inp} autoFocus />
-            </div>
-            <div>
-              <label style={lbl}>Category</label>
-              <select value={form.category} onChange={e => f('category', e.target.value)} style={{ ...inp, background: 'var(--hf-surface)' }}>
-                {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
-              </select>
-            </div>
-          </div>
-          <div>
-            <label style={lbl}>Email subject *</label>
-            <input value={form.subject} onChange={e => f('subject', e.target.value)} placeholder="Hello {{first_name}} — news from {{company_name}}" style={inp} />
-            <div style={{ fontSize: 11, color: 'var(--hf-text-faint)', marginTop: 4 }}>Personalisation tokens: {TOKENS.slice(0,3).join(', ')}</div>
-          </div>
-          <div>
-            <label style={lbl}>Preview text</label>
-            <input value={form.previewText} onChange={e => f('previewText', e.target.value)} placeholder="Short text shown in inbox preview before opening..." style={inp} />
-          </div>
-          <div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-              <label style={{ ...lbl, marginBottom: 0 }}>HTML body *</label>
-              <div style={{ display: 'flex', gap: 6 }}>
-                {TOKENS.map(t => (
-                  <button key={t} onClick={() => f('htmlBody', form.htmlBody + t)} style={{ padding: '2px 7px', background: 'var(--hf-sky-soft)', border: '1px solid var(--hf-sky-border)', borderRadius: 5, fontSize: 10, color: 'var(--hf-sky-text)', cursor: 'pointer', fontFamily: 'monospace' }}>{t}</button>
-                ))}
-              </div>
-            </div>
-            <textarea value={form.htmlBody} onChange={e => f('htmlBody', e.target.value)} rows={10}
-              placeholder={EXAMPLE_EMAIL_HTML}
-              style={{ ...inp, resize: 'vertical' as const, fontFamily: 'monospace', fontSize: 12, lineHeight: 1.5 }} />
-          </div>
-
-          {/* Live preview */}
-          {form.htmlBody && (
-            <div>
-              <div style={{ display: 'flex', gap: 8, marginBottom: 8, alignItems: 'center' }}>
-                <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--hf-text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Preview</span>
-                {(['desktop','mobile'] as const).map(v => (
-                  <button key={v} onClick={() => setPreviewTab(v)} style={{ padding: '2px 10px', borderRadius: 20, border: '1px solid var(--hf-border)', background: previewTab === v ? 'var(--hf-primary)' : 'var(--hf-surface)', color: previewTab === v ? 'var(--hf-text-on-solid)' : 'var(--hf-text-muted)', fontSize: 11, cursor: 'pointer', fontWeight: 600, textTransform: 'capitalize' }}>{v}</button>
-                ))}
-              </div>
-              <div style={{ border: '1px solid var(--hf-border)', borderRadius: 10, overflow: 'hidden', background: 'var(--hf-surface-muted)', padding: 12 }}>
-                <iframe
-                  srcDoc={form.htmlBody.replace('{{first_name}}','Thabo').replace('{{company_name}}','HandyFlow').replace('{{unsubscribe_url}}','#')}
-                  style={{ width: previewTab === 'mobile' ? 375 : '100%', height: 300, border: 'none', borderRadius: 8, display: 'block', margin: previewTab === 'mobile' ? '0 auto' : undefined }}
-                  title="Email preview"
-                />
-              </div>
-            </div>
-          )}
-
-          <div style={{ padding: '10px 14px', background: 'var(--hf-sky-soft)', border: '1px solid var(--hf-sky-border)', borderRadius: 8, fontSize: 12, color: 'var(--hf-sky-text-strong)' }}>
-            Available tokens: <strong>{TOKENS.join(', ')}</strong>. The unsubscribe link is auto-appended if <code>{'{{unsubscribe_url}}'}</code> is not present in your template.
-          </div>
-        </div>
-
-        {error && <div style={{ marginTop: 12, padding: '10px 14px', background: 'var(--hf-danger-soft)', border: '1px solid var(--hf-danger-border)', borderRadius: 8, fontSize: 13, color: 'var(--hf-danger-text)' }}>{error}</div>}
-
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 22 }}>
-          <button onClick={onClose} style={{ padding: '9px 18px', border: '1px solid var(--hf-border)', borderRadius: 9, background: 'var(--hf-surface)', fontSize: 14, cursor: 'pointer' }}>Cancel</button>
-          <button onClick={onSave} disabled={!form.name || !form.subject || !form.htmlBody || saving}
-            style={{ padding: '9px 22px', background: 'var(--hf-primary)', color: 'var(--hf-text-on-solid)', border: 'none', borderRadius: 9, fontSize: 14, fontWeight: 700, cursor: 'pointer', opacity: (!form.name || !form.subject || !form.htmlBody) ? 0.5 : 1 }}>
-            {saving ? 'Saving...' : 'Save Template'}
-          </button>
-        </div>
-      </div>
-    </div>
-  )
+  const ok = form.name.trim() && form.subject.trim() && form.htmlBody.trim()
 
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 18 }}>
-        <button onClick={() => { setShowCreate(true); setForm(INIT()); setError('') }}
-          style={{ display: 'flex', alignItems: 'center', gap: 7, background: 'var(--hf-primary)', color: 'var(--hf-text-on-solid)', border: 'none', borderRadius: 8, padding: '9px 18px', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>
-          <Plus size={15} /> New Template
-        </button>
+      <div style={{ marginBottom: 18 }}>
+        <Tabs active={sub} onChange={setSub} tabs={[
+          { id: 'email', label: 'Email templates', icon: <FileText size={14} /> },
+          { id: 'blocks', label: 'Content blocks' },
+          { id: 'sms', label: 'SMS templates', icon: <MessageSquare size={14} /> }]} />
       </div>
 
-      {isLoading ? (
-        <div style={{ textAlign: 'center', padding: 40, color: 'var(--hf-text-faint)' }}>Loading templates...</div>
-      ) : (templates as any[]).length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '60px 20px', color: 'var(--hf-text-faint)' }}>
-          <FileText size={40} style={{ marginBottom: 12, opacity: 0.3 }} />
-          <div style={{ fontWeight: 700, color: 'var(--hf-text-tertiary)', marginBottom: 6 }}>No templates yet</div>
-          <div style={{ fontSize: 13, marginBottom: 16 }}>Create reusable email templates for your campaigns.</div>
-          <button onClick={() => { setShowCreate(true); setForm(INIT()) }} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'var(--hf-primary)', color: 'var(--hf-text-on-solid)', border: 'none', borderRadius: 8, padding: '9px 18px', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
-            <Plus size={14} /> New Template
-          </button>
-        </div>
-      ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 16 }}>
-          {(templates as any[]).map((t: any) => {
-            const catColor = CAT_COLOR[t.category] ?? 'var(--hf-text-muted)'
-            return (
-              <div key={t.id} style={{ border: '1px solid var(--hf-border)', borderRadius: 12, overflow: 'hidden', background: 'var(--hf-surface)', transition: 'box-shadow 0.15s' }}
-                onMouseEnter={e => (e.currentTarget as HTMLElement).style.boxShadow = '0 4px 16px rgba(0,0,0,0.08)'}
-                onMouseLeave={e => (e.currentTarget as HTMLElement).style.boxShadow = 'none'}>
-                {/* Preview strip */}
-                <div style={{ height: 100, overflow: 'hidden', background: 'var(--hf-surface-muted)', position: 'relative' as const }}>
-                  {t.htmlBody ? (
-                    <iframe srcDoc={t.htmlBody} style={{ width: '200%', height: '200%', border: 'none', transform: 'scale(0.5)', transformOrigin: 'top left', pointerEvents: 'none' }} title={t.name} />
-                  ) : (
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--hf-text-disabled)' }}>
-                      <FileText size={28} />
-                    </div>
-                  )}
-                </div>
-                <div style={{ padding: '14px 16px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
-                    <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--hf-text)' }}>{t.name}</div>
-                    <span style={{ background: `color-mix(in srgb, ${catColor} 8%, transparent)`, color: catColor, padding: '1px 8px', borderRadius: 20, fontSize: 10, fontWeight: 700, flexShrink: 0, marginLeft: 8 }}>{t.category}</span>
-                  </div>
-                  <div style={{ fontSize: 12, color: 'var(--hf-text-muted)', marginBottom: 4, lineHeight: 1.4 }}>{t.subject}</div>
-                  {t.previewText && <div style={{ fontSize: 11, color: 'var(--hf-text-faint)', marginBottom: 10, lineHeight: 1.4 }}>{t.previewText}</div>}
-                  <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
-                    <button onClick={() => setPreviewTemplate(t)}
-                      style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5, padding: '6px', background: 'var(--hf-surface-muted)', border: '1px solid var(--hf-border)', borderRadius: 7, fontSize: 12, color: 'var(--hf-text-secondary)', cursor: 'pointer', fontWeight: 500 }}>
-                      <Eye size={12} /> Preview
-                    </button>
-                    <button onClick={() => openEdit(t)}
-                      style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5, padding: '6px', background: 'var(--hf-surface-muted)', border: '1px solid var(--hf-border)', borderRadius: 7, fontSize: 12, color: 'var(--hf-text-secondary)', cursor: 'pointer', fontWeight: 500 }}>
-                      <Edit3 size={12} /> Edit
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )
-          })}
-        </div>
-      )}
+      {sub === 'blocks' && <BlocksTab />}
 
-      {/* Full-screen preview */}
-      {previewTemplate && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, backdropFilter: 'blur(2px)' }}>
-          <div style={{ background: 'var(--hf-surface)', borderRadius: 16, width: 700, maxHeight: '90vh', overflow: 'hidden', boxShadow: '0 24px 70px rgba(0,0,0,0.3)' }}>
-            <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--hf-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div>
-                <div style={{ fontWeight: 700, fontSize: 15 }}>{previewTemplate.name}</div>
-                <div style={{ fontSize: 12, color: 'var(--hf-text-faint)' }}>Subject: {previewTemplate.subject}</div>
+      {sub === 'sms' && <Empty icon={<MessageSquare size={36} />} title="SMS templates aren’t available yet" text="No SMS provider is connected. Email is the only channel today." />}
+
+      {sub === 'email' && (
+        <>
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, marginBottom: 16, flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <div style={{ position: 'relative' }}>
+                <Search size={13} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: C.mute }} />
+                <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search templates…" style={{ ...inp, width: 240, padding: '8px 10px 8px 30px', fontSize: 13 }} />
               </div>
-              <div style={{ display: 'flex', gap: 8 }}>
-                {(['desktop','mobile'] as const).map(v => (
-                  <button key={v} onClick={() => setPreviewTab(v)} style={{ padding: '4px 12px', borderRadius: 20, border: '1px solid var(--hf-border)', background: previewTab === v ? 'var(--hf-primary)' : 'var(--hf-surface)', color: previewTab === v ? 'var(--hf-text-on-solid)' : 'var(--hf-text-muted)', fontSize: 12, cursor: 'pointer', fontWeight: 600, textTransform: 'capitalize' }}>{v}</button>
-                ))}
-                <button onClick={() => setPreviewTemplate(null)} style={{ background: 'var(--hf-surface-sunken)', border: 'none', borderRadius: '50%', width: 30, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'var(--hf-text-muted)' }}><X size={14} /></button>
+              <select value={cat} onChange={e => setCat(e.target.value)} style={{ ...inp, width: 'auto', padding: '8px 12px', fontSize: 13 }}>
+                <option value="">All categories</option>{cats.map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </div>
+            <Btn variant="primary" onClick={() => open()}><Plus size={14} /> New template</Btn>
+          </div>
+
+          {isLoading ? <div style={{ textAlign: 'center', padding: 40, color: C.mute }}>Loading…</div>
+            : shown.length === 0 ? <Empty icon={<FileText size={36} />} title={(templates as any[]).length ? 'No templates match' : 'No templates yet'} text={(templates as any[]).length ? 'Try a different search or category.' : 'Create a reusable layout to start campaigns faster.'} />
+            : (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: 16 }}>
+                {shown.map((t: any) => (
+                  <Card key={t.id} pad={0} style={{ overflow: 'hidden' }}>
+                    <div style={{ height: 150, background: C.bg, overflow: 'hidden', borderBottom: `1px solid ${C.line}`, position: 'relative' }}>
+                      <iframe sandbox="" srcDoc={t.htmlBody} title={t.name} style={{ width: '200%', height: '200%', border: 'none', transform: 'scale(0.5)', transformOrigin: 'top left', pointerEvents: 'none' }} />
+                    </div>
+                    <div style={{ padding: '12px 14px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'flex-start' }}>
+                        <div style={{ fontWeight: 700, fontSize: 14, color: C.ink, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.name}</div>
+                        {t.category && <Pill color="#1D4ED8" bg="#EFF6FF">{t.category}</Pill>}
+                      </div>
+                      <div style={{ fontSize: 12, color: C.text, marginTop: 3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.subject}</div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 10 }}>
+                        <span style={{ fontSize: 11, color: C.mute }}>Added {fmtDate(t.createdAt)}</span>
+                        <Btn onClick={() => open(t)} style={{ padding: '4px 10px', fontSize: 12 }}><Pencil size={12} /> Edit</Btn>
+                      </div>
+                    </div>
+                  </Card>))}
+              </div>)}
+          <div style={{ fontSize: 11, color: C.mute, marginTop: 14 }}>Starting a campaign from a template copies its content, so editing a template never changes campaigns that already used it.</div>
+        </>)}
+
+      {editing && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
+          <div style={{ background: '#fff', borderRadius: 16, padding: 28, width: 'min(1000px, 96vw)', maxHeight: '92vh', overflowY: 'auto' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 18 }}>
+              <h3 style={{ margin: 0, fontSize: 17, fontWeight: 800 }}>{editing.id ? `Edit — ${editing.name}` : 'New template'}</h3>
+              <button onClick={() => setEditing(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: C.mute }}><X size={20} /></button>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(0,1fr)', gap: 22 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                <div><label style={lbl}>Name *</label><input style={inp} value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} autoFocus /></div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                  <div><label style={lbl}>Category</label><input style={inp} list="tpl-cats" value={form.category} onChange={e => setForm(p => ({ ...p, category: e.target.value }))} /><datalist id="tpl-cats">{cats.map(c => <option key={c} value={c} />)}</datalist></div>
+                  <div><label style={lbl}>Preview text</label><input style={inp} value={form.previewText} onChange={e => setForm(p => ({ ...p, previewText: e.target.value }))} /></div>
+                </div>
+                <div><label style={lbl}>Subject *</label><input style={inp} value={form.subject} onChange={e => setForm(p => ({ ...p, subject: e.target.value }))} placeholder="Hello {{first_name}}" /></div>
+                <div><label style={lbl}>HTML *</label><textarea style={{ ...inp, fontFamily: 'monospace', fontSize: 12, resize: 'vertical' }} rows={14} value={form.htmlBody} onChange={e => setForm(p => ({ ...p, htmlBody: e.target.value }))} /></div>
+                <div style={{ fontSize: 11, color: C.mute }}>Tip: design visually in a campaign, then copy the HTML here. Placeholders: {'{{first_name}} {{name}} {{email}} {{company_name}} {{unsubscribe_url}}'}</div>
+              </div>
+              <div>
+                <label style={lbl}>Preview (raw, placeholders not filled)</label>
+                <iframe sandbox="" srcDoc={form.htmlBody} title="Template preview" style={{ width: '100%', height: 470, border: `1px solid ${C.line}`, borderRadius: 10, background: '#fff' }} />
               </div>
             </div>
-            <div style={{ padding: 16, background: 'var(--hf-surface-muted)', display: 'flex', justifyContent: 'center' }}>
-              <iframe
-                srcDoc={previewTemplate.htmlBody?.replace('{{first_name}}','Thabo').replace('{{company_name}}','HandyFlow').replace('{{unsubscribe_url}}','#')}
-                style={{ width: previewTab === 'mobile' ? 375 : '100%', height: 500, border: 'none', background: 'var(--hf-surface)', borderRadius: 8, boxShadow: '0 2px 12px rgba(0,0,0,0.08)' }}
-                title="Template preview"
-              />
+            {error && <div style={{ marginTop: 12, padding: '9px 12px', background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: 8, fontSize: 13, color: '#DC2626' }}>{error}</div>}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 18 }}>
+              <Btn onClick={() => setEditing(null)}>Cancel</Btn>
+              <Btn variant="primary" disabled={!ok || save.isPending} onClick={() => { setError(''); save.mutate() }}>{save.isPending ? 'Saving…' : 'Save template'}</Btn>
             </div>
           </div>
-        </div>
-      )}
-
-      {showCreate && (
-        <TemplateForm title="New Email Template" onClose={() => setShowCreate(false)} saving={createTemplate.isPending}
-          onSave={() => createTemplate.mutate({ name: form.name, subject: form.subject, htmlBody: form.htmlBody, category: form.category, previewText: form.previewText || null })} />
-      )}
-      {editTemplate && (
-        <TemplateForm title={`Edit — ${editTemplate.name}`} onClose={() => setEditTemplate(null)} saving={updateTemplate.isPending}
-          onSave={() => updateTemplate.mutate({ id: editTemplate.id, body: { name: form.name, subject: form.subject, htmlBody: form.htmlBody, category: form.category, previewText: form.previewText || null } })} />
-      )}
+        </div>)}
     </div>
   )
 }

@@ -12,12 +12,15 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import za.co.handyflow.platform.marketing.application.internal.MarketingAudienceService;
+import za.co.handyflow.platform.marketing.application.internal.MarketingDeliveryEventService;
 import za.co.handyflow.platform.marketing.application.internal.MarketingService;
 import za.co.handyflow.platform.marketing.dto.*;
 import za.co.handyflow.platform.shared.ApiResponse;
 import za.co.handyflow.platform.shared.TenantContext;
 
 import java.net.URI;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.UUID;
 
@@ -27,7 +30,9 @@ import java.util.UUID;
 @Tag(name = "Marketing", description = "Email campaigns, POPIA contacts and analytics")
 public class MarketingController {
 
-    private final MarketingService marketingService;
+    private final MarketingService              marketingService;
+    private final MarketingDeliveryEventService deliveryEventService;
+    private final MarketingAudienceService      audienceService;
 
     // ── Summary ───────────────────────────────────────────────────────────────
 
@@ -43,22 +48,51 @@ public class MarketingController {
 
     @GetMapping("/contacts")
     @PreAuthorize("hasAuthority('MARKETING_READ')")
-    @Operation(summary = "List all marketing contacts with opt-in status")
+    @Operation(summary = "Search contacts (server-side). status: ALL | OPTED_IN | NOT_OPTED_IN | SUPPRESSED")
     public ResponseEntity<ApiResponse<Page<ContactPreferenceResponse>>> getContacts(
+            @RequestParam(required = false) String search,
+            @RequestParam(defaultValue = "ALL") String status,
+            @RequestParam(required = false) String source,
             Pageable pageable) {
         return ResponseEntity.ok(ApiResponse.success(
-                marketingService.getContacts(TenantContext.getTenantIdAsObject(), pageable)));
+                marketingService.getContacts(TenantContext.getTenantIdAsObject(), search, status, source, pageable)));
+    }
+
+    @GetMapping("/contacts/export")
+    @PreAuthorize("hasAuthority('MARKETING_ADMIN')")
+    @Operation(summary = "Export contacts matching the filters as CSV (max 50,000 rows). Admin only.")
+    public ResponseEntity<byte[]> exportContacts(
+            @RequestParam(required = false) String search,
+            @RequestParam(defaultValue = "ALL") String status,
+            @RequestParam(required = false) String source) {
+        String csv = audienceService.exportContactsCsv(
+                TenantContext.getTenantIdAsObject().getValue(), search, status, source);
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"marketing-contacts.csv\"")
+                .header(HttpHeaders.CACHE_CONTROL, "no-store")
+                .contentType(new MediaType("text", "csv", StandardCharsets.UTF_8))
+                .body(("\uFEFF" + csv).getBytes(StandardCharsets.UTF_8));
+    }
+
+    @GetMapping("/contacts/{id}/consent-history")
+    @PreAuthorize("hasAuthority('MARKETING_READ')")
+    @Operation(summary = "Proof-of-permission history for a contact (opt-ins, opt-outs, suppressions)")
+    public ResponseEntity<ApiResponse<List<ConsentEvidenceResponse>>> getConsentHistory(@PathVariable UUID id) {
+        return ResponseEntity.ok(ApiResponse.success(
+                marketingService.getConsentHistory(TenantContext.getTenantIdAsObject(), id)));
     }
 
     @PostMapping("/contacts/import")
     @PreAuthorize("hasAuthority('MARKETING_ADMIN')")
-    @Operation(summary = "Import contacts — POPIA: only import contacts that have given consent")
+    @Operation(summary = "Import contacts — POPIA: only import contacts that have given consent. Suppressed and invalid addresses are skipped.")
     public ResponseEntity<ApiResponse<Integer>> importContacts(
             @Valid @RequestBody ImportContactsRequest req) {
-        int count = marketingService.importContacts(
-                TenantContext.getTenantIdAsObject(), req);
-        return ResponseEntity.ok(ApiResponse.success(
-                count + " contacts imported", count));
+        ImportContactsResult result = marketingService.importContacts(
+                TenantContext.getTenantIdAsObject(), TenantContext.getCurrentUserId(), req);
+        String message = result.imported() + " contacts imported"
+                + (result.skippedSuppressed() > 0 ? ", " + result.skippedSuppressed() + " skipped (suppressed)" : "")
+                + (result.skippedInvalid() > 0 ? ", " + result.skippedInvalid() + " skipped (invalid email)" : "");
+        return ResponseEntity.ok(ApiResponse.success(message, result.imported()));
     }
 
     @PostMapping("/contacts/sync-crm")
@@ -72,13 +106,48 @@ public class MarketingController {
 
     @PostMapping("/contacts/opt-in")
     @PreAuthorize("hasAuthority('MARKETING_ADMIN')")
-    @Operation(summary = "Manually opt-in a contact")
+    @Operation(summary = "Manually opt-in a contact. Rejected (409) if the address is suppressed. Supply evidence of consent.")
     public ResponseEntity<ApiResponse<ContactPreferenceResponse>> optIn(
             @RequestParam String email,
             @RequestParam(required = false) String name,
-            @RequestParam(defaultValue = "MANUAL") String source) {
+            @RequestParam(defaultValue = "MANUAL") String source,
+            @RequestParam(required = false) String evidence) {
         return ResponseEntity.ok(ApiResponse.success("Contact opted in",
-                marketingService.optIn(TenantContext.getTenantIdAsObject(), email, name, source)));
+                marketingService.optIn(TenantContext.getTenantIdAsObject(),
+                        TenantContext.getCurrentUserId(), email, name, source, evidence)));
+    }
+
+    // ── Suppression list ──────────────────────────────────────────────────────
+
+    @GetMapping("/suppressions")
+    @PreAuthorize("hasAuthority('MARKETING_READ')")
+    @Operation(summary = "List suppressed addresses (active only by default)")
+    public ResponseEntity<ApiResponse<Page<SuppressionResponse>>> getSuppressions(
+            @RequestParam(defaultValue = "true") boolean activeOnly,
+            Pageable pageable) {
+        return ResponseEntity.ok(ApiResponse.success(
+                marketingService.getSuppressions(TenantContext.getTenantIdAsObject(), activeOnly, pageable)));
+    }
+
+    @PostMapping("/suppressions")
+    @PreAuthorize("hasAuthority('MARKETING_ADMIN')")
+    @Operation(summary = "Add an address to the suppression list — also opts the contact out and stops queued sends")
+    public ResponseEntity<ApiResponse<SuppressionResponse>> addSuppression(
+            @Valid @RequestBody AddSuppressionRequest req) {
+        return ResponseEntity.status(201).body(ApiResponse.success("Address suppressed",
+                marketingService.addSuppression(TenantContext.getTenantIdAsObject(),
+                        TenantContext.getCurrentUserId(), req)));
+    }
+
+    @PostMapping("/suppressions/{id}/lift")
+    @PreAuthorize("hasAuthority('MARKETING_ADMIN')")
+    @Operation(summary = "Lift a suppression with a documented reason. Does NOT opt the contact back in.")
+    public ResponseEntity<ApiResponse<SuppressionResponse>> liftSuppression(
+            @PathVariable UUID id,
+            @Valid @RequestBody LiftSuppressionRequest req) {
+        return ResponseEntity.ok(ApiResponse.success("Suppression lifted",
+                marketingService.liftSuppression(TenantContext.getTenantIdAsObject(),
+                        TenantContext.getCurrentUserId(), id, req.reason())));
     }
 
     // ── Templates ─────────────────────────────────────────────────────────────
@@ -129,9 +198,18 @@ public class MarketingController {
                 marketingService.getCampaign(TenantContext.getTenantIdAsObject(), id)));
     }
 
+    @GetMapping("/campaigns/{id}/delivery-events")
+    @PreAuthorize("hasAuthority('MARKETING_READ')")
+    @Operation(summary = "Latest 200 provider delivery events (delivered, bounces, complaints) for a campaign")
+    public ResponseEntity<ApiResponse<List<DeliveryEventResponse>>> getDeliveryEvents(@PathVariable UUID id) {
+        var tenantId = TenantContext.getTenantIdAsObject();
+        marketingService.getCampaign(tenantId, id);   // 404 if the campaign isn't this tenant's
+        return ResponseEntity.ok(ApiResponse.success(deliveryEventService.listForCampaign(tenantId, id)));
+    }
+
     @PostMapping("/campaigns")
     @PreAuthorize("hasAuthority('MARKETING_MANAGE')")
-    @Operation(summary = "Create a campaign — status starts as DRAFT")
+    @Operation(summary = "Create a campaign — DRAFT, or SCHEDULED when scheduledAt is supplied. Audience: ALL_OPTED_IN or SEGMENT (+ segmentId).")
     public ResponseEntity<ApiResponse<CampaignResponse>> createCampaign(
             @Valid @RequestBody CreateCampaignRequest req) {
         return ResponseEntity.status(201).body(ApiResponse.success("Campaign created",
@@ -141,7 +219,7 @@ public class MarketingController {
 
     @PostMapping("/campaigns/{id}/launch")
     @PreAuthorize("hasAuthority('MARKETING_MANAGE')")
-    @Operation(summary = "Launch campaign — builds audience snapshot and queues emails for async send")
+    @Operation(summary = "Launch (DRAFT/SCHEDULED) or resume (PAUSED) — resolves the audience, snapshots eligible recipients, excludes suppressed ones")
     public ResponseEntity<ApiResponse<CampaignResponse>> launchCampaign(@PathVariable UUID id) {
         return ResponseEntity.ok(ApiResponse.success("Campaign launched — emails queued",
                 marketingService.launchCampaign(TenantContext.getTenantIdAsObject(), id)));
@@ -164,19 +242,23 @@ public class MarketingController {
     }
 
     // ── PUBLIC unsubscribe (no auth — token in URL) ───────────────────────────
-    // SecurityConfig must have /api/v1/marketing/unsubscribe/** in permitAll()
 
     @GetMapping("/unsubscribe/{token}")
-    @Operation(summary = "PUBLIC — One-click unsubscribe via token from email footer")
+    @Operation(summary = "PUBLIC — One-click unsubscribe via token from email footer. 404 for an invalid token.")
     public ResponseEntity<ApiResponse<Void>> unsubscribe(@PathVariable String token) {
         marketingService.handleUnsubscribe(token);
         return ResponseEntity.ok(ApiResponse.success(
                 "You have been unsubscribed. You will no longer receive marketing emails.", null));
     }
 
+    @PostMapping("/unsubscribe/{token}")
+    @Operation(summary = "PUBLIC — RFC 8058 List-Unsubscribe-Post one-click unsubscribe")
+    public ResponseEntity<ApiResponse<Void>> unsubscribeOneClick(@PathVariable String token) {
+        marketingService.handleUnsubscribe(token);
+        return ResponseEntity.ok(ApiResponse.success("Unsubscribed", null));
+    }
+
     // ── PUBLIC open/click tracking (no auth — fired directly by an email client) ──
-    // SecurityConfig must have /api/v1/marketing/track/** in permitAll() too —
-    // same requirement as unsubscribe above, easy to miss adding twice.
 
     @GetMapping(value = "/track/open/{campaignContactId}", produces = MediaType.IMAGE_GIF_VALUE)
     @Operation(summary = "PUBLIC — 1x1 tracking pixel, records a campaign email open")
@@ -189,7 +271,7 @@ public class MarketingController {
     }
 
     @GetMapping("/track/click/{campaignContactId}")
-    @Operation(summary = "PUBLIC — records a campaign link click, then redirects to the real destination")
+    @Operation(summary = "PUBLIC — records a click, then redirects. Destination is validated against the campaign's own link hosts.")
     public ResponseEntity<Void> trackClick(@PathVariable UUID campaignContactId,
                                            @RequestParam String url) {
         String target = marketingService.trackClick(campaignContactId, url);

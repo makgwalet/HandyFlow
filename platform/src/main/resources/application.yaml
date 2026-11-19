@@ -271,3 +271,17 @@ capture:
   ocr:
     enabled: ${CAPTURE_OCR_ENABLED:false}
     languages: ${CAPTURE_OCR_LANGUAGES:eng}   # e.g. eng+afr once tesseract-ocr-afr is installed
+
+
+# ── Marketing module ────────────────────────────────────────────────────────
+marketing:
+  mail:
+    provider: smtp
+  send:
+    batch-size: 50
+    max-retries: 3
+    stale-claim-minutes: 15
+    delay-ms: 0
+  webhook:
+    secret: ${MARKETING_WEBHOOK_SECRET:}
+    mailgun-signing-key: ${MARKETING_MAILGUN_SIGNING_KEY:}

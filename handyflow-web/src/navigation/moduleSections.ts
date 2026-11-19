@@ -13,7 +13,7 @@ import {
   Boxes,
   AlertTriangle, Bell, CheckCircle2, Coins, Camera, ClipboardList, Clock, Crosshair, DoorOpen, FileBarChart,
   GitBranch, Key, LayoutDashboard, Lock, MapPin, Radio, RefreshCw, Repeat, Route,
-  Footprints, QrCode, Gauge, Shield, ShieldAlert, ShieldCheck, Siren, Tablet, DollarSign, Wheat, Tractor, PawPrint,
+  Footprints, QrCode, Gauge, Shield, ShieldCheck, Siren, Tablet, DollarSign, Wheat, Tractor, PawPrint,
   Droplets, Archive, Smartphone, ArrowDownToLine, Fuel, Truck, Users, TrendingUp, Car, Wrench,
   Hexagon, Calculator, BookOpen, GitBranch as JournalIcon, Landmark, BarChart2, FileText,
   Upload, Store, Sparkles, Briefcase, Calendar, FolderOpen, AlertOctagon, CalendarCheck, Settings,

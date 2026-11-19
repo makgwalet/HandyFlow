@@ -18,6 +18,7 @@ public interface MktCampaignRepository extends JpaRepository<MktCampaign, UUID> 
         SELECT c FROM MktCampaign c
         WHERE c.tenantId = :tenantId
         AND c.deletedAt IS NULL
+        AND c.kind = 'CAMPAIGN'
         ORDER BY c.createdAt DESC
         """)
     Page<MktCampaign> findAll(TenantId tenantId, Pageable pageable);

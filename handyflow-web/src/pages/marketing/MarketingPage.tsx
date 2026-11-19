@@ -1,62 +1,67 @@
 // src/pages/marketing/MarketingPage.tsx
-//
-// Sections are routes (/marketing/:section) with navigation in the sidebar
-// (see navigation/moduleSections.ts and components/shell/SectionedModulePage).
-// The KPI strip shows above every section; the summary it loads is also
-// handed to Analytics.
+import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { apiClient } from '../../api/client'
-import { Users, CheckCircle, Send, Clock, Inbox } from 'lucide-react'
-import CampaignsTab   from './CampaignsTab'
-import TemplatesTab   from './TemplatesTab'
-import ContactsTab    from './ContactsTab'
-import AnalyticsTab   from './AnalyticsTab'
-import { SectionedModulePage } from '../../components/shell/SectionedModulePage'
-import { MARKETING_SECTIONS } from '../../navigation/moduleSections'
+import { Megaphone, LayoutDashboard, FileText, Users, Filter, Workflow, BarChart2, Settings as SettingsIcon } from 'lucide-react'
+import DashboardTab from './DashboardTab'
+import CampaignsTab from './CampaignsTab'
+import TemplatesTab from './TemplatesTab'
+import ContactsTab from './ContactsTab'
+import AudiencesTab from './AudiencesTab'
+import JourneysTab from './JourneysTab'
+import AnalyticsTab from './AnalyticsTab'
+import SettingsTab from './SettingsTab'
+import { Tabs, C } from './ui'
+
+type Tab = 'dashboard' | 'campaigns' | 'templates' | 'contacts' | 'segments' | 'automation' | 'reports' | 'settings'
+
+const TABS = [
+  { id: 'dashboard',  label: 'Dashboard',  icon: <LayoutDashboard size={15} /> },
+  { id: 'campaigns',  label: 'Campaigns',  icon: <Megaphone size={15} /> },
+  { id: 'templates',  label: 'Templates',  icon: <FileText size={15} /> },
+  { id: 'contacts',   label: 'Contacts',   icon: <Users size={15} /> },
+  { id: 'segments',   label: 'Segments',   icon: <Filter size={15} /> },
+  { id: 'automation', label: 'Automation', icon: <Workflow size={15} /> },
+  { id: 'reports',    label: 'Reports',    icon: <BarChart2 size={15} /> },
+  { id: 'settings',   label: 'Settings',   icon: <SettingsIcon size={15} /> },
+]
 
 export function MarketingPage() {
+  const [tab, setTab] = useState<Tab>('dashboard')
+  const [openNew, setOpenNew] = useState(false)   // opens the campaign wizard when the Campaigns tab mounts
+
   const { data: summary } = useQuery({
     queryKey: ['marketing-summary'],
-    queryFn: async () => {
-      const r = await apiClient.get('/api/v1/marketing/summary')
-      return r.data?.data ?? r.data
-    },
+    queryFn: async () => { const r = await apiClient.get('/api/v1/marketing/summary'); return r.data?.data ?? r.data },
     refetchInterval: 30_000,
   })
 
-  const kpis = [
-    { label: 'Total contacts', value: summary?.totalContacts  ?? 0, color: 'var(--hf-primary-text)', bg: 'var(--hf-indigo-soft)', icon: <Users size={16} /> },
-    { label: 'Opted in',       value: summary?.optedInCount   ?? 0, color: 'var(--hf-success-text-strong)', bg: 'var(--hf-success-soft-strong)', icon: <CheckCircle size={16} /> },
-    { label: 'Campaigns sent', value: summary?.sentCampaigns  ?? 0, color: 'var(--hf-accent-text)', bg: 'var(--hf-accent-soft)', icon: <Send size={16} /> },
-    { label: 'Scheduled',      value: summary?.scheduledCampaigns ?? 0, color: 'var(--hf-warning-text)', bg: 'var(--hf-warning-soft)', icon: <Clock size={16} /> },
-    { label: 'Queue pending',  value: summary?.queuePending   ?? 0, color: 'var(--hf-violet-text)', bg: 'var(--hf-violet-soft)', icon: <Inbox size={16} /> },
-  ]
-
-  const banner = (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 12, marginBottom: 24 }}>
-      {kpis.map(k => (
-        <div key={k.label} style={{ background: 'var(--hf-surface)', border: '1px solid var(--hf-border)', borderRadius: 12, padding: '14px 18px', display: 'flex', alignItems: 'center', gap: 12 }}>
-          <div style={{ width: 36, height: 36, borderRadius: 9, background: k.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', color: k.color, flexShrink: 0 }}>{k.icon}</div>
-          <div>
-            <div style={{ fontSize: 22, fontWeight: 800, color: k.color, letterSpacing: '-0.02em' }}>{k.value}</div>
-            <div style={{ fontSize: 11, color: 'var(--hf-text-faint)', marginTop: 1 }}>{k.label}</div>
-          </div>
-        </div>
-      ))}
-    </div>
-  )
+  const go = (t: string) => setTab(t as Tab)
 
   return (
-    <SectionedModulePage config={MARKETING_SECTIONS} banner={banner}
-      subtitle="Email campaigns · POPIA-compliant contacts · Templates · Analytics"
-      render={id => {
-        switch (id) {
-          case 'campaigns': return <CampaignsTab />
-          case 'templates': return <TemplatesTab />
-          case 'contacts':  return <ContactsTab />
-          case 'analytics': return <AnalyticsTab summary={summary} />
-          default:          return null
-        }
-      }} />
+    <div style={{ fontFamily: "'Inter', system-ui, sans-serif" }}>
+      <div style={{ marginBottom: 18 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
+          <div style={{ width: 36, height: 36, borderRadius: 10, background: C.primary, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Megaphone size={18} color="#fff" /></div>
+          <h1 style={{ fontSize: 24, fontWeight: 800, color: C.ink, margin: 0 }}>Marketing</h1>
+        </div>
+        <p style={{ fontSize: 13, color: C.mute, margin: 0, paddingLeft: 46 }}>
+          Campaigns, segments and automation, built on opt-in consent and a suppression list that is checked before every send.
+        </p>
+      </div>
+
+      <div style={{ background: '#fff', border: `1px solid ${C.line}`, borderRadius: 14, padding: '4px 24px 24px' }}>
+        <div style={{ marginBottom: 22 }}><Tabs tabs={TABS} active={tab} onChange={go} /></div>
+
+        {tab === 'dashboard'  && <DashboardTab onNavigate={go} onCreate={() => { setOpenNew(true); setTab('campaigns') }} />}
+        {tab === 'campaigns'  && <CampaignsTab autoOpenNew={openNew} onAutoOpened={() => setOpenNew(false)} />}
+        {tab === 'templates'  && <TemplatesTab />}
+        {tab === 'contacts'   && <ContactsTab />}
+        {tab === 'segments'   && <AudiencesTab />}
+        {tab === 'automation' && <JourneysTab />}
+        {tab === 'reports'    && <AnalyticsTab summary={summary} />}
+        {tab === 'settings'   && <SettingsTab />}
+      </div>
+    </div>
   )
 }
