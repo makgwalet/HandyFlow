@@ -9,6 +9,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import { input, primaryBtn, ghostBtn, one, fmtDate, errMsg } from "./lcHelpers"
 import { Modal, Err, Badge } from "./LcUi"
+import { ProxyVotesSection } from "./ProxyPanels"
 
 type Choice = "FOR" | "AGAINST" | "ABSTAIN" | "RECUSED"
 interface Voter { memberId: string; name: string; role: string; eligible: boolean; choice: Choice | null; reason: string | null }
@@ -98,6 +99,8 @@ export default function ResolutionVotesModal({ committeeId, meetingId, resolutio
           )
         })}
       </div>
+
+      <ProxyVotesSection base={url.replace(/\/votes$/, "")} canManage={canManage} onChanged={refresh} />
 
       <div style={{ display: "flex", gap: 14, margin: "10px 0", fontSize: 13, color: "#334155", flexWrap: "wrap" }}>
         <span><strong>{v.tally.votesFor}</strong> for</span><span><strong>{v.tally.against}</strong> against</span>

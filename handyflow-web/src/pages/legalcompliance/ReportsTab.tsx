@@ -11,6 +11,7 @@ import { one, input, primaryBtn, ghostBtn, fmtDateTime, errMsg } from "./lcHelpe
 import { Err, Badge } from "./LcUi"
 import { Download, FileText, Play, X } from "lucide-react"
 import ReportSchedulesPanel from "./ReportSchedulesPanel"
+import CustomReportsPanel from "./CustomReportsPanel"
 
 const base = "/api/v1/legalcompliance/reports"
 
@@ -28,6 +29,7 @@ export default function ReportsTab() {
   const hasExport = usePermission("LEGALCOMPLIANCE_REPORT_EXPORT")
   const hasAdmin = usePermission("LEGALCOMPLIANCE_ADMIN")
   const canExport = hasExport || hasAdmin
+  const canShare = usePermission("LEGALCOMPLIANCE_MANAGE") || hasAdmin
 
   const [search, setSearch] = useState("")
   const [asOf, setAsOf] = useState("")
@@ -188,6 +190,7 @@ export default function ReportsTab() {
           )}
         </div>
       )}
+      <CustomReportsPanel reports={catalogue.map(c => ({ key: c.key, title: c.title }))} canExport={canExport} canShare={canShare} />
       {canExport && <ReportSchedulesPanel reports={catalogue.map(c => ({ key: c.key, title: c.title }))} />}
     </div>
   )

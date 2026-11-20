@@ -179,4 +179,29 @@ class VotingRulesTest {
         assertTrue(VotingRules.castingChair(List.of(chair, other), Map.of(chair.getId(), VoteChoice.RECUSED)).isEmpty(), "a recused chair has a conflict");
         assertTrue(VotingRules.castingChair(List.of(other), Map.of()).isEmpty());
     }
+
+    @Test @DisplayName("A charter's special percentage is applied exactly: 2 of 3 passes at 66 and fails at 67; 3 of 4 passes at 75 and fails at 76")
+    void specialPercent() {
+        assertEquals(BallotOutcome.CARRIED, VotingRules.outcome(ResolutionType.SPECIAL, t(2, 1, 0, 0), 66));
+        assertEquals(BallotOutcome.NOT_CARRIED, VotingRules.outcome(ResolutionType.SPECIAL, t(2, 1, 0, 0), 67));
+        assertEquals(BallotOutcome.CARRIED, VotingRules.outcome(ResolutionType.SPECIAL, t(3, 1, 0, 0), 75));
+        assertEquals(BallotOutcome.NOT_CARRIED, VotingRules.outcome(ResolutionType.SPECIAL, t(3, 1, 0, 0), 76));
+        assertEquals(BallotOutcome.CARRIED, VotingRules.outcome(ResolutionType.SPECIAL, t(1, 0, 0, 0), 100));
+        assertEquals(BallotOutcome.NOT_CARRIED, VotingRules.outcome(ResolutionType.SPECIAL, t(3, 1, 0, 0), 100));
+        assertEquals(BallotOutcome.CARRIED, VotingRules.outcome(ResolutionType.ORDINARY, t(2, 1, 0, 0), 100), "the percentage never applies to an ordinary resolution");
+        assertEquals(VotingRules.outcome(ResolutionType.SPECIAL, t(3, 1, 0, 0)), VotingRules.outcome(ResolutionType.SPECIAL, t(3, 1, 0, 0), 75), "the default is 75");
+        assertTrue(VotingRules.requirement(ResolutionType.SPECIAL, 60).contains("60%"));
+        assertTrue(VotingRules.requirement(ResolutionType.SPECIAL).contains("75%"));
+    }
+
+    @Test @DisplayName("The quorum-after-recusal check can be switched off by the charter, but the other close checks stay")
+    void quorumAfterRecusalSwitch() {
+        CommitteeMember a = member("A", MemberRole.MEMBER, MEETING.minusDays(50)), b = member("B", MemberRole.MEMBER, MEETING.minusDays(50)), c = member("C", MemberRole.MEMBER, MEETING.minusDays(50));
+        Map<UUID, VoteChoice> v = Map.of(a.getId(), VoteChoice.FOR, b.getId(), VoteChoice.RECUSED, c.getId(), VoteChoice.RECUSED);
+        assertFalse(VotingRules.closeProblems(List.of(a, b, c), v, 2).isEmpty());
+        assertFalse(VotingRules.closeProblems(List.of(a, b, c), v, 2, true).isEmpty());
+        assertTrue(VotingRules.closeProblems(List.of(a, b, c), v, 2, false).isEmpty());
+        assertFalse(VotingRules.closeProblems(List.of(a, b, c), Map.of(a.getId(), VoteChoice.FOR), 2, false).isEmpty(), "missing votes still stop it");
+        assertFalse(VotingRules.closeProblems(List.of(a, b, c), Map.of(a.getId(), VoteChoice.RECUSED, b.getId(), VoteChoice.RECUSED, c.getId(), VoteChoice.RECUSED), 2, false).isEmpty(), "nobody voting still stops it");
+    }
 }

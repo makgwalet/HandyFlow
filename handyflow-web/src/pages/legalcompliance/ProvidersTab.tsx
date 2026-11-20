@@ -12,11 +12,12 @@ import { usePermission } from "../../hooks/usePermission"
 import { one, unwrap, input, primaryBtn, ghostBtn, fmtDate, fmtDateTime, errMsg } from "./lcHelpers"
 import { Modal, Field, Err, Badge } from "./LcUi"
 import { Plus, Copy } from "lucide-react"
+import { ClientSubmissions, SubmissionInbox, GrantsEditor } from "./ProviderSubmissionPanels"
 
 const base = "/api/v1/legalcompliance/provider"
 const accessBase = "/api/v1/legalcompliance/provider-access"
 
-type Scope = "SUMMARY" | "REPORTS"
+type Scope = "SUMMARY" | "REPORTS" | "SUBMIT"
 type Status = "INVITED" | "ACTIVE" | "SUSPENDED" | "ENDED"
 type Side = "PROVIDER" | "CLIENT"
 type Role = "LEAD" | "REVIEWER" | "SUPPORT"
@@ -44,8 +45,8 @@ interface Access { id: string; providerName: string; status: Status; requestedSc
 interface Preview { providerName: string; requestedScopes: Scope[]; expiresAt: string }
 interface AccessEvent { at: string; eventType: string; detail: string; actorName: string }
 
-const SCOPE_TEXT: Record<Scope, string> = { SUMMARY: "Compliance summary (counts, indicators and attention list)", REPORTS: "Standard reports (viewed on screen, not downloadable)" }
-const SCOPE_SHORT: Record<Scope, string> = { SUMMARY: "Summary", REPORTS: "Reports" }
+const SCOPE_TEXT: Record<Scope, string> = { SUMMARY: "Compliance summary (counts, indicators and attention list)", REPORTS: "Standard reports (viewed on screen, not downloadable)", SUBMIT: "Send observations and recommendations to your inbox (cannot change your records)" }
+const SCOPE_SHORT: Record<Scope, string> = { SUMMARY: "Summary", REPORTS: "Reports", SUBMIT: "Submissions" }
 const pretty = (s: string) => s.charAt(0) + s.slice(1).toLowerCase().replace(/_/g, " ")
 const statusTone: Record<Status, { color: string; bg: string }> = {
   INVITED: { color: "#92400E", bg: "#FEF3C7" }, ACTIVE: { color: "#166534", bg: "#DCFCE7" }, SUSPENDED: { color: "#9A3412", bg: "#FFEDD5" }, ENDED: { color: "#475569", bg: "#E2E8F0" },
@@ -86,7 +87,7 @@ function InviteModal({ onClose, onCreated }: { onClose: () => void; onCreated: (
       <Err m={err} />
       <Field l="Your organisation, as the client should see it *"><input style={input} value={f.providerName} onChange={e => setF({ ...f, providerName: e.target.value })} /></Field>
       <Field l="Client name (your label) *"><input style={input} value={f.clientName} onChange={e => setF({ ...f, clientName: e.target.value })} /></Field>
-      <Field l="What you are asking to see *"><ScopePicker value={scopes} onChange={setScopes} allowed={["SUMMARY", "REPORTS"]} /></Field>
+      <Field l="What you are asking to see *"><ScopePicker value={scopes} onChange={setScopes} allowed={["SUMMARY", "REPORTS", "SUBMIT"]} /></Field>
       <div style={{ display: "flex", gap: 10 }}>
         <div style={{ flex: 1 }}><Field l="Contract start"><input type="date" style={input} value={f.contractStart} onChange={e => setF({ ...f, contractStart: e.target.value })} /></Field></div>
         <div style={{ flex: 1 }}><Field l="Contract end"><input type="date" style={input} value={f.contractEnd} onChange={e => setF({ ...f, contractEnd: e.target.value })} /></Field></div>
@@ -180,7 +181,7 @@ function ClientReports({ id }: { id: string }) {
 function ClientModal({ id, canManage, onClose, onCode }: { id: string; canManage: boolean; onClose: () => void; onCode: (code: string) => void }) {
   const qc = useQueryClient()
   const [err, setErr] = useState("")
-  const [view, setView] = useState<"team" | "summary" | "reports">("team")
+  const [view, setView] = useState<"team" | "summary" | "reports" | "submissions">("team")
   const [reason, setReason] = useState<{ kind: "suspend" | "end"; text: string } | null>(null)
   const [assign, setAssign] = useState({ userId: "", role: "SUPPORT" as Role })
   const [review, setReview] = useState({ reviewDate: new Date().toISOString().slice(0, 10), outcome: "SATISFACTORY" as Outcome, notes: "" })
@@ -236,7 +237,7 @@ function ClientModal({ id, canManage, onClose, onCode }: { id: string; canManage
       {rescopes && (
         <div style={{ border: "1px solid #E2E8F0", borderRadius: 8, padding: 12, marginBottom: 12 }}>
           <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 6 }}>Issue a new code (the old one stops working)</div>
-          <ScopePicker value={rescopes} onChange={setRescopes} allowed={["SUMMARY", "REPORTS"]} />
+          <ScopePicker value={rescopes} onChange={setRescopes} allowed={["SUMMARY", "REPORTS", "SUBMIT"]} />
           <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}><button style={ghostBtn} onClick={() => setRescopes(null)}>Cancel</button><button style={primaryBtn} disabled={rescopes.length === 0 || reissue.isPending} onClick={() => reissue.mutate(rescopes)}>Issue code</button></div>
         </div>
       )}
@@ -254,9 +255,9 @@ function ClientModal({ id, canManage, onClose, onCode }: { id: string; canManage
       )}
 
       <div style={{ display: "flex", gap: 2, borderBottom: "1px solid #E2E8F0", marginBottom: 12 }}>
-        {(["team", "summary", "reports"] as const).map(v => (
+        {(["team", "summary", "reports", "submissions"] as const).map(v => (
           <button key={v} onClick={() => setView(v)} style={{ background: "none", border: "none", padding: "8px 12px", cursor: "pointer", fontSize: 13, fontWeight: view === v ? 600 : 400, color: view === v ? "#4338CA" : "#64748B", borderBottom: view === v ? "2px solid #4338CA" : "2px solid transparent", marginBottom: -1 }}>
-            {v === "team" ? "Team and reviews" : v === "summary" ? "Compliance summary" : "Reports"}
+            {v === "team" ? "Team and reviews" : v === "summary" ? "Compliance summary" : v === "reports" ? "Reports" : "Submissions"}
           </button>
         ))}
       </div>
@@ -314,6 +315,7 @@ function ClientModal({ id, canManage, onClose, onCode }: { id: string; canManage
       )}
       {view === "summary" && (c.status === "ACTIVE" && c.grantedScopes.includes("SUMMARY") ? <Posture id={id} /> : <p style={{ color: "#64748B", fontSize: 13 }}>Summary access is not currently available for this client.</p>)}
       {view === "reports" && (c.status === "ACTIVE" && c.grantedScopes.includes("REPORTS") ? <ClientReports id={id} /> : <p style={{ color: "#64748B", fontSize: 13 }}>Report access is not currently available for this client.</p>)}
+      {view === "submissions" && (c.status === "INVITED" ? <p style={{ color: "#64748B", fontSize: 13 }}>Submissions are available once the client has accepted.</p> : <ClientSubmissions id={id} status={c.status} granted={c.grantedScopes} requested={c.requestedScopes} canManage={canManage} />)}
     </Modal>
   )
 }
@@ -442,6 +444,7 @@ function ProviderAccessPanel() {
               {a.status === "SUSPENDED" && a.suspendedBy === "PROVIDER" && <span style={{ fontSize: 12, color: "#64748B", alignSelf: "center" }}>Paused by the provider.</span>}
               <button style={{ ...ghostBtn, color: "#B91C1C" }} onClick={() => setReason({ id: a.id, kind: "revoke", text: "" })}>End access</button>
               <button style={ghostBtn} onClick={() => setActivityFor(a)}>What they viewed</button>
+              <GrantsEditor id={a.id} requested={a.requestedScopes} granted={a.grantedScopes} />
             </div>
           )}
           {a.status === "ENDED" && <button style={ghostBtn} onClick={() => setActivityFor(a)}>What they viewed</button>}
@@ -471,12 +474,15 @@ export default function ProvidersTab() {
   const hasManage = usePermission("LEGALCOMPLIANCE_PROVIDER_MANAGE")
   const hasConsult = usePermission("LEGALCOMPLIANCE_PROVIDER_CONSULT")
   const hasAdmin = usePermission("LEGALCOMPLIANCE_ADMIN")
+  const hasRead = usePermission("LEGALCOMPLIANCE_READ")
+  const hasLcManage = usePermission("LEGALCOMPLIANCE_MANAGE")
   const isProvider = hasManage || hasConsult || hasAdmin
-  const [view, setView] = useState<"clients" | "access">(isProvider ? "clients" : "access")
+  const [view, setView] = useState<"clients" | "access" | "inbox">(isProvider ? "clients" : "access")
 
-  const pills: { id: "clients" | "access"; label: string; show: boolean }[] = [
+  const pills: { id: "clients" | "access" | "inbox"; label: string; show: boolean }[] = [
     { id: "clients", label: "My clients", show: isProvider },
     { id: "access", label: "Provider access to this organisation", show: hasAdmin },
+    { id: "inbox", label: "Provider submissions", show: hasAdmin || hasLcManage || hasRead },
   ]
   return (
     <div>
@@ -487,6 +493,7 @@ export default function ProvidersTab() {
       </div>
       {view === "clients" && isProvider && <ProviderWorkspace />}
       {view === "access" && hasAdmin && <ProviderAccessPanel />}
+      {view === "inbox" && (hasAdmin || hasLcManage || hasRead) && <SubmissionInbox canAnswer={hasAdmin || hasLcManage} />}
     </div>
   )
 }

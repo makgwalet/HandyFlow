@@ -16,6 +16,9 @@ import WallsTab from "./WallsTab"
 import KycTab from "./KycTab"
 import DocumentsTab from "./DocumentsTab"
 import LitigationTab from "./LitigationTab"
+import TasksTab from "./TasksTab"
+import ReportsTab from "./ReportsTab"
+import AccessTab from "./AccessTab"
 import { useNavigate } from "react-router-dom"
 
 export function LegalPracticePage() {
@@ -38,6 +41,9 @@ export function LegalPracticePage() {
         case "kyc": return <KycTab />
         case "documents": return <DocumentsTab />
         case "litigation": return <LitigationTab />
+        case "tasks": return <TasksTab />
+        case "reports": return <ReportsTab />
+        case "access": return <AccessTab />
         case "profile":   return <ProfileTab />
         default:          return null
       }

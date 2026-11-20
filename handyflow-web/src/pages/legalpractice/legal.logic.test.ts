@@ -1,4 +1,7 @@
 import { describe, it, expect } from "vitest"
+import { accessClipboard, accessFindingTone, accessGroups, accessLevelText, accessLevelTone, accessSummary, accessToggle, type AccessPermission, type AccessTemplate } from "./legal.logic"
+import { bucketTone, matterGrid, matterStatusText, reportAsAtProblem, reportMonthText, reportRangeProblem, reportUrl, reportYearStart } from "./legal.logic"
+import { applyProblem as wfApplyProblem, emptyStep, emptyTask, emptyWorkflow, moveStep, stepDue, taskActions, taskDueText, taskEventText, taskPriorityTone, taskProblem, taskReasonProblem, taskRequest, taskStatusLabel, taskTone, taskToForm, workflowProblem, workflowRequest, workflowToForm, type TaskDetail, type WorkflowDetail } from "./legal.logic"
 import { emptyLitCase, litActions, litCaseProblem, litCaseRequest, litCaseToForm, litCompliedProblem, litConcludeProblem, litDaysAway, litDaysText, litEventText, litHearingActions, litHearingProblem, litHeldProblem, litOrderProblem, litPostponeProblem, litReopenProblem, litStageProblem, litStageLabel, litTime, type LitCase } from "./legal.logic"
 import { CONFLICT_STATUS, conflictHeadline, decisionProblem, emptyParty, partiesRequest, usableChecks, type ConflictCheck, approvalMode, canWithdraw, reasonProblem, nextAttempt, type TrustForm, canRevokeGrant, emptyTrust, evidenceProblem, fileSize, inviteProblem, payableByTrust, trustKindsFor, trustProblem, trustRequest, attorneyProblem, billable, canChangeWork, canLogWork, clientProblem, disbProblem, emptyAttorney, emptyClient, emptyDisb, emptyKeyDate, emptyMatter, emptyProfile, emptyRetainer, emptyTime, generateProblem, invoiceActions, keyDateNote, keyDateProblem, matterActions, matterProblem, matterRequest, paymentProblem, profileProblem, retainerProblem, timeProblem, timeRequest } from "./legal.logic"
 
@@ -845,5 +848,137 @@ describe("litigation: wording", () => {
     expect(litTime("09:30:00")).toBe("09:30"); expect(litTime(null)).toBe("")
     expect(litDaysAway("2026-11-23", "2026-11-20")).toBe(3)
     expect(litDaysText(0)).toBe("Today"); expect(litDaysText(1)).toBe("Tomorrow"); expect(litDaysText(5)).toBe("In 5 days"); expect(litDaysText(-3)).toBe("3 days ago"); expect(litDaysText(-1)).toBe("Yesterday")
+  })
+})
+
+describe("tasks: the form", () => {
+  const ok = { ...emptyTask("m1"), title: "Draft particulars" }
+  it("needs a matter when creating and a sensible title", () => {
+    expect(taskProblem(ok, true)).toBeNull()
+    expect(taskProblem({ ...ok, matterId: "" }, true)).toMatch(/matter/); expect(taskProblem({ ...ok, matterId: "" }, false)).toBeNull()
+    expect(taskProblem({ ...ok, title: " a " }, true)).toMatch(/title/)
+    expect(taskProblem({ ...ok, title: "x".repeat(201) }, true)).toMatch(/200/)
+    expect(taskProblem({ ...ok, description: "x".repeat(2001) }, true)).toMatch(/2000/)
+  })
+  it("sends the matter and assignee only when creating, and nulls what is blank", () => {
+    expect(taskRequest({ ...ok, assigneeId: "u1", dueDate: "2026-07-01", description: " " }, true, "Thandi")).toEqual({ matterId: "m1", assigneeId: "u1", assigneeName: "Thandi", title: "Draft particulars", description: null, priority: "NORMAL", dueDate: "2026-07-01" })
+    expect(taskRequest(ok, true, null)).toMatchObject({ assigneeId: null, assigneeName: null, dueDate: null })
+    expect(taskRequest(ok, false, null)).toEqual({ title: "Draft particulars", description: null, priority: "NORMAL", dueDate: null })
+  })
+  it("fills the form from a task", () => {
+    const d = { task: { matterId: "m1", title: "T", priority: "HIGH", dueDate: "2026-07-01", assigneeId: "u1" }, description: "Per counsel" } as unknown as TaskDetail
+    expect(taskToForm(d)).toEqual({ matterId: "m1", title: "T", description: "Per counsel", priority: "HIGH", dueDate: "2026-07-01", assigneeId: "u1" })
+  })
+  it("wants a reason of ten characters", () => {
+    expect(taskReasonProblem("too short", "why")).toMatch(/10/); expect(taskReasonProblem("          x ", "why")).toMatch(/10/); expect(taskReasonProblem("Matter settled early", "why")).toBeNull()
+  })
+})
+describe("tasks: what can be done", () => {
+  it("follows the status", () => {
+    expect(taskActions("OPEN", true)).toEqual({ canEdit: true, canAssign: true, canStart: true, canStop: false, canComplete: true, canReopen: false, canCancel: true })
+    expect(taskActions("IN_PROGRESS", true)).toMatchObject({ canStart: false, canStop: true, canComplete: true })
+    expect(taskActions("DONE", true)).toEqual({ canEdit: false, canAssign: false, canStart: false, canStop: false, canComplete: false, canReopen: true, canCancel: false })
+    expect(Object.values(taskActions("CANCELLED", true)).every(v => v === false)).toBe(true)
+  })
+  it("offers nothing without the permission", () => { expect(Object.values(taskActions("OPEN", false)).every(v => v === false)).toBe(true); expect(taskActions("DONE", false).canReopen).toBe(false) })
+  it("says how late or soon a task is, and nothing for finished ones", () => {
+    expect(taskDueText("2026-06-10", "OPEN", "2026-06-10")).toBe("Due today"); expect(taskDueText("2026-06-11", "OPEN", "2026-06-10")).toBe("Due tomorrow")
+    expect(taskDueText("2026-06-15", "OPEN", "2026-06-10")).toBe("Due in 5 days"); expect(taskDueText("2026-06-09", "OPEN", "2026-06-10")).toBe("Overdue by 1 day")
+    expect(taskDueText("2026-06-01", "IN_PROGRESS", "2026-06-10")).toBe("Overdue by 9 days")
+    expect(taskDueText("2026-06-01", "DONE", "2026-06-10")).toBe(""); expect(taskDueText(null, "OPEN", "2026-06-10")).toBe("No due date")
+  })
+  it("colours overdue first, then by status", () => {
+    expect(taskTone("OPEN", true)).toBe("danger"); expect(taskTone("DONE", false)).toBe("success"); expect(taskTone("IN_PROGRESS", false)).toBe("info"); expect(taskTone("CANCELLED", false)).toBe("neutral"); expect(taskTone("OPEN", false)).toBe("warning")
+    expect(taskPriorityTone("URGENT")).toBe("danger"); expect(taskPriorityTone("HIGH")).toBe("warning"); expect(taskPriorityTone("LOW")).toBe("neutral"); expect(taskStatusLabel("IN_PROGRESS")).toBe("In progress")
+  })
+  it("words the history", () => {
+    expect(taskEventText({ eventType: "COMPLETED", actorName: "Anele", detail: null })).toBe("Anele completed the task")
+    expect(taskEventText({ eventType: "REASSIGNED", actorName: null, detail: "Anele to Thandi" })).toBe("Someone reassigned the task: Anele to Thandi")
+    expect(taskEventText({ eventType: "WEIRD", actorName: "A", detail: null })).toBe("A weird")
+  })
+})
+describe("workflows: the form", () => {
+  const ok = { ...emptyWorkflow(), name: "Open litigation file", steps: [{ ...emptyStep(), title: "Open file" }, { ...emptyStep(), title: "Letter of demand", offsetDays: "14" }] }
+  it("needs a name and at least one good step", () => {
+    expect(workflowProblem(ok)).toBeNull()
+    expect(workflowProblem({ ...ok, name: "x" })).toMatch(/name/); expect(workflowProblem({ ...ok, steps: [] })).toMatch(/at least one/)
+    expect(workflowProblem({ ...ok, steps: [{ ...emptyStep(), title: "" }] })).toMatch(/Step 1: give it a title/)
+    expect(workflowProblem({ ...ok, steps: [ok.steps[0], { ...emptyStep(), title: "Two", offsetDays: "-1" }] })).toMatch(/Step 2: .*0 to 730/)
+    expect(workflowProblem({ ...ok, steps: [{ ...emptyStep(), title: "Two", offsetDays: "731" }] })).toMatch(/730/)
+    expect(workflowProblem({ ...ok, steps: [{ ...emptyStep(), title: "Two", offsetDays: "1.5" }] })).toMatch(/whole number/)
+    expect(workflowProblem({ ...ok, steps: [{ ...emptyStep(), title: "Two", offsetDays: "" }] })).toMatch(/whole number/)
+    expect(workflowProblem({ ...ok, steps: Array.from({ length: 31 }, (_, i) => ({ ...emptyStep(), title: `Step ${i}` })) })).toMatch(/30 steps/)
+  })
+  it("sends numbers, and nulls what is blank", () => {
+    expect(workflowRequest(ok)).toEqual({ name: "Open litigation file", description: null, matterType: null, steps: [
+      { title: "Open file", description: null, priority: "NORMAL", offsetDays: 0, assignTo: "STARTER" }, { title: "Letter of demand", description: null, priority: "NORMAL", offsetDays: 14, assignTo: "STARTER" }] })
+  })
+  it("fills the form from a workflow", () => {
+    const w = { template: { name: "W", description: null, matterType: "LITIGATION" }, steps: [{ stepNo: 1, title: "A", description: "d", priority: "HIGH", offsetDays: 3, assignTo: "NONE" }] } as unknown as WorkflowDetail
+    expect(workflowToForm(w)).toEqual({ name: "W", description: "", matterType: "LITIGATION", steps: [{ title: "A", description: "d", priority: "HIGH", offsetDays: "3", assignTo: "NONE" }] })
+  })
+  it("moves steps without losing any", () => {
+    expect(moveStep(["a", "b", "c"], 2, 0)).toEqual(["c", "a", "b"]); expect(moveStep(["a", "b", "c"], 0, 1)).toEqual(["b", "a", "c"])
+    expect(moveStep(["a", "b"], 0, -1)).toEqual(["a", "b"]); expect(moveStep(["a", "b"], 1, 2)).toEqual(["a", "b"])
+  })
+  it("checks the start date and shows each due date", () => {
+    expect(wfApplyProblem("", "2026-06-10", "2026-06-10")).toMatch(/matter/); expect(wfApplyProblem("m", "", "2026-06-10")).toMatch(/start/)
+    expect(wfApplyProblem("m", "2026-06-10", "2026-06-10")).toBeNull(); expect(wfApplyProblem("m", "2027-07-01", "2026-06-10")).toMatch(/within a year/); expect(wfApplyProblem("m", "2025-06-10", "2026-06-10")).toBeNull()
+    expect(stepDue("2026-06-10", 7)).toBe("2026-06-17"); expect(stepDue("2026-12-30", 3)).toBe("2027-01-02")
+  })
+})
+
+describe("firm reports", () => {
+  it("checks the billing range", () => {
+    expect(reportRangeProblem("2026-01-01", "2026-06-30", "2026-06-30")).toBeNull()
+    expect(reportRangeProblem("", "2026-06-30", "2026-06-30")).toMatch(/start date/)
+    expect(reportRangeProblem("2026-06-30", "2026-06-01", "2026-06-30")).toMatch(/before/)
+    expect(reportRangeProblem("2026-01-01", "2026-07-01", "2026-06-30")).toMatch(/future/)
+    expect(reportRangeProblem("2010-01-01", "2026-06-30", "2026-06-30")).toMatch(/ten years/)
+  })
+  it("checks the trust date", () => {
+    expect(reportAsAtProblem("2026-06-30", "2026-06-30")).toBeNull(); expect(reportAsAtProblem("", "2026-06-30")).toMatch(/date/); expect(reportAsAtProblem("2026-07-01", "2026-06-30")).toMatch(/future/)
+  })
+  it("builds the request for each report and its CSV", () => {
+    expect(reportUrl("billing", { from: "2026-01-01", to: "2026-06-30" })).toEqual({ path: "billing", params: { from: "2026-01-01", to: "2026-06-30" } })
+    expect(reportUrl("billing", { from: "2026-01-01", to: "2026-06-30" }, true).path).toBe("billing.csv")
+    expect(reportUrl("trust", { asAt: "" }, true)).toEqual({ path: "trust.csv", params: { asAt: undefined } })
+    expect(reportUrl("debtors", { from: "x" })).toEqual({ path: "debtors", params: {} })
+  })
+  it("words months, statuses and colours", () => {
+    expect(reportYearStart("2026-06-30")).toBe("2026-01-01"); expect(reportMonthText("2026-04")).toBe("April 2026"); expect(matterStatusText("ON_HOLD")).toBe("On hold"); expect(matterStatusText("X")).toBe("X")
+    expect(bucketTone("CURRENT")).toBe("success"); expect(bucketTone("D31_60")).toBe("warning"); expect(bucketTone("D90_PLUS")).toBe("danger")
+  })
+  it("lays matters out as a grid", () => {
+    const g = matterGrid([{ status: "OPEN", matterType: "LITIGATION", count: 3 }, { status: "CLOSED", matterType: "ESTATES", count: 2 }, { status: "OPEN", matterType: "ESTATES", count: 1 }])
+    expect(g.kinds).toEqual(["ESTATES", "LITIGATION"]); expect(g.statuses).toEqual(["OPEN", "CLOSED"])
+    expect(g.cell("OPEN", "LITIGATION")).toBe(3); expect(g.cell("CLOSED", "LITIGATION")).toBe(0)
+  })
+})
+
+describe("access", () => {
+  const perms: AccessPermission[] = [
+    { code: "LEGALPRACTICE_READ", group: "Core", kind: "VIEW", level: "NORMAL", secondPerson: false, description: "r" },
+    { code: "LEGALPRACTICE_TRUST_RECEIVE", group: "Trust account", kind: "WORK", level: "FINANCIAL", secondPerson: false, description: "t" },
+    { code: "LEGALPRACTICE_MANAGE", group: "Core", kind: "WORK", level: "NORMAL", secondPerson: false, description: "m" },
+    { code: "LEGALPRACTICE_WALL_MANAGE", group: "Ethical walls", kind: "ADMIN", level: "SENSITIVE", secondPerson: false, description: "w" },
+  ]
+  it("groups in the order they first appear", () => {
+    const g = accessGroups(perms)
+    expect(g.map(x => x.group)).toEqual(["Core", "Trust account", "Ethical walls"]); expect(g[0].items.map(p => p.code)).toEqual(["LEGALPRACTICE_READ", "LEGALPRACTICE_MANAGE"])
+  })
+  it("colours and words the levels", () => {
+    expect(accessLevelTone("FINANCIAL")).toBe("danger"); expect(accessLevelTone("SENSITIVE")).toBe("warning"); expect(accessLevelTone("NORMAL")).toBe("neutral")
+    expect(accessLevelText("FINANCIAL")).toBe("Financial"); expect(accessLevelText("NORMAL")).toBe("Normal"); expect(accessFindingTone("WARNING")).toBe("warning"); expect(accessFindingTone("NOTE")).toBe("info")
+  })
+  it("summarises a template and writes it out for pasting", () => {
+    const t: AccessTemplate = { key: "k", name: "Bookkeeper", description: "", permissions: ["LEGALPRACTICE_TRUST_RECEIVE", "LEGALPRACTICE_READ", "LEGALPRACTICE_WALL_MANAGE"], findings: [] }
+    expect(accessSummary(t, perms)).toBe("3 permissions, 1 financial, 1 sensitive")
+    expect(accessSummary({ ...t, permissions: ["LEGALPRACTICE_READ"] }, perms)).toBe("1 permission")
+    expect(accessClipboard(t)).toBe("Bookkeeper\nLEGALPRACTICE_READ\nLEGALPRACTICE_TRUST_RECEIVE\nLEGALPRACTICE_WALL_MANAGE")
+    expect(t.permissions[0]).toBe("LEGALPRACTICE_TRUST_RECEIVE")
+  })
+  it("toggles without changing the original", () => {
+    const a = ["x"]; expect(accessToggle(a, "y")).toEqual(["x", "y"]); expect(accessToggle(["x", "y"], "x")).toEqual(["y"]); expect(a).toEqual(["x"])
   })
 })

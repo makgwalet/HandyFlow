@@ -11,7 +11,7 @@ import java.util.*;
 
 /**
  * Pure rules for counting committee votes. Only votes FOR and AGAINST decide the result: abstentions and recusals are recorded but not counted either way. An ordinary
- * resolution is carried by MORE than half of those votes (a tie is not carried); a special resolution needs at least 75% of them. All maths is in whole numbers.
+ * resolution is carried by MORE than half of those votes (a tie is not carried); a special resolution needs at least 75% of them (or the percentage in the committee's recorded charter). All maths is in whole numbers.
  *
  * Who may vote: members who were present at the meeting, were on the committee on the meeting date, and are not observers (the same people who count toward quorum).
  * Voting can close only when every one of them has a recorded vote (a member who simply did not vote is recorded as ABSTAIN), when enough members remain after recusals to
@@ -39,10 +39,13 @@ public final class VotingRules {
         return new Tally(f, a, ab, r);
     }
 
-    public static BallotOutcome outcome(ResolutionType type, Tally t) {
+    public static BallotOutcome outcome(ResolutionType type, Tally t) { return outcome(type, t, CharterRules.DEFAULT_SPECIAL_PERCENT); }
+
+    /** A special resolution needs at least specialPercent of the votes for or against (the charter's figure; 75 when none is recorded). */
+    public static BallotOutcome outcome(ResolutionType type, Tally t, int specialPercent) {
         int cast = t.cast();
         if (cast == 0) return BallotOutcome.NOT_CARRIED;
-        boolean carried = type == ResolutionType.SPECIAL ? t.votesFor() * 4 >= cast * 3 : t.votesFor() * 2 > cast;
+        boolean carried = type == ResolutionType.SPECIAL ? t.votesFor() * 100 >= cast * specialPercent : t.votesFor() * 2 > cast;
         return carried ? BallotOutcome.CARRIED : BallotOutcome.NOT_CARRIED;
     }
 
@@ -62,8 +65,10 @@ public final class VotingRules {
         return eligible.stream().filter(m -> m.getMemberRole() == MemberRole.CHAIR && votes.get(m.getId()) != VoteChoice.RECUSED).findFirst();
     }
 
-    public static String requirement(ResolutionType type) {
-        return type == ResolutionType.SPECIAL ? "Special resolution: at least 75% of the votes for or against must be for"
+    public static String requirement(ResolutionType type) { return requirement(type, CharterRules.DEFAULT_SPECIAL_PERCENT); }
+
+    public static String requirement(ResolutionType type, int specialPercent) {
+        return type == ResolutionType.SPECIAL ? "Special resolution: at least " + specialPercent + "% of the votes for or against must be for"
                 : "Ordinary resolution: more than half of the votes for or against must be for (a tie is not carried)";
     }
 
@@ -77,15 +82,21 @@ public final class VotingRules {
     }
 
     /** What stops voting from being closed. Empty means it can be closed. */
-    public static List<String> closeProblems(List<CommitteeMember> eligible, Map<UUID, VoteChoice> votes, int quorumMin) {
+    public static List<String> closeProblems(List<CommitteeMember> eligible, Map<UUID, VoteChoice> votes, int quorumMin) { return closeProblems(eligible, votes, quorumMin, true); }
+
+    /** quorumAfterRecusal=false is for a charter that does not require a quorum to remain once members recuse themselves. */
+    public static List<String> closeProblems(List<CommitteeMember> eligible, Map<UUID, VoteChoice> votes, int quorumMin, boolean quorumAfterRecusal) { return closeProblems(eligible, votes, quorumMin, quorumAfterRecusal, 0); }
+
+    /** proxyCast = proxy votes for or against already recorded; they count toward "somebody voted for or against" but never toward quorum. */
+    public static List<String> closeProblems(List<CommitteeMember> eligible, Map<UUID, VoteChoice> votes, int quorumMin, boolean quorumAfterRecusal, int proxyCast) {
         List<String> out = new ArrayList<>();
         List<String> missing = eligible.stream().filter(m -> !votes.containsKey(m.getId())).map(CommitteeMember::getMemberName).toList();
         if (!missing.isEmpty()) out.add("A vote is still needed from: " + String.join(", ", missing) + " (record ABSTAIN for a member who did not vote)");
         List<VoteChoice> counted = eligible.stream().map(m -> votes.get(m.getId())).filter(Objects::nonNull).toList();
         Tally t = tally(counted);
         int able = eligible.size() - t.recused();
-        if (able < quorumMin) out.add("Only " + able + " member(s) can vote after recusals, but the committee's quorum is " + quorumMin);
-        if (t.cast() == 0) out.add("Nobody has voted for or against");
+        if (quorumAfterRecusal && able < quorumMin) out.add("Only " + able + " member(s) can vote after recusals, but the committee's quorum is " + quorumMin);
+        if (t.cast() + proxyCast == 0) out.add("Nobody has voted for or against");
         return out;
     }
 }

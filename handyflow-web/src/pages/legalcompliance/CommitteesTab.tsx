@@ -1,7 +1,7 @@
 // src/pages/legalcompliance/CommitteesTab.tsx
 //
 // Governance committees. Endpoints (/api/v1/legalcompliance/committees):
-//   GET / (status) · /summary · /actions?open= · /{id} · /{id}/meetings/{mid} · POST / · PUT /{id} · POST /{id}/charter-review|dissolve
+//   GET / (status) · /summary · /actions?open= · /{id} · /{id}/meetings/{mid} · POST / · PUT /{id} · POST /{id}/charter-review|dissolve · GET|POST /{id}/charter (rules: see CharterRulesPanel)
 //   POST /{id}/members · POST /{id}/members/{memberId}/end · POST /{id}/meetings · PUT /{id}/meetings/{mid} · POST .../cancel|hold|minutes|minutes/approve
 //   POST|PUT|DELETE /{id}/meetings/{mid}/resolutions[/{rid}] · POST .../resolutions/{rid}/complete
 //   GET /{id}/meetings/{mid}/ballots · votes on a decision: see ResolutionVotesModal
@@ -15,6 +15,8 @@ import { input, primaryBtn, ghostBtn, unwrap, one, fmtDate, errMsg } from "./lcH
 import { Modal, Field, Err, Badge } from "./LcUi"
 import { ChevronDown, ChevronUp, Plus } from "lucide-react"
 import ResolutionVotesModal from "./ResolutionVotesModal"
+import { MeetingProxies } from "./ProxyPanels"
+import { CharterRulesPanel } from "./CharterRulesPanel"
 
 const base = "/api/v1/legalcompliance/committees"
 const pretty = (s: string) => s.replace(/_/g, " ").toLowerCase()
@@ -48,6 +50,7 @@ export default function CommitteesTab() {
   const hasManage = usePermission("LEGALCOMPLIANCE_GOVERNANCE_MANAGE")
   const hasAdmin = usePermission("LEGALCOMPLIANCE_ADMIN")
   const canManage = hasManage || hasAdmin
+  const canRecordCharter = usePermission("LEGALCOMPLIANCE_CHARTER_MANAGE") || hasAdmin
 
   const [view, setView] = useState<"committees" | "actions">("committees")
   const [expanded, setExpanded] = useState<string | null>(null)
@@ -151,6 +154,7 @@ export default function CommitteesTab() {
               <div style={{ padding: "0 16px 14px", fontSize: 13, color: "#475569" }}>
                 {c.charter && <p style={{ marginTop: 0, whiteSpace: "pre-wrap" }}>{c.charter}</p>}
                 <p style={{ fontSize: 12 }}>Charter reviewed {c.lastCharterReview ? fmtDate(c.lastCharterReview) : "never"} · reviewed every {c.charterReviewMonths} months{c.charterReviewOverdue ? " · overdue" : ""}{!c.hasChair && live ? " · no chair appointed" : ""}{c.dissolvedReason ? ` · dissolved: ${c.dissolvedReason}` : ""}</p>
+                <CharterRulesPanel committeeId={c.id} canRecord={canRecordCharter} live={live} />
 
                 <div style={{ fontWeight: 700, margin: "8px 0 4px" }}>Members</div>
                 {!d ? <p style={{ fontSize: 12 }}>Loading…</p> : d.members.length === 0 ? <p style={{ fontSize: 12 }}>No members yet.</p> : d.members.map(m => (
@@ -177,6 +181,7 @@ export default function CommitteesTab() {
                       {mo && (
                         <div style={{ padding: "0 10px 10px", fontSize: 13 }}>
                           {mm.agenda && <p style={{ whiteSpace: "pre-wrap", margin: "0 0 6px" }}>{mm.agenda}</p>}
+                          {d && (mm.status === "SCHEDULED" || mm.status === "HELD") && <MeetingProxies committeeId={c.id} meeting={{ id: mm.id, meetingDate: mm.meetingDate, status: mm.status }} members={d.members} canManage={canManage && live} />}
                           {mm.cancelReason && <p style={{ color: "#64748B", margin: "0 0 6px" }}>Cancelled: {mm.cancelReason}</p>}
                           {mm.status === "HELD" && <p style={{ fontSize: 12, margin: "0 0 6px" }}>Present ({mm.presentCount} counting toward quorum of {c.quorumMin}): {mm.attendees.join(", ")}</p>}
                           {mm.status === "HELD" && !mm.quorumMet && <p style={{ fontSize: 12, color: "#991B1B", margin: "0 0 6px" }}>There was no quorum, so no decisions or actions can be recorded for this meeting.</p>}

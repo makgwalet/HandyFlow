@@ -1422,6 +1422,7 @@ export const LEGAL_PRACTICE_SECTIONS: ModuleSections = {
     ] },
     { label: 'Work', sections: [
       { id: 'matters', label: 'Matters', icon: Gavel, anyPermission: ['LEGALPRACTICE_READ', 'LEGALPRACTICE_MANAGE', 'LEGALPRACTICE_ADMIN'] },
+      { id: 'tasks', label: 'Tasks', icon: ListChecks, anyPermission: ['LEGALPRACTICE_READ', 'LEGALPRACTICE_MANAGE', 'LEGALPRACTICE_TASK_WRITE', 'LEGALPRACTICE_WORKFLOW_MANAGE', 'LEGALPRACTICE_ADMIN'] },
       { id: 'litigation', label: 'Litigation', icon: Gavel, anyPermission: ['LEGALPRACTICE_READ', 'LEGALPRACTICE_MANAGE', 'LEGALPRACTICE_LITIGATION_MANAGE', 'LEGALPRACTICE_LITIGATION_CONCLUDE', 'LEGALPRACTICE_ADMIN'] },
       { id: 'documents', label: 'Documents', icon: FileText, anyPermission: ['LEGALPRACTICE_READ', 'LEGALPRACTICE_MANAGE', 'LEGALPRACTICE_DOCUMENT_WRITE', 'LEGALPRACTICE_DOCUMENT_HOLD', 'LEGALPRACTICE_DOCUMENT_OVERRIDE', 'LEGALPRACTICE_ADMIN'] },
       { id: 'clients', label: 'Clients', icon: Users, anyPermission: ['LEGALPRACTICE_READ', 'LEGALPRACTICE_MANAGE', 'LEGALPRACTICE_ADMIN'] },
@@ -1438,8 +1439,10 @@ export const LEGAL_PRACTICE_SECTIONS: ModuleSections = {
 
     ] },
     { label: 'Firm', sections: [
+      { id: 'reports', label: 'Reports', icon: BarChart3, anyPermission: ['LEGALPRACTICE_REPORT_VIEW', 'LEGALPRACTICE_ADMIN'] },
       { id: 'attorneys', label: 'Attorneys', icon: UserCheck, anyPermission: ['LEGALPRACTICE_READ', 'LEGALPRACTICE_MANAGE', 'LEGALPRACTICE_ADMIN'] },
       { id: 'profile', label: 'Firm details', icon: Settings, anyPermission: ['LEGALPRACTICE_READ', 'LEGALPRACTICE_MANAGE', 'LEGALPRACTICE_ADMIN'] },
+      { id: 'access', label: 'Access', icon: ShieldCheck, anyPermission: ['LEGALPRACTICE_ADMIN'] },
     ] },
   ],
 }

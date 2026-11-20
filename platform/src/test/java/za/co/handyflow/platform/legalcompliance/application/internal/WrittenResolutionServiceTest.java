@@ -27,6 +27,7 @@ class WrittenResolutionServiceTest {
     private static final UUID ANNA_U = UUID.randomUUID(), BEN_U = UUID.randomUUID(), OBI_U = UUID.randomUUID(), STRANGER = UUID.randomUUID(), MGR = UUID.randomUUID();
 
     private final List<WrittenResolution> resolutionStore = new ArrayList<>();
+    private final List<CommitteeCharterRules> charterStore = new ArrayList<>();
     private final List<WrittenResponse> responseStore = new ArrayList<>();
     private final List<String> audit = new ArrayList<>();
     private final List<String> sent = new ArrayList<>();
@@ -77,7 +78,8 @@ class WrittenResolutionServiceTest {
         RegulatoryAuditService trail = new RegulatoryAuditService(null) {
             @Override public void record(UUID t, String e, UUID id, String ev, String d, UUID a, String n) { audit.add(ev + "|" + d); }
         };
-        service = new WrittenResolutionService(committees, members, resolutions, responses, notifier, trail);
+        CommitteeCharterRulesRepository charters = proxy(CommitteeCharterRulesRepository.class, (n, a) -> n.equals("history") ? charterStore : null);
+        service = new WrittenResolutionService(committees, members, resolutions, responses, notifier, trail, charters);
     }
 
     private WrittenDetail circulate(ApprovalThreshold th) {
@@ -257,5 +259,44 @@ class WrittenResolutionServiceTest {
         assertTrue(audit.get(1).contains("(1 of 3 answered)") && audit.get(2).contains("(2 of 3 answered)"));
         assertTrue(audit.get(4).contains("CARRIED (2 for, 1 against, 0 abstained, 0 no response of 3)"));
         for (String line : audit) for (String n : new String[]{"Anna", "Ben", "Cara"}) assertFalse(line.contains(n), line);
+    }
+
+    // ── Chunk 29: charter rules ──
+
+    private void charter(WrittenMode mode) {
+        charterStore.add(CommitteeCharterRules.record(T, committee.getId(), charterStore.size() + 1, null, TODAY.minusDays(30), TODAY.minusDays(1), true, mode, true, 75, "Adopted by the board", "me"));
+    }
+
+    @Test @DisplayName("With no charter either threshold may be circulated (as before)")
+    void noCharterAllowsBoth() {
+        circulate(ApprovalThreshold.UNANIMOUS);
+        assertEquals(1, resolutionStore.size());
+    }
+
+    @Test @DisplayName("A charter that does not allow written resolutions refuses to circulate one, and nothing is saved or sent")
+    void charterNotAllowed() {
+        charter(WrittenMode.NOT_ALLOWED);
+        HandyFlowException e = assertThrows(HandyFlowException.class, () -> circulate(ApprovalThreshold.UNANIMOUS));
+        assertEquals(HttpStatus.CONFLICT, e.getStatus());
+        assertTrue(e.getMessage().contains("does not allow"));
+        assertTrue(resolutionStore.isEmpty());
+        assertTrue(sent.isEmpty());
+    }
+
+    @Test @DisplayName("A charter that requires unanimity refuses a majority threshold and accepts a unanimous one")
+    void charterUnanimousOnly() {
+        charter(WrittenMode.UNANIMOUS);
+        assertThrows(HandyFlowException.class, () -> circulate(ApprovalThreshold.MAJORITY_OF_ALL));
+        assertTrue(resolutionStore.isEmpty());
+        circulate(ApprovalThreshold.UNANIMOUS);
+        assertEquals(1, resolutionStore.size());
+    }
+
+    @Test @DisplayName("A charter that allows a majority of all refuses a unanimous threshold")
+    void charterMajorityOnly() {
+        charter(WrittenMode.MAJORITY_OF_ALL);
+        assertThrows(HandyFlowException.class, () -> circulate(ApprovalThreshold.UNANIMOUS));
+        circulate(ApprovalThreshold.MAJORITY_OF_ALL);
+        assertEquals(1, resolutionStore.size());
     }
 }

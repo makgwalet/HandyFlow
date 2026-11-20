@@ -884,3 +884,152 @@ export const litEventText = (e: Pick<LitEvent, "eventType" | "actorName" | "deta
 /** Days from today to a date, for "in 3 days" / "2 days ago" on the court roll. */
 export const litDaysAway = (date: string, today: string) => Math.round((Date.parse(date + "T00:00:00Z") - Date.parse(today + "T00:00:00Z")) / 86400000)
 export const litDaysText = (n: number) => (n === 0 ? "Today" : n === 1 ? "Tomorrow" : n === -1 ? "Yesterday" : n > 0 ? `In ${n} days` : `${-n} days ago`)
+
+// ---- tasks and workflows ---------------------------------------------------------------------------------------------------
+export const TASK_PRIORITIES = [["LOW", "Low"], ["NORMAL", "Normal"], ["HIGH", "High"], ["URGENT", "Urgent"]] as const
+export const TASK_STATUSES = [["OPEN", "Open"], ["IN_PROGRESS", "In progress"], ["DONE", "Done"], ["CANCELLED", "Cancelled"]] as const
+export const TASK_ASSIGN_TO = [["STARTER", "Whoever applies the workflow"], ["NONE", "Nobody (assign later)"]] as const
+export const TASK_MIN_REASON = 10, TASK_MAX_STEPS = 30, TASK_MAX_OFFSET = 730
+
+export interface TaskSummary { id: string; matterId: string; matterLabel: string; clientId: string; title: string; priority: string; status: string; assigneeId: string | null; assigneeName: string | null; dueDate: string | null; overdue: boolean; workflowRunId: string | null; updatedAt: string }
+export interface TaskEvent { eventType: string; actorName: string | null; detail: string | null; occurredAt: string }
+export interface TaskDetail { task: TaskSummary; description: string | null; completedAt: string | null; completedByName: string | null; cancelReason: string | null; createdByName: string | null; createdAt: string; events: TaskEvent[] }
+export interface WorkflowStep { stepNo: number; title: string; description: string | null; priority: string; offsetDays: number; assignTo: string }
+export interface WorkflowSummary { id: string; name: string; description: string | null; matterType: string | null; active: boolean; steps: number; updatedAt: string }
+export interface WorkflowDetail { template: WorkflowSummary; createdByName: string | null; steps: WorkflowStep[] }
+export interface WorkflowRun { id: string; templateId: string; templateName: string; startDate: string; tasksCreated: number; appliedByName: string | null; appliedAt: string }
+export interface ApplyResult { run: WorkflowRun; tasks: TaskSummary[]; warnings: string[] }
+
+export interface TaskForm { matterId: string; title: string; description: string; priority: string; dueDate: string; assigneeId: string }
+export const emptyTask = (matterId = ""): TaskForm => ({ matterId, title: "", description: "", priority: "NORMAL", dueDate: "", assigneeId: "" })
+export const taskToForm = (t: TaskDetail): TaskForm => ({ matterId: t.task.matterId, title: t.task.title, description: t.description ?? "", priority: t.task.priority, dueDate: t.task.dueDate ?? "", assigneeId: t.task.assigneeId ?? "" })
+
+export function taskProblem(f: TaskForm, creating: boolean): string | null {
+  if (creating && !f.matterId) return "Choose the matter"
+  if (f.title.trim().length < 2) return "Give the task a title"
+  if (f.title.trim().length > 200) return "Keep the title to 200 characters"
+  if (f.description.trim().length > 2000) return "Keep the description to 2000 characters"
+  return null
+}
+export const taskRequest = (f: TaskForm, creating: boolean, assigneeName: string | null) => ({
+  ...(creating ? { matterId: f.matterId, assigneeId: f.assigneeId || null, assigneeName: f.assigneeId ? assigneeName : null } : {}),
+  title: f.title.trim(), description: f.description.trim() || null, priority: f.priority, dueDate: f.dueDate || null,
+})
+export const taskReasonProblem = (reason: string, what: string): string | null => (reason.trim().length < TASK_MIN_REASON ? `Say ${what}, in at least ${TASK_MIN_REASON} characters` : null)
+
+/** What can be done to a task, from its status and the person's permission. A cancelled task is final; a done one can only be reopened. */
+export function taskActions(status: string, write: boolean) {
+  const live = status === "OPEN" || status === "IN_PROGRESS"
+  return { canEdit: write && live, canAssign: write && live, canStart: write && status === "OPEN", canStop: write && status === "IN_PROGRESS", canComplete: write && live, canReopen: write && status === "DONE", canCancel: write && live }
+}
+export const taskTone = (status: string, overdue: boolean): Tone => (overdue ? "danger" : status === "DONE" ? "success" : status === "IN_PROGRESS" ? "info" : status === "CANCELLED" ? "neutral" : "warning")
+export const taskStatusLabel = (s: string) => TASK_STATUSES.find(x => x[0] === s)?.[1] ?? s
+export const taskPriorityLabel = (p: string) => TASK_PRIORITIES.find(x => x[0] === p)?.[1] ?? p
+export const taskPriorityTone = (p: string): Tone => (p === "URGENT" ? "danger" : p === "HIGH" ? "warning" : "neutral")
+/** "Overdue by 3 days", "Due today", "Due in 2 days" — or nothing for a finished task. */
+export function taskDueText(due: string | null, status: string, today: string): string {
+  if (!due || status === "DONE" || status === "CANCELLED") return due ? "" : "No due date"
+  const n = Math.round((Date.parse(due + "T00:00:00Z") - Date.parse(today + "T00:00:00Z")) / 86400000)
+  return n === 0 ? "Due today" : n === 1 ? "Due tomorrow" : n > 1 ? `Due in ${n} days` : n === -1 ? "Overdue by 1 day" : `Overdue by ${-n} days`
+}
+const TASK_EVENT_TEXT: Record<string, string> = { CREATED: "added the task", EDITED: "changed the task", REASSIGNED: "reassigned the task", STARTED: "started the task", STOPPED: "put the task back to open", COMPLETED: "completed the task", REOPENED: "reopened the task", CANCELLED: "cancelled the task" }
+export const taskEventText = (e: Pick<TaskEvent, "eventType" | "actorName" | "detail">) => `${e.actorName ?? "Someone"} ${TASK_EVENT_TEXT[e.eventType] ?? e.eventType.toLowerCase()}${e.detail ? `: ${e.detail}` : ""}`
+
+export interface StepForm { title: string; description: string; priority: string; offsetDays: string; assignTo: string }
+export interface WorkflowForm { name: string; description: string; matterType: string; steps: StepForm[] }
+export const emptyStep = (): StepForm => ({ title: "", description: "", priority: "NORMAL", offsetDays: "0", assignTo: "STARTER" })
+export const emptyWorkflow = (): WorkflowForm => ({ name: "", description: "", matterType: "", steps: [emptyStep()] })
+export const workflowToForm = (w: WorkflowDetail): WorkflowForm => ({
+  name: w.template.name, description: w.template.description ?? "", matterType: w.template.matterType ?? "",
+  steps: w.steps.map(s => ({ title: s.title, description: s.description ?? "", priority: s.priority, offsetDays: String(s.offsetDays), assignTo: s.assignTo })),
+})
+export function workflowProblem(f: WorkflowForm): string | null {
+  if (f.name.trim().length < 2) return "Give the workflow a name"
+  if (f.name.trim().length > 120) return "Keep the name to 120 characters"
+  if (f.steps.length === 0) return "Add at least one step"
+  if (f.steps.length > TASK_MAX_STEPS) return `A workflow can have up to ${TASK_MAX_STEPS} steps`
+  for (let i = 0; i < f.steps.length; i++) {
+    const s = f.steps[i], n = `Step ${i + 1}: `
+    if (s.title.trim().length < 2) return n + "give it a title"
+    if (s.title.trim().length > 200) return n + "keep the title to 200 characters"
+    const o = Number(s.offsetDays)
+    if (s.offsetDays.trim() === "" || !Number.isInteger(o) || o < 0 || o > TASK_MAX_OFFSET) return n + `the due date must be a whole number of days from 0 to ${TASK_MAX_OFFSET} after the start`
+  }
+  return null
+}
+export const workflowRequest = (f: WorkflowForm) => ({
+  name: f.name.trim(), description: f.description.trim() || null, matterType: f.matterType.trim() || null,
+  steps: f.steps.map(s => ({ title: s.title.trim(), description: s.description.trim() || null, priority: s.priority, offsetDays: Number(s.offsetDays), assignTo: s.assignTo })),
+})
+export const moveStep = <T,>(list: T[], from: number, to: number): T[] => {
+  if (to < 0 || to >= list.length || from === to) return list
+  const out = list.slice(); const [x] = out.splice(from, 1); out.splice(to, 0, x); return out
+}
+export const applyProblem = (matterId: string, start: string, today: string): string | null => {
+  if (!matterId) return "Choose the matter"
+  if (!start) return "Choose the start date"
+  const days = Math.round((Date.parse(start + "T00:00:00Z") - Date.parse(today + "T00:00:00Z")) / 86400000)
+  return Math.abs(days) > 365 ? "The start date must be within a year of today" : null
+}
+/** The due date each step would get, so the person sees it before applying. */
+export const stepDue = (start: string, offset: number): string => { const d = new Date(start + "T12:00:00"); d.setDate(d.getDate() + offset); return iso(d) }
+
+// ---- firm reports ----------------------------------------------------------------------------------------------------------
+export const REPORTS = [["matters", "Matters"], ["unbilled", "Unbilled work"], ["debtors", "Debtors"], ["billing", "Billing"], ["trust", "Trust balances"]] as const
+export type ReportKey = (typeof REPORTS)[number][0]
+export interface MattersReport { rows: { status: string; matterType: string; count: number }[]; total: number; open: number; hidden: boolean }
+export interface UnbilledReport { rows: { matterId: string; matterLabel: string; clientName: string; hours: number; timeValue: number; disbursements: number; total: number }[]; hours: number; timeValue: number; disbursements: number; total: number; truncated: boolean; hidden: boolean }
+export interface DebtorsReport { rows: { invoiceId: string; invoiceNumber: string; clientName: string; matterLabel: string | null; issueDate: string; dueDate: string | null; total: number; paid: number; outstanding: number; daysOverdue: number; bucket: string }[]; buckets: { key: string; label: string; amount: number; count: number }[]; outstanding: number; overdue: number; truncated: boolean; hidden: boolean }
+export interface BillingReport { from: string; to: string; months: { month: string; invoices: number; invoiced: number; paid: number; writtenOff: number }[]; invoiced: number; vat: number; paid: number; writtenOff: number; collectedPercent: number; hidden: boolean }
+export interface TrustReport { asAt: string; rows: { clientId: string; clientName: string; balance: number; lastMovement: string | null }[]; total: number; overdrawn: number; hidden: boolean }
+
+/** The first day of the current year, for the billing report's default range. */
+export const reportYearStart = (today: string) => `${today.slice(0, 4)}-01-01`
+export function reportRangeProblem(from: string, to: string, today: string): string | null {
+  if (!from || !to) return "Choose a start date and an end date"
+  if (to < from) return "The end date cannot be before the start date"
+  if (to > today) return "The end date cannot be in the future"
+  if (Date.parse(to + "T00:00:00Z") - Date.parse(from + "T00:00:00Z") > 3660 * 86400000) return "Choose a range of up to ten years"
+  return null
+}
+export const reportAsAtProblem = (asAt: string, today: string): string | null => (!asAt ? "Choose a date" : asAt > today ? "The date cannot be in the future" : null)
+export const reportUrl = (key: ReportKey, params: { from?: string; to?: string; asAt?: string }, csv = false) => ({
+  path: `${csv ? `${key}.csv` : key}`,
+  params: key === "billing" ? { from: params.from, to: params.to } : key === "trust" ? { asAt: params.asAt || undefined } : {},
+})
+export const bucketTone = (key: string): Tone => (key === "CURRENT" ? "success" : key === "D1_30" ? "info" : key === "D31_60" ? "warning" : "danger")
+export const matterStatusText = (s: string) => ({ OPEN: "Open", ON_HOLD: "On hold", CLOSED: "Closed", ARCHIVED: "Archived" } as Record<string, string>)[s] ?? s
+export const reportMonthText = (ym: string) => { const [y, m] = ym.split("-"); return `${MONTHS[Number(m) - 1] ?? m} ${y}` }
+/** Rows of the matters report as a status by kind grid: the kinds that appear, the statuses that appear, and the counts. */
+export function matterGrid(rows: MattersReport["rows"]) {
+  const kinds = [...new Set(rows.map(r => r.matterType))].sort(), statuses = ["OPEN", "ON_HOLD", "CLOSED", "ARCHIVED"].filter(s => rows.some(r => r.status === s))
+  return { kinds, statuses, cell: (s: string, k: string) => rows.find(r => r.status === s && r.matterType === k)?.count ?? 0 }
+}
+export const reportWallNote = "Some matters or clients are left out because of ethical walls, so these figures are not the whole firm's."
+
+// ---- access: permissions, role templates and checks ------------------------------------------------------------------------
+export interface AccessPermission { code: string; group: string; kind: string; level: string; secondPerson: boolean; description: string }
+export interface AccessFinding { severity: string; code: string; message: string }
+export interface AccessTemplate { key: string; name: string; description: string; permissions: string[]; findings: AccessFinding[] }
+export interface AccessCatalogue { permissions: AccessPermission[]; templates: AccessTemplate[] }
+
+export const accessLevelTone = (level: string): Tone => (level === "FINANCIAL" ? "danger" : level === "SENSITIVE" ? "warning" : "neutral")
+export const accessLevelText = (level: string) => (level === "FINANCIAL" ? "Financial" : level === "SENSITIVE" ? "Sensitive" : "Normal")
+export const accessFindingTone = (severity: string): Tone => (severity === "WARNING" ? "warning" : "info")
+/** The permissions grouped in the order the groups first appear. */
+export function accessGroups(perms: AccessPermission[]): { group: string; items: AccessPermission[] }[] {
+  const out: { group: string; items: AccessPermission[] }[] = []
+  for (const p of perms) { const g = out.find(x => x.group === p.group); if (g) g.items.push(p); else out.push({ group: p.group, items: [p] }) }
+  return out
+}
+/** Plain text of a template's permissions, one per line, for pasting into the Roles screen's search or a ticket. */
+export const accessClipboard = (t: Pick<AccessTemplate, "name" | "permissions">) => `${t.name}\n${[...t.permissions].sort().join("\n")}`
+export const accessToggle = (set: string[], code: string): string[] => (set.includes(code) ? set.filter(c => c !== code) : [...set, code])
+/** What the template gives, counted by how sensitive it is, e.g. "9 permissions, 2 financial". */
+export function accessSummary(t: AccessTemplate, perms: AccessPermission[]): string {
+  const by = new Map(perms.map(p => [p.code, p])), fin = t.permissions.filter(c => by.get(c)?.level === "FINANCIAL").length, sens = t.permissions.filter(c => by.get(c)?.level === "SENSITIVE").length
+  const parts = [`${t.permissions.length} ${t.permissions.length === 1 ? "permission" : "permissions"}`]
+  if (fin) parts.push(`${fin} financial`)
+  if (sens) parts.push(`${sens} sensitive`)
+  return parts.join(", ")
+}

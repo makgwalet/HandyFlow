@@ -38,6 +38,7 @@ public class WrittenResolutionService {
     private final WrittenResponseRepository responses;
     private final WrittenResolutionNotifier notifier;
     private final RegulatoryAuditService trail;
+    private final CommitteeCharterRulesRepository charters;
 
     // ── Managers ──
 
@@ -45,6 +46,8 @@ public class WrittenResolutionService {
     public WrittenDetail circulate(TenantId t, CirculateRequest r, UUID uid, String uname) {
         Committee committee = committees.findForTenant(t, r.committeeId()).orElseThrow(() -> new ResourceNotFoundException("Committee", r.committeeId().toString()));
         if (committee.getStatus() != CommitteeStatus.ACTIVE) throw new HandyFlowException("A dissolved committee cannot pass written resolutions", HttpStatus.CONFLICT, "INVALID_STATE");
+        String charterProblem = CharterRules.writtenProblem(CharterRules.current(charters.history(t, committee.getId()), today()), r.threshold());
+        if (charterProblem != null) throw new HandyFlowException(charterProblem, HttpStatus.CONFLICT, "INVALID_STATE");
         List<CommitteeMember> voters = members.findForCommittee(t, committee.getId()).stream().filter(CommitteeMember::countsForQuorum).toList();
         WrittenResolution w = guarded(() -> WrittenResolution.circulate(t, committee.getId(), String.format("WRS-%05d", resolutions.nextRef()), r.title(), r.text(), r.threshold(), r.deadline(),
                 voters.size(), committee.getQuorumMin(), today(), uname));

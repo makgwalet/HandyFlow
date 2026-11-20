@@ -1,222 +1,213 @@
 // src/pages/legalcompliance/LegalComplianceDashboard.tsx
 //
-// Aggregates across all 4 registers. Every number here is computed
-// client-side from the same list endpoints the tabs themselves use — there
-// is no dedicated dashboard/summary endpoint on the backend for this
-// module (confirmed: LegalComplianceCalendarController is the only
-// cross-aggregate endpoint, and it only aggregates dates, not counts).
+// The Legal & Compliance dashboard. Three reads, all existing endpoints:
+//  - GET /api/v1/legalcompliance/executive   (counts of obligations, risks and findings; "attention" items)
+//  - GET /api/v1/legalcompliance/calendar?days=62   (deadlines and the month calendar)
+//  - GET /api/v1/legalcompliance/reports/AUDIT_TRAIL   (recent activity; administrators only, the report is admin-only)
+// The donut is the split of obligations by status, not a composite score. A percentage shows "—" when there is nothing to measure. All the arithmetic is in dashboardLogic.ts.
+import { useMemo } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
+import { usePermission } from "../../hooks/usePermission"
+import { useAuthStore } from "../../store/auth.store"
+import { one, fmtDate, fmtDateTime } from "./lcHelpers"
+import { Badge } from "./LcUi"
+import { ArrowRight, CheckCircle, AlertTriangle } from "lucide-react"
 import {
-  ClipboardList, Gavel, Lock, FileSearch, AlertTriangle, CheckCircle,
-  ArrowRight, ShieldAlert, Globe2,
-} from "lucide-react"
+  statCards, donut, arcs, riskBars, deadlines, monthGrid, activityRows, greeting, isoDay, sourceColour, SOURCE_COLOURS, pctText,
+  type Metrics, type CalendarEntry, type StatCard,
+} from "./dashboardLogic"
 
-const unwrap = (r: any) => { const p = r.data?.data ?? r.data; return p?.content ?? p ?? [] }
-const fmtDate = (d: string | null) => d ? new Date(d).toLocaleDateString("en-ZA", { day: "numeric", month: "short", year: "numeric" }) : "—"
-const fmtR = (n: number | null | undefined) => n != null ? `R ${Number(n).toLocaleString("en-ZA", { minimumFractionDigits: 2 })}` : "—"
-const daysUntil = (d: string) => Math.ceil((new Date(d).getTime() - Date.now()) / 86400000)
+interface Overview { generatedAt: string; metrics: Metrics; attention: { key: string; severity: "CRITICAL" | "WARNING"; text: string; count: number; tab: string }[] }
 
-const SOURCE_CFG: Record<string, { color: string; bg: string; label: string }> = {
-  OBLIGATION:       { color: "#4338CA", bg: "#E0E7FF", label: "Obligation" },
-  LITIGATION:       { color: "#BE123C", bg: "#FFE4E6", label: "Litigation" },
-  CONTRACT_RENEWAL: { color: "#0D9488", bg: "#F0FDFA", label: "Contract"   },
-  REGULATORY_CHANGE:{ color: "#B45309", bg: "#FFFBEB", label: "Reg. change" },
+const TONES: Record<StatCard["tone"], { color: string; bar: string }> = {
+  neutral: { color: "#0F172A", bar: "#4338CA" }, good: { color: "#166534", bar: "#16A34A" }, warn: { color: "#B45309", bar: "#F59E0B" }, bad: { color: "#B91C1C", bar: "#DC2626" },
 }
+const DEADLINE_BADGE = { bad: { color: "#991B1B", bg: "#FEE2E2" }, warn: { color: "#92400E", bg: "#FEF3C7" }, info: { color: "#3730A3", bg: "#E0E7FF" }, neutral: { color: "#475569", bg: "#E2E8F0" } } as const
+const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"]
+const card: React.CSSProperties = { background: "#fff", border: "1px solid #E2E8F0", borderRadius: 14, padding: 18, minWidth: 0 }
+const heading: React.CSSProperties = { fontSize: 14, fontWeight: 800, color: "#0F172A", margin: 0 }
+const link: React.CSSProperties = { display: "flex", alignItems: "center", gap: 4, fontSize: 12, color: "#4338CA", background: "none", border: "none", cursor: "pointer", fontWeight: 600, padding: 0 }
 
-const OPEN_LITIGATION_STATUSES = new Set(["OPEN", "IN_PROGRESS"])
-const OPEN_DSAR_STATUSES = new Set(["RECEIVED", "IN_PROGRESS"])
+export default function LegalComplianceDashboard({ onNavigate }: { onNavigate: (tab: string) => void }) {
+  const isAdmin = usePermission("LEGALCOMPLIANCE_ADMIN")
+  const firstName = useAuthStore(s => s.user?.firstName)
+  const now = useMemo(() => new Date(), [])
+  const todayIso = isoDay(now)
 
-type Tab = string
+  const { data: ov, isLoading, isError } = useQuery<Overview>({ queryKey: ["lc-exec", "overview"], queryFn: async () => one(await apiClient.get("/api/v1/legalcompliance/executive")) })
+  const { data: entries = [] } = useQuery<CalendarEntry[]>({ queryKey: ["lc-calendar-62"], queryFn: async () => one(await apiClient.get("/api/v1/legalcompliance/calendar?days=62")) ?? [] })
+  const { data: trail } = useQuery<{ rows: string[][] }>({ queryKey: ["lc-dashboard-activity"], enabled: isAdmin, staleTime: 60_000, queryFn: async () => one(await apiClient.get("/api/v1/legalcompliance/reports/AUDIT_TRAIL")) })
 
-export default function LegalComplianceDashboard({ onNavigate }: { onNavigate: (t: Tab) => void }) {
-  const { data: obligations = [] } = useQuery<any[]>({
-    queryKey: ["lc-obligations-all"],
-    queryFn: async () => unwrap(await apiClient.get("/api/v1/legalcompliance/obligations?size=200")),
-  })
-
-  const { data: matters = [] } = useQuery<any[]>({
-    queryKey: ["lc-matters-all"],
-    queryFn: async () => unwrap(await apiClient.get("/api/v1/legalcompliance/matters?size=200")),
-  })
-
-  const { data: popiaActivities = [] } = useQuery<any[]>({
-    queryKey: ["lc-popia-all"],
-    queryFn: async () => unwrap(await apiClient.get("/api/v1/legalcompliance/popia-activities")),
-  })
-
-  const { data: dsarRequests = [] } = useQuery<any[]>({
-    queryKey: ["lc-dsar-all"],
-    queryFn: async () => unwrap(await apiClient.get("/api/v1/legalcompliance/dsar-requests?size=200")),
-  })
-
-  const { data: calendar = [] } = useQuery<any[]>({
-    queryKey: ["lc-calendar-30"],
-    queryFn: async () => unwrap(await apiClient.get("/api/v1/legalcompliance/calendar?days=30")),
-  })
-
-  const obs = obligations as any[]
-  const nonCompliant = obs.filter(o => o.status === "NON_COMPLIANT")
-  const overdue = obs.filter(o => o.status === "OVERDUE")
-  const dueSoon = obs.filter(o => o.status === "DUE_SOON")
-
-  const mts = matters as any[]
-  const openMatters = mts.filter(m => OPEN_LITIGATION_STATUSES.has(m.status))
-  const totalExposure = openMatters.reduce((s, m) => s + (m.estimatedExposure ?? 0), 0)
-
-  const activities = popiaActivities as any[]
-  const activeActivities = activities.filter(a => a.active)
-  const crossBorder = activeActivities.filter(a => a.crossBorderTransfer)
-
-  const dsars = dsarRequests as any[]
-  const openDsars = dsars.filter(d => OPEN_DSAR_STATUSES.has(d.status))
-  const overdueDsars = dsars.filter(d => d.overdue)
-
-  const kpis = [
-    {
-      label: "Non-compliant / overdue", value: nonCompliant.length + overdue.length,
-      color: (nonCompliant.length + overdue.length) > 0 ? "#DC2626" : "#166534",
-      bg: (nonCompliant.length + overdue.length) > 0 ? "#FEF2F2" : "#DCFCE7",
-      icon: ShieldAlert, tab: "obligations" as Tab,
-    },
-    {
-      label: "Open litigation matters", value: openMatters.length,
-      color: "#BE123C", bg: "#FFE4E6", icon: Gavel, tab: "litigation" as Tab,
-    },
-    {
-      label: "Cross-border transfers", value: crossBorder.length,
-      color: crossBorder.length > 0 ? "#D97706" : "#166534",
-      bg: crossBorder.length > 0 ? "#FFFBEB" : "#DCFCE7",
-      icon: Globe2, tab: "popia" as Tab,
-    },
-    {
-      label: "DSAR overdue", value: overdueDsars.length,
-      color: overdueDsars.length > 0 ? "#DC2626" : "#166534",
-      bg: overdueDsars.length > 0 ? "#FEF2F2" : "#DCFCE7",
-      icon: FileSearch, tab: "dsar" as Tab,
-    },
-  ]
-
-  const upcoming = (calendar as any[]).slice(0, 8)
+  const cards = statCards(ov?.metrics)
+  const split = donut(ov?.metrics)
+  const ring = arcs(split)
+  const bars = riskBars(ov?.metrics)
+  const upcoming = deadlines(entries, todayIso, 5)
+  const weeks = monthGrid(now.getFullYear(), now.getMonth(), entries, todayIso)
+  const activity = activityRows(trail?.rows, 6)
+  const attention = ov?.attention ?? []
 
   return (
     <div>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 14, marginBottom: 28 }}>
-        {kpis.map(k => (
-          <div key={k.label} onClick={() => onNavigate(k.tab)}
-            style={{ background: k.bg, borderRadius: 12, padding: "18px 20px", cursor: "pointer" }}
-            onMouseEnter={e => (e.currentTarget.style.boxShadow = "0 4px 16px rgba(0,0,0,0.08)")}
-            onMouseLeave={e => (e.currentTarget.style.boxShadow = "none")}>
-            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 10 }}>
-              <div style={{ fontSize: 11, fontWeight: 700, color: k.color, textTransform: "uppercase" as const }}>{k.label}</div>
-              <k.icon size={16} color={k.color} />
-            </div>
-            <div style={{ fontSize: 28, fontWeight: 800, color: k.color }}>{k.value}</div>
-          </div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", gap: 12, flexWrap: "wrap", marginBottom: 18 }}>
+        <div>
+          <h2 style={{ fontSize: 22, fontWeight: 800, color: "#0F172A", margin: 0 }}>{greeting(now.getHours())}{firstName ? `, ${firstName}` : ""}</h2>
+          <p style={{ fontSize: 13, color: "#64748B", margin: "4px 0 0" }}>Here’s your compliance overview for today.</p>
+        </div>
+        <div style={{ textAlign: "right", fontSize: 12, color: "#64748B" }}>
+          <div style={{ fontWeight: 700, color: "#334155" }}>{fmtDate(todayIso)}</div>
+          {ov?.generatedAt && <div>Last updated {fmtDateTime(ov.generatedAt)}</div>}
+        </div>
+      </div>
+
+      {isError && <p style={{ color: "#B91C1C", fontSize: 13 }}>Could not load the overview. Try again in a moment.</p>}
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))", gap: 12, marginBottom: 16 }}>
+        {cards.map(c => (
+          <button key={c.key} onClick={() => onNavigate(c.tab)} aria-label={`${c.label}: ${c.value}. ${c.note}`}
+            style={{ ...card, textAlign: "left", cursor: "pointer", borderLeft: `4px solid ${TONES[c.tone].bar}`, opacity: isLoading ? 0.6 : 1 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: "#64748B", textTransform: "uppercase", letterSpacing: "0.04em" }}>{c.label}</div>
+            <div style={{ fontSize: 30, fontWeight: 800, color: TONES[c.tone].color, margin: "6px 0 2px" }}>{c.value}</div>
+            <div style={{ fontSize: 12, color: "#64748B" }}>{c.note}</div>
+          </button>
         ))}
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 320px", gap: 18 }}>
-        <div>
-          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 14 }}>
-            <span style={{ fontSize: 14, fontWeight: 700, color: "#0F172A" }}>Upcoming (next 30 days)</span>
-            <button onClick={() => onNavigate("calendar")} style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 12, color: "#4338CA", background: "none", border: "none", cursor: "pointer", fontWeight: 600 }}>
-              Full calendar <ArrowRight size={13} />
-            </button>
-          </div>
-
-          {upcoming.length === 0 ? (
-            <div style={{ textAlign: "center", padding: "40px 20px", border: "1px dashed #E2E8F0", borderRadius: 12, color: "#94A3B8" }}>
-              <CheckCircle size={32} color="#CBD5E1" style={{ marginBottom: 10 }} />
-              <div style={{ fontWeight: 600, color: "#475569" }}>Nothing due in the next 30 days</div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 12, marginBottom: 12 }}>
+        <section style={card} aria-label="Compliance status">
+          <h3 style={heading}>Compliance status</h3>
+          {split.total === 0 ? <p style={{ fontSize: 13, color: "#64748B" }}>No obligations recorded yet.</p> : (
+            <div style={{ display: "flex", alignItems: "center", gap: 18, marginTop: 12, flexWrap: "wrap" }}>
+              <svg viewBox="0 0 42 42" width={130} height={130} role="img" aria-label={`${pctText(split.compliantPercent)} of ${split.total} obligations are compliant`}>
+                <circle cx={21} cy={21} r={15.9155} fill="none" stroke="#F1F5F9" strokeWidth={5} />
+                {ring.map(a => <circle key={a.key} cx={21} cy={21} r={15.9155} fill="none" stroke={a.color} strokeWidth={5} pathLength={100} strokeDasharray={`${a.dash} ${100 - a.dash}`} strokeDashoffset={a.offset} transform="rotate(-90 21 21)" />)}
+                <text x={21} y={21.5} textAnchor="middle" fontSize={8} fontWeight={800} fill="#0F172A">{pctText(split.compliantPercent)}</text>
+                <text x={21} y={27} textAnchor="middle" fontSize={3.4} fill="#64748B">compliant</text>
+              </svg>
+              <ul style={{ listStyle: "none", margin: 0, padding: 0, fontSize: 13, display: "flex", flexDirection: "column", gap: 6 }}>
+                {split.segments.filter(s => s.count > 0 || s.key !== "other").map(s => (
+                  <li key={s.key} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <span aria-hidden style={{ width: 10, height: 10, borderRadius: 3, background: s.color, display: "inline-block" }} />
+                    <span style={{ color: "#475569", minWidth: 70 }}>{s.label}</span><strong>{s.count}</strong>
+                  </li>
+                ))}
+              </ul>
             </div>
+          )}
+        </section>
+
+        <section style={card} aria-label="Upcoming deadlines">
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <h3 style={heading}>Upcoming deadlines</h3>
+            <button style={link} onClick={() => onNavigate("calendar")}>View all <ArrowRight size={12} /></button>
+          </div>
+          {upcoming.length === 0 ? (
+            <div style={{ textAlign: "center", padding: "24px 0", color: "#94A3B8" }}><CheckCircle size={26} color="#CBD5E1" /><div style={{ fontSize: 13, marginTop: 6 }}>Nothing due soon</div></div>
           ) : (
-            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              {upcoming.map((e: any, i: number) => {
-                const cfg = SOURCE_CFG[e.sourceType] ?? SOURCE_CFG.OBLIGATION
-                const days = daysUntil(e.date)
+            <ul style={{ listStyle: "none", margin: "10px 0 0", padding: 0, display: "flex", flexDirection: "column", gap: 10 }}>
+              {upcoming.map(d => {
+                const b = DEADLINE_BADGE[d.tone]
                 return (
-                  <div key={`${e.sourceType}-${e.sourceId}-${i}`} style={{ display: "flex", alignItems: "center", gap: 14, padding: "12px 16px", border: "1px solid #E2E8F0", borderRadius: 10, background: "#fff" }}>
-                    <div style={{ padding: "3px 9px", borderRadius: 20, background: cfg.bg, color: cfg.color, fontSize: 10, fontWeight: 700, flexShrink: 0 }}>{cfg.label}</div>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontWeight: 700, fontSize: 13, color: "#0F172A" }}>{e.title}</div>
-                      <div style={{ fontSize: 12, color: "#64748B" }}>{e.detail}</div>
+                  <li key={d.key} style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center" }}>
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: "#0F172A", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{d.title}</div>
+                      <div style={{ fontSize: 11, color: "#64748B" }}>{sourceColour(d.sourceType).label} · {fmtDate(d.date)}</div>
                     </div>
-                    <div style={{ textAlign: "right" as const, flexShrink: 0 }}>
-                      <div style={{ fontWeight: 700, fontSize: 12, color: days < 0 ? "#DC2626" : days <= 7 ? "#D97706" : "#0F172A" }}>
-                        {days < 0 ? `${Math.abs(days)}d overdue` : days === 0 ? "Today" : `${days}d`}
-                      </div>
-                      <div style={{ fontSize: 11, color: "#94A3B8" }}>{fmtDate(e.date)}</div>
-                    </div>
-                  </div>
+                    <Badge text={d.label} color={b.color} bg={b.bg} />
+                  </li>
                 )
               })}
-            </div>
+            </ul>
           )}
+        </section>
 
-          {(nonCompliant.length > 0 || overdue.length > 0) && (
-            <div style={{ marginTop: 24 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 14 }}>
-                <AlertTriangle size={15} color="#DC2626" />
-                <span style={{ fontSize: 14, fontWeight: 700, color: "#0F172A" }}>Needs attention</span>
-              </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                {[...nonCompliant, ...overdue].slice(0, 6).map(o => (
-                  <div key={o.id} onClick={() => onNavigate("obligations")} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 16px", border: "1px solid #FECACA", borderRadius: 10, background: "#FEF2F2", cursor: "pointer" }}>
-                    <div>
-                      <div style={{ fontWeight: 700, fontSize: 13, color: "#0F172A" }}>{o.title}</div>
-                      <div style={{ fontSize: 11, color: "#94A3B8" }}>{o.category} · Review date {fmtDate(o.reviewDate)}</div>
-                    </div>
-                    <span style={{ fontSize: 10, fontWeight: 700, color: "#DC2626", background: "#FFF", padding: "3px 9px", borderRadius: 20, border: "1px solid #FECACA" }}>{o.status.replace("_", " ")}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-
-        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-          <div style={{ background: "#4338CA", borderRadius: 12, padding: 20, color: "#fff" }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.6)", marginBottom: 14, textTransform: "uppercase" as const, letterSpacing: "0.06em" }}>At a glance</div>
-            {[
-              { label: "Regulatory obligations", value: obs.length },
-              { label: "Litigation matters",      value: mts.length },
-              { label: "Exposure (open matters)", value: fmtR(totalExposure) },
-              { label: "POPIA activities (active)", value: activeActivities.length },
-              { label: "Open DSAR requests",      value: openDsars.length },
-            ].map(s => (
-              <div key={s.label} style={{ display: "flex", justifyContent: "space-between", padding: "7px 0", borderBottom: "1px solid rgba(255,255,255,0.1)" }}>
-                <span style={{ fontSize: 13, color: "rgba(255,255,255,0.8)" }}>{s.label}</span>
-                <span style={{ fontSize: 14, fontWeight: 700, color: "#fff" }}>{s.value}</span>
+        <section style={card} aria-label="Risk overview">
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <h3 style={heading}>Risk overview</h3>
+            <button style={link} onClick={() => onNavigate("risks")}>Risk register <ArrowRight size={12} /></button>
+          </div>
+          <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-around", height: 130, marginTop: 14 }}>
+            {bars.map(b => (
+              <div key={b.key} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4, flex: 1 }}>
+                <strong style={{ fontSize: 13 }}>{b.count}</strong>
+                <div title={`${b.label}: ${b.count}`} style={{ width: 34, height: `${Math.max(b.heightPercent, 0) * 0.8}px`, background: b.color, borderRadius: "6px 6px 0 0", minHeight: b.count > 0 ? 4 : 0 }} />
               </div>
             ))}
           </div>
-
-          {dueSoon.length > 0 && (
-            <div style={{ background: "#FFFBEB", border: "1px solid #FDE68A", borderRadius: 12, padding: 16 }}>
-              <div style={{ fontSize: 13, fontWeight: 700, color: "#92400E", marginBottom: 6 }}>{dueSoon.length} obligation{dueSoon.length === 1 ? "" : "s"} due soon</div>
-              <div style={{ fontSize: 12, color: "#92400E" }}>Review before they roll to overdue.</div>
-              <button onClick={() => onNavigate("obligations")} style={{ marginTop: 10, width: "100%", padding: "7px", background: "#fff", color: "#D97706", border: "1px solid #FDE68A", borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
-                Review obligations →
-              </button>
-            </div>
-          )}
-
-          <div>
-            <div style={{ fontSize: 13, fontWeight: 700, color: "#0F172A", marginBottom: 10 }}>Quick actions</div>
-            {[
-              { label: "New obligation",   tab: "obligations" as Tab, color: "#4338CA", icon: ClipboardList },
-              { label: "Open matter",      tab: "litigation"  as Tab, color: "#BE123C", icon: Gavel         },
-              { label: "Register activity",tab: "popia"       as Tab, color: "#0D9488", icon: Lock          },
-              { label: "Log DSAR",         tab: "dsar"        as Tab, color: "#D97706", icon: FileSearch    },
-            ].map(a => (
-              <button key={a.label} onClick={() => onNavigate(a.tab)}
-                style={{ width: "100%", marginBottom: 8, padding: "9px 14px", background: "#fff", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 13, fontWeight: 600, color: a.color, cursor: "pointer", textAlign: "left" as const, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                {a.label} <ArrowRight size={13} />
-              </button>
-            ))}
+          <div style={{ display: "flex", justifyContent: "space-around", borderTop: "1px solid #E2E8F0", paddingTop: 6 }}>
+            {bars.map(b => <span key={b.key} style={{ fontSize: 11, color: "#64748B", flex: 1, textAlign: "center" }}>{b.label}</span>)}
           </div>
-        </div>
+        </section>
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 12 }}>
+        <section style={card} aria-label={isAdmin ? "Recent activity" : "Needs attention"}>
+          {isAdmin ? (
+            <>
+              <h3 style={heading}>Recent activity</h3>
+              {activity.length === 0 ? <p style={{ fontSize: 13, color: "#64748B" }}>No recent activity.</p> : (
+                <ul style={{ listStyle: "none", margin: "10px 0 0", padding: 0, display: "flex", flexDirection: "column", gap: 10 }}>
+                  {activity.map((a, i) => (
+                    <li key={i} style={{ display: "flex", justifyContent: "space-between", gap: 10, fontSize: 13 }}>
+                      <span style={{ minWidth: 0 }}><strong style={{ color: "#0F172A" }}>{a.event}</strong> <span style={{ color: "#64748B" }}>· {a.area}{a.by ? ` · ${a.by}` : ""}</span></span>
+                      <span style={{ fontSize: 11, color: "#94A3B8", whiteSpace: "nowrap" }}>{a.when}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </>
+          ) : (
+            <>
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}><AlertTriangle size={14} color="#B45309" /><h3 style={heading}>Needs attention</h3></div>
+              {attention.length === 0 ? <p style={{ fontSize: 13, color: "#64748B" }}>Nothing needs attention right now.</p> : (
+                <ul style={{ listStyle: "none", margin: "10px 0 0", padding: 0, display: "flex", flexDirection: "column", gap: 8 }}>
+                  {attention.slice(0, 6).map(a => (
+                    <li key={a.key}><button onClick={() => onNavigate(a.tab)} style={{ ...link, color: "#0F172A", fontSize: 13, fontWeight: 500, textAlign: "left", gap: 8 }}>
+                      <Badge text={a.severity === "CRITICAL" ? "Critical" : "Warning"} color={a.severity === "CRITICAL" ? "#991B1B" : "#92400E"} bg={a.severity === "CRITICAL" ? "#FEE2E2" : "#FEF3C7"} />{a.text}
+                    </button></li>
+                  ))}
+                </ul>
+              )}
+            </>
+          )}
+        </section>
+
+        <section style={card} aria-label="Compliance calendar">
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <h3 style={heading}>Compliance calendar · {MONTHS[now.getMonth()]} {now.getFullYear()}</h3>
+            <button style={link} onClick={() => onNavigate("calendar")}>Open <ArrowRight size={12} /></button>
+          </div>
+          <table style={{ width: "100%", borderCollapse: "collapse", marginTop: 8, textAlign: "center", fontSize: 12 }}>
+            <thead><tr>{["M", "T", "W", "T", "F", "S", "S"].map((d, i) => <th key={i} style={{ color: "#94A3B8", fontWeight: 600, padding: 3 }}>{d}</th>)}</tr></thead>
+            <tbody>
+              {weeks.map((w, i) => (
+                <tr key={i}>{w.map((c, j) => (
+                  <td key={j} style={{ padding: 2 }}>
+                    {c && (
+                      <div title={c.types.map(t => sourceColour(t).label).join(", ") || undefined} aria-label={c.types.length ? `${c.day}: ${c.types.map(t => sourceColour(t).label).join(", ")}` : undefined}
+                        style={{ margin: "0 auto", width: 26, height: 26, lineHeight: "26px", borderRadius: "50%", background: c.today ? "#4338CA" : "transparent", color: c.today ? "#fff" : "#334155", fontWeight: c.today ? 800 : 500, position: "relative" }}>
+                        {c.day}
+                        {c.types.length > 0 && <span aria-hidden style={{ position: "absolute", left: "50%", bottom: -1, transform: "translateX(-50%)", display: "flex", gap: 2 }}>
+                          {c.types.slice(0, 3).map(t => <i key={t} style={{ width: 4, height: 4, borderRadius: "50%", background: sourceColour(t).color, display: "block" }} />)}
+                        </span>}
+                      </div>
+                    )}
+                  </td>
+                ))}</tr>
+              ))}
+            </tbody>
+          </table>
+          <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginTop: 10 }}>
+            {Object.entries(SOURCE_COLOURS).map(([k, v]) => <span key={k} style={{ fontSize: 11, color: "#64748B", display: "flex", alignItems: "center", gap: 5 }}><i style={{ width: 8, height: 8, borderRadius: "50%", background: v.color, display: "inline-block" }} />{v.label}</span>)}
+          </div>
+        </section>
+      </div>
+
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 14 }}>
+        {[["Litigation & legal cases", "litigation"], ["POPIA & privacy", "popia"], ["DSAR requests", "dsar"], ["Executive overview", "executive"]].map(([label, tab]) => (
+          <button key={tab} onClick={() => onNavigate(tab)} style={{ ...link, padding: "6px 12px", border: "1px solid #E2E8F0", borderRadius: 20, background: "#fff" }}>{label} <ArrowRight size={12} /></button>
+        ))}
       </div>
     </div>
   )

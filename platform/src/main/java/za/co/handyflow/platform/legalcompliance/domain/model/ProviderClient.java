@@ -139,6 +139,24 @@ public class ProviderClient extends AggregateRoot<ProviderClient> {
         this.endedAt = now;
     }
 
+    /** Provider side: ask for more on access that has been accepted. It adds to what was requested and never removes anything; what is granted does not change until the client decides. */
+    public void requestMore(Set<AccessScope> more) {
+        if (status != ProviderClientStatus.ACTIVE && status != ProviderClientStatus.SUSPENDED) throw new IllegalStateException("Only accepted access can ask for more");
+        if (more == null || more.isEmpty()) throw new IllegalArgumentException("Choose what you are asking for");
+        Set<AccessScope> all = java.util.EnumSet.noneOf(AccessScope.class);
+        all.addAll(scopesRequested());
+        all.addAll(more);
+        this.requestedScopes = ProviderRules.scopesToCsv(all);
+    }
+
+    /** Client side: change what is granted, within what was requested and never to nothing (to take everything away, end the access). A suspension stays in place. */
+    public void changeGrants(Set<AccessScope> granted) {
+        if (status != ProviderClientStatus.ACTIVE && status != ProviderClientStatus.SUSPENDED) throw new IllegalStateException("Only accepted access can be changed");
+        if (granted == null || granted.isEmpty()) throw new IllegalArgumentException("Grant at least one thing, or end the access");
+        if (!scopesRequested().containsAll(granted)) throw new IllegalArgumentException("You can only grant what the provider asked for");
+        this.grantedScopes = ProviderRules.scopesToCsv(granted);
+    }
+
     public void scheduleReview(LocalDate reviewedOn) {
         if (status != ProviderClientStatus.ACTIVE && status != ProviderClientStatus.SUSPENDED) throw new IllegalStateException("Reviews are recorded for clients with accepted access");
         this.nextReviewDue = ProviderRules.nextReview(reviewedOn, reviewCycle);

@@ -25,6 +25,7 @@ class ResolutionVotingServiceTest {
     private final List<String> audit = new ArrayList<>();
     private final List<ResolutionBallot> ballotStore = new ArrayList<>();
     private final List<ResolutionVote> voteStore = new ArrayList<>();
+    private final List<CommitteeCharterRules> charterStore = new ArrayList<>();
 
     private Committee committee;
     private CommitteeMeeting meeting;
@@ -72,7 +73,10 @@ class ResolutionVotingServiceTest {
         RegulatoryAuditService trail = new RegulatoryAuditService(null) {
             @Override public void record(UUID t, String e, UUID id, String ev, String d, UUID a, String n) { audit.add(ev + "|" + d); }
         };
-        service = new ResolutionVotingService(committees, members, meetings, resolutions, ballots, votes, trail);
+        CommitteeCharterRulesRepository charters = proxy(CommitteeCharterRulesRepository.class, (n, a) -> n.equals("history") ? charterStore : null);
+        ProxyAppointmentRepository noProxies = proxy(ProxyAppointmentRepository.class, (n, ar) -> n.equals("findForMeeting") ? List.of() : null);
+        ProxyVoteRepository noProxyVotes = proxy(ProxyVoteRepository.class, (n, ar) -> n.equals("findForResolution") ? List.of() : null);
+        service = new ResolutionVotingService(committees, members, meetings, resolutions, ballots, votes, trail, charters, noProxies, noProxyVotes);
     }
 
     private CastRequest cast(Object... pairs) {
@@ -301,5 +305,63 @@ class ResolutionVotingServiceTest {
         String line = audit.get(audit.size() - 1);
         assertTrue(line.startsWith("VOTE_CLOSED_CASTING|") && line.contains("CARRIED on the chair's casting vote after a tie of 1 for and 1 against"), line);
         for (String n : new String[]{"Anna", "Ben", "Cara"}) assertFalse(line.contains(n), line);
+    }
+
+    // ── Chunk 29: charter rules ──
+
+    private void charter(boolean casting, boolean quorumAfterRecusal, int special) {
+        charterStore.add(CommitteeCharterRules.record(T, committee.getId(), charterStore.size() + 1, "Charter 2024", TODAY.minusDays(30), TODAY.minusDays(1), casting, WrittenMode.EITHER, quorumAfterRecusal, special, "Adopted by the board", "me"));
+    }
+
+    @Test @DisplayName("A charter that gives the chair a casting vote makes the tick-box unnecessary")
+    void charterGrantsCastingVote() {
+        charter(true, true, 75);
+        tie();
+        assertEquals(BallotOutcome.CARRIED, casting(VoteChoice.FOR, false).outcome());
+    }
+
+    @Test @DisplayName("A charter that gives the chair no casting vote refuses it even when the closer ticks the box, and nothing is closed")
+    void charterRefusesCastingVote() {
+        charter(false, true, 75);
+        tie();
+        HandyFlowException e = assertThrows(HandyFlowException.class, () -> casting(VoteChoice.FOR, true));
+        assertEquals(HttpStatus.CONFLICT, e.getStatus());
+        assertTrue(e.getMessage().contains("no casting vote"));
+        assertEquals(BallotStatus.OPEN, ballotStore.get(0).getStatus());
+        assertEquals(BallotOutcome.NOT_CARRIED, service.close(T, committee.getId(), meeting.getId(), decision.getId(), null, "Sec").outcome(), "a plain close still works: a tie is not carried");
+    }
+
+    @Test @DisplayName("A charter that is not yet in force changes nothing")
+    void futureCharterIgnored() {
+        charterStore.add(CommitteeCharterRules.record(T, committee.getId(), 1, null, TODAY, TODAY.plusDays(5), false, WrittenMode.EITHER, true, 75, "Adopted by the board", "me"));
+        tie();
+        assertEquals(BallotOutcome.CARRIED, casting(VoteChoice.FOR, true).outcome());
+    }
+
+    @Test @DisplayName("The charter's special-resolution percentage decides: 2 of 3 is enough at 66 but not at 75")
+    void charterSpecialPercent() {
+        charter(true, true, 66);
+        service.setType(T, committee.getId(), meeting.getId(), decision.getId(), ResolutionType.SPECIAL, null, "Sec");
+        VotingView open = castAll(VoteChoice.FOR, VoteChoice.FOR, VoteChoice.AGAINST);
+        assertTrue(open.requirement().contains("66%"));
+        assertEquals(BallotOutcome.CARRIED, service.close(T, committee.getId(), meeting.getId(), decision.getId(), null, "Sec").outcome());
+    }
+
+    @Test @DisplayName("With no charter, 2 of 3 on a special resolution is not carried (75%)")
+    void noCharterSpecialPercent() {
+        service.setType(T, committee.getId(), meeting.getId(), decision.getId(), ResolutionType.SPECIAL, null, "Sec");
+        VotingView open = castAll(VoteChoice.FOR, VoteChoice.FOR, VoteChoice.AGAINST);
+        assertTrue(open.requirement().contains("75%"));
+        assertEquals(BallotOutcome.NOT_CARRIED, service.close(T, committee.getId(), meeting.getId(), decision.getId(), null, "Sec").outcome());
+    }
+
+    @Test @DisplayName("A charter with no quorum-after-recusal rule lets voting close when recusals leave fewer than the quorum; without it the house rule stops it")
+    void charterQuorumAfterRecusal() {
+        service.cast(T, committee.getId(), meeting.getId(), decision.getId(), new CastRequest(List.of(new VoteInput(anna.getId(), VoteChoice.FOR, null),
+                new VoteInput(ben.getId(), VoteChoice.RECUSED, "Related party to the supplier"), new VoteInput(cara.getId(), VoteChoice.RECUSED, "Related party to the supplier"))), null, "Sec");
+        HandyFlowException e = assertThrows(HandyFlowException.class, () -> service.close(T, committee.getId(), meeting.getId(), decision.getId(), null, "Sec"));
+        assertTrue(e.getMessage().contains("quorum"));
+        charter(false, false, 75);
+        assertEquals(BallotOutcome.CARRIED, service.close(T, committee.getId(), meeting.getId(), decision.getId(), null, "Sec").outcome());
     }
 }
