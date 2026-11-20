@@ -52,7 +52,7 @@ public class AuditFindingService {
 
     @Transactional(readOnly = true)
     public List<AuditFindingResponse> list(TenantId tenantId, UUID auditId, AuditFindingStatus status, boolean includeClosed) {
-        return findings.search(tenantId, auditId, status, includeClosed).stream().map(f -> view(tenantId, f, null)).toList();
+        return findings.searchCapped(tenantId, auditId, status, includeClosed).stream().map(f -> view(tenantId, f, null)).toList();
     }
 
     @Transactional(readOnly = true)

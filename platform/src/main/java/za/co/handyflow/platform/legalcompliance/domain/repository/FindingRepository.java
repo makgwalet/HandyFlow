@@ -1,9 +1,9 @@
 package za.co.handyflow.platform.legalcompliance.domain.repository;
 
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
-import za.co.handyflow.platform.legalcompliance.domain.model.Finding;
-import za.co.handyflow.platform.legalcompliance.domain.model.FindingStatus;
+import za.co.handyflow.platform.legalcompliance.domain.model.*;
 import za.co.handyflow.platform.shared.TenantId;
 
 import java.time.LocalDate;
@@ -26,7 +26,13 @@ public interface FindingRepository extends JpaRepository<Finding, UUID> {
         AND (:includeClosed = TRUE OR f.status <> za.co.handyflow.platform.legalcompliance.domain.model.FindingStatus.CLOSED)
         ORDER BY f.dueDate, f.reference
         """)
-    List<Finding> search(TenantId tenantId, FindingStatus status, UUID controlId, boolean includeClosed);
+    List<Finding> search(TenantId tenantId, FindingStatus status, UUID controlId, boolean includeClosed, Pageable pageable);
+
+    /** Everything, for summaries, coverage and sweeps that must count every row. */
+    default List<Finding> search(TenantId tenantId, FindingStatus status, UUID controlId, boolean includeClosed) { return search(tenantId, status, controlId, includeClosed, Pageable.unpaged()); }
+
+    /** In the query's own order, at most RowLimit.MAX_ROWS: for list screens only. */
+    default List<Finding> searchCapped(TenantId tenantId, FindingStatus status, UUID controlId, boolean includeClosed) { return search(tenantId, status, controlId, includeClosed, RowLimit.first()); }
 
     @Query("SELECT f FROM Finding f WHERE f.tenantId = :tenantId AND f.controlId = :controlId AND f.status <> za.co.handyflow.platform.legalcompliance.domain.model.FindingStatus.CLOSED")
     List<Finding> findOpenForControl(TenantId tenantId, UUID controlId);

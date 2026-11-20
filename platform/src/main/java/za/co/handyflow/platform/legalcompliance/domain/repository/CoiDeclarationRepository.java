@@ -1,5 +1,6 @@
 package za.co.handyflow.platform.legalcompliance.domain.repository;
 
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import za.co.handyflow.platform.legalcompliance.domain.model.*;
@@ -21,7 +22,13 @@ public interface CoiDeclarationRepository extends JpaRepository<CoiDeclaration, 
         AND (:status IS NULL OR x.status = :status)
         ORDER BY x.declaredOn DESC
         """)
-    List<CoiDeclaration> search(TenantId tenantId, UUID declarantId, DeclarationStatus status);
+    List<CoiDeclaration> search(TenantId tenantId, UUID declarantId, DeclarationStatus status, Pageable pageable);
+
+    /** Everything, for summaries, coverage and sweeps that must count every row. */
+    default List<CoiDeclaration> search(TenantId tenantId, UUID declarantId, DeclarationStatus status) { return search(tenantId, declarantId, status, Pageable.unpaged()); }
+
+    /** In the query's own order, at most RowLimit.MAX_ROWS: for list screens only. */
+    default List<CoiDeclaration> searchCapped(TenantId tenantId, UUID declarantId, DeclarationStatus status) { return search(tenantId, declarantId, status, RowLimit.first()); }
 
     /** Cross-tenant — daily sweep: declarations awaiting review, and cleared or mitigated ones whose review date has passed. */
     @Query("""

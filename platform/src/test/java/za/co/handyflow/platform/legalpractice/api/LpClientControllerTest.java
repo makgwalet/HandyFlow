@@ -39,10 +39,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 /**
  * {@code @PreAuthorize} authorization gate coverage for {@link LpClientController} —
  * the READ/MANAGE/ADMIN split, with particular focus on the trust-transaction
- * sub-resource's MANAGE-vs-ADMIN split (a plain RECEIPT stays MANAGE-gated,
- * while TRANSFER_TO_BUSINESS/DISBURSEMENT_PAYMENT/REFUND — the three ways
- * trust money actually leaves the ledger — are ADMIN-only), mirroring
- * {@code CollAgencyTrustControllerTest}'s own "MANAGE-vs-ADMIN split" precedent.
+ * sub-resource: a RECEIPT needs LEGALPRACTICE_TRUST_RECEIVE (or the MANAGE/ADMIN that could always record one), and money
+ * leaving trust is no longer posted here at all — it goes through the request-and-approve flow in
+ * {@code LpTrustPaymentRequestController}.
  * Follows {@code HrControllerTest}/{@code ClinicControllerTest}'s confirmed
  * {@code @WebMvcTest} + {@link WebMvcTestSecuritySupport} + {@code @MockitoBean}
  * + {@code @WithMockUser(authorities = ...)} shape exactly.
@@ -72,6 +71,7 @@ class LpClientControllerTest {
     @MockitoBean LpPortalService portalService;
     @MockitoBean EvidenceFacade evidenceFacade;
     @MockitoBean FeatureGuard featureGuard;
+    @MockitoBean za.co.handyflow.platform.legalpractice.application.internal.LpWallGuard walls;
 
     static final String BASE = "/api/v1/legal-practice/clients";
     static final UUID TENANT_ID = UUID.randomUUID();
@@ -98,7 +98,7 @@ class LpClientControllerTest {
     LpTrustTransactionResponse trustResponse(UUID id, String type) {
         return new LpTrustTransactionResponse(id, UUID.randomUUID(), null, type,
                 new BigDecimal("1000.00"), java.time.LocalDate.now(), null, null, null,
-                USER_ID, "Jane Attorney", null, new BigDecimal("4000.00"), Instant.now());
+                USER_ID, "Jane Attorney", null, new BigDecimal("4000.00"), null, Instant.now());
     }
 
     // ── GET /clients — READ/MANAGE/ADMIN all allowed ────────────────────────
@@ -229,107 +229,51 @@ class LpClientControllerTest {
                 .andExpect(jsonPath("$.data.transactionType").value("RECEIPT"));
     }
 
-    // ── POST .../trust-transactions/transfer-to-business — ADMIN only ──────
-    // This is the key MANAGE-vs-ADMIN split: money actually LEAVING trust
-    // requires the stronger authority, mirroring CollAgencyTrustControllerTest's
-    // own precedent that processing a remittance is ADMIN-only.
+    // ── POST .../trust-transactions/receipt — TRUST_RECEIVE, or the MANAGE/ADMIN that could always record one ──
 
     @Test
-    @WithMockUser(authorities = "LEGALPRACTICE_MANAGE")
-    @DisplayName("POST .../transfer-to-business with only LEGALPRACTICE_MANAGE returns 403 — moving trust money out is ADMIN-only")
-    void transferToBusinessWithManageOnlyReturns403() throws Exception {
+    @WithMockUser(authorities = "LEGALPRACTICE_TRUST_RECEIVE")
+    @DisplayName("POST .../trust-transactions/receipt with only LEGALPRACTICE_TRUST_RECEIVE returns 201 — a clerk can record deposits without MANAGE")
+    void recordReceiptWithTrustReceiveReturns201() throws Exception {
         var id = UUID.randomUUID();
-        var body = Map.of("invoiceId", UUID.randomUUID().toString(), "amount", 1000);
+        when(trustService.recordReceipt(any(), any(), any(), any(), any()))
+                .thenReturn(trustResponse(UUID.randomUUID(), "RECEIPT"));
 
-        mvc.perform(post(BASE + "/" + id + "/trust-transactions/transfer-to-business").with(csrf())
+        mvc.perform(post(BASE + "/" + id + "/trust-transactions/receipt").with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(mapper.writeValueAsString(body)))
-                .andExpect(status().isForbidden());
-
-        verify(trustService, never()).transferToBusiness(any(), any(), any(), any(), any());
-    }
-
-    @Test
-    @WithMockUser(authorities = "LEGALPRACTICE_ADMIN")
-    @DisplayName("POST .../transfer-to-business with LEGALPRACTICE_ADMIN returns 201")
-    void transferToBusinessWithAdminReturns201() throws Exception {
-        var id = UUID.randomUUID();
-        when(trustService.transferToBusiness(any(), any(), any(), any(), any()))
-                .thenReturn(trustResponse(UUID.randomUUID(), "TRANSFER_TO_BUSINESS"));
-
-        var body = Map.of("invoiceId", UUID.randomUUID().toString(), "amount", 1000);
-
-        mvc.perform(post(BASE + "/" + id + "/trust-transactions/transfer-to-business").with(csrf())
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(mapper.writeValueAsString(body)))
-                .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.data.transactionType").value("TRANSFER_TO_BUSINESS"));
-    }
-
-    // ── POST .../trust-transactions/pay-disbursement — ADMIN only ──────────
-
-    @Test
-    @WithMockUser(authorities = "LEGALPRACTICE_MANAGE")
-    @DisplayName("POST .../pay-disbursement with only LEGALPRACTICE_MANAGE returns 403")
-    void payDisbursementWithManageOnlyReturns403() throws Exception {
-        var id = UUID.randomUUID();
-        var body = Map.of("amount", 500, "payee", "Sheriff of the Court");
-
-        mvc.perform(post(BASE + "/" + id + "/trust-transactions/pay-disbursement").with(csrf())
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(mapper.writeValueAsString(body)))
-                .andExpect(status().isForbidden());
-
-        verify(trustService, never()).payDisbursement(any(), any(), any(), any(), any());
-    }
-
-    @Test
-    @WithMockUser(authorities = "LEGALPRACTICE_ADMIN")
-    @DisplayName("POST .../pay-disbursement with LEGALPRACTICE_ADMIN returns 201")
-    void payDisbursementWithAdminReturns201() throws Exception {
-        var id = UUID.randomUUID();
-        when(trustService.payDisbursement(any(), any(), any(), any(), any()))
-                .thenReturn(trustResponse(UUID.randomUUID(), "DISBURSEMENT_PAYMENT"));
-
-        var body = Map.of("amount", 500, "payee", "Sheriff of the Court");
-
-        mvc.perform(post(BASE + "/" + id + "/trust-transactions/pay-disbursement").with(csrf())
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(mapper.writeValueAsString(body)))
+                        .content(mapper.writeValueAsString(Map.of("amount", 1000))))
                 .andExpect(status().isCreated());
     }
 
-    // ── POST .../trust-transactions/refund — ADMIN only ─────────────────────
-
     @Test
-    @WithMockUser(authorities = "LEGALPRACTICE_MANAGE")
-    @DisplayName("POST .../refund with only LEGALPRACTICE_MANAGE returns 403")
-    void refundWithManageOnlyReturns403() throws Exception {
+    @WithMockUser(authorities = {"LEGALPRACTICE_TRUST_PAYMENT_REQUEST", "LEGALPRACTICE_TRUST_PAYMENT_APPROVE"})
+    @DisplayName("POST .../trust-transactions/receipt with only the payment permissions returns 403 — asking for and approving payments is not recording deposits")
+    void recordReceiptWithPaymentPermissionsOnlyReturns403() throws Exception {
         var id = UUID.randomUUID();
-        var body = Map.of("amount", 200, "payee", "Client themselves");
 
-        mvc.perform(post(BASE + "/" + id + "/trust-transactions/refund").with(csrf())
+        mvc.perform(post(BASE + "/" + id + "/trust-transactions/receipt").with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(mapper.writeValueAsString(body)))
+                        .content(mapper.writeValueAsString(Map.of("amount", 1000))))
                 .andExpect(status().isForbidden());
 
-        verify(trustService, never()).refund(any(), any(), any(), any(), any());
+        verify(trustService, never()).recordReceipt(any(), any(), any(), any(), any());
     }
 
+    // Money leaving trust is no longer posted from this controller at all: it is requested and approved through
+    // LpTrustPaymentRequestController (see LpTrustPaymentRequestControllerTest), so a client controller has no endpoint
+    // that can post a transfer, a disbursement or a refund by itself.
     @Test
-    @WithMockUser(authorities = "LEGALPRACTICE_ADMIN")
-    @DisplayName("POST .../refund with LEGALPRACTICE_ADMIN returns 201")
-    void refundWithAdminReturns201() throws Exception {
-        var id = UUID.randomUUID();
-        when(trustService.refund(any(), any(), any(), any(), any()))
-                .thenReturn(trustResponse(UUID.randomUUID(), "REFUND"));
-
-        var body = Map.of("amount", 200, "payee", "Client themselves");
-
-        mvc.perform(post(BASE + "/" + id + "/trust-transactions/refund").with(csrf())
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(mapper.writeValueAsString(body)))
-                .andExpect(status().isCreated());
+    @DisplayName("LpClientController no longer exposes a way to post money out of trust directly")
+    void noDirectPaymentOutOfTrustEndpoint() {
+        var methods = java.util.Arrays.stream(LpClientController.class.getDeclaredMethods()).map(java.lang.reflect.Method::getName).toList();
+        org.assertj.core.api.Assertions.assertThat(methods).doesNotContain("transferToBusiness", "payDisbursement", "refund");
+        for (var m : LpTrustTransactionService.class.getDeclaredMethods()) {
+            if (java.util.Set.of("transferToBusiness", "payDisbursement", "refund").contains(m.getName())) {
+                org.assertj.core.api.Assertions.assertThat(m.getParameterTypes())
+                        .as(m.getName() + " must require an approval")
+                        .contains(LpTrustTransactionService.TrustApproval.class);
+            }
+        }
     }
 
     // ── Unauthenticated request — no authority at all ───────────────────────

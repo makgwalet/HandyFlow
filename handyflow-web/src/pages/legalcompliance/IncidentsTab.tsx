@@ -12,7 +12,7 @@ import { apiClient } from "../../api/client"
 import { usePermission } from "../../hooks/usePermission"
 import { useAuth } from "../../hooks/useAuth"
 import { input, primaryBtn, ghostBtn, unwrap, one, fmtDateTime, errMsg } from "./lcHelpers"
-import { Modal, Field, Err, Badge } from "./LcUi"
+import { Modal, Field, Err, Badge, RowLimitNotice } from "./LcUi"
 import { ChevronDown, ChevronUp, Plus } from "lucide-react"
 
 interface Incident {
@@ -116,6 +116,7 @@ export default function IncidentsTab() {
       {apiError && !form && !act && <Err m={apiError} />}
       {!canManage && <p style={{ fontSize: 13, color: "#64748B" }}>Anyone can report an incident. Investigating and closing incidents is limited to the people responsible for them.</p>}
 
+      <RowLimitNotice count={incidents.length} />
       {canManage && (isLoading ? <p style={{ color: "#64748B" }}>Loading…</p> : incidents.length === 0 ? <p style={{ color: "#64748B", fontSize: 14 }}>No incidents.</p> : incidents.map(i => {
         const open = expanded === i.id
         return (

@@ -26,9 +26,11 @@ import java.util.UUID;
 public class LpMatterKeyDateService {
 
     private final LpMatterKeyDateRepository keyDateRepo;
+    private final LpWallGuard walls;
 
     @Transactional(readOnly = true)
     public List<LpMatterKeyDateResponse> listForMatter(TenantId tenantId, UUID matterId) {
+        walls.requireMatterAccess(tenantId, matterId);
         return keyDateRepo.findAllForMatter(tenantId, matterId).stream().map(this::toResponse).toList();
     }
 
@@ -38,7 +40,8 @@ public class LpMatterKeyDateService {
         if (from == null || to == null) throw new IllegalArgumentException("from and to are required");
         if (to.isBefore(from)) throw new IllegalArgumentException("to cannot be before from");
         if (ChronoUnit.DAYS.between(from, to) > 400) throw new IllegalArgumentException("Choose a range of at most 400 days");
-        return keyDateRepo.findInRangeWithMatter(tenantId, from, to).stream().map(row -> {
+        var barred = walls.barred(tenantId);
+        return keyDateRepo.findInRangeWithMatterExcluding(tenantId, from, to, barred.matterIds(), barred.clientIds()).stream().map(row -> {
             LpMatterKeyDate k = (LpMatterKeyDate) row[0];
             LpMatter m = (LpMatter) row[1];
             return new LpFirmKeyDateResponse(k.getId(), k.getMatterId(), m.getMatterNumber(), m.getMatterName(), m.getStatus(),
@@ -48,6 +51,7 @@ public class LpMatterKeyDateService {
 
     @Transactional
     public LpMatterKeyDateResponse createKeyDate(TenantId tenantId, UUID matterId, CreateLpMatterKeyDateRequest req) {
+        walls.requireMatterAccess(tenantId, matterId);
         LpMatterKeyDate keyDate = LpMatterKeyDate.create(tenantId, matterId, req.dateType(),
                 req.dueDate(), req.description(), req.notes());
         keyDateRepo.save(keyDate);
@@ -87,8 +91,10 @@ public class LpMatterKeyDateService {
     }
 
     private LpMatterKeyDate findOwn(TenantId tenantId, UUID id) {
-        return keyDateRepo.findActiveById(tenantId, id)
+        LpMatterKeyDate keyDate = keyDateRepo.findActiveById(tenantId, id)
                 .orElseThrow(() -> new ResourceNotFoundException("LpMatterKeyDate", id.toString()));
+        walls.requireMatterAccess(tenantId, keyDate.getMatterId());
+        return keyDate;
     }
 
     private LpMatterKeyDateResponse toResponse(LpMatterKeyDate k) {

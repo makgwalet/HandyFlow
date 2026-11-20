@@ -53,15 +53,19 @@ public class LpBillingService {
     // VAT_RATE constant (flat 0.15, not configurable) — see LpInvoice's
     // own Javadoc for the fuller reasoning.
     private final VatRateProvider vatRateProvider;
+    private final LpWallGuard walls;
 
     @Transactional(readOnly = true)
     public Page<LpInvoiceResponse> listForClient(TenantId tenantId, UUID clientId, Pageable pageable) {
-        return invoiceRepo.findAllForClient(tenantId, clientId, pageable).map(this::toResponse);
+        walls.requireClientAccess(tenantId, clientId);
+        var barred = walls.barred(tenantId);
+        return invoiceRepo.findAllForClientExcluding(tenantId, clientId, barred.matterIds(), pageable).map(this::toResponse);
     }
 
     @Transactional(readOnly = true)
     public Page<LpInvoiceResponse> listForFirm(TenantId tenantId, Pageable pageable) {
-        return invoiceRepo.findAllForFirm(tenantId, pageable).map(this::toResponse);
+        var barred = walls.barred(tenantId);
+        return invoiceRepo.findAllForFirmExcluding(tenantId, barred.matterIds(), barred.clientIds(), pageable).map(this::toResponse);
     }
 
     @Transactional(readOnly = true)
@@ -83,6 +87,7 @@ public class LpBillingService {
     public LpInvoiceResponse generateInvoice(TenantId tenantId, GenerateInvoiceRequest req) {
         LpClient client = clientRepo.findActiveById(tenantId, req.clientId())
                 .orElseThrow(() -> new ResourceNotFoundException("LpClient", req.clientId().toString()));
+        walls.requireScopeAccess(tenantId, req.matterId(), req.clientId());
 
         List<UUID> timeEntryIds = req.timeEntryIds() != null ? req.timeEntryIds() : List.of();
         List<UUID> disbursementIds = req.disbursementIds() != null ? req.disbursementIds() : List.of();
@@ -163,6 +168,7 @@ public class LpBillingService {
     private LpTimeEntry requireUnbilledTimeEntry(TenantId tenantId, UUID id, UUID matterId) {
         LpTimeEntry entry = timeEntryRepo.findActiveById(tenantId, id)
                 .orElseThrow(() -> new ResourceNotFoundException("LpTimeEntry", id.toString()));
+        walls.requireMatterAccess(tenantId, entry.getMatterId());
         if (!"UNBILLED".equals(entry.getStatus())) {
             throw new IllegalStateException("Time entry " + id + " is not UNBILLED, current status: " + entry.getStatus());
         }
@@ -178,6 +184,7 @@ public class LpBillingService {
         if (!"UNBILLED".equals(disbursement.getStatus())) {
             throw new IllegalStateException("Disbursement " + id + " is not UNBILLED, current status: " + disbursement.getStatus());
         }
+        walls.requireMatterAccess(tenantId, disbursement.getMatterId());
         if (matterId != null && !disbursement.getMatterId().equals(matterId)) {
             throw new IllegalArgumentException("Disbursement " + id + " does not belong to matter " + matterId);
         }
@@ -190,8 +197,10 @@ public class LpBillingService {
     }
 
     private LpInvoice findOwn(TenantId tenantId, UUID invoiceId) {
-        return invoiceRepo.findActiveById(tenantId, invoiceId)
+        LpInvoice invoice = invoiceRepo.findActiveById(tenantId, invoiceId)
                 .orElseThrow(() -> new ResourceNotFoundException("LpInvoice", invoiceId.toString()));
+        walls.requireScopeAccess(tenantId, invoice.getMatterId(), invoice.getClientId());
+        return invoice;
     }
 
     private LpInvoiceResponse toResponse(LpInvoice i) {

@@ -51,7 +51,7 @@ public class FindingService {
     @Transactional(readOnly = true)
     public List<FindingResponse> list(TenantId tenantId, FindingStatus status, UUID controlId, boolean includeClosed) {
         LocalDate today = LocalDate.now();
-        return findings.search(tenantId, status, controlId, includeClosed).stream().map(f -> FindingResponse.of(f, label(tenantId, f.getControlId()), today)).toList();
+        return findings.searchCapped(tenantId, status, controlId, includeClosed).stream().map(f -> FindingResponse.of(f, label(tenantId, f.getControlId()), today)).toList();
     }
 
     @Transactional(readOnly = true)

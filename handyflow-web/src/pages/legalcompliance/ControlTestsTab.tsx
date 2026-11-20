@@ -12,7 +12,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import { usePermission } from "../../hooks/usePermission"
 import { input, primaryBtn, ghostBtn, unwrap, one, fmtDate, fmtDateTime, errMsg } from "./lcHelpers"
-import { Modal, Field, Err, Badge } from "./LcUi"
+import { Modal, Field, Err, Badge, RowLimitNotice } from "./LcUi"
 import { ChevronDown, ChevronUp, Plus, Paperclip, Download, X } from "lucide-react"
 
 interface Test {
@@ -137,6 +137,7 @@ export default function ControlTestsTab() {
       {notice && <div style={{ background: "#ECFDF5", border: "1px solid #A7F3D0", color: "#065F46", borderRadius: 8, padding: "8px 12px", fontSize: 13, marginBottom: 12 }}>{notice}</div>}
       {apiError && !schedule && !cancel && <Err m={apiError} />}
 
+      <RowLimitNotice count={tests.length} />
       {isLoading ? <p style={{ color: "#64748B" }}>Loading…</p> : tests.length === 0 ? <p style={{ color: "#64748B", fontSize: 14 }}>No tests yet. Schedule one for an active control.</p> : tests.map(t => {
         const open = expanded === t.id, st = STATUS_CFG[t.status], d = detail?.test.id === t.id ? detail : null
         const editing = t.status === "IN_PROGRESS" && runFor === t.id

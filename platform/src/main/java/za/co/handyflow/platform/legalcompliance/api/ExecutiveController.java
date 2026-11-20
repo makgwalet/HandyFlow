@@ -6,6 +6,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import za.co.handyflow.platform.billing.FeatureGuard;
+import za.co.handyflow.platform.legalcompliance.application.internal.ExecutiveForecastService;
 import za.co.handyflow.platform.legalcompliance.application.internal.ExecutiveService;
 import za.co.handyflow.platform.legalcompliance.domain.model.SnapshotSource;
 import za.co.handyflow.platform.legalcompliance.dto.ExecDtos.*;
@@ -26,6 +27,7 @@ public class ExecutiveController {
     private static final String CAN_SNAPSHOT = "hasAnyAuthority('LEGALCOMPLIANCE_MANAGE','LEGALCOMPLIANCE_ADMIN')";
 
     private final ExecutiveService executive;
+    private final ExecutiveForecastService forecasts;
     private final FeatureGuard featureGuard;
 
     @GetMapping("")
@@ -40,6 +42,14 @@ public class ExecutiveController {
     public ResponseEntity<ApiResponse<List<SnapshotPoint>>> history(@RequestParam(defaultValue = "12") int months) {
         featureGuard.requireModule("legalcompliance");
         return ResponseEntity.ok(ApiResponse.success(executive.history(tenant(), months)));
+    }
+
+    /** Indicative straight-line trends per indicator from the stored snapshots. Not a prediction; see ForecastRules. */
+    @GetMapping("/forecast")
+    @PreAuthorize(CAN_READ)
+    public ResponseEntity<ApiResponse<List<Forecast>>> forecast(@RequestParam(defaultValue = "12") int months) {
+        featureGuard.requireModule("legalcompliance");
+        return ResponseEntity.ok(ApiResponse.success(forecasts.forecast(tenant(), months)));
     }
 
     @PostMapping("/snapshots")

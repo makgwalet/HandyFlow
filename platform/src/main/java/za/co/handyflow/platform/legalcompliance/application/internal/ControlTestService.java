@@ -149,7 +149,7 @@ public class ControlTestService {
     @Transactional(readOnly = true)
     public List<TestResponse> list(TenantId tenantId, ControlTestStatus status, UUID controlId) {
         LocalDate today = LocalDate.now();
-        return tests.search(tenantId, status, controlId).stream().map(t -> TestResponse.of(t, today)).toList();
+        return tests.searchCapped(tenantId, status, controlId).stream().map(t -> TestResponse.of(t, today)).toList();
     }
 
     @Transactional(readOnly = true)

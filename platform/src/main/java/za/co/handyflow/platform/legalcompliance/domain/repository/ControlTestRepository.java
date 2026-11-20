@@ -1,9 +1,9 @@
 package za.co.handyflow.platform.legalcompliance.domain.repository;
 
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
-import za.co.handyflow.platform.legalcompliance.domain.model.ControlTest;
-import za.co.handyflow.platform.legalcompliance.domain.model.ControlTestStatus;
+import za.co.handyflow.platform.legalcompliance.domain.model.*;
 import za.co.handyflow.platform.shared.TenantId;
 
 import java.util.List;
@@ -21,7 +21,13 @@ public interface ControlTestRepository extends JpaRepository<ControlTest, UUID> 
         AND (:controlId IS NULL OR t.controlId = :controlId)
         ORDER BY t.plannedDate DESC, t.reference DESC
         """)
-    List<ControlTest> search(TenantId tenantId, ControlTestStatus status, UUID controlId);
+    List<ControlTest> search(TenantId tenantId, ControlTestStatus status, UUID controlId, Pageable pageable);
+
+    /** Everything, for summaries, coverage and sweeps that must count every row. */
+    default List<ControlTest> search(TenantId tenantId, ControlTestStatus status, UUID controlId) { return search(tenantId, status, controlId, Pageable.unpaged()); }
+
+    /** In the query's own order, at most RowLimit.MAX_ROWS: for list screens only. */
+    default List<ControlTest> searchCapped(TenantId tenantId, ControlTestStatus status, UUID controlId) { return search(tenantId, status, controlId, RowLimit.first()); }
 
     @Query("SELECT t FROM ControlTest t WHERE t.tenantId = :tenantId AND t.controlId = :controlId AND t.status IN (za.co.handyflow.platform.legalcompliance.domain.model.ControlTestStatus.PLANNED, za.co.handyflow.platform.legalcompliance.domain.model.ControlTestStatus.IN_PROGRESS, za.co.handyflow.platform.legalcompliance.domain.model.ControlTestStatus.SUBMITTED)")
     Optional<ControlTest> findOpenForControl(TenantId tenantId, UUID controlId);

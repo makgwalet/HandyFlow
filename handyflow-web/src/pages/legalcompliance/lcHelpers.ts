@@ -8,6 +8,10 @@ export const input: CSSProperties = {
   background: 'var(--hf-surface)', color: 'var(--hf-text)', outline: 'none',
 }
 
+export const label: CSSProperties = {
+  display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--hf-text-secondary)', marginBottom: 4,
+}
+
 export const primaryBtn: CSSProperties = {
   padding: '9px 20px', background: 'var(--hf-indigo)', color: 'var(--hf-text-on-solid)',
   border: 'none', borderRadius: 9, fontSize: 14, fontWeight: 700, cursor: 'pointer',

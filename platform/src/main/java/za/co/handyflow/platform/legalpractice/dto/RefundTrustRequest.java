@@ -14,5 +14,7 @@ public record RefundTrustRequest(
         LocalDate transactionDate,
         @NotBlank String payee,
         String reference,
-        String notes
+        String notes,
+        /** Optional. The same key sent twice posts once. */
+        @jakarta.validation.constraints.Size(max = 80) String idempotencyKey
 ) {}

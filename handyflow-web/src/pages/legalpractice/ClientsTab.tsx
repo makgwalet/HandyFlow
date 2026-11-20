@@ -51,6 +51,9 @@ interface Inv { id: string; invoiceNumber: string; issueDate: string | null; tot
 function ClientDetail({ client: listed, onClose }: { client: LClient; onClose: () => void }) {
   const isAdmin = usePermission("LEGALPRACTICE_ADMIN")
   const canWrite = usePermission("LEGALPRACTICE_MANAGE") || isAdmin
+  // Recording money in and asking for money out are separate permissions; admins and managers keep what they had.
+  const canReceive = usePermission("LEGALPRACTICE_TRUST_RECEIVE") || canWrite
+  const canRequest = usePermission("LEGALPRACTICE_TRUST_PAYMENT_REQUEST") || isAdmin
   // The list row can be out of date once money moves, so the balance is read fresh while the dialog is open.
   const live = useQuery({ queryKey: ["lp-client", listed.id], initialData: listed, queryFn: async () => (await apiClient.get<LClient>(`${BASE}/clients/${listed.id}`)).data })
   const c = live.data ?? listed
@@ -63,7 +66,7 @@ function ClientDetail({ client: listed, onClose }: { client: LClient; onClose: (
       <Row k="Contact">{[c.email, c.phone].filter(Boolean).join(" · ")}</Row>
       <Row k="Trust balance"><b>{money(c.trustBalance)}</b></Row>
       {c.notes && <Row k="Notes">{c.notes}</Row>}
-      <TrustPanel clientId={c.id} balance={c.trustBalance} isAdmin={isAdmin} canWrite={canWrite} />
+      <TrustPanel clientId={c.id} balance={c.trustBalance} canReceive={canReceive} canRequest={canRequest} />
       <div style={{ fontSize: 13, fontWeight: 700, margin: "16px 0 6px" }}>Matters</div>
       {matters.isError ? <div style={muted}>Could not load the matters.</div> : (matters.data?.content ?? []).length === 0 ? <div style={muted}>{matters.isLoading ? "Loading…" : "No matters yet."}</div> : (
         <div style={{ overflowX: "auto" }}><table style={{ width: "100%", borderCollapse: "collapse" }}><tbody>{matters.data!.content.map(m => (

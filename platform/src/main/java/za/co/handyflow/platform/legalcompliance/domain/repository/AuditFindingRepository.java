@@ -1,6 +1,6 @@
 package za.co.handyflow.platform.legalcompliance.domain.repository;
 
-import org.springframework.stereotype.Repository;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import za.co.handyflow.platform.legalcompliance.domain.model.*;
@@ -11,7 +11,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
-@Repository("legalComplianceAuditFindingRepository")
+@org.springframework.stereotype.Repository("legalComplianceAuditFindingRepository")
 public interface AuditFindingRepository extends JpaRepository<AuditFinding, UUID> {
 
     @Query("SELECT f FROM LcAuditFinding f WHERE f.tenantId = :tenantId AND f.id = :id")
@@ -24,7 +24,13 @@ public interface AuditFindingRepository extends JpaRepository<AuditFinding, UUID
         AND (:includeClosed = TRUE OR f.status <> za.co.handyflow.platform.legalcompliance.domain.model.AuditFindingStatus.CLOSED)
         ORDER BY f.dueDate, f.reference
         """)
-    List<AuditFinding> search(TenantId tenantId, UUID auditId, AuditFindingStatus status, boolean includeClosed);
+    List<AuditFinding> search(TenantId tenantId, UUID auditId, AuditFindingStatus status, boolean includeClosed, Pageable pageable);
+
+    /** Everything, for summaries, coverage and sweeps that must count every row. */
+    default List<AuditFinding> search(TenantId tenantId, UUID auditId, AuditFindingStatus status, boolean includeClosed) { return search(tenantId, auditId, status, includeClosed, Pageable.unpaged()); }
+
+    /** In the query's own order, at most RowLimit.MAX_ROWS: for list screens only. */
+    default List<AuditFinding> searchCapped(TenantId tenantId, UUID auditId, AuditFindingStatus status, boolean includeClosed) { return search(tenantId, auditId, status, includeClosed, RowLimit.first()); }
 
     @Query("SELECT f FROM LcAuditFinding f WHERE f.tenantId = :tenantId AND f.auditId = :auditId")
     List<AuditFinding> findByAudit(TenantId tenantId, UUID auditId);

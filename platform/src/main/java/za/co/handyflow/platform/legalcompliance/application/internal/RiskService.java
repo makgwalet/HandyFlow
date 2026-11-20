@@ -6,10 +6,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import za.co.handyflow.platform.legalcompliance.domain.model.*;
-import za.co.handyflow.platform.legalcompliance.domain.repository.GrcLinkRepository;
-import za.co.handyflow.platform.legalcompliance.domain.repository.RiskAssessmentRepository;
-import za.co.handyflow.platform.legalcompliance.domain.repository.RiskRepository;
-import za.co.handyflow.platform.legalcompliance.domain.repository.RiskSettingsRepository;
+import za.co.handyflow.platform.legalcompliance.domain.repository.*;
 import za.co.handyflow.platform.legalcompliance.dto.GrcDtos.*;
 import za.co.handyflow.platform.shared.HandyFlowException;
 import za.co.handyflow.platform.shared.ResourceNotFoundException;
@@ -87,7 +84,7 @@ public class RiskService {
         Map<UUID, RiskAssessment> current = currentByRisk(tenantId);
         Map<UUID, Integer> controlCounts = countBySource(tenantId, GrcLinkType.RISK_CONTROL), obligationCounts = countBySource(tenantId, GrcLinkType.RISK_OBLIGATION);
         LocalDate today = LocalDate.now();
-        return risks.search(tenantId, status, category, includeClosed).stream()
+        return risks.searchCapped(tenantId, status, category, includeClosed).stream()
                 .map(r -> RiskResponse.of(r, current.get(r.getId()), controlCounts.getOrDefault(r.getId(), 0), obligationCounts.getOrDefault(r.getId(), 0), today)).toList();
     }
 

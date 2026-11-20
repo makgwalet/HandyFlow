@@ -17,12 +17,14 @@ import org.springframework.web.multipart.MultipartFile;
 import za.co.handyflow.platform.billing.FeatureGuard;
 import za.co.handyflow.platform.evidence.application.EvidenceFacade;
 import za.co.handyflow.platform.evidence.dto.EvidenceResponse;
+import za.co.handyflow.platform.legalpractice.application.internal.LpWallGuard;
 import za.co.handyflow.platform.legalpractice.application.internal.LpDisbursementService;
 import za.co.handyflow.platform.legalpractice.application.internal.LpMatterKeyDateService;
 import za.co.handyflow.platform.legalpractice.application.internal.LpMatterService;
 import za.co.handyflow.platform.legalpractice.application.internal.LpTimeEntryService;
 import za.co.handyflow.platform.legalpractice.dto.*;
 import za.co.handyflow.platform.shared.ApiResponse;
+import za.co.handyflow.platform.shared.ResourceNotFoundException;
 import za.co.handyflow.platform.shared.TenantContext;
 
 import java.util.List;
@@ -49,6 +51,7 @@ public class LpMatterController {
     private final LpDisbursementService disbursementService;
     private final LpMatterKeyDateService keyDateService;
     private final EvidenceFacade evidenceFacade;
+    private final LpWallGuard walls;
     private final FeatureGuard featureGuard;
 
     // ── Matter CRUD + lifecycle ───────────────────────────────────────────────
@@ -279,6 +282,7 @@ public class LpMatterController {
     public ResponseEntity<ApiResponse<EvidenceResponse>> attachEvidence(
             @PathVariable UUID id, @RequestParam("file") MultipartFile file, @RequestParam String evidenceType) {
         featureGuard.requireModule("legalpractice");
+        walls.requireMatterAccess(TenantContext.getTenantIdAsObject(), id);
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(evidenceFacade.attach(
                 TenantContext.getTenantIdAsObject(), file, evidenceType, SOURCE_MODULE, ENTITY_TYPE, id,
                 null, TenantContext.getCurrentUserId(), TenantContext.getCurrentUserName())));
@@ -288,6 +292,7 @@ public class LpMatterController {
     @PreAuthorize("hasAnyAuthority('LEGALPRACTICE_READ','LEGALPRACTICE_MANAGE','LEGALPRACTICE_ADMIN')")
     public ResponseEntity<ApiResponse<List<EvidenceResponse>>> listEvidence(@PathVariable UUID id) {
         featureGuard.requireModule("legalpractice");
+        walls.requireMatterAccess(TenantContext.getTenantIdAsObject(), id);
         return ResponseEntity.ok(ApiResponse.success(
                 evidenceFacade.listFor(TenantContext.getTenantIdAsObject(), SOURCE_MODULE, ENTITY_TYPE, id)));
     }
@@ -296,6 +301,7 @@ public class LpMatterController {
     @PreAuthorize("hasAnyAuthority('LEGALPRACTICE_READ','LEGALPRACTICE_MANAGE','LEGALPRACTICE_ADMIN')")
     public ResponseEntity<byte[]> downloadEvidence(@PathVariable UUID id, @PathVariable UUID evidenceId) {
         featureGuard.requireModule("legalpractice");
+        requireOwnEvidence(id, evidenceId);
         EvidenceFacade.DownloadedEvidence file = evidenceFacade.download(TenantContext.getTenantIdAsObject(), evidenceId);
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + file.fileName() + "\"")
@@ -307,7 +313,20 @@ public class LpMatterController {
     @PreAuthorize("hasAnyAuthority('LEGALPRACTICE_MANAGE','LEGALPRACTICE_ADMIN')")
     public ResponseEntity<ApiResponse<Void>> detachEvidence(@PathVariable UUID id, @PathVariable UUID evidenceId) {
         featureGuard.requireModule("legalpractice");
+        requireOwnEvidence(id, evidenceId);
         evidenceFacade.detach(TenantContext.getTenantIdAsObject(), evidenceId);
         return ResponseEntity.ok(ApiResponse.success(null));
+    }
+
+    /**
+     * The signed-in user must be allowed to see this matter (a wall may bar them), and the document must be one of its own: the path's id
+     * is what the wall is checked against, so a document of another record cannot be fetched through an allowed one.
+     */
+    private void requireOwnEvidence(UUID id, UUID evidenceId) {
+        var tenantId = TenantContext.getTenantIdAsObject();
+        walls.requireMatterAccess(tenantId, id);
+        if (evidenceFacade.listFor(tenantId, SOURCE_MODULE, ENTITY_TYPE, id).stream().noneMatch(e -> e.id().equals(evidenceId))) {
+            throw new ResourceNotFoundException("Evidence", evidenceId.toString());
+        }
     }
 }

@@ -45,14 +45,17 @@ public class LpTimeEntryService {
     private final LpTimeEntryRepository timeEntryRepo;
     private final LpMatterRepository matterRepo;
     private final LpAttorneyRepository attorneyRepo;
+    private final LpWallGuard walls;
 
     @Transactional(readOnly = true)
     public Page<LpTimeEntryResponse> listForMatter(TenantId tenantId, UUID matterId, Pageable pageable) {
+        walls.requireMatterAccess(tenantId, matterId);
         return timeEntryRepo.findAllForMatter(tenantId, matterId, pageable).map(this::toResponse);
     }
 
     @Transactional(readOnly = true)
     public List<LpTimeEntryResponse> listUnbilledForMatter(TenantId tenantId, UUID matterId) {
+        walls.requireMatterAccess(tenantId, matterId);
         return timeEntryRepo.findUnbilledByMatter(tenantId, matterId).stream().map(this::toResponse).toList();
     }
 
@@ -60,6 +63,7 @@ public class LpTimeEntryService {
     public LpTimeEntryResponse createTimeEntry(TenantId tenantId, UUID matterId, CreateLpTimeEntryRequest req) {
         LpMatter matter = matterRepo.findActiveById(tenantId, matterId)
                 .orElseThrow(() -> new ResourceNotFoundException("LpMatter", matterId.toString()));
+        walls.requireAccess(tenantId, matter);
         requireLoggableMatter(matter);
 
         BigDecimal hourlyRate = req.hourlyRate();
@@ -103,8 +107,10 @@ public class LpTimeEntryService {
     }
 
     private LpTimeEntry findOwn(TenantId tenantId, UUID entryId) {
-        return timeEntryRepo.findActiveById(tenantId, entryId)
+        LpTimeEntry entry = timeEntryRepo.findActiveById(tenantId, entryId)
                 .orElseThrow(() -> new ResourceNotFoundException("LpTimeEntry", entryId.toString()));
+        walls.requireMatterAccess(tenantId, entry.getMatterId());
+        return entry;
     }
 
     private LpTimeEntryResponse toResponse(LpTimeEntry t) {

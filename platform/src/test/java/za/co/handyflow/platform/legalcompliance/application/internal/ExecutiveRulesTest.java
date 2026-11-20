@@ -77,7 +77,8 @@ class ExecutiveRulesTest {
         for (String k : List.of("obligations.nonCompliant", "findings.critical", "incidents.awaitingAssessment", "risks.outsideTolerance", "licences.expired", "licences.conditionsBreached",
                 "privacy.paiaOverdue", "thirdParties.expired", "changes.overdue", "obligations.overdue", "findings.overdue", "capa.overdue", "audits.overdue", "testing.overdue",
                 "risks.overdueReview", "policies.reviewOverdue", "incidents.awaitingNotification", "privacy.filingsOverdue", "privacy.piaReviewOverdue", "thirdParties.reviewOverdue",
-                "licences.conditionsOverdue", "licences.expiring", "coverage.uncovered", "risks.unassessed", "governance.withoutQuorumCapacity", "governance.meetingsOverdue", "governance.charterReviewOverdue", "governance.actionsOverdue", "governance.minutesPending", "ethics.awaitingReview", "ethics.reviewOverdue", "ethics.giftsPending")) all.put(k, 1L);
+                "licences.conditionsOverdue", "licences.expiring", "coverage.uncovered", "risks.unassessed", "governance.withoutQuorumCapacity", "governance.meetingsOverdue", "governance.charterReviewOverdue", "governance.actionsOverdue", "governance.minutesPending", "ethics.awaitingReview", "ethics.reviewOverdue", "ethics.giftsPending",
+                "continuity.criticalWithoutPlan", "continuity.lastTestUnsuccessful", "continuity.testOverdue", "continuity.planReviewOverdue", "continuity.biaOverdue", "esg.readingsOverdue", "esg.targetsMissed")) all.put(k, 1L);
         List<AttentionItem> out = ExecutiveRules.attention(all);
         assertEquals(all.size(), out.size());
         assertEquals(out.size(), out.stream().map(AttentionItem::key).distinct().count());
@@ -91,5 +92,28 @@ class ExecutiveRulesTest {
         assertEquals(Integer.valueOf(75), find(out, "committeeActionsOnTime").percent());
         assertNull(find(out, "declarationsInDate").percent(), "nothing in force is not 100%");
         assertNull(find(ExecutiveRules.indicators(Map.of("obligations.total", 1L, "obligations.compliant", 1L)), "committeeActionsOnTime"));
+    }
+
+    @Test @DisplayName("Continuity and ESG indicators use their own denominators; a tenant with no processes or metrics shows null, not 100%")
+    void resilienceIndicators() {
+        Map<String, Long> m = Map.of("continuity.processes", 10L, "continuity.withoutApprovedPlan", 4L, "continuity.testOverdue", 1L, "esg.active", 8L, "esg.readingsOverdue", 2L);
+        List<Indicator> out = ExecutiveRules.indicators(m);
+        assertEquals(Integer.valueOf(60), find(out, "continuityPlanned").percent());
+        assertEquals(Integer.valueOf(90), find(out, "continuityTested").percent());
+        assertEquals(Integer.valueOf(75), find(out, "esgReadingsOnTime").percent());
+        Map<String, Long> none = Map.of("continuity.processes", 0L, "continuity.withoutApprovedPlan", 0L, "continuity.testOverdue", 0L, "esg.active", 0L, "esg.readingsOverdue", 0L);
+        List<Indicator> empty = ExecutiveRules.indicators(none);
+        assertNull(find(empty, "continuityPlanned").percent());
+        assertNull(find(empty, "esgReadingsOnTime").percent());
+        assertNull(find(ExecutiveRules.indicators(Map.of("obligations.total", 1L, "obligations.compliant", 1L)), "esgReadingsOnTime"), "old snapshots omit the new indicators");
+    }
+
+    @Test @DisplayName("Critical continuity gaps rank above warnings")
+    void resilienceAttention() {
+        Map<String, Long> m = Map.of("continuity.testOverdue", 2L, "continuity.criticalWithoutPlan", 1L, "esg.targetsMissed", 3L);
+        List<AttentionItem> out = ExecutiveRules.attention(m);
+        assertEquals("continuity.criticalWithoutPlan", out.get(0).key());
+        assertEquals("CRITICAL", out.get(0).severity());
+        assertEquals("esg", out.get(2).tab());
     }
 }

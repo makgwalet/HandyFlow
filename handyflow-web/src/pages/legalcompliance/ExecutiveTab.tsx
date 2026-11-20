@@ -1,15 +1,15 @@
 // src/pages/legalcompliance/ExecutiveTab.tsx
 //
-// Executive GRC overview. Endpoints (/api/v1/legalcompliance/executive): GET / (live indicators and attention list) · GET /history?months= · POST /snapshots
+// Executive GRC overview. Endpoints (/api/v1/legalcompliance/executive): GET / (live indicators and attention list) · GET /history?months= · GET /forecast?months= · POST /snapshots
 // Every figure is a count taken from a register; there is deliberately no composite "compliance score". A percentage shows "—" when there is nothing to
-// measure (zero denominator) rather than 0% or 100%. Snapshots store the raw counts as they were on the day, one per day; the monthly job takes one on the 1st.
+// measure (zero denominator) rather than 0% or 100%. The forecast table is an indicative straight-line trend of the recorded snapshots, not a prediction. Snapshots store the raw counts as they were on the day, one per day; the monthly job takes one on the 1st.
 import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import { usePermission } from "../../hooks/usePermission"
 import { one, unwrap, ghostBtn, input, fmtDate, errMsg } from "./lcHelpers"
 import { Err, Badge } from "./LcUi"
-import { Camera, ChevronRight } from "lucide-react"
+import { Camera, ChevronRight, TrendingUp, TrendingDown, Minus, HelpCircle } from "lucide-react"
 
 const base = "/api/v1/legalcompliance/executive"
 
@@ -20,6 +20,14 @@ interface Point { date: string; source: string; takenBy: string | null; metrics:
 
 // Colour is never the only signal: the figure and the words carry the meaning too.
 const tone = (p: number | null) => p === null ? { color: "#475569", bar: "#CBD5E1" } : p >= 90 ? { color: "#166534", bar: "#16A34A" } : p >= 70 ? { color: "#92400E", bar: "#D97706" } : { color: "#991B1B", bar: "#DC2626" }
+
+interface Forecast { key: string; label: string; tab: string; points: number; latestPercent: number | null; latestDate: string | null; direction: "IMPROVING" | "DECLINING" | "STEADY" | "UNCLEAR" | "INSUFFICIENT_DATA"; slopePer30Days: number; fit: number; projected30Days: number | null; projected90Days: number | null; note: string }
+
+const dirView = (d: Forecast["direction"]) => d === "IMPROVING" ? { label: "Improving", icon: <TrendingUp size={14} />, color: "#166534" }
+  : d === "DECLINING" ? { label: "Declining", icon: <TrendingDown size={14} />, color: "#991B1B" }
+  : d === "STEADY" ? { label: "Steady", icon: <Minus size={14} />, color: "#475569" }
+  : d === "UNCLEAR" ? { label: "Unclear", icon: <HelpCircle size={14} />, color: "#92400E" }
+  : { label: "Not enough history", icon: <HelpCircle size={14} />, color: "#64748B" }
 
 function Trend({ points, k }: { points: Point[]; k: string }) {
   const data = points.map(p => ({ d: p.date, v: p.indicators.find(i => i.key === k)?.percent ?? null }))
@@ -51,6 +59,7 @@ export default function ExecutiveTab({ onNavigate }: { onNavigate: (tab: string)
 
   const { data: ov, isLoading } = useQuery<Overview>({ queryKey: ["lc-exec", "overview"], queryFn: async () => one(await apiClient.get(base)) })
   const { data: history = [] } = useQuery<Point[]>({ queryKey: ["lc-exec", "history", months], queryFn: async () => unwrap(await apiClient.get(`${base}/history`, { params: { months } })) })
+  const { data: forecast = [] } = useQuery<Forecast[]>({ queryKey: ["lc-exec", "forecast", months], queryFn: async () => unwrap(await apiClient.get(`${base}/forecast`, { params: { months } })) })
   const snap = useMutation({
     mutationFn: () => apiClient.post(`${base}/snapshots`), onSuccess: () => { qc.invalidateQueries({ queryKey: ["lc-exec"] }); setApiError(""); setNotice("Snapshot taken") },
     onError: (e: unknown) => { setNotice(""); setApiError(errMsg(e, "Could not take a snapshot")) },
@@ -103,7 +112,7 @@ export default function ExecutiveTab({ onNavigate }: { onNavigate: (tab: string)
 
       <div style={{ fontWeight: 700, color: "#0F172A", margin: "20px 0 8px" }}>At a glance</div>
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 20 }}>
-        {[["Obligations", m["obligations.total"]], ["Open risks", m["risks.open"]], ["Open findings", m["findings.open"]], ["Open incidents", m["incidents.open"]], ["Published policies", m["policies.active"]], ["Approved third parties", m["thirdParties.approved"]], ["Licences in force", m["licences.live"]]].map(([l, v]) => (
+        {[["Obligations", m["obligations.total"]], ["Open risks", m["risks.open"]], ["Open findings", m["findings.open"]], ["Open incidents", m["incidents.open"]], ["Published policies", m["policies.active"]], ["Approved third parties", m["thirdParties.approved"]], ["Licences in force", m["licences.live"]], ["Critical processes", m["continuity.critical"]], ["Active ESG metrics", m["esg.active"]]].map(([l, v]) => (
           <div key={String(l)} style={{ background: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: 10, padding: "8px 14px" }}><div style={{ fontSize: 11, color: "#64748B" }}>{l}</div><div style={{ fontSize: 18, fontWeight: 700, color: "#0F172A" }}>{v ?? "—"}</div></div>
         ))}
       </div>
@@ -126,6 +135,34 @@ export default function ExecutiveTab({ onNavigate }: { onNavigate: (tab: string)
             </table>
           </div>
         </>
+      )}
+
+      <div style={{ fontWeight: 700, color: "#0F172A", margin: "24px 0 4px" }}>Where the figures are heading</div>
+      <p style={{ fontSize: 12, color: "#64748B", margin: "0 0 8px", maxWidth: 720 }}>
+        An indicative straight-line trend through the recorded snapshots. It does not know about planned work, seasonality or one-off events, so treat it as a description of recent movement, not a prediction.
+        A line is only drawn from at least 4 snapshots spanning 60 days, and a projection is only shown when the line fits the figures reasonably (fit of 0.5 or more).
+      </p>
+      {forecast.length === 0 ? <p style={{ fontSize: 13, color: "#64748B" }}>No snapshots in this period yet.</p> : (
+        <div style={{ overflowX: "auto" }}>
+          <table style={{ borderCollapse: "collapse", fontSize: 12, width: "100%" }}>
+            <thead><tr>{["Indicator", "Now", "Direction", "Per month", "In 30 days", "In 90 days", "Snapshots"].map((h, i) => <th key={h} style={{ textAlign: i === 0 || i === 2 ? "left" : "right", padding: "6px 8px", borderBottom: "1px solid #E2E8F0", fontWeight: 600 }}>{h}</th>)}</tr></thead>
+            <tbody>{forecast.map(f => {
+              const v = dirView(f.direction), has = f.direction === "IMPROVING" || f.direction === "DECLINING" || f.direction === "STEADY"
+              const cell = { padding: "6px 8px", borderBottom: "1px solid #F1F5F9", textAlign: "right" as const }
+              return (
+                <tr key={f.key} title={f.note}>
+                  <td style={{ ...cell, textAlign: "left" }}><button onClick={() => onNavigate(f.tab)} style={{ all: "unset", cursor: "pointer", color: "#4338CA" }}>{f.label}</button></td>
+                  <td style={cell}>{f.latestPercent === null ? "—" : `${f.latestPercent}%`}</td>
+                  <td style={{ ...cell, textAlign: "left", color: v.color }}><span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>{v.icon}{v.label}</span></td>
+                  <td style={cell}>{has ? `${f.slopePer30Days > 0 ? "+" : ""}${f.slopePer30Days.toFixed(1)} pts` : "—"}</td>
+                  <td style={cell}>{f.projected30Days === null ? "—" : `${f.projected30Days}%`}</td>
+                  <td style={cell}>{f.projected90Days === null ? "—" : `${f.projected90Days}%`}</td>
+                  <td style={{ ...cell, color: "#64748B" }}>{f.points}</td>
+                </tr>
+              )
+            })}</tbody>
+          </table>
+        </div>
       )}
     </div>
   )

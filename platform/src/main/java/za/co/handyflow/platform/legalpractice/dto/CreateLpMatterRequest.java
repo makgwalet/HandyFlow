@@ -17,5 +17,7 @@ public record CreateLpMatterRequest(
         @NotBlank String billingType,
         BigDecimal fixedFeeAmount,
         LocalDate openedDate,
-        String notes
+        String notes,
+        /** The conflict check that cleared this client for this matter (see LpConflictCheckController). */
+        @NotNull UUID conflictCheckId
 ) {}

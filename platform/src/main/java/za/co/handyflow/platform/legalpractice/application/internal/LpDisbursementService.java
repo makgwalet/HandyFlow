@@ -40,14 +40,17 @@ public class LpDisbursementService {
 
     private final LpDisbursementRepository disbursementRepo;
     private final LpMatterRepository matterRepo;
+    private final LpWallGuard walls;
 
     @Transactional(readOnly = true)
     public Page<LpDisbursementResponse> listForMatter(TenantId tenantId, UUID matterId, Pageable pageable) {
+        walls.requireMatterAccess(tenantId, matterId);
         return disbursementRepo.findAllForMatter(tenantId, matterId, pageable).map(this::toResponse);
     }
 
     @Transactional(readOnly = true)
     public List<LpDisbursementResponse> listUnbilledForMatter(TenantId tenantId, UUID matterId) {
+        walls.requireMatterAccess(tenantId, matterId);
         return disbursementRepo.findUnbilledByMatter(tenantId, matterId).stream().map(this::toResponse).toList();
     }
 
@@ -55,6 +58,7 @@ public class LpDisbursementService {
     public LpDisbursementResponse createDisbursement(TenantId tenantId, UUID matterId, CreateLpDisbursementRequest req) {
         LpMatter matter = matterRepo.findActiveById(tenantId, matterId)
                 .orElseThrow(() -> new ResourceNotFoundException("LpMatter", matterId.toString()));
+        walls.requireAccess(tenantId, matter);
         if ("CLOSED".equals(matter.getStatus()) || "ARCHIVED".equals(matter.getStatus())) {
             throw new IllegalStateException("Cannot log a disbursement against a matter in status " + matter.getStatus());
         }
@@ -82,8 +86,10 @@ public class LpDisbursementService {
     }
 
     private LpDisbursement findOwn(TenantId tenantId, UUID disbursementId) {
-        return disbursementRepo.findActiveById(tenantId, disbursementId)
+        LpDisbursement disbursement = disbursementRepo.findActiveById(tenantId, disbursementId)
                 .orElseThrow(() -> new ResourceNotFoundException("LpDisbursement", disbursementId.toString()));
+        walls.requireMatterAccess(tenantId, disbursement.getMatterId());
+        return disbursement;
     }
 
     private LpDisbursementResponse toResponse(LpDisbursement d) {

@@ -92,6 +92,24 @@ public class LpTrustTransaction {
 
     private String notes;
 
+    /** Set when a second person approved this payment: the request it came from and who approved it. Null for receipts. */
+    @Column(name = "request_id", updatable = false)
+    private UUID requestId;
+
+    @Column(name = "approved_by", updatable = false)
+    private UUID approvedBy;
+
+    @Column(name = "approved_by_name", length = 255, updatable = false)
+    private String approvedByName;
+
+    /** The client's trust balance straight after this movement, stamped once by the service when the row is written. Null only on rows older than V821 that could not be backfilled. */
+    @Column(name = "balance_after", precision = 15, scale = 2, updatable = false)
+    private BigDecimal balanceAfter;
+
+    /** Supplied by the screen so a double click or a retried request cannot post the same movement twice. Unique per firm when present. */
+    @Column(name = "idempotency_key", length = 80, updatable = false)
+    private String idempotencyKey;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
@@ -119,6 +137,31 @@ public class LpTrustTransaction {
         t.notes = notes;
         t.createdAt = Instant.now();
         return t;
+    }
+
+    /** Called once, before the row is saved, for a payment released through the request-and-approve step. */
+    public void recordApproval(UUID requestId, UUID approvedBy, String approvedByName) {
+        if (this.requestId != null) {
+            throw new IllegalStateException("This trust transaction already has an approval");
+        }
+        if (requestId == null || approvedBy == null) {
+            throw new IllegalArgumentException("An approval needs the request and the approver");
+        }
+        this.requestId = requestId;
+        this.approvedBy = approvedBy;
+        this.approvedByName = approvedByName;
+    }
+
+    /** Called once, by the service, after the client's balance has been moved and before the row is saved. */
+    public void seal(BigDecimal balanceAfter, String idempotencyKey) {
+        if (this.balanceAfter != null) {
+            throw new IllegalStateException("This trust transaction has already been sealed");
+        }
+        if (balanceAfter == null || balanceAfter.signum() < 0) {
+            throw new IllegalArgumentException("A trust balance can never be negative");
+        }
+        this.balanceAfter = balanceAfter;
+        this.idempotencyKey = idempotencyKey;
     }
 
     private static void validateTypeFieldCombination(String type, UUID invoiceId, String payee) {

@@ -7,6 +7,7 @@ import org.springframework.data.jpa.repository.Query;
 import za.co.handyflow.platform.legalpractice.domain.model.LpMatter;
 import za.co.handyflow.platform.shared.TenantId;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -29,4 +30,19 @@ public interface LpMatterRepository extends JpaRepository<LpMatter, UUID> {
 
     @Query("SELECT m FROM LpMatter m WHERE m.tenantId = :tenantId ORDER BY m.createdAt DESC")
     Page<LpMatter> findAllActiveForFirm(TenantId tenantId, Pageable pageable);
+
+    /** The firm's matters, leaving out the ones a wall bars the signed-in user from (matters walled directly, and every matter of a walled client). */
+    @Query("""
+        SELECT m FROM LpMatter m
+        WHERE m.tenantId = :tenantId AND m.id NOT IN :barredMatterIds AND m.clientId NOT IN :barredClientIds
+        ORDER BY m.createdAt DESC
+        """)
+    Page<LpMatter> findAllActiveForFirmExcluding(TenantId tenantId, List<UUID> barredMatterIds, List<UUID> barredClientIds, Pageable pageable);
+
+    @Query("""
+        SELECT m FROM LpMatter m
+        WHERE m.tenantId = :tenantId AND m.clientId = :clientId AND m.id NOT IN :barredMatterIds
+        ORDER BY m.createdAt DESC
+        """)
+    Page<LpMatter> findAllActiveForClientExcluding(TenantId tenantId, UUID clientId, List<UUID> barredMatterIds, Pageable pageable);
 }

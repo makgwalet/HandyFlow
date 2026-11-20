@@ -56,6 +56,15 @@ public final class ExecutiveRules {
         Long inForce = m.get("ethics.inForce"), reviewOverdue = m.get("ethics.reviewOverdue");
         if (inForce != null && reviewOverdue != null)
             out.add(new Indicator("declarationsInDate", "Cleared declarations within their review date", "(cleared or mitigated − review overdue) ÷ cleared or mitigated", inForce - reviewOverdue, inForce, percent(inForce - reviewOverdue, inForce), "ethics"));
+        Long bcProcesses = m.get("continuity.processes"), bcNoPlan = m.get("continuity.withoutApprovedPlan");
+        if (bcProcesses != null && bcNoPlan != null)
+            out.add(new Indicator("continuityPlanned", "Business processes with an approved continuity plan", "(processes − without an approved plan) ÷ processes", bcProcesses - bcNoPlan, bcProcesses, percent(bcProcesses - bcNoPlan, bcProcesses), "continuity"));
+        Long bcTestOverdue = m.get("continuity.testOverdue");
+        if (bcProcesses != null && bcTestOverdue != null)
+            out.add(new Indicator("continuityTested", "Business processes whose continuity test is in date", "(processes − test overdue) ÷ processes", bcProcesses - bcTestOverdue, bcProcesses, percent(bcProcesses - bcTestOverdue, bcProcesses), "continuity"));
+        Long esgActive = m.get("esg.active"), esgOverdue = m.get("esg.readingsOverdue");
+        if (esgActive != null && esgOverdue != null)
+            out.add(new Indicator("esgReadingsOnTime", "ESG metrics with readings on time", "(active metrics − readings overdue) ÷ active metrics", esgActive - esgOverdue, esgActive, percent(esgActive - esgOverdue, esgActive), "esg"));
         return out;
     }
 
@@ -71,6 +80,8 @@ public final class ExecutiveRules {
             new Rule("privacy.paiaOverdue", true, "PAIA request(s) past their due date", "privacy"),
             new Rule("thirdParties.expired", true, "third-party document(s) expired", "thirdparties"),
             new Rule("changes.overdue", true, "regulatory change(s) overdue for assessment", "changes"),
+            new Rule("continuity.criticalWithoutPlan", true, "critical process(es) with no approved continuity plan", "continuity"),
+            new Rule("continuity.lastTestUnsuccessful", true, "continuity plan(s) whose latest test was unsuccessful", "continuity"),
             new Rule("governance.withoutQuorumCapacity", true, "committee(s) with too few members to ever reach a quorum", "committees"),
             new Rule("obligations.overdue", false, "obligation(s) overdue", "obligations"),
             new Rule("findings.overdue", false, "finding(s) overdue", "findings"),
@@ -92,6 +103,11 @@ public final class ExecutiveRules {
             new Rule("ethics.awaitingReview", false, "conflict-of-interest declaration(s) awaiting review", "ethics"),
             new Rule("ethics.reviewOverdue", false, "declaration(s) past their review date", "ethics"),
             new Rule("ethics.giftsPending", false, "gift or hospitality entr(ies) awaiting approval", "ethics"),
+            new Rule("continuity.testOverdue", false, "continuity test(s) overdue", "continuity"),
+            new Rule("continuity.planReviewOverdue", false, "continuity plan review(s) overdue", "continuity"),
+            new Rule("continuity.biaOverdue", false, "business impact analysis review(s) overdue", "continuity"),
+            new Rule("esg.readingsOverdue", false, "ESG reading(s) overdue", "esg"),
+            new Rule("esg.targetsMissed", false, "ESG target(s) missed", "esg"),
             new Rule("coverage.uncovered", false, "obligation(s) with no control", "controls"),
             new Rule("risks.unassessed", false, "risk(s) not yet assessed", "risks"));
 

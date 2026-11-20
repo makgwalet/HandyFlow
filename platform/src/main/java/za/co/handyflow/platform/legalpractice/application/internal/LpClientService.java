@@ -23,10 +23,12 @@ import java.util.UUID;
 public class LpClientService {
 
     private final LpClientRepository clientRepo;
+    private final LpWallGuard walls;
 
     @Transactional(readOnly = true)
     public Page<LpClientResponse> listClients(TenantId tenantId, Pageable pageable) {
-        return clientRepo.findAllActive(tenantId, pageable).map(this::toResponse);
+        var barred = walls.barred(tenantId);
+        return clientRepo.findAllActiveExcluding(tenantId, barred.clientIds(), pageable).map(this::toResponse);
     }
 
     @Transactional(readOnly = true)
@@ -76,8 +78,10 @@ public class LpClientService {
     }
 
     private LpClient findOwn(TenantId tenantId, UUID clientId) {
-        return clientRepo.findActiveById(tenantId, clientId)
+        LpClient client = clientRepo.findActiveById(tenantId, clientId)
                 .orElseThrow(() -> new ResourceNotFoundException("LpClient", clientId.toString()));
+        walls.requireClientAccess(tenantId, clientId);
+        return client;
     }
 
     private LpClientResponse toResponse(LpClient c) {

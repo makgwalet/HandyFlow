@@ -4,10 +4,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import za.co.handyflow.platform.legalcompliance.domain.model.CoiDeclaration;
-import za.co.handyflow.platform.legalcompliance.domain.model.DeclarationStatus;
-import za.co.handyflow.platform.legalcompliance.domain.model.GiftEntry;
-import za.co.handyflow.platform.legalcompliance.domain.model.GiftStatus;
+import za.co.handyflow.platform.legalcompliance.domain.model.*;
 import za.co.handyflow.platform.legalcompliance.domain.repository.CoiDeclarationRepository;
 import za.co.handyflow.platform.legalcompliance.domain.repository.GiftEntryRepository;
 import za.co.handyflow.platform.legalcompliance.dto.AssuranceDtos.ReasonRequest;
@@ -95,7 +92,7 @@ public class EthicsService {
 
     @Transactional(readOnly = true)
     public List<DeclarationResponse> declarations(TenantId t, UUID viewer, boolean seeAll, DeclarationStatus status) {
-        return declarations.search(t, seeAll ? null : viewer, status).stream().map(d -> view(d, viewer)).toList();
+        return declarations.searchCapped(t, seeAll ? null : viewer, status).stream().map(d -> view(d, viewer)).toList();
     }
 
     @Transactional(readOnly = true)
@@ -136,7 +133,7 @@ public class EthicsService {
 
     @Transactional(readOnly = true)
     public List<GiftResponse> gifts(TenantId t, UUID viewer, boolean seeAll, GiftStatus status) {
-        return gifts.search(t, seeAll ? null : viewer, status).stream().map(g -> view(g, viewer)).toList();
+        return gifts.searchCapped(t, seeAll ? null : viewer, status).stream().map(g -> view(g, viewer)).toList();
     }
 
     @Transactional(readOnly = true)

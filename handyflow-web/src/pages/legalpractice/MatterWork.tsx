@@ -2,12 +2,14 @@
 import { useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
+import { usePermissions } from "../../hooks/usePermission"
 import { toast } from "../../store/toast.store"
 import { Btn, Dialog, Empty, ErrorLine, Input, Pick, Pill, card, day, errorText, fail, money, muted, pageOf, td, th } from "./kit"
 import { BASE, type Lookups } from "./lookups"
 import type { Matter } from "./MattersTab"
+import { ComputeDialog, DeadlinePanel } from "./DeadlinePanel"
 import {
-  DATE_TYPES, KEYDATE_STATUS, WORK_STATUS, billable, canChangeWork, disbProblem, disbRequest, emptyDisb, emptyKeyDate, emptyTime, generateProblem, keyDateNote, keyDateProblem, keyDateRequest,
+  DATE_TYPES, KEYDATE_STATUS, WORK_STATUS, billable, canChangeWork, canLogWork, disbProblem, disbRequest, emptyDisb, emptyKeyDate, emptyTime, generateProblem, keyDateNote, keyDateProblem, keyDateRequest,
   labelOf, timeProblem, timeRequest, type DisbForm, type KeyDateForm, type TimeForm,
 } from "./legal.logic"
 
@@ -165,7 +167,8 @@ function DisbDialog({ matter, item, onClose, onSaved }: { matter: Matter; item: 
 
 function KeyDatePanel({ matter, canWrite }: { matter: Matter; canWrite: boolean }) {
   const qc = useQueryClient()
-  const [editing, setEditing] = useState<KeyDate | "new" | null>(null)
+  const [editing, setEditing] = useState<KeyDate | "new" | null>(null), [computing, setComputing] = useState(false)
+  const canCompute = usePermissions(["LEGALPRACTICE_DEADLINE_COMPUTE", "LEGALPRACTICE_MANAGE", "LEGALPRACTICE_ADMIN"]) && canLogWork(matter.status)
   const { data = [], isLoading, isError } = useQuery({ queryKey: ["lp-keydates", matter.id], queryFn: async () => { const r: any = await apiClient.get(`${BASE}/matters/${matter.id}/key-dates`); const d = r?.data?.data ?? r?.data; return (Array.isArray(d) ? d : []) as KeyDate[] } })
   const refresh = () => qc.invalidateQueries({ queryKey: ["lp-keydates"] })
   const act = useMutation({
@@ -175,7 +178,10 @@ function KeyDatePanel({ matter, canWrite }: { matter: Matter; canWrite: boolean 
   const rows = [...data].sort((a, b) => (a.status === "PENDING" ? 0 : 1) - (b.status === "PENDING" ? 0 : 1) || a.dueDate.localeCompare(b.dueDate))
   return (
     <div>
-      <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 8 }}>{canWrite && <Btn onClick={() => setEditing("new")}>Add key date</Btn>}</div>
+      <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginBottom: 8 }}>
+        {canCompute && <Btn onClick={() => setComputing(true)}>Work out a deadline</Btn>}
+        {canWrite && <Btn onClick={() => setEditing("new")}>Add key date</Btn>}
+      </div>
       <div style={{ ...card, padding: 0, overflowX: "auto" }}>
         {isError ? <Empty>Could not load the key dates.</Empty> : isLoading ? <Empty>Loading…</Empty> : rows.length === 0 ? <Empty>No key dates. Add court dates and filing or prescription deadlines so they are not missed.</Empty> : (
           <table style={{ width: "100%", borderCollapse: "collapse" }}>
@@ -196,7 +202,9 @@ function KeyDatePanel({ matter, canWrite }: { matter: Matter; canWrite: boolean 
             })}</tbody>
           </table>)}
       </div>
+      <DeadlinePanel matterId={matter.id} canCompute={canCompute} />
       {editing && <KeyDateDialog matter={matter} item={editing === "new" ? null : editing} onClose={() => setEditing(null)} onSaved={refresh} />}
+      {computing && <ComputeDialog matterId={matter.id} onClose={() => setComputing(false)} onAdded={refresh} />}
     </div>
   )
 }

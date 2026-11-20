@@ -1,5 +1,6 @@
 package za.co.handyflow.platform.legalcompliance.domain.repository;
 
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import za.co.handyflow.platform.legalcompliance.domain.model.*;
@@ -22,7 +23,13 @@ public interface RiskRepository extends JpaRepository<Risk, UUID> {
         AND (:includeClosed = TRUE OR r.status <> za.co.handyflow.platform.legalcompliance.domain.model.RiskStatus.CLOSED)
         ORDER BY r.reference
         """)
-    List<Risk> search(TenantId tenantId, RiskStatus status, RiskCategory category, boolean includeClosed);
+    List<Risk> search(TenantId tenantId, RiskStatus status, RiskCategory category, boolean includeClosed, Pageable pageable);
+
+    /** Everything, for summaries, coverage and sweeps that must count every row. */
+    default List<Risk> search(TenantId tenantId, RiskStatus status, RiskCategory category, boolean includeClosed) { return search(tenantId, status, category, includeClosed, Pageable.unpaged()); }
+
+    /** In the query's own order, at most RowLimit.MAX_ROWS: for list screens only. */
+    default List<Risk> searchCapped(TenantId tenantId, RiskStatus status, RiskCategory category, boolean includeClosed) { return search(tenantId, status, category, includeClosed, RowLimit.first()); }
 
     /** Globally unique, increasing; per-tenant numbering therefore has gaps. */
     @Query(value = "SELECT nextval('legalcompliance_ref_seq')", nativeQuery = true)

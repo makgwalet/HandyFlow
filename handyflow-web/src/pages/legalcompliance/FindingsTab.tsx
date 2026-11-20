@@ -10,7 +10,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import { usePermission } from "../../hooks/usePermission"
 import { input, primaryBtn, ghostBtn, unwrap, one, fmtDate, fmtDateTime, errMsg } from "./lcHelpers"
-import { Modal, Field, Err, Badge } from "./LcUi"
+import { Modal, Field, Err, Badge, RowLimitNotice } from "./LcUi"
 import { ChevronDown, ChevronUp } from "lucide-react"
 
 interface Finding {
@@ -88,6 +88,7 @@ export default function FindingsTab() {
       <label style={{ fontSize: 13, color: "#475569", display: "flex", gap: 6, alignItems: "center", marginBottom: 12 }}><input type="checkbox" checked={includeClosed} onChange={e => setIncludeClosed(e.target.checked)} /> Show closed</label>
       {notice && <div style={{ background: "#ECFDF5", border: "1px solid #A7F3D0", color: "#065F46", borderRadius: 8, padding: "8px 12px", fontSize: 13, marginBottom: 12 }}>{notice}</div>}
 
+      <RowLimitNotice count={findings.length} />
       {isLoading ? <p style={{ color: "#64748B" }}>Loading…</p> : findings.length === 0 ? <p style={{ color: "#64748B", fontSize: 14 }}>No findings. They are raised automatically when a control test is partial or fails.</p> : findings.map(f => {
         const isOpen = expanded === f.id
         return (

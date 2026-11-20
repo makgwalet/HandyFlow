@@ -4,7 +4,11 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.data.domain.PageRequest;
+import za.co.handyflow.platform.legalcompliance.domain.model.ImpactStatus;
 import za.co.handyflow.platform.legalcompliance.domain.repository.PostureSnapshotRepository;
+import za.co.handyflow.platform.legalcompliance.domain.repository.RegulatoryEventRepository;
+import za.co.handyflow.platform.legalcompliance.dto.RegulatoryChangeDtos.ImpactResponse;
 import za.co.handyflow.platform.legalcompliance.dto.ExecDtos.Indicator;
 import za.co.handyflow.platform.legalcompliance.dto.ReportDtos.ReportInfo;
 import za.co.handyflow.platform.legalcompliance.dto.ReportDtos.ReportResult;
@@ -26,6 +30,8 @@ import static za.co.handyflow.platform.legalcompliance.application.internal.Repo
  *  - FICA and conflict-of-interest declarations are not reports here at all (restricted areas);
  *  - personal data of the public (PAIA requesters, data subjects, declarants) is never a column; incident descriptions and free-text notes are left out too;
  *  - only the executive scorecard can be run "as of" an earlier date, and then it is computed from the stored snapshot, not from today's data;
+ *  - each report has a minimum audience: PROVIDER (a consultant reading a client's workspace) < STAFF < ADMIN. The Audit Trail is ADMIN only and Litigation is not shown to providers;
+ *    callers that do not say who is asking get PROVIDER, the most restrictive view;
  *  - downloading is a separate act (exportCsv) which is written to the regulatory audit trail with the report, the row count and who did it.
  * Output is capped at ReportRules.MAX_ROWS rows and says so when cut.
  */
@@ -48,23 +54,57 @@ public class ReportService {
     private final CommitteeService committees;
     private final ContinuityService continuity;
     private final EsgService esg;
+    private final ControlService controls;
+    private final LitigationMatterService litigation;
+    private final RegulatoryChangeService changes;
+    private final PopiaProcessingActivityService popia;
+    private final DsarRequestService dsar;
+    private final RegulatoryEventRepository events;
     private final PostureSnapshotRepository snapshots;
     private final RegulatoryAuditService trail;
 
-    public record ExportFile(String fileName, byte[] bytes) {}
+    public record ExportFile(String fileName, byte[] bytes, String contentType) {}
+
+    public enum Format {
+        CSV("csv", "text/csv; charset=utf-8"), XLSX("xlsx", ReportFiles.XLSX_TYPE), PDF("pdf", ReportFiles.PDF_TYPE);
+        public final String ext, contentType;
+        Format(String ext, String contentType) { this.ext = ext; this.contentType = contentType; }
+        /** Null or blank means CSV; anything unrecognised is a 400, not a silent fallback. */
+        public static Format parse(String s) {
+            if (s == null || s.isBlank()) return CSV;
+            try { return valueOf(s.trim().toUpperCase(java.util.Locale.ROOT)); }
+            catch (IllegalArgumentException e) { throw new HandyFlowException("Unknown export format: use csv, xlsx or pdf", org.springframework.http.HttpStatus.BAD_REQUEST, "VALIDATION"); }
+        }
+    }
 
     private record Ctx(TenantId tenant, LocalDate today, LocalDate asOf) {}
 
-    private record Def(ReportInfo info, List<String> columns, Function<Ctx, List<List<String>>> rows) {}
+    /** Who is asking. Each report names the lowest audience that may see it. */
+    public enum Audience { PROVIDER, STAFF, ADMIN }
+
+    private record Def(ReportInfo info, List<String> columns, Function<Ctx, List<List<String>>> rows, Audience min) {}
 
     private final Map<String, Def> defs = build();
 
-    public List<ReportInfo> catalogue() { return defs.values().stream().map(Def::info).toList(); }
+    /** The most restrictive view (a provider's). Callers that mean staff or admin must say so. */
+    public List<ReportInfo> catalogue() { return catalogue(Audience.PROVIDER); }
+
+    public List<ReportInfo> catalogue(Audience who) { return defs.values().stream().filter(d -> allowed(d, who)).map(Def::info).toList(); }
+
+    /** The most restrictive view (a provider's). */
+    @Transactional(readOnly = true)
+    public ReportResult run(TenantId t, String key, String asOf, String by) { return run(t, key, asOf, by, Audience.PROVIDER); }
+
+    private static boolean allowed(Def d, Audience who) { return visible(d.min(), who); }
+
+    /** True when someone of audience `who` may see a report whose lowest audience is `min`. A missing audience sees nothing. */
+    static boolean visible(Audience min, Audience who) { return who != null && who.ordinal() >= min.ordinal(); }
 
     @Transactional(readOnly = true)
-    public ReportResult run(TenantId t, String key, String asOf, String by) {
+    public ReportResult run(TenantId t, String key, String asOf, String by, Audience who) {
         Def d = defs.get(key == null ? "" : key.toUpperCase());
-        if (d == null) throw new ResourceNotFoundException("Report", String.valueOf(key));
+        // A report the caller may not see is reported exactly like one that does not exist.
+        if (d == null || !allowed(d, who)) throw new ResourceNotFoundException("Report", String.valueOf(key));
         LocalDate asOfDate = null;
         if (asOf != null && !asOf.isBlank()) {
             if (!d.info().supportsAsOf()) throw new HandyFlowException("This report can only be run for today", HttpStatus.BAD_REQUEST, "VALIDATION");
@@ -79,12 +119,43 @@ public class ReportService {
 
     /** Runs the report and records the export. The audit entry is written in the same transaction as the run, so there is no export without a record. */
     @Transactional
-    public ExportFile exportCsv(TenantId t, String key, String asOf, UUID uid, String uname) {
-        ReportResult r = run(t, key, asOf, uname);
+    public ExportFile exportCsv(TenantId t, String key, String asOf, UUID uid, String uname, Audience who) { return export(t, key, asOf, uid, uname, who, Format.CSV); }
+
+    @Transactional
+    public ExportFile export(TenantId t, String key, String asOf, UUID uid, String uname, Audience who, Format format) {
+        ReportResult r = run(t, key, asOf, uname, who);
         trail.record(t.getValue(), ENTITY, UUID.nameUUIDFromBytes(("report:" + r.key()).getBytes(StandardCharsets.UTF_8)), "EXPORTED",
-                r.title() + ": " + r.rowCount() + " row(s)" + (r.truncated() ? " (cut at " + MAX_ROWS + ")" : "") + (r.asOf() == null ? "" : ", as of " + r.asOf()) + ", CSV", uid, uname);
-        byte[] body = ("﻿" + csv(r.columns(), r.rows())).getBytes(StandardCharsets.UTF_8);
-        return new ExportFile(fileName(r.key(), today()), body);
+                r.title() + ": " + r.rowCount() + " row(s)" + (r.truncated() ? " (cut at " + MAX_ROWS + ")" : "") + (r.asOf() == null ? "" : ", as of " + r.asOf()) + ", " + format, uid, uname);
+        byte[] body = switch (format) {
+            case CSV -> ("\uFEFF" + csv(r.columns(), r.rows())).getBytes(StandardCharsets.UTF_8);
+            case XLSX -> ReportFiles.xlsx(r.title(), ReportRules.subtitle(r.generatedAt(), r.generatedBy(), r.asOf(), r.rowCount(), r.truncated()), r.columns(), r.rows());
+            case PDF -> ReportFiles.pdf(r.title(), ReportRules.subtitle(r.generatedAt(), r.generatedBy(), r.asOf(), r.rowCount(), r.truncated()), r.columns(), r.rows());
+        };
+        return new ExportFile(fileName(r.key(), today(), format.ext), body, format.contentType);
+    }
+
+    /**
+     * A board pack: the chosen reports in one PDF with a cover page and contents. The same audience rule applies to every report (one the caller may not see is a 404 and
+     * the whole pack is refused). A date applies to the reports that can be run as at a date and is ignored by the rest. Each report carries at most
+     * ReportRules.PACK_ROWS_PER_REPORT rows and says so when cut. One audit entry names every report in the pack, written in the same transaction as the run.
+     */
+    @Transactional
+    public ExportFile exportPack(TenantId t, List<String> keys, String asOf, String title, UUID uid, String uname, Audience who) {
+        List<String> ks = ReportRules.packKeys(keys);
+        Map<String, ReportInfo> visibleInfo = new HashMap<>();
+        for (ReportInfo i : catalogue(who)) visibleInfo.put(i.key(), i);
+        List<ReportFiles.Section> sections = new ArrayList<>();
+        for (String key : ks) {
+            ReportInfo info = visibleInfo.get(key);
+            if (info == null) throw new ResourceNotFoundException("Report", key);
+            ReportResult r = run(t, key, info.supportsAsOf() ? asOf : null, uname, who);
+            List<List<String>> rows = ReportRules.packCuts(r.rows().size()) ? r.rows().subList(0, ReportRules.PACK_ROWS_PER_REPORT) : r.rows();
+            sections.add(new ReportFiles.Section(r.title(), ReportRules.subtitle(r.generatedAt(), r.generatedBy(), r.asOf(), r.rowCount(), r.truncated()) + ReportRules.packNote(r.rows().size()), r.columns(), rows));
+        }
+        trail.record(t.getValue(), ENTITY, UUID.nameUUIDFromBytes("report:PACK".getBytes(StandardCharsets.UTF_8)), "EXPORTED",
+                "Board pack of " + ks.size() + " report(s): " + String.join(", ", ks) + (asOf == null || asOf.isBlank() ? "" : ", as of " + asOf.trim()) + ", PDF", uid, uname);
+        byte[] body = ReportFiles.pdfPack(ReportRules.packTitle(title), ReportRules.packSubtitle(today(), uname, ks.size(), asOf), sections);
+        return new ExportFile(ReportRules.packFileName(today()), body, ReportFiles.PDF_TYPE);
     }
 
     private static LocalDate today() { return LocalDate.now(ZoneId.of("Africa/Johannesburg")); }
@@ -157,10 +228,53 @@ public class ReportService {
                 c -> esg.list(c.tenant(), false).stream().map(x -> List.of(text(x.reference()), text(x.name()), text(x.category()), text(x.unit()), text(x.frequency()), text(x.ownerName()), text(x.frameworkRef()),
                         text(x.targetValue() == null ? null : x.targetValue().stripTrailingZeros().toPlainString()), date(x.latestPeriodEnd()),
                         text(x.latestValue() == null ? null : x.latestValue().stripTrailingZeros().toPlainString()), text(x.latestTargetStatus()), yesNo(x.readingOverdue()))).toList());
+
+        add(m, "CONTROL_EFFECTIVENESS", "Controls", "Control effectiveness", "Each control with its design rating, tested operating effectiveness, last and next test, and how many obligations and risks it covers. An untested control is shown as not tested, never as effective.", true, false,
+                List.of("Reference", "Control", "Type", "Nature", "Frequency", "Owner", "Status", "Design rating", "Operating effectiveness", "Last tested", "Next test due", "Test overdue", "Currently effective", "Obligations", "Risks"),
+                c -> controls.list(c.tenant(), null, false).stream().map(x -> List.of(text(x.reference()), text(x.title()), text(x.controlType()), text(x.nature()), text(x.frequency()), text(x.ownerName()), text(x.status()),
+                        text(x.designRating()), text(x.operatingEffectiveness()), dateOf(x.lastTestedAt()), date(x.nextTestDue()), yesNo(x.testOverdue()), yesNo(x.currentlyEffective()), num(x.obligationCount()), num(x.riskCount()))).toList());
+        add(m, "REG_CHANGES", "Regulatory", "Regulatory changes", "Changes to the regulations you follow, with how many obligations and requirements each affects and how many assessments are still open or overdue.", false, false,
+                List.of("Regulation", "From version", "To version", "Kind", "Status", "Added", "Changed", "Removed", "Unchanged", "Impacts", "Impacts pending", "Impacts overdue", "Recorded", "Closed"),
+                c -> {
+                    Map<UUID, List<ImpactResponse>> byChange = new HashMap<>();
+                    for (ImpactResponse i : changes.listImpacts(c.tenant(), null)) byChange.computeIfAbsent(i.changeId(), k -> new ArrayList<>()).add(i);
+                    return changes.list(c.tenant(), null, PageRequest.of(0, MAX_ROWS + 1)).getContent().stream().map(x -> {
+                        List<ImpactResponse> imp = byChange.getOrDefault(x.id(), List.of());
+                        return List.of(text(x.instrumentTitle()), text(x.fromLabel()), text(x.toLabel()), text(x.changeKind()), text(x.status()), num(x.addedCount()), num(x.changedCount()), num(x.removedCount()),
+                                num(x.carriedCount()), num(imp.size()), num(imp.stream().filter(i -> i.status() == ImpactStatus.PENDING).count()), num(imp.stream().filter(ImpactResponse::overdue).count()),
+                                dateOf(x.createdAt()), dateOf(x.closedAt()));
+                    }).toList();
+                });
+        add(m, "POPIA_ACTIVITIES", "Privacy", "POPIA processing activities", "The register of personal-information processing: category, lawful basis, owner, retention, cross-border transfer and review date.", false, false,
+                List.of("Activity", "Data category", "Lawful basis", "Purpose", "Department", "Owner", "Retention", "Cross-border transfer", "Review date", "Review overdue", "Active"),
+                c -> popia.list(c.tenant()).stream().map(a -> List.of(text(a.getActivityName()), text(a.getDataCategory()), text(a.getLawfulBasis()), text(a.getPurpose()), text(a.getResponsibleDepartment()), text(a.getResponsibleUserName()),
+                        text(a.getRetentionPeriodDescription()), yesNo(a.isCrossBorderTransfer()), date(a.getReviewDate()), yesNo(a.isActive() && a.getReviewDate() != null && a.getReviewDate().isBefore(c.today())), yesNo(a.isActive()))).toList());
+        add(m, "DSAR", "Privacy", "Data subject requests", "Requests with type, dates, status and who is handling them. The requester's name and contact details and the resolution notes are not included.", false, false,
+                List.of("Request", "Type", "Data category", "Received", "Due", "Status", "Assigned to", "Completed", "Overdue", "Days overdue"),
+                c -> dsar.listAll(c.tenant()).stream().map(d -> List.of(text(d.getRequestNumber()), text(d.getRequestType()), text(d.getDataCategory()), date(d.getReceivedDate()), date(d.getDueDate()), text(d.getStatus()),
+                        text(d.getAssignedToUserName()), date(d.getCompletedDate()), yesNo(d.isOverdue(c.today())), num(d.isOverdue(c.today()) ? daysOverdue(d.getDueDate(), c.today()) : 0))).toList(), Audience.STAFF);
+        add(m, "LITIGATION", "Legal", "Litigation register", "Matters with type, status, court or forum, key dates and estimated exposure. Party names, descriptions and outcome notes are not included. Not shown to external providers.", false, false,
+                List.of("Matter", "Type", "Status", "Our side", "Court or forum", "Case reference", "Opened", "Next key date", "Key date passed", "Closed", "Estimated exposure", "Linked contract"),
+                c -> litigation.listAll(c.tenant()).stream().map(l -> {
+                    boolean live = l.getStatus() == za.co.handyflow.platform.legalcompliance.domain.model.LitigationStatus.OPEN || l.getStatus() == za.co.handyflow.platform.legalcompliance.domain.model.LitigationStatus.IN_PROGRESS;
+                    return List.of(text(l.getMatterNumber()), text(l.getMatterType()), text(l.getStatus()), text(l.getOurSide()), text(l.getCourtOrForum()), text(l.getCaseReference()), date(l.getOpenedDate()), date(l.getNextKeyDate()),
+                            yesNo(live && l.getNextKeyDate() != null && l.getNextKeyDate().isBefore(c.today())), date(l.getClosedDate()), text(l.getEstimatedExposure() == null ? null : l.getEstimatedExposure().stripTrailingZeros().toPlainString()), yesNo(l.getLinkedContractId() != null));
+                }).toList(), Audience.STAFF);
+        add(m, "AUDIT_TRAIL", "Management", "Audit trail", "Who did what, and when, across the compliance registers for the 90 days ending on the chosen date (today if none). Administrators only. FICA, conflict-of-interest, attestation and PAIA activity is never included, and neither is event detail.", true, true,
+                List.of("When (SAST)", "Area", "Event", "By"),
+                c -> {
+                    Instant[] w = AuditTrailRules.window(c.asOf(), c.today());
+                    return events.inWindow(c.tenant().getValue(), w[0], w[1], AuditTrailRules.allowedTypes(), PageRequest.of(0, MAX_ROWS + 1)).stream()
+                            .map(e -> List.of(AuditTrailRules.stamp(e.getCreatedAt()), text(AuditTrailRules.area(e.getEntityType())), AuditTrailRules.eventLabel(e.getEventType()), text(e.getActorName()))).toList();
+                }, Audience.ADMIN);
         return Collections.unmodifiableMap(m);
     }
 
     private static void add(Map<String, Def> m, String key, String category, String title, String description, boolean names, boolean asOf, List<String> columns, Function<Ctx, List<List<String>>> rows) {
-        m.put(key, new Def(new ReportInfo(key, category, title, description, names, asOf), columns, rows));
+        add(m, key, category, title, description, names, asOf, columns, rows, Audience.PROVIDER);
+    }
+
+    private static void add(Map<String, Def> m, String key, String category, String title, String description, boolean names, boolean asOf, List<String> columns, Function<Ctx, List<List<String>>> rows, Audience min) {
+        m.put(key, new Def(new ReportInfo(key, category, title, description, names, asOf), columns, rows, min));
     }
 }

@@ -22,4 +22,8 @@ public interface LpClientRepository extends JpaRepository<LpClient, UUID> {
 
     @Query("SELECT c FROM LpClient c WHERE c.tenantId = :tenantId AND c.id = :id")
     Optional<LpClient> findActiveById(TenantId tenantId, UUID id);
+
+    /** The firm's clients, leaving out those the signed-in user is walled from. */
+    @Query("SELECT c FROM LpClient c WHERE c.tenantId = :tenantId AND c.id NOT IN :barredClientIds ORDER BY c.name ASC")
+    Page<LpClient> findAllActiveExcluding(TenantId tenantId, java.util.List<UUID> barredClientIds, Pageable pageable);
 }

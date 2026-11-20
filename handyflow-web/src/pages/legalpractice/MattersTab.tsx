@@ -9,6 +9,7 @@ import EvidencePanel from "./EvidencePanel"
 import { BASE, useLookups, type Lookups } from "./lookups"
 import { BILLING_TYPES, MATTER_STATUS, MATTER_TYPES, canLogWork, emptyMatter, labelOf, matterActions, matterProblem, matterRequest, type MatterForm } from "./legal.logic"
 import MatterWork from "./MatterWork"
+import ConflictPanel from "./ConflictPanel"
 
 export interface Matter { id: string; clientId: string; attorneyId: string; matterNumber: string; matterType: string; matterName: string; description: string | null; billingType: string; fixedFeeAmount: number | null; status: string; openedDate: string | null; closedDate: string | null; notes: string | null }
 
@@ -107,9 +108,11 @@ const Fact = ({ k, v }: { k: string; v: string }) => <div style={{ minWidth: 0 }
 
 function MatterDialog({ matter, lookups, onClose }: { matter: Matter | null; lookups: Lookups; onClose: () => void }) {
   const creating = !matter, qc = useQueryClient()
-  const [f, setF] = useState<MatterForm>(() => matter ? { clientId: matter.clientId, attorneyId: matter.attorneyId, matterNumber: matter.matterNumber, matterType: matter.matterType, matterName: matter.matterName, description: matter.description ?? "", billingType: matter.billingType, fixedFeeAmount: matter.fixedFeeAmount != null ? String(matter.fixedFeeAmount) : "", openedDate: matter.openedDate ?? "", notes: matter.notes ?? "" } : emptyMatter())
+  const [f, setF] = useState<MatterForm>(() => matter ? { clientId: matter.clientId, attorneyId: matter.attorneyId, matterNumber: matter.matterNumber, matterType: matter.matterType, matterName: matter.matterName, description: matter.description ?? "", billingType: matter.billingType, fixedFeeAmount: matter.fixedFeeAmount != null ? String(matter.fixedFeeAmount) : "", openedDate: matter.openedDate ?? "", notes: matter.notes ?? "", conflictCheckId: "" } : emptyMatter())
   const [err, setErr] = useState("")
   const set = (k: keyof MatterForm) => (v: string) => setF(s => ({ ...s, [k]: v }))
+  // A conflict check belongs to one client, so changing the client drops the chosen check.
+  const setClient = (v: string) => setF(s => ({ ...s, clientId: v, conflictCheckId: "" }))
   const problem = matterProblem(f, creating)
   const save = useMutation({
     mutationFn: () => creating ? apiClient.post(`${BASE}/matters`, matterRequest(f, true)) : apiClient.put(`${BASE}/matters/${matter!.id}`, matterRequest(f, false)),
@@ -121,7 +124,7 @@ function MatterDialog({ matter, lookups, onClose }: { matter: Matter | null; loo
     <Dialog title={creating ? "New matter" : `Edit ${matter!.matterNumber}`} onClose={onClose} width={640}
       footer={<><Btn onClick={onClose}>Cancel</Btn><Btn kind="primary" disabled={!!problem || save.isPending} onClick={() => { setErr(""); save.mutate() }}>{save.isPending ? "Saving…" : "Save"}</Btn></>}>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0 12px" }}>
-        {creating ? <Pick label="Client" value={f.clientId} onChange={set("clientId")} options={lookups.clients.filter(c => c.status === "ACTIVE").map(c => [c.id, c.name] as const)} blank="Choose a client" /> : <div />}
+        {creating ? <Pick label="Client" value={f.clientId} onChange={setClient} options={lookups.clients.filter(c => c.status === "ACTIVE").map(c => [c.id, c.name] as const)} blank="Choose a client" /> : <div />}
         <Pick label="Responsible attorney" value={f.attorneyId} onChange={set("attorneyId")} options={attorneys} blank="Choose an attorney" />
         {creating && <Input label="Matter number" value={f.matterNumber} onChange={set("matterNumber")} maxLength={100} />}
         {creating && <Pick label="Type" value={f.matterType} onChange={set("matterType")} options={MATTER_TYPES} />}
@@ -129,6 +132,7 @@ function MatterDialog({ matter, lookups, onClose }: { matter: Matter | null; loo
         {f.billingType === "FIXED_FEE" && <Input label="Fixed fee (R)" type="number" min="0" step="0.01" value={f.fixedFeeAmount} onChange={set("fixedFeeAmount")} />}
         {creating && <Input label="Opened" type="date" value={f.openedDate} onChange={set("openedDate")} hint="Leave empty for today" />}
       </div>
+      {creating && <ConflictPanel clientId={f.clientId} value={f.conflictCheckId} onChange={set("conflictCheckId")} />}
       <Input label="Matter name" value={f.matterName} onChange={set("matterName")} maxLength={255} />
       <Input label="Description" value={f.description} onChange={set("description")} />
       <Input label="Notes" value={f.notes} onChange={set("notes")} />

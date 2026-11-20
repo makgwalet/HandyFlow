@@ -9,6 +9,7 @@ import za.co.handyflow.platform.legalcompliance.domain.repository.CommitteeMeeti
 import za.co.handyflow.platform.legalcompliance.domain.repository.CommitteeMemberRepository;
 import za.co.handyflow.platform.legalcompliance.domain.repository.CommitteeRepository;
 import za.co.handyflow.platform.legalcompliance.domain.repository.CommitteeResolutionRepository;
+import za.co.handyflow.platform.legalcompliance.domain.repository.ResolutionBallotRepository;
 import za.co.handyflow.platform.legalcompliance.dto.AssuranceDtos.ReasonRequest;
 import za.co.handyflow.platform.legalcompliance.dto.GovernanceDtos;
 import za.co.handyflow.platform.shared.HandyFlowException;
@@ -35,6 +36,7 @@ public class CommitteeService {
     private final CommitteeMemberRepository members;
     private final CommitteeMeetingRepository meetings;
     private final CommitteeResolutionRepository resolutions;
+    private final ResolutionBallotRepository ballots;
     private final RegulatoryAuditService trail;
 
     // ── Committees ──
@@ -179,6 +181,7 @@ public class CommitteeService {
         CommitteeMeeting m = loadMeeting(t, id, mid);
         requireOpenForResolutions(m);
         CommitteeResolution x = loadResolution(t, mid, rid);
+        requireNoBallot(t, x);
         guarded(() -> { x.update(r.kind(), r.description(), r.ownerName(), r.dueDate(), m.getMeetingDate()); return null; });
         resolutions.save(x);
         trail.record(t.getValue(), ENTITY, id, "RESOLUTION_UPDATED", abbreviate(x.getDescription()), uid, uname);
@@ -190,6 +193,7 @@ public class CommitteeService {
         CommitteeMeeting m = loadMeeting(t, id, mid);
         requireOpenForResolutions(m);
         CommitteeResolution x = loadResolution(t, mid, rid);
+        requireNoBallot(t, x);
         if (x.getStatus() == ResolutionStatus.DONE) throw new HandyFlowException("A completed action cannot be removed", HttpStatus.CONFLICT, "INVALID_STATE");
         resolutions.delete(x);
         trail.record(t.getValue(), ENTITY, id, "RESOLUTION_REMOVED", abbreviate(x.getDescription()), uid, uname);
@@ -256,6 +260,12 @@ public class CommitteeService {
     private static boolean memberOn(CommitteeMember m, LocalDate d) { return !m.getAppointedOn().isAfter(d) && (m.getEndedOn() == null || !m.getEndedOn().isBefore(d)); }
 
     private static String abbreviate(String s) { return s.length() <= 120 ? s : s.substring(0, 117) + "…"; }
+
+    /** Once voting has started on a decision, its wording is what was voted on, so it can no longer be edited or removed. */
+    private void requireNoBallot(TenantId t, CommitteeResolution x) {
+        if (x.getKind() == ResolutionKind.DECISION && ballots.findForResolution(t, x.getId()).isPresent())
+            throw new HandyFlowException("Voting has started on this decision, so it can no longer be edited or removed", HttpStatus.CONFLICT, "INVALID_STATE");
+    }
 
     private void requireOpenForResolutions(CommitteeMeeting m) {
         if (m.canRecordResolutions()) return;

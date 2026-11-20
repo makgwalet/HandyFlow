@@ -142,7 +142,7 @@ public class CapaService {
 
     @Transactional(readOnly = true)
     public List<CapaResponse> list(TenantId tenantId, CapaStatus status, boolean includeFinished, UUID findingId, UUID auditFindingId) {
-        return capas.search(tenantId, status, includeFinished).stream()
+        return capas.searchCapped(tenantId, status, includeFinished).stream()
                 .filter(c -> findingId == null || findingId.equals(c.getFindingId()))
                 .filter(c -> auditFindingId == null || auditFindingId.equals(c.getAuditFindingId()))
                 .map(c -> view(tenantId, c)).toList();

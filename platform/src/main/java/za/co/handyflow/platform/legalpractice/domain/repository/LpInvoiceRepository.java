@@ -7,6 +7,7 @@ import org.springframework.data.jpa.repository.Query;
 import za.co.handyflow.platform.legalpractice.domain.model.LpInvoice;
 import za.co.handyflow.platform.shared.TenantId;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -35,4 +36,21 @@ public interface LpInvoiceRepository extends JpaRepository<LpInvoice, UUID> {
      */
     @Query("SELECT COUNT(i) FROM LpInvoice i WHERE i.tenantId = :tenantId")
     long countForTenant(TenantId tenantId);
+
+    /** The firm's invoices, leaving out those on a matter or client the signed-in user is walled from. */
+    @Query("""
+        SELECT i FROM LpInvoice i
+        WHERE i.tenantId = :tenantId AND i.clientId NOT IN :barredClientIds
+        AND (i.matterId IS NULL OR i.matterId NOT IN :barredMatterIds)
+        ORDER BY i.issueDate DESC
+        """)
+    Page<LpInvoice> findAllForFirmExcluding(TenantId tenantId, List<UUID> barredMatterIds, List<UUID> barredClientIds, Pageable pageable);
+
+    @Query("""
+        SELECT i FROM LpInvoice i
+        WHERE i.tenantId = :tenantId AND i.clientId = :clientId
+        AND (i.matterId IS NULL OR i.matterId NOT IN :barredMatterIds)
+        ORDER BY i.issueDate DESC
+        """)
+    Page<LpInvoice> findAllForClientExcluding(TenantId tenantId, UUID clientId, List<UUID> barredMatterIds, Pageable pageable);
 }

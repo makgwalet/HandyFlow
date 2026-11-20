@@ -11,7 +11,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import { usePermission } from "../../hooks/usePermission"
 import { input, primaryBtn, ghostBtn, unwrap, one, fmtDate, fmtDateTime, errMsg } from "./lcHelpers"
-import { Modal, Field, Err, Badge } from "./LcUi"
+import { Modal, Field, Err, Badge, RowLimitNotice } from "./LcUi"
 import { EvidenceFiles } from "./LcEvidence"
 import { ChevronDown, ChevronUp, Plus } from "lucide-react"
 
@@ -235,6 +235,7 @@ function PaiaSection() {
       </div>
       <Notice m={notice} />
       {apiError && !form && !act && <Err m={apiError} />}
+      <RowLimitNotice count={requests.length} />
       {isLoading ? <p style={{ color: "#64748B" }}>Loading…</p> : requests.length === 0 ? <p style={{ color: "#64748B", fontSize: 14 }}>No PAIA requests.</p> : requests.map(r => (
         <Row key={r.id} open={expanded === r.id} onToggle={() => { setExpanded(expanded === r.id ? null : r.id); setApiError("") }} danger={r.overdue}
           title={`${r.reference} — ${r.requesterName}`} sub={`Received ${fmtDate(r.receivedDate)} · due ${fmtDate(r.effectiveDue)}${r.extendedUntil ? " (extended)" : ""}${r.assignedToName ? ` · ${r.assignedToName}` : ""}`}

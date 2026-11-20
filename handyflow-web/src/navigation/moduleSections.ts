@@ -29,6 +29,9 @@ import {
   BarChart3, FileSignature, Undo2, ShieldAlert, PackageSearch,
   Workflow,
   GitCompare, BookMarked, ShieldHalf, ScrollText, HeartHandshake, BadgeCheck, LifeBuoy, Leaf, Flag,
+  Radar,
+  Network,
+  ShieldOff,
 } from 'lucide-react'
 
 export interface ModuleSection {
@@ -554,6 +557,7 @@ export const LEGAL_COMPLIANCE_SECTIONS: ModuleSections = {
         { id: 'regulatory', label: 'Regulatory register', icon: BookMarked },
         { id: 'applicability', label: 'Applicability', icon: ListChecks },
         { id: 'changes', label: 'Regulatory changes', icon: GitCompare },
+        { id: 'monitoring', label: 'Regulatory monitoring', icon: Radar },
         { id: 'obligations', label: 'Obligations', icon: ClipboardList },
         { id: 'calendar', label: 'Calendar', icon: CalendarDays },
       ],
@@ -579,7 +583,9 @@ export const LEGAL_COMPLIANCE_SECTIONS: ModuleSections = {
       sections: [
         { id: 'policies', label: 'Policies', icon: ScrollText },
         { id: 'attestations', label: 'Attestations', icon: FileSignature },
+        { id: 'declarations', label: 'Declarations', icon: UserCheck },
         { id: 'committees', label: 'Committees', icon: Users },
+        { id: 'written-resolutions', label: 'Written resolutions', icon: FileSignature },
         { id: 'ethics', label: 'Conflicts & ethics', icon: HeartHandshake },
         { id: 'licences', label: 'Licences & permits', icon: BadgeCheck },
       ],
@@ -612,7 +618,11 @@ export const LEGAL_COMPLIANCE_SECTIONS: ModuleSections = {
         { id: 'esg', label: 'ESG', icon: Leaf },
       ],
     },
-    { label: 'Insights', sections: [{ id: 'reports', label: 'Reports', icon: FileBarChart }] },
+    { label: 'Insights', 
+      sections: [
+        { id: 'reports', label: 'Reports', icon: FileBarChart },
+        { id: 'ecosystem', label: 'Across HandyFlow', icon: Network, anyPermission: ['LEGALCOMPLIANCE_MANAGE', 'LEGALCOMPLIANCE_ADMIN'] },
+    ] },
   ],
 }
 
@@ -1412,11 +1422,20 @@ export const LEGAL_PRACTICE_SECTIONS: ModuleSections = {
     ] },
     { label: 'Work', sections: [
       { id: 'matters', label: 'Matters', icon: Gavel, anyPermission: ['LEGALPRACTICE_READ', 'LEGALPRACTICE_MANAGE', 'LEGALPRACTICE_ADMIN'] },
+      { id: 'litigation', label: 'Litigation', icon: Gavel, anyPermission: ['LEGALPRACTICE_READ', 'LEGALPRACTICE_MANAGE', 'LEGALPRACTICE_LITIGATION_MANAGE', 'LEGALPRACTICE_LITIGATION_CONCLUDE', 'LEGALPRACTICE_ADMIN'] },
+      { id: 'documents', label: 'Documents', icon: FileText, anyPermission: ['LEGALPRACTICE_READ', 'LEGALPRACTICE_MANAGE', 'LEGALPRACTICE_DOCUMENT_WRITE', 'LEGALPRACTICE_DOCUMENT_HOLD', 'LEGALPRACTICE_DOCUMENT_OVERRIDE', 'LEGALPRACTICE_ADMIN'] },
       { id: 'clients', label: 'Clients', icon: Users, anyPermission: ['LEGALPRACTICE_READ', 'LEGALPRACTICE_MANAGE', 'LEGALPRACTICE_ADMIN'] },
+      { id: 'kyc', label: 'Client due diligence', icon: UserCheck, anyPermission: ['LEGALPRACTICE_KYC_PREPARE', 'LEGALPRACTICE_KYC_APPROVE', 'LEGALPRACTICE_KYC_APPROVE_SENIOR', 'LEGALPRACTICE_KYC_SETTINGS', 'LEGALPRACTICE_ADMIN'] },
     ] },
     { label: 'Billing', sections: [
       { id: 'invoices', label: 'Invoices', icon: Receipt, anyPermission: ['LEGALPRACTICE_READ', 'LEGALPRACTICE_MANAGE', 'LEGALPRACTICE_ADMIN'] },
       { id: 'retainers', label: 'Retainers', icon: Repeat, anyPermission: ['LEGALPRACTICE_READ', 'LEGALPRACTICE_MANAGE', 'LEGALPRACTICE_ADMIN'] },
+      { id: 'approvals', label: 'Trust approvals', icon: ShieldCheck, anyPermission: ['LEGALPRACTICE_TRUST_PAYMENT_REQUEST', 'LEGALPRACTICE_TRUST_PAYMENT_APPROVE', 'LEGALPRACTICE_ADMIN'] },
+      { id: 'conflicts', label: 'Conflict checks', icon: ShieldCheck, anyPermission: ['LEGALPRACTICE_CONFLICT_RUN', 'LEGALPRACTICE_CONFLICT_REVIEW', 'LEGALPRACTICE_MANAGE', 'LEGALPRACTICE_ADMIN'] },
+      { id: 'deadlines', label: 'Deadlines', icon: CalendarClock, anyPermission: ['LEGALPRACTICE_READ', 'LEGALPRACTICE_DEADLINE_COMPUTE', 'LEGALPRACTICE_DEADLINE_RULES', 'LEGALPRACTICE_MANAGE', 'LEGALPRACTICE_ADMIN'] },
+      { id: 'reconciliation', label: 'Trust reconciliation', icon: Scale, anyPermission: ['LEGALPRACTICE_TRUST_RECONCILE', 'LEGALPRACTICE_TRUST_RECONCILE_APPROVE', 'LEGALPRACTICE_ADMIN'] },
+      { id: 'walls', label: 'Ethical walls', icon: ShieldOff, anyPermission: ['LEGALPRACTICE_WALL_MANAGE', 'LEGALPRACTICE_WALL_AUDIT', 'LEGALPRACTICE_ADMIN'] },
+
     ] },
     { label: 'Firm', sections: [
       { id: 'attorneys', label: 'Attorneys', icon: UserCheck, anyPermission: ['LEGALPRACTICE_READ', 'LEGALPRACTICE_MANAGE', 'LEGALPRACTICE_ADMIN'] },

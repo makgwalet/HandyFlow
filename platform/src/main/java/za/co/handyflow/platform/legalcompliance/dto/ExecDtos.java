@@ -18,4 +18,8 @@ public final class ExecDtos {
     public record Overview(Instant generatedAt, Map<String, Long> metrics, List<Indicator> indicators, List<AttentionItem> attention) {}
 
     public record SnapshotPoint(LocalDate date, String source, String takenBy, Map<String, Long> metrics, List<Indicator> indicators) {}
+
+    /** Indicative straight-line trend of one indicator across its snapshots. A description of recorded figures, not a prediction; projections are null unless the fit is reasonable. */
+    public record Forecast(String key, String label, String tab, int points, Integer latestPercent, LocalDate latestDate, String direction, double slopePer30Days, double fit,
+                           Integer projected30Days, Integer projected90Days, String note) {}
 }

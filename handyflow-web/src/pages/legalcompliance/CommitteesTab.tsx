@@ -4,6 +4,7 @@
 //   GET / (status) · /summary · /actions?open= · /{id} · /{id}/meetings/{mid} · POST / · PUT /{id} · POST /{id}/charter-review|dissolve
 //   POST /{id}/members · POST /{id}/members/{memberId}/end · POST /{id}/meetings · PUT /{id}/meetings/{mid} · POST .../cancel|hold|minutes|minutes/approve
 //   POST|PUT|DELETE /{id}/meetings/{mid}/resolutions[/{rid}] · POST .../resolutions/{rid}/complete
+//   GET /{id}/meetings/{mid}/ballots · votes on a decision: see ResolutionVotesModal
 // Quorum is worked out from who attended (observers do not count). Decisions and actions can be recorded only for a meeting held with a quorum, and not after the
 // minutes are approved. The person who wrote the minutes cannot approve them.
 import { useState } from "react"
@@ -13,6 +14,7 @@ import { usePermission } from "../../hooks/usePermission"
 import { input, primaryBtn, ghostBtn, unwrap, one, fmtDate, errMsg } from "./lcHelpers"
 import { Modal, Field, Err, Badge } from "./LcUi"
 import { ChevronDown, ChevronUp, Plus } from "lucide-react"
+import ResolutionVotesModal from "./ResolutionVotesModal"
 
 const base = "/api/v1/legalcompliance/committees"
 const pretty = (s: string) => s.replace(/_/g, " ").toLowerCase()
@@ -33,6 +35,7 @@ interface Meeting {
   minutes: string | null; minutesStatus: string; minutesByName: string | null; minutesApprovedByName: string | null; minutesApprovedOn: string | null; canRecordResolutions: boolean
 }
 interface Res { id: string; kind: string; description: string; ownerName: string | null; dueDate: string | null; status: string; completedOn: string | null; note: string | null; overdue: boolean; committeeName: string | null; meetingDate: string | null }
+interface Ballot { resolutionId: string; type: string; status: string; outcome: string | null; tally: { votesFor: number; against: number; abstained: number; recused: number } }
 interface Detail { committee: Com; members: Member[]; meetings: Meeting[] }
 interface MeetingDetail { meeting: Meeting; resolutions: Res[] }
 interface Summary { committees: number; meetingsOverdue: number; charterReviewOverdue: number; minutesPending: number; actionsOpen: number; actionsOverdue: number; withoutQuorumCapacity: number }
@@ -61,12 +64,14 @@ export default function CommitteesTab() {
   const [reason, setReason] = useState<Reason | null>(null)
   const [apiError, setApiError] = useState("")
   const [notice, setNotice] = useState("")
+  const [voting, setVoting] = useState<{ c: Com; m: Meeting; r: Res } | null>(null)
 
   const { data: summary } = useQuery<Summary>({ queryKey: ["lc-com", "summary"], queryFn: async () => one(await apiClient.get(`${base}/summary`)) })
   const { data: list = [], isLoading } = useQuery<Com[]>({ queryKey: ["lc-com", "list"], queryFn: async () => unwrap(await apiClient.get(base)) })
   const { data: actions = [] } = useQuery<Res[]>({ queryKey: ["lc-com", "actions"], enabled: view === "actions", queryFn: async () => unwrap(await apiClient.get(`${base}/actions`, { params: { open: true } })) })
   const { data: detail } = useQuery<Detail>({ queryKey: ["lc-com", "detail", expanded], enabled: !!expanded, queryFn: async () => one(await apiClient.get(`${base}/${expanded}`)) })
   const { data: md } = useQuery<MeetingDetail>({ queryKey: ["lc-com", "meeting", expanded, openMeeting], enabled: !!expanded && !!openMeeting, queryFn: async () => one(await apiClient.get(`${base}/${expanded}/meetings/${openMeeting}`)) })
+  const { data: ballots = [] } = useQuery<Ballot[]>({ queryKey: ["lc-com", "ballots", expanded, openMeeting], enabled: !!expanded && !!openMeeting, queryFn: async () => unwrap(await apiClient.get(`${base}/${expanded}/meetings/${openMeeting}/ballots`)) })
 
   const refresh = () => { qc.invalidateQueries({ queryKey: ["lc-com"] }); setApiError("") }
   const fail = (m: string) => (e: unknown) => setApiError(errMsg(e, m))
@@ -176,11 +181,12 @@ export default function CommitteesTab() {
                           {mm.status === "HELD" && <p style={{ fontSize: 12, margin: "0 0 6px" }}>Present ({mm.presentCount} counting toward quorum of {c.quorumMin}): {mm.attendees.join(", ")}</p>}
                           {mm.status === "HELD" && !mm.quorumMet && <p style={{ fontSize: 12, color: "#991B1B", margin: "0 0 6px" }}>There was no quorum, so no decisions or actions can be recorded for this meeting.</p>}
                           {mm.minutes && <div style={{ background: "#F8FAFC", borderRadius: 8, padding: 8, whiteSpace: "pre-wrap", marginBottom: 6 }}>{mm.minutes}<div style={{ fontSize: 11, color: "#94A3B8", marginTop: 4 }}>Written by {mm.minutesByName}{mm.minutesApprovedByName ? ` · approved by ${mm.minutesApprovedByName} on ${fmtDate(mm.minutesApprovedOn)}` : ""}</div></div>}
-                          {x?.resolutions.map(r => actionRow(r, canManage && (
+                          {x?.resolutions.map(r => actionRow(r, (
                             <div style={{ display: "flex", gap: 6, marginTop: 4 }}>
-                              {r.kind === "ACTION" && r.status === "OPEN" && <button style={small} onClick={() => { setApiError(""); setDone({ c, m: mm, r, on: today(), note: "" }) }}>Mark done</button>}
-                              {mm.canRecordResolutions && r.status === "OPEN" && <button style={small} onClick={() => { setApiError(""); setRes({ c, m: mm, id: r.id, kind: r.kind, description: r.description, owner: r.ownerName ?? "", due: r.dueDate ?? "" }) }}>Edit</button>}
-                              {mm.canRecordResolutions && r.status === "OPEN" && <button style={small} onClick={() => { if (confirm("Remove this entry?")) removeRes.mutate({ c, m: mm, r }) }}>Remove</button>}
+                              {r.kind === "DECISION" && <button style={small} onClick={() => setVoting({ c, m: mm, r })}>{(() => { const b = ballots.find(x => x.resolutionId === r.id); return !b ? "Votes" : b.status === "CLOSED" ? (b.outcome === "CARRIED" ? "Votes · carried" : "Votes · not carried") : "Votes · open" })()}</button>}
+                              {canManage && r.kind === "ACTION" && r.status === "OPEN" && <button style={small} onClick={() => { setApiError(""); setDone({ c, m: mm, r, on: today(), note: "" }) }}>Mark done</button>}
+                              {canManage && mm.canRecordResolutions && r.status === "OPEN" && <button style={small} onClick={() => { setApiError(""); setRes({ c, m: mm, id: r.id, kind: r.kind, description: r.description, owner: r.ownerName ?? "", due: r.dueDate ?? "" }) }}>Edit</button>}
+                              {canManage && mm.canRecordResolutions && r.status === "OPEN" && <button style={small} onClick={() => { if (confirm("Remove this entry?")) removeRes.mutate({ c, m: mm, r }) }}>Remove</button>}
                             </div>))) }
                           {apiError && <Err m={apiError} />}
                           {canManage && live && (
@@ -295,6 +301,7 @@ export default function CommitteesTab() {
             <button style={primaryBtn} disabled={saveRes.isPending || res.description.trim().length < MIN || (res.kind === "ACTION" && (!res.owner.trim() || !res.due))} onClick={() => saveRes.mutate(res)}>Save</button></div>
         </Modal>
       )}
+      {voting && <ResolutionVotesModal committeeId={voting.c.id} meetingId={voting.m.id} resolutionId={voting.r.id} canManage={canManage} onClose={() => { setVoting(null); refresh() }} />}
       {done && (
         <Modal title="Mark action done" onClose={() => setDone(null)}>
           <Err m={apiError} />

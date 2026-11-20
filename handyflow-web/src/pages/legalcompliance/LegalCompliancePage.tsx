@@ -32,11 +32,14 @@ import ReportsTab from "./ReportsTab"
 import ProvidersTab from "./ProvidersTab"
 import ContinuityTab from "./ContinuityTab"
 import EsgTab from "./EsgTab"
+import MonitoringTab from "./MonitoringTab"
 import { usePermission } from "../../hooks/usePermission"
 import LitigationTab from "./LitigationTab"
 import PopiaTab from "./PopiaTab"
 import DsarTab from "./DsarTab"
 import CalendarTab from "./CalendarTab"
+import DeclarationCampaignsTab from "./DeclarationCampaignsTab"
+import WrittenResolutionsTab from "./WrittenResolutionsTab"
 
 export function LegalCompliancePage() {
   // FICA is restricted (escalations must not be visible to people who do not need them) and applies only to accountable institutions.
@@ -63,6 +66,7 @@ export function LegalCompliancePage() {
           case "regulatory":    return <RegulatoryRegisterTab />
           case "applicability": return <ApplicabilityTab />
           case "changes":       return <RegulatoryChangesTab />
+          case "monitoring":    return <MonitoringTab />
           case "risks":         return <RiskRegisterTab />
           case "controls":      return <ControlsTab />
           case "testing":       return <ControlTestsTab />
@@ -71,11 +75,13 @@ export function LegalCompliancePage() {
           case "capa":          return <CapaTab />
           case "policies":      return <PoliciesTab />
           case "attestations":  return <AttestationsTab />
+          case "declarations":  return <DeclarationCampaignsTab />
           case "incidents":     return <IncidentsTab />
           case "privacy":       return <PrivacyTab />
           case "thirdparties":  return <ThirdPartiesTab />
           case "licences":      return <LicencesTab />
           case "committees":    return <CommitteesTab />
+          case "written-resolutions":  return <WrittenResolutionsTab />
           case "ethics":        return <EthicsTab />
           case "fica":          return showFica ? <FicaTab /> : null
           case "obligations":   return <ObligationsTab />

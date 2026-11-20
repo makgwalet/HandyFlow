@@ -25,7 +25,8 @@ import java.util.*;
  * that map by {@link ExecutiveRules}, so the same map stored in a snapshot reproduces the same indicators later.
  *
  * Snapshots: one per tenant per day. A manual one can be taken at any time; the monthly job takes one on the 1st. Past figures are therefore the figures as
- * they were, not a recalculation against today's data. FICA is deliberately left out of the overview because it is a restricted area. Ethics shows counts only, never a person's declaration.
+ * they were, not a recalculation against today's data. Provider (consultancy) data is deliberately not collected here: ProviderService already depends on this class, and a
+ * provider's client list is not the tenant's own compliance posture. FICA is deliberately left out of the overview because it is a restricted area. Ethics shows counts only, never a person's declaration.
  */
 @Service
 @RequiredArgsConstructor
@@ -46,6 +47,8 @@ public class ExecutiveService {
     private final LicenceService licences;
     private final CommitteeService committeesSvc;
     private final EthicsService ethics;
+    private final ContinuityService continuity;
+    private final EsgService esg;
     private final PostureSnapshotRepository snapshots;
     private final RegulatoryAuditService trail;
 
@@ -125,6 +128,14 @@ public class ExecutiveService {
 
         var e = ethics.summary(t);
         m.put("ethics.awaitingReview", e.awaitingReview()); m.put("ethics.inForce", e.inForce()); m.put("ethics.reviewOverdue", e.reviewOverdue()); m.put("ethics.giftsPending", e.giftsPending());
+
+        var bc = continuity.summary(t);
+        m.put("continuity.processes", bc.processes()); m.put("continuity.critical", bc.critical()); m.put("continuity.withoutApprovedPlan", bc.withoutApprovedPlan());
+        m.put("continuity.criticalWithoutPlan", bc.criticalWithoutPlan()); m.put("continuity.biaOverdue", bc.biaOverdue()); m.put("continuity.planReviewOverdue", bc.planReviewOverdue());
+        m.put("continuity.testOverdue", bc.testOverdue()); m.put("continuity.lastTestUnsuccessful", bc.lastTestUnsuccessful());
+
+        var es = esg.summary(t);
+        m.put("esg.active", es.active()); m.put("esg.readingsOverdue", es.readingsOverdue()); m.put("esg.targetsMissed", es.targetsMissed()); m.put("esg.noReadings", es.noReadings());
         return m;
     }
 

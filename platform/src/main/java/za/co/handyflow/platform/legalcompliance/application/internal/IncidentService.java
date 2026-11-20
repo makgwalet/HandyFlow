@@ -125,7 +125,7 @@ public class IncidentService {
     }
 
     @Transactional(readOnly = true)
-    public List<IncidentResponse> list(TenantId tenantId, IncidentStatus status, boolean includeClosed) { return incidents.search(tenantId, status, includeClosed).stream().map(i -> view(tenantId, i)).toList(); }
+    public List<IncidentResponse> list(TenantId tenantId, IncidentStatus status, boolean includeClosed) { return incidents.searchCapped(tenantId, status, includeClosed).stream().map(i -> view(tenantId, i)).toList(); }
 
     @Transactional(readOnly = true)
     public IncidentResponse get(TenantId tenantId, UUID id) { return view(tenantId, load(tenantId, id)); }

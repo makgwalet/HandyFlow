@@ -8,6 +8,14 @@ import InvoicesTab from "./InvoicesTab"
 import ProfileTab from "./ProfileTab"
 import DashboardTab from "./DashboardTab"
 import CalendarTab from "./CalendarTab"
+import ApprovalsTab from "./ApprovalsTab"
+import ConflictsTab from "./ConflictsTab"
+import DeadlinesTab from "./DeadlinesTab"
+import ReconciliationTab from "./ReconciliationTab"
+import WallsTab from "./WallsTab"
+import KycTab from "./KycTab"
+import DocumentsTab from "./DocumentsTab"
+import LitigationTab from "./LitigationTab"
 import { useNavigate } from "react-router-dom"
 
 export function LegalPracticePage() {
@@ -22,6 +30,14 @@ export function LegalPracticePage() {
         case "attorneys": return <AttorneysTab />
         case "retainers": return <RetainersTab />
         case "invoices":  return <InvoicesTab />
+        case "approvals": return <ApprovalsTab />
+        case "conflicts": return <ConflictsTab />
+        case "deadlines": return <DeadlinesTab />
+        case "reconciliation": return <ReconciliationTab />
+        case "walls": return <WallsTab />
+        case "kyc": return <KycTab />
+        case "documents": return <DocumentsTab />
+        case "litigation": return <LitigationTab />
         case "profile":   return <ProfileTab />
         default:          return null
       }

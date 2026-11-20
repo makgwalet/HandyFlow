@@ -191,7 +191,7 @@ public class PrivacyService {
     }
 
     @Transactional(readOnly = true)
-    public List<PaiaResponse> listPaia(TenantId t, PaiaStatus status, boolean includeClosed) { return paia.search(t, status, includeClosed).stream().map(this::view).toList(); }
+    public List<PaiaResponse> listPaia(TenantId t, PaiaStatus status, boolean includeClosed) { return paia.searchCapped(t, status, includeClosed).stream().map(this::view).toList(); }
 
     @Transactional(readOnly = true)
     public PaiaSummary paiaSummary(TenantId t) {

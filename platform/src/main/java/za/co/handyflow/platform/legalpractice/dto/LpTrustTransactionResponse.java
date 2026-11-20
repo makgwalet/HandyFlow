@@ -19,5 +19,6 @@ public record LpTrustTransactionResponse(
         String capturedByName,
         String notes,
         BigDecimal clientTrustBalanceAfter,
+        String approvedByName,
         Instant createdAt
 ) {}

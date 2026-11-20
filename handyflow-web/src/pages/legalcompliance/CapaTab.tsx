@@ -12,7 +12,7 @@ import { apiClient } from "../../api/client"
 import { usePermission } from "../../hooks/usePermission"
 import { useAuth } from "../../hooks/useAuth"
 import { input, primaryBtn, ghostBtn, unwrap, one, fmtDate, fmtDateTime, errMsg } from "./lcHelpers"
-import { Modal, Field, Err, Badge } from "./LcUi"
+import { Modal, Field, Err, Badge, RowLimitNotice } from "./LcUi"
 import { ChevronDown, ChevronUp, Plus, Paperclip, Download, X } from "lucide-react"
 
 interface Capa {
@@ -120,6 +120,7 @@ export default function CapaTab() {
       {notice && <div style={{ background: "#ECFDF5", border: "1px solid #A7F3D0", color: "#065F46", borderRadius: 8, padding: "8px 12px", fontSize: 13, marginBottom: 12 }}>{notice}</div>}
       {apiError && !form && !act && <Err m={apiError} />}
 
+      <RowLimitNotice count={capas.length} />
       {isLoading ? <p style={{ color: "#64748B" }}>Loading…</p> : capas.length === 0 ? <p style={{ color: "#64748B", fontSize: 14 }}>No corrective or preventive actions.</p> : capas.map(c => {
         const open = expanded === c.id, st = STATUS[c.status], d = detail?.capa.id === c.id ? detail : null
         return (
