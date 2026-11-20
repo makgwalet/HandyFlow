@@ -33,6 +33,7 @@ import ProvidersTab from "./ProvidersTab"
 import ContinuityTab from "./ContinuityTab"
 import EsgTab from "./EsgTab"
 import MonitoringTab from "./MonitoringTab"
+import EcosystemTab from "./EcosystemTab"
 import { usePermission } from "../../hooks/usePermission"
 import LitigationTab from "./LitigationTab"
 import PopiaTab from "./PopiaTab"
@@ -50,6 +51,9 @@ export function LegalCompliancePage() {
   const hasProviderConsult = usePermission("LEGALCOMPLIANCE_PROVIDER_CONSULT")
   const showProviders = hasProviderManage || hasProviderConsult || hasAdmin
   const showFica = hasFica || hasAdmin
+  // "Across HandyFlow" shows other modules' compliance counts; it follows the same permission as its menu entry.
+  const hasManage = usePermission("LEGALCOMPLIANCE_MANAGE")
+  const showEcosystem = hasManage || hasAdmin
 
   return (
     <SectionedModulePage
@@ -83,6 +87,7 @@ export function LegalCompliancePage() {
           case "committees":    return <CommitteesTab />
           case "written-resolutions":  return <WrittenResolutionsTab />
           case "ethics":        return <EthicsTab />
+          case "ecosystem":     return showEcosystem ? <EcosystemTab /> : null
           case "fica":          return showFica ? <FicaTab /> : null
           case "obligations":   return <ObligationsTab />
           case "litigation":    return <LitigationTab />
