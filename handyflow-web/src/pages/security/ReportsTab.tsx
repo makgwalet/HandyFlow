@@ -2,6 +2,7 @@
 import { useState } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
+import { getAllGuards } from "./fetchAllPages"
 import { FileBarChart, Download, Building2 } from "lucide-react"
 import { canGenerate, defaultMonth, knownCards, lastRunLine, monthLabel, reportPaths, runSummary, scopeNeeds, ago } from "./reports.logic"
 import type { Card, Catalogue, ReportKey } from "./reports.logic"
@@ -82,7 +83,7 @@ export default function ReportsTab() {
   const { data: guards = [] } = useQuery<Guard[]>({
     queryKey: ["guards-list"],
     queryFn: async () => {
-      const r = await apiClient.get("/api/v1/security/guards?size=100")
+      const r = await getAllGuards()
       const p = r.data?.data ?? r.data
       return (p?.content ?? p) as Guard[]
     },

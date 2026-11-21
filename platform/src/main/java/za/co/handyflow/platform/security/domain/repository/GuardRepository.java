@@ -31,6 +31,14 @@ public interface GuardRepository extends JpaRepository<Guard, UUID> {
         """)
     Optional<Guard> findActiveById(TenantId tenantId, UUID id);
 
+    /** Includes deleted guards: pay already earned is still owed when a guard record has been removed (payroll, exports). */
+    @Query("""
+        SELECT g FROM Guard g
+        WHERE g.tenantId = :tenantId
+        AND g.id = :id
+        """)
+    Optional<Guard> findAnyById(TenantId tenantId, UUID id);
+
     @Query("""
         SELECT g FROM Guard g
         WHERE g.tenantId = :tenantId
@@ -102,6 +110,15 @@ public interface GuardRepository extends JpaRepository<Guard, UUID> {
         """)
     Optional<Guard> findActiveByEmployeeCode(String employeeCode);
 
+    /** Every active guard with this phone, in any tenant: the same person can work for two companies. */
+    @Query("""
+        SELECT g FROM Guard g
+        WHERE g.phone = :phone
+        AND g.deletedAt IS NULL
+        AND g.active = true
+        """)
+    java.util.List<Guard> findAllActiveByPhone(String phone);
+
     /**
      * Global existence check used during employee-code generation to detect
      * (rare) collisions between two tenants' independently-derived prefixes.
@@ -137,4 +154,17 @@ public interface GuardRepository extends JpaRepository<Guard, UUID> {
         AND g.deletedAt IS NULL
         """)
     Optional<Guard> findByIdForAuth(UUID id);
+
+    /**
+     * The same lookup, limited to one tenant. Use this whenever the guard id comes from a request a supervisor made (enrol, device replacement,
+     * token revocation): a guard id from another tenant then simply is not found. findByIdForAuth stays for flows that start from a guard's own
+     * token or a single-use code, where the id cannot be chosen by an outsider.
+     */
+    @Query("""
+        SELECT g FROM Guard g
+        WHERE g.id = :id
+        AND g.tenantId = :tenantId
+        AND g.deletedAt IS NULL
+        """)
+    Optional<Guard> findByIdAndTenantForAuth(UUID id, TenantId tenantId);
 }

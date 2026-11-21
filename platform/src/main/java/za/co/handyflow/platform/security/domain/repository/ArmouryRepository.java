@@ -16,6 +16,15 @@ import java.util.UUID;
 
 public interface ArmouryRepository extends JpaRepository<Armoury, UUID> {
 
+    /** Lost firearms with no SAPS case number yet and a due time already past. System job: all tenants. */
+    @Query("""
+        SELECT a FROM Armoury a
+        WHERE a.status = 'LOST'
+        AND a.sapsCaseNumber IS NULL
+        AND a.sapsReportDueAt < :now
+        """)
+    List<Armoury> findLostAwaitingSapsCase(java.time.Instant now);
+
     @Query("""
         SELECT a FROM Armoury a
         WHERE a.tenantId = :tenantId

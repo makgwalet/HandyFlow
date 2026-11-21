@@ -214,48 +214,29 @@ public class ShiftSwapService {
         }
 
         // ── Run validations ────────────────────────────────────────────────────
-        StringBuilder notes     = new StringBuilder();
-        boolean       allPassed = true;
+        Guard proposed = guardRepository.findActiveById(tenantId, proposedGuardId).orElse(null);
+        LocalDate shiftDate = shift.getStartAt().atZone(
+                java.time.ZoneId.of("Africa/Johannesburg")).toLocalDate();
+        boolean overlaps = proposed != null && shiftRepository.hasOverlap(
+                tenantId, proposedGuardId, shift.getStartAt(), shift.getEndAt(), shift.getId());
 
-        Guard proposed = guardRepository.findActiveById(tenantId, proposedGuardId)
-                .orElse(null);
+        SwapChecks.Result checks = SwapChecks.evaluate(
+                proposed != null, proposed != null && proposed.isSchedulable(),
+                proposed != null ? proposed.getStatus() : null,
+                proposed != null ? proposed.getPsiraExpiryDate() : null, shiftDate, overlaps);
 
-        if (proposed == null) {
-            notes.append("Proposed guard not found or deleted. ");
-            allPassed = false;
-        } else {
-            // Status check
-            if (!proposed.isSchedulable()) {
-                notes.append("Proposed guard is ").append(proposed.getStatus())
-                        .append(" — not schedulable. ");
-                allPassed = false;
-            }
-
-            // PSiRA expiry check
-            LocalDate shiftDate = shift.getStartAt().atZone(
-                    java.time.ZoneId.of("Africa/Johannesburg")).toLocalDate();
-            if (proposed.getPsiraExpiryDate() != null &&
-                    proposed.getPsiraExpiryDate().isBefore(shiftDate)) {
-                notes.append("Proposed guard PSiRA expired on ")
-                        .append(proposed.getPsiraExpiryDate()).append(". ");
-                allPassed = false;
-            }
-
-            // Overlap check — same guard, same time window, excluding this shift
-            boolean overlaps = shiftRepository.hasOverlap(
-                    tenantId, proposedGuardId,
-                    shift.getStartAt(), shift.getEndAt(),
-                    shift.getId());
-            if (overlaps) {
-                notes.append("Proposed guard has an overlapping shift. ");
-                allPassed = false;
-            }
+        // An unregistered, suspended or flagged guard cannot be assigned, whatever the supervisor decides.
+        // The swap stays pending so it can be rejected, or approved once the problem is fixed.
+        if (checks.blocked()) {
+            throw new HandyFlowException(String.join(" ", checks.blocking()),
+                    HttpStatus.CONFLICT, "SWAP_BLOCKED");
         }
-
-        if (!allPassed) {
-            notes.append("Supervisor approved despite validation failures.");
-        } else {
+        boolean allPassed = checks.allPassed();
+        StringBuilder notes = new StringBuilder();
+        if (allPassed) {
             notes.append("All validations passed.");
+        } else {
+            notes.append(String.join(" ", checks.warnings())).append(" Supervisor approved despite this warning.");
         }
 
         // Record approval (with validation snapshot)

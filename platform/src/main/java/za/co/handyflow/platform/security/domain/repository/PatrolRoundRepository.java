@@ -20,6 +20,15 @@ public interface PatrolRoundRepository extends JpaRepository<PatrolRound, UUID> 
         """)
     List<PatrolRound> findByShift(UUID shiftId);
 
+    /** For requests that carry a shift id from outside: a shift of another tenant has no rounds here. */
+    @Query("""
+        SELECT r FROM PatrolRound r
+        WHERE r.tenantId = :tenantId
+        AND r.shiftId = :shiftId
+        ORDER BY r.expectedStartAt, r.roundNumber
+        """)
+    List<PatrolRound> findByTenantAndShift(TenantId tenantId, UUID shiftId);
+
     /**
      * The "current" round for a shift — the lowest-numbered round that is
      * not yet COMPLETE. Used by PatrolRoundService.routeScanToRound() to

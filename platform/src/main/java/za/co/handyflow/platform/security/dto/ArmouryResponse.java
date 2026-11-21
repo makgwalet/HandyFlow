@@ -19,5 +19,11 @@ public record ArmouryResponse(
         LocalDate lastServiceAt,
         LocalDate nextServiceDueAt,
         String    notes,
-        Instant   createdAt
+        Instant   createdAt,
+        String    sapsCaseNumber,
+        Instant   lostReportedAt,
+        Instant   sapsReportDueAt,
+        boolean   sapsReportOverdue,
+        Integer   ammoRoundsIssued,   // only while ISSUED, and only if rounds were recorded
+        String    ammoCalibre
 ) {}

@@ -280,6 +280,30 @@ public class ShiftService {
 // this, or send me the file and I'll reconcile the two paths.
 
     /**
+     * Cancels a shift that has not started (guard sick, site contract paused, rostered by mistake).
+     * The shift leaves the rosters and reports as CANCELLED; the guard is told. A reason is required.
+     */
+    @Transactional
+    public ShiftResponse cancelShift(TenantId tenantId, UUID id, UUID supervisorId,
+                                     ShiftSupervisorActionRequest req) {
+        Shift shift = findActive(tenantId, id);
+        if (!ShiftCancelRules.cancellable(shift.getStatus())) {
+            throw new HandyFlowException(
+                    "Only a shift that has not started can be cancelled (status: " + shift.getStatus() + ")",
+                    HttpStatus.CONFLICT, "SHIFT_NOT_CANCELLABLE");
+        }
+        shift.cancel(supervisorId);
+        shiftRepository.save(shift);
+
+        writeAudit(tenantId, supervisorId, id, "SHIFT_CANCELLED", req.reason());
+        pushTo(tenantId, shift.getGuardId(), "Shift cancelled",
+                "Your shift on " + shift.getStartAt() + " was cancelled.", "Home");
+
+        log.info("[Security] Shift cancelled shiftId={} by={} reason='{}'", id, supervisorId, req.reason());
+        return toResponse(shift);
+    }
+
+    /**
      * Dismisses a no-show/late alert without changing the shift's status --
      * e.g. the guard called in sick and a replacement is being handled manually
      * outside the system. Purely a record-keeping action.

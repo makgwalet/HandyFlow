@@ -107,10 +107,10 @@ public class ArmouryPdfService {
             return;
         }
 
-        Table table = new Table(UnitValue.createPercentArray(new float[]{2, 2, 2, 2, 3}))
+        Table table = new Table(UnitValue.createPercentArray(new float[]{2, 2, 2, 2, 1.5f, 3}))
                 .useAllAvailableWidth();
 
-        for (String h : new String[]{"Date/Time", "Action", "Guard", "Witness", "Condition Notes"}) {
+        for (String h : new String[]{"Date/Time", "Action", "Guard", "Witness", "Ammunition", "Condition Notes"}) {
             table.addCell(new Cell()
                     .add(new Paragraph(h).setFontSize(8).setBold().setFontColor(ColorConstants.WHITE))
                     .setBackgroundColor(BRAND_NAVY)
@@ -125,6 +125,8 @@ public class ArmouryPdfService {
             table.addCell(cell(log.getAction().name(), bg));
             table.addCell(cell(guardName(tenantId, log.getGuardId()), bg));
             table.addCell(cell(guardName(tenantId, log.getWitnessedByGuardId()), bg));
+            table.addCell(cell(AmmoRules.label(log.getAmmoCalibre(), log.getAmmoRounds())
+                    + (log.getAmmoUnaccountedReason() != null ? " (short: " + log.getAmmoUnaccountedReason() + ")" : ""), bg));
             table.addCell(cell(log.getConditionNotes() != null ? log.getConditionNotes() : "—", bg));
             alt = !alt;
         }

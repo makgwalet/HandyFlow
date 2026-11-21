@@ -16,7 +16,6 @@ import za.co.handyflow.platform.shared.ResourceNotFoundException;
 import za.co.handyflow.platform.shared.TenantId;
 
 import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.time.*;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
@@ -52,12 +51,21 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class SecurityPayrollService {
 
+    /** "Someone else could do this step" means someone else holds the permission the endpoint demands. */
+    static final String PAYROLL_APPROVE_PERMISSION = "SECURITY_PAYROLL_APPROVE";
+    static final String PAYROLL_PAY_PERMISSION     = "SECURITY_PAYROLL_PAY";
+
     private final PayrollPeriodRepository   periodRepository;
     private final PayrollLineItemRepository lineItemRepository;
     private final ShiftRepository           shiftRepository;
     private final GuardRepository           guardRepository;
     private final GradeRateRepository       gradeRateRepository;
     private final BranchRepository          branchRepository;
+
+    /** Optional, so existing constructor callers (tests) keep working. */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private za.co.handyflow.platform.shared.SeparationOfDutiesChecker separationOfDuties;
+    private final SiteRepository            siteRepository;
     // FIX: closes the confirmed AuditEvent coverage gap for Payroll —
     // approving a period is a major financial event that previously
     // had no generic audit trail entry at all.
@@ -118,8 +126,23 @@ public class SecurityPayrollService {
                     HttpStatus.CONFLICT, "PERIOD_NOT_DRAFT");
         }
 
+        // Maker-checker: whoever created the period does not approve it, unless nobody else could (sole operator,
+        // which is allowed and recorded for the owner/auditor).
+        if (separationOfDuties != null) {
+            separationOfDuties.require(tenantId, PAYROLL_APPROVE_PERMISSION, period.getCreatedBy(), approvedBy,
+                    "You created this payroll period, so someone else must approve it",
+                    "SECURITY_PAYROLL_PERIOD", id, "Created and approved the same payroll period");
+        }
+
         List<PayrollLineItem> items = computeLineItems(tenantId, period);
-        lineItemRepository.saveAll(items);
+        try {
+            lineItemRepository.saveAll(items);
+            lineItemRepository.flush();
+        } catch (org.springframework.dao.DataIntegrityViolationException e) {
+            // The unique index (V840) caught a shift that was paid by another approval running at the same moment.
+            throw new HandyFlowException("A shift in this period has just been paid in another period. Reload and approve again.",
+                    HttpStatus.CONFLICT, "SHIFT_ALREADY_PAID");
+        }
 
         BigDecimal totalHours = items.stream()
                 .map(li -> li.getHoursWorked().add(li.getOvertimeHours()))
@@ -139,40 +162,43 @@ public class SecurityPayrollService {
     // ── Line item computation ──────────────────────────────────────────────────
 
     private List<PayrollLineItem> computeLineItems(TenantId tenantId, PayrollPeriod period) {
-        Instant from = period.getPeriodStart().atStartOfDay().toInstant(ZoneOffset.UTC);
-        Instant to   = period.getPeriodEnd().plusDays(1).atStartOfDay().toInstant(ZoneOffset.UTC);
+        // South African days, not UTC days (audit 1.6).
+        Instant from = PayrollRules.windowStart(period.getPeriodStart());
+        Instant to   = PayrollRules.windowEnd(period.getPeriodEnd());
 
-        List<Shift> shifts = (period.getBranchId() != null)
-                ? shiftRepository.findByTenantInRange(tenantId, from, to).stream()
-                .filter(s -> {
-                    // filter by branch: sites assigned to this branch only
-                    return true; // TODO: join with site.branch_id once SiteRepository has branch queries
-                })
-                .toList()
-                : shiftRepository.findByTenantInRange(tenantId, from, to);
+        List<Shift> shifts = shiftRepository.findByTenantInRange(tenantId, from, to);
+        if (period.getBranchId() != null) {
+            // A branch period pays only shifts at that branch's sites (audit 1.6: it used to pay every shift of the tenant).
+            Set<UUID> branchSites = new HashSet<>(siteRepository.findIdsByBranch(tenantId, period.getBranchId()));
+            shifts = shifts.stream().filter(s -> branchSites.contains(s.getSiteId())).toList();
+        }
 
-        List<Shift> completedShifts = shifts.stream()
+        // A shift still running when the period is approved would never be paid: its pay would fall into no later period, because it started before that
+        // period does. Make the supervisor finish or close it first.
+        long running = shifts.stream().filter(s -> s.getStatus().name().equals("ACTIVE")).count();
+        if (running > 0) {
+            throw new HandyFlowException(running + " shift(s) in this period are still running. Complete or close them, then approve again.",
+                    HttpStatus.CONFLICT, "SHIFTS_STILL_RUNNING");
+        }
+
+        List<Shift> completedShifts = withoutPaidShifts(tenantId, shifts.stream()
                 .filter(s -> s.getStatus().name().equals("COMPLETED"))
-                .filter(s -> !lineItemRepository.existsForShift(period.getId(), s.getId()))
-                .toList();
+                .toList());
 
         List<PayrollLineItem> items = new ArrayList<>();
 
         for (Shift shift : completedShifts) {
-            Guard guard = guardRepository.findActiveById(tenantId, shift.getGuardId())
-                    .orElse(null);
-            if (guard == null) continue;
+            // Deleted guards are included: pay already earned is still owed (audit 1.6: they used to be skipped and vanish from payroll).
+            Guard guard = guardRepository.findAnyById(tenantId, shift.getGuardId()).orElseThrow(() ->
+                    new HandyFlowException("A completed shift belongs to a guard that no longer exists (shift " + shift.getId() + "). Contact support before approving.",
+                            HttpStatus.UNPROCESSABLE_ENTITY, "GUARD_NOT_FOUND"));
 
             int rateCents = resolveRate(tenantId, guard, period.getPeriodEnd());
             int standardHours = resolveStandardHours(tenantId, guard, period.getPeriodEnd());
 
-            double durationHours = Duration.between(shift.getStartAt(), shift.getEndAt())
-                    .toMinutes() / 60.0;
-            BigDecimal totalHours = BigDecimal.valueOf(durationHours).setScale(2, RoundingMode.HALF_UP);
-            BigDecimal stdHours   = BigDecimal.valueOf(standardHours);
-
-            BigDecimal regularHours  = totalHours.min(stdHours);
-            BigDecimal overtimeHours = totalHours.subtract(regularHours).max(BigDecimal.ZERO);
+            PayrollRules.Split split = PayrollRules.split(shift.getStartAt(), shift.getEndAt(), standardHours);
+            BigDecimal regularHours  = split.regular();
+            BigDecimal overtimeHours = split.overtime();
 
             items.add(PayrollLineItem.regular(tenantId, period.getId(), guard.getId(),
                     shift.getId(), shift.getStartAt(), shift.getEndAt(), regularHours, rateCents));
@@ -191,6 +217,17 @@ public class SecurityPayrollService {
         }
 
         return items;
+    }
+
+    /** Drops shifts that already have pay in any period, so a shift can never be paid twice (audit 1.6). Queried in batches to keep the IN list small. */
+    private List<Shift> withoutPaidShifts(TenantId tenantId, List<Shift> completed) {
+        if (completed.isEmpty()) return completed;
+        Set<UUID> paid = new HashSet<>();
+        for (int i = 0; i < completed.size(); i += 500) {
+            List<UUID> batch = completed.subList(i, Math.min(i + 500, completed.size())).stream().map(Shift::getId).toList();
+            paid.addAll(lineItemRepository.findPaidShiftIds(tenantId, batch));
+        }
+        return completed.stream().filter(s -> !paid.contains(s.getId())).toList();
     }
 
     private int resolveRate(TenantId tenantId, Guard guard, LocalDate asOf) {
@@ -216,9 +253,9 @@ public class SecurityPayrollService {
         if (guard.getGrade() != null) {
             return gradeRateRepository.findEffectiveRate(tenantId, guard.getGrade(), asOf)
                     .map(GradeRate::getStandardHoursPerDay)
-                    .orElse(9);
+                    .orElse(PayrollRules.DEFAULT_STANDARD_HOURS);
         }
-        return 9;
+        return PayrollRules.DEFAULT_STANDARD_HOURS;
     }
 
     // ── Export ─────────────────────────────────────────────────────────────────
@@ -242,26 +279,28 @@ public class SecurityPayrollService {
         DateTimeFormatter dateFmt = DateTimeFormatter.ofPattern("yyyy-MM-dd");
 
         for (PayrollLineItem li : items) {
+            // Every line is written, also for a guard record that has since been deleted (audit 1.6: such rows used to vanish from the file).
             Guard guard = guardCache.computeIfAbsent(li.getGuardId(),
-                    gid -> guardRepository.findActiveById(tenantId, gid).orElse(null));
-            if (guard == null) continue;
+                    gid -> guardRepository.findAnyById(tenantId, gid).orElse(null));
 
-            String shiftDate = li.getShiftStartAt().atOffset(ZoneOffset.UTC)
-                    .format(dateFmt);
-            double grossZar = li.getGrossAmountCents() / 100.0;
+            String shiftDate = PayrollRules.shiftDate(li.getShiftStartAt()).format(dateFmt);
 
-            csv.append(String.format("\"%s\",%s,%s,\"%s\",%s,%s,%s,%s,%.2f,%.2f,%d,%d,%d,%.2f%n",
-                    period.getName(), period.getPeriodStart(), period.getPeriodEnd(),
-                    guard.getFullName(), nvl(guard.getGrade()), nvl(guard.getPsiraNumber()),
+            // Point decimals whatever the server locale; text quoted and defused against spreadsheet formulas.
+            csv.append(String.join(",",
+                    PayrollCsv.text(period.getName()), period.getPeriodStart().toString(), period.getPeriodEnd().toString(),
+                    PayrollCsv.text(guard != null ? guard.getFullName() : "(unknown guard)"), PayrollCsv.text(guard != null ? nvl(guard.getGrade()) : ""),
+                    PayrollCsv.text(guard != null ? nvl(guard.getPsiraNumber()) : ""),
                     li.getLineType().name(), shiftDate,
-                    li.getHoursWorked().doubleValue(), li.getOvertimeHours().doubleValue(),
-                    li.getHourlyRateCents(), li.getOvertimeRateCents(),
-                    li.getGrossAmountCents(), grossZar));
+                    PayrollCsv.hours(li.getHoursWorked()), PayrollCsv.hours(li.getOvertimeHours()),
+                    String.valueOf(li.getHourlyRateCents()), String.valueOf(li.getOvertimeRateCents()),
+                    String.valueOf(li.getGrossAmountCents()), PayrollCsv.money(li.getGrossAmountCents()))).append("\n");
         }
 
-        if (period.isDraft()) { /* already not-approved, handled above */ }
-        period.markExported("CSV");
-        periodRepository.save(period);
+        // A repeat download of an already exported period must work: only the first export changes the status.
+        if (period.isApproved()) {
+            period.markExported("CSV");
+            periodRepository.save(period);
+        }
 
         log.info("[Payroll] Period exported CSV id={} rows={}", id, items.size());
         return csv.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8);
@@ -284,8 +323,7 @@ public class SecurityPayrollService {
 
         List<PayrollExportJsonResponse.GuardPaySummary> summaries = byGuard.entrySet().stream()
                 .map(e -> {
-                    Guard g = guardRepository.findActiveById(tenantId, e.getKey()).orElse(null);
-                    if (g == null) return null;
+                    Guard g = guardRepository.findAnyById(tenantId, e.getKey()).orElse(null);
                     List<PayrollLineItem> gItems = e.getValue();
 
                     BigDecimal totalHours = gItems.stream()
@@ -294,15 +332,16 @@ public class SecurityPayrollService {
                     long totalCents = gItems.stream().mapToLong(PayrollLineItem::getGrossAmountCents).sum();
 
                     return new PayrollExportJsonResponse.GuardPaySummary(
-                            g.getId(), g.getFullName(), g.getGrade(), g.getPsiraNumber(),
+                            e.getKey(), g != null ? g.getFullName() : "(unknown guard)", g != null ? g.getGrade() : null, g != null ? g.getPsiraNumber() : null,
                             gItems.size(), totalHours, totalCents, totalCents / 100.0);
                 })
-                .filter(Objects::nonNull)
                 .sorted(Comparator.comparing(PayrollExportJsonResponse.GuardPaySummary::guardName))
                 .toList();
 
-        period.markExported("JSON");
-        periodRepository.save(period);
+        if (period.isApproved()) {
+            period.markExported("JSON");
+            periodRepository.save(period);
+        }
 
         return new PayrollExportJsonResponse(
                 period.getId(), period.getName(),
@@ -315,6 +354,12 @@ public class SecurityPayrollService {
     @Transactional
     public PayrollPeriodResponse markPaid(TenantId tenantId, UUID id, UUID actorId) {
         PayrollPeriod period = findPeriod(tenantId, id);
+        // Maker-checker: the person who approved the run does not also release payment.
+        if (separationOfDuties != null) {
+            separationOfDuties.require(tenantId, PAYROLL_PAY_PERMISSION, period.getApprovedBy(), actorId,
+                    "You approved this payroll period, so someone else must mark it paid",
+                    "SECURITY_PAYROLL_PERIOD", id, "Approved and marked paid the same payroll period");
+        }
         period.markPaid();
         periodRepository.save(period);
         writeAudit(tenantId, actorId, id, "MARKED_PAID", null);

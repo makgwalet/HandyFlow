@@ -108,6 +108,9 @@ export default function SitesTab() {
   const [showPortal,      setShowPortal]        = useState<Site | null>(null)
   const [portalLabel,     setPortalLabel]        = useState("")
   const [portalToken,     setPortalToken]        = useState<string | null>(null)
+  const [portalExpiry,    setPortalExpiry]       = useState<string | null>(null)
+  const [portalExpired,   setPortalExpired]      = useState(false)
+  const [confirmNewLink,  setConfirmNewLink]     = useState(false)
   const [siteErrors,      setSiteErrors]       = useState<Record<string, string>>({})
   const [apiError,        setApiError]         = useState("")
   const [printingCpId,    setPrintingCpId]     = useState<string | null>(null)
@@ -179,12 +182,29 @@ export default function SitesTab() {
     onError: (e: any) => setApiError(e.response?.data?.message ?? "Failed to delete site"),
   })
 
+  // Open the portal window and show the site's current link if it has one, instead of offering to replace it blindly.
+  const openPortal = (site: Site) => {
+    setShowPortal(site); setPortalLabel(site.name); setPortalToken(null); setPortalExpiry(null)
+    setPortalExpired(false); setConfirmNewLink(false); setApiError("")
+    apiClient.get(`/api/v1/security/sites/${site.id}/portal`).then(r => {
+      const st = r.data?.data ?? r.data
+      if (st?.enabled && !st?.expired) { setPortalToken(st.token); setPortalExpiry(st.expiresAt ?? null) }
+      else if (st?.enabled && st?.expired) setPortalExpired(true)
+    }).catch(() => { /* no link yet, or not allowed: the Generate form still works */ })
+  }
+
   const generatePortalToken = useMutation({
-    mutationFn: ({ id, label }: { id: string; label: string }) =>
-      apiClient.post(`/api/v1/security/sites/${id}/portal/generate`, { label }),
-    onSuccess: (res) => {
-      const token = res.data?.data?.token ?? res.data?.token
-      setPortalToken(token)
+    mutationFn: ({ id, label, regenerate }: { id: string; label: string; regenerate?: boolean }) =>
+      apiClient.post(`/api/v1/security/sites/${id}/portal/generate${regenerate ? "?regenerate=true" : ""}`, { label }),
+    onSuccess: (_res, vars) => {
+      setConfirmNewLink(false)
+      setPortalExpired(false)
+      // Ask the server for the link and its expiry rather than guessing either.
+      apiClient.get(`/api/v1/security/sites/${vars.id}/portal`).then(r => {
+        const st = r.data?.data ?? r.data
+        setPortalToken(st?.token ?? null)
+        setPortalExpiry(st?.expiresAt ?? null)
+      }).catch(() => setApiError("The link was made but could not be loaded. Close and reopen this window."))
       invalidate()
     },
     onError: (e: any) => setApiError(e.response?.data?.message ?? "Failed to generate portal link"),
@@ -192,7 +212,7 @@ export default function SitesTab() {
 
   const disablePortal = useMutation({
     mutationFn: (id: string) => apiClient.delete(`/api/v1/security/sites/${id}/portal`),
-    onSuccess: () => { invalidate(); setShowPortal(null); setPortalToken(null) },
+    onSuccess: () => { invalidate(); setShowPortal(null); setPortalToken(null); setPortalExpiry(null) },
     onError: (e: any) => setApiError(e.response?.data?.message ?? "Failed to disable portal"),
   })
 
@@ -356,7 +376,7 @@ export default function SitesTab() {
                   <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
                     {site.contractStatus !== "TERMINATED" && site.active && (
                       <>
-                        <button onClick={e => { e.stopPropagation(); setShowPortal(site); setPortalLabel(site.name); setPortalToken(null); setApiError("") }}
+                        <button onClick={e => { e.stopPropagation(); openPortal(site) }}
                           title="Client portal"
                           style={{ background: "var(--hf-success-soft)", border: "none", borderRadius: 6, padding: "6px 10px", cursor: "pointer", color: "var(--hf-success-text-strong)", fontSize: 12, fontWeight: 600 }}>
                           Portal
@@ -622,6 +642,11 @@ export default function SitesTab() {
 
           {!portalToken ? (
             <>
+              {portalExpired && (
+                <div role="alert" style={{ marginBottom: 12, padding: "8px 12px", borderRadius: 8, background: "var(--hf-warning-soft)", color: "var(--hf-warning-text-deep)", fontSize: 12 }}>
+                  This site's link has expired. Make a new one to share with your client.
+                </div>
+              )}
               <div style={{ marginBottom: 14 }}>
                 <label style={lbl}>Portal label <span style={{ fontWeight: 400, color: "var(--hf-text-faint)" }}>(shown in portal header)</span></label>
                 <input value={portalLabel} onChange={e => setPortalLabel(e.target.value)}
@@ -643,14 +668,34 @@ export default function SitesTab() {
               <div style={{ marginBottom: 14 }}>
                 <label style={lbl}>Portal URL — share this with your client</label>
                 <div style={{ display: "flex", gap: 8 }}>
-                  <input readOnly value={`${window.location.origin}/portal/${portalToken}`}
+                  <input readOnly value={`${window.location.origin}/site-portal/${portalToken}`}
                     style={{ flex: 1, padding: "9px 12px", border: "1.5px solid var(--hf-success-border)", borderRadius: 8, fontSize: 13, background: "var(--hf-success-soft)", color: "var(--hf-success-text-strong)", fontFamily: "monospace", outline: "none" }} />
-                  <button onClick={() => navigator.clipboard.writeText(`${window.location.origin}/portal/${portalToken}`)}
+                  <button onClick={() => navigator.clipboard.writeText(`${window.location.origin}/site-portal/${portalToken}`)}
                     style={{ padding: "9px 14px", background: "var(--hf-success-soft)", border: "1px solid var(--hf-success-border)", borderRadius: 8, cursor: "pointer", fontSize: 12, color: "var(--hf-success-text-strong)", fontWeight: 600 }}>
                     Copy
                   </button>
                 </div>
-                <div style={{ fontSize: 11, color: "var(--hf-text-faint)", marginTop: 5 }}>Anyone with this link can view the portal. To revoke access, click "Disable Portal".</div>
+                <div style={{ fontSize: 11, color: "var(--hf-text-faint)", marginTop: 5 }}>
+                  Anyone with this link can view the portal{portalExpiry ? <> until <strong>{new Date(portalExpiry).toLocaleDateString("en-ZA", { day: "numeric", month: "short", year: "numeric" })}</strong></> : null}. To revoke access, click "Disable Portal".
+                </div>
+                {apiError && <ErrBanner msg={apiError} />}
+                <div style={{ marginTop: 10 }}>
+                  {!confirmNewLink ? (
+                    <button onClick={() => setConfirmNewLink(true)} style={{ fontSize: 12, background: "none", border: "none", color: "var(--hf-text-muted)", cursor: "pointer", textDecoration: "underline", padding: 0 }}>
+                      Make a new link
+                    </button>
+                  ) : (
+                    <span style={{ fontSize: 12, color: "var(--hf-danger-text)" }}>
+                      The link your client has will stop working.{" "}
+                      <button onClick={() => generatePortalToken.mutate({ id: showPortal.id, label: portalLabel || showPortal.name, regenerate: true })}
+                        disabled={generatePortalToken.isPending}
+                        style={{ fontSize: 12, fontWeight: 700, background: "none", border: "none", color: "var(--hf-danger-text)", cursor: "pointer", textDecoration: "underline", padding: 0 }}>
+                        Yes, make a new link
+                      </button>{" "}
+                      <button onClick={() => setConfirmNewLink(false)} style={{ fontSize: 12, background: "none", border: "none", color: "var(--hf-text-muted)", cursor: "pointer", padding: 0 }}>Cancel</button>
+                    </span>
+                  )}
+                </div>
               </div>
               <div style={{ display: "flex", gap: 10, marginTop: 16 }}>
                 <button onClick={() => { setShowPortal(null); setPortalToken(null) }} style={{ flex: 1, padding: "10px", background: "var(--hf-primary)", color: "var(--hf-text-on-solid)", border: "none", borderRadius: 9, fontSize: 14, fontWeight: 700, cursor: "pointer" }}>Done</button>

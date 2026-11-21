@@ -1,6 +1,5 @@
 package za.co.handyflow.platform.security.dto;
 
-import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 
 /**
@@ -14,8 +13,8 @@ import jakarta.validation.constraints.Pattern;
  * pinExpiryDays: null = use tenant policy default (90 days).
  */
 public record GuardEnrollRequest(
-        @NotBlank @Pattern(regexp = "\\d{6}", message = "PIN must be exactly 6 digits")
-        String pin,
+        @Pattern(regexp = "\\d{6}", message = "PIN must be exactly 6 digits")
+        String pin,                   // optional: leave blank and the server generates one (recommended)
 
         String faceEmbeddingBase64,   // Base64 float vector from on-device face model; null = skip
         String deviceHardwareId,      // hardware ID of the guard's assigned device; null = skip

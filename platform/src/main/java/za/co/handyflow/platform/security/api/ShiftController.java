@@ -120,6 +120,21 @@ public class ShiftController {
     // (Same SECURITY_MANAGE gate as updateStatus()/deleteGuard() elsewhere -- these
     // are supervisor actions, not guard-facing.)
 
+    @PostMapping("/{id}/cancel")
+    @PreAuthorize("hasAuthority('SECURITY_MANAGE')")
+    @Operation(
+            summary = "Cancel a shift that has not started",
+            description = "SCHEDULED shifts only (409 otherwise). A written reason is required and audited; " +
+                    "the guard is notified.")
+    public ResponseEntity<ApiResponse<ShiftResponse>> cancelShift(
+            @PathVariable UUID id,
+            @Valid @RequestBody ShiftSupervisorActionRequest request) {
+        featureGuard.requireModule("security");
+        UUID supervisorId = TenantContext.getCurrentUserId();
+        return ResponseEntity.ok(ApiResponse.success("Shift cancelled",
+                shiftService.cancelShift(TenantContext.getTenantIdAsObject(), id, supervisorId, request)));
+    }
+
     @PostMapping("/{id}/dismiss-no-show")
     @PreAuthorize("hasAuthority('SECURITY_MANAGE')")
     @Operation(

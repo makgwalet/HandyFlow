@@ -14,7 +14,6 @@ import org.springframework.transaction.annotation.Transactional;
 import za.co.handyflow.platform.security.domain.model.Incident;
 import za.co.handyflow.platform.security.domain.model.IncidentEvent;
 import za.co.handyflow.platform.security.domain.repository.IncidentEventRepository;
-import za.co.handyflow.platform.security.application.internal.CheckpointScanService;
 import za.co.handyflow.platform.security.domain.repository.IncidentRepository;
 import za.co.handyflow.platform.security.domain.repository.GuardRepository;
 import za.co.handyflow.platform.security.domain.repository.SiteRepository;
@@ -24,11 +23,9 @@ import za.co.handyflow.platform.shared.HandyFlowException;
 import za.co.handyflow.platform.shared.ResourceNotFoundException;
 import za.co.handyflow.platform.shared.TenantId;
 
-import java.math.BigDecimal;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
-import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -59,6 +56,14 @@ public class IncidentService {
     /** Optional so the service still builds without push (tests, installs with push off). Never throws. */
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     private GuardPushService push;
+
+    /** Optional; alerts control-room users to CRITICAL incidents. Never throws. */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private SecurityAlertNotifier alerts;
+
+    /** Optional; delivers events to customers' webhook subscriptions. Never throws. */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private PublicApiService webhooks;
 
     private void pushTo(TenantId tenantId, UUID guardId, String title, String body, String screen) {
         if (push != null) push.notifyGuard(tenantId, guardId, title, body, java.util.Map.of("screen", screen));
@@ -144,7 +149,7 @@ public class IncidentService {
 
     @Transactional
     public IncidentResponse createIncident(TenantId tenantId, CreateIncidentRequest req, UUID by, String byName) {
-        siteRepo.findActiveById(tenantId, req.siteId())
+        var reportSite = siteRepo.findActiveById(tenantId, req.siteId())
                 .orElseThrow(() -> new ResourceNotFoundException("Site", req.siteId().toString()));
 
         if (req.guardId() != null) {
@@ -189,6 +194,19 @@ public class IncidentService {
 
         log.info("[Security] Incident created id={} type={} severity={} site={}",
                 incident.getId(), incidentType, req.severity(), req.siteId());
+        if (webhooks != null) {
+            try {
+                webhooks.dispatchWebhookEvent(tenantId, "INCIDENT_CREATED", incident.getId(),
+                        WebhookPayloads.event("INCIDENT_CREATED", incident.getId(), req.siteId(),
+                                req.severity() == null ? null : req.severity().toUpperCase(), incidentType,
+                                java.time.Instant.now()));
+            } catch (Exception e) {
+                log.warn("[Security] Webhook dispatch failed for incident={}: {}", incident.getId(), e.getMessage());
+            }
+        }
+        if (alerts != null && "CRITICAL".equalsIgnoreCase(req.severity())) {
+            alerts.criticalIncident(tenantId, incident.getId(), req.title(), reportSite.getName());
+        }
         return getIncidentById(tenantId, incident.getId());
     }
 

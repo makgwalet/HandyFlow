@@ -153,8 +153,7 @@ public class DeviceSessionService {
                         .filter(s -> device.getSiteId() == null || s.getSiteId().equals(device.getSiteId()))
                         .filter(s -> {
                             int minutes = windowBySite.computeIfAbsent(s.getSiteId(), id -> clockInWindowMinutes(tenantId, id));
-                            return s.getStartAt().isAfter(now.minus(minutes, ChronoUnit.MINUTES))
-                                    && !s.getStartAt().isAfter(now.plus(minutes, ChronoUnit.MINUTES));
+                            return ClockOutRules.shiftMatches(s.getStartAt(), s.getEndAt(), now, minutes);
                         })
                         .sorted(java.util.Comparator.comparing(za.co.handyflow.platform.security.domain.model.Shift::getStartAt))
                         .toList();
@@ -212,8 +211,8 @@ public class DeviceSessionService {
     public DeviceSessionResponse closeGuardSession(TenantId tenantId, UUID authenticatedGuardId,
                                                    UUID sessionId, CloseSessionRequest req) {
         assertSessionOwnedBy(tenantId, sessionId, authenticatedGuardId);
-        return closeSession(tenantId, sessionId, new CloseSessionRequest(
-                true, null, req.handoverNotes(), req.resourcesReturned(), req.incompletePatrolReason()));
+        return doClose(tenantId, sessionId, new CloseSessionRequest(
+                true, null, req.handoverNotes(), req.resourcesReturned(), req.incompletePatrolReason()), true);
     }
 
     // ── Session Close ──────────────────────────────────────────────────────────
@@ -221,6 +220,11 @@ public class DeviceSessionService {
     @Transactional
     public DeviceSessionResponse closeSession(TenantId tenantId, UUID sessionId,
                                               CloseSessionRequest req) {
+        return doClose(tenantId, sessionId, req, false);
+    }
+
+    private DeviceSessionResponse doClose(TenantId tenantId, UUID sessionId,
+                                          CloseSessionRequest req, boolean guardRoute) {
         DeviceSession session = sessionRepository.findById(sessionId)
                 .filter(s -> s.getTenantId().equals(tenantId))
                 .orElseThrow(() -> new ResourceNotFoundException("DeviceSession",
@@ -249,7 +253,10 @@ public class DeviceSessionService {
 
         List<ResourceCustody> openCustody =
                 custodyRepository.findCheckedOutByGuard(session.getGuardId());
-        if (!openCustody.isEmpty() && !req.resourcesReturned()) {
+        // A firearm, or anything at all on the guard route, blocks clock-out whatever the request claims.
+        if (ClockOutRules.blocksClockOut(
+                openCustody.stream().map(ResourceCustody::getResourceType).toList(),
+                req.resourcesReturned(), guardRoute)) {
             throw new HandyFlowException(
                     openCustody.size() + " resource(s) not returned: " +
                             openCustody.stream().map(ResourceCustody::getResourceRef)
@@ -329,6 +336,12 @@ public class DeviceSessionService {
             type = ResourceCustody.ResourceType.valueOf(req.resourceType());
         } catch (IllegalArgumentException e) {
             throw new HandyFlowException("Unknown resource type: " + req.resourceType(), HttpStatus.BAD_REQUEST, "INVALID_RESOURCE_TYPE");
+        }
+        if (type == ResourceCustody.ResourceType.FIREARM) {
+            // Firearms go through the Armoury register (licence, competency, PSiRA, two-person witness).
+            // Generic custody has none of those checks.
+            throw new HandyFlowException("Firearms are issued from the Armoury, not checked out here.",
+                    HttpStatus.BAD_REQUEST, "USE_ARMOURY_FOR_FIREARMS");
         }
         if (req.resourceRef().length() > 100) {
             throw new HandyFlowException("The item name is too long (100 characters at most).", HttpStatus.BAD_REQUEST, "VALIDATION_ERROR");

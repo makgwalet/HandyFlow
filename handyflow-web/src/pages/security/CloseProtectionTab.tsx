@@ -2,6 +2,7 @@
 import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
+import { getAllGuards } from "./fetchAllPages"
 import { Lock, Plus, Shield, Users2, Edit2, Ban, History, Eye, FileDown, Paperclip, Download, Trash2, Car, Crosshair, MapPinned, CheckCircle2, Wrench, UserCheck, UserMinus } from "lucide-react"
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -340,7 +341,7 @@ export default function CloseProtectionTab() {
   const { data: guards = [] } = useQuery<Guard[]>({
     queryKey: ["guards-list-for-cp"],
     queryFn: async () => {
-      const r = await apiClient.get("/api/v1/security/guards?size=200")
+      const r = await getAllGuards()
       const p = r.data?.data ?? r.data
       return (p?.content ?? p) as Guard[]
     },

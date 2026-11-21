@@ -35,6 +35,10 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class GuardCompetencyExpiryScheduler {
 
+    /** Lease + per-tenant transactions (optional so hand-built instances in tests keep working). */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private SecurityJobRunner jobs;
+
     static final int WARN_DAYS_BEFORE = 30;
     private static final ZoneId SAST = ZoneId.of("Africa/Johannesburg");
 
@@ -46,10 +50,14 @@ public class GuardCompetencyExpiryScheduler {
 
     @Scheduled(cron = "0 45 6 * * *", zone = "Africa/Johannesburg")
     public void checkCompetencyExpiry() {
+        SecurityJobRunner.exclusively(jobs, "security-competency-expiry", java.time.Duration.ofMinutes(30), this::checkCompetencyExpiryNow);
+    }
+
+    void checkCompetencyExpiryNow() {
         LocalDate today = LocalDate.now(SAST);
         for (UUID tenantId : siteRepository.findDistinctActiveTenantIds()) {
             try {
-                checkForTenant(TenantId.of(tenantId), today);
+                SecurityJobRunner.tx(jobs, true, () -> checkForTenant(TenantId.of(tenantId), today));
             } catch (Exception e) {
                 log.error("[Security] Competency expiry check failed for tenant={}: {}", tenantId, e.getMessage(), e);
             }

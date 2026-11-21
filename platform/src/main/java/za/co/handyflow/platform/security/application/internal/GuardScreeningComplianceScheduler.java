@@ -60,6 +60,10 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class GuardScreeningComplianceScheduler {
 
+    /** Lease + per-tenant transactions (optional so hand-built instances in tests keep working). */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private SecurityJobRunner jobs;
+
     private static final int WARN_DAYS_BEFORE = 30;
 
     private final GuardScreeningRepository screeningRepository;
@@ -68,16 +72,20 @@ public class GuardScreeningComplianceScheduler {
     private final NotificationService      notificationService;
     private final TenantAdminRecipients    tenantAdminRecipients;
 
-    @Scheduled(cron = "0 30 6 * * *")
+    @Scheduled(cron = "0 30 6 * * *", zone = "Africa/Johannesburg")
     public void checkScreeningExpiry() {
-        LocalDate today    = LocalDate.now();
+        SecurityJobRunner.exclusively(jobs, "security-screening-expiry", java.time.Duration.ofMinutes(30), this::checkScreeningExpiryNow);
+    }
+
+    void checkScreeningExpiryNow() {
+        LocalDate today    = LocalDate.now(java.time.ZoneId.of("Africa/Johannesburg"));
         LocalDate warnDate = today.plusDays(WARN_DAYS_BEFORE);
 
         List<UUID> tenantIds = siteRepository.findDistinctActiveTenantIds();
 
         for (UUID tenantId : tenantIds) {
             try {
-                checkForTenant(TenantId.of(tenantId), warnDate);
+                SecurityJobRunner.tx(jobs, true, () -> checkForTenant(TenantId.of(tenantId), warnDate));
             } catch (Exception e) {
                 log.error("[Security] Guard screening compliance check failed for tenant={}: {}",
                         tenantId, e.getMessage(), e);

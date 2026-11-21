@@ -48,6 +48,10 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class ArmouryComplianceScheduler {
 
+    /** Lease + per-tenant transactions (optional so hand-built instances in tests keep working). */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private SecurityJobRunner jobs;
+
     private static final int WARN_DAYS_BEFORE = 30;
 
     private final ArmouryRepository armouryRepository;
@@ -55,16 +59,20 @@ public class ArmouryComplianceScheduler {
     private final NotificationService notificationService;
     private final TenantAdminRecipients tenantAdminRecipients;
 
-    @Scheduled(cron = "0 15 7 * * *")
+    @Scheduled(cron = "0 15 7 * * *", zone = "Africa/Johannesburg")
     public void checkLicenseExpiry() {
-        LocalDate today    = LocalDate.now();
+        SecurityJobRunner.exclusively(jobs, "security-armoury-license-expiry", java.time.Duration.ofMinutes(30), this::checkLicenseExpiryNow);
+    }
+
+    void checkLicenseExpiryNow() {
+        LocalDate today    = LocalDate.now(java.time.ZoneId.of("Africa/Johannesburg"));
         LocalDate warnDate = today.plusDays(WARN_DAYS_BEFORE);
 
         List<UUID> tenantIds = siteRepository.findDistinctActiveTenantIds();
 
         for (UUID tenantId : tenantIds) {
             try {
-                checkForTenant(TenantId.of(tenantId), warnDate);
+                SecurityJobRunner.tx(jobs, true, () -> checkForTenant(TenantId.of(tenantId), warnDate));
             } catch (Exception e) {
                 log.error("[Security] Armoury compliance check failed for tenant={}: {}",
                         tenantId, e.getMessage(), e);

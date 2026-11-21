@@ -46,17 +46,26 @@ public class SecurityClientPortalController {
     @PreAuthorize("hasAuthority('SECURITY_MANAGE')")
     @Operation(
             summary = "Generate (or regenerate) a client portal token for this site",
-            description = "Replaces any existing token — the old portal URL immediately stops working. " +
-                    "Returns the new token. Share the portal URL: /portal/{token}"
+            description = "Returns the current link while it is live. Pass regenerate=true (or when none/expired) to make a new one — the old URL then stops working. " +
+                    "Returns the new token. Share the portal URL: /site-portal/{token}"
     )
     public ResponseEntity<ApiResponse<Map<String, String>>> generateToken(
             @PathVariable UUID id,
+            @RequestParam(defaultValue = "false") boolean regenerate,
             @RequestBody(required = false) Map<String, String> body) {
         String label = body != null ? body.get("label") : null;
         String token = portalService.generatePortalToken(
-                id, label, TenantContext.getTenantIdAsObject());
+                id, label, regenerate, TenantContext.getTenantIdAsObject());
         return ResponseEntity.ok(ApiResponse.success("Portal token generated",
-                Map.of("token", token, "url", "/portal/" + token)));
+                Map.of("token", token, "url", "/site-portal/" + token)));
+    }
+
+    @GetMapping("/api/v1/security/sites/{id}/portal")
+    @PreAuthorize("hasAuthority('SECURITY_MANAGE')")
+    @Operation(summary = "Is the portal on for this site, and until when? Returns the live link for managers.")
+    public ResponseEntity<ApiResponse<ClientPortalService.PortalStatus>> portalStatus(@PathVariable UUID id) {
+        return ResponseEntity.ok(ApiResponse.success("Success",
+                portalService.portalStatus(id, TenantContext.getTenantIdAsObject())));
     }
 
     @DeleteMapping("/api/v1/security/sites/{id}/portal")

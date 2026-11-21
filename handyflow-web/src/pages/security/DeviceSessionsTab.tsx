@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import { Tablet, Clock, LogOut, AlertTriangle } from "lucide-react"
 import { useState } from "react"
+import SharedDevicesPanel from "./SharedDevicesPanel"
 
 interface DeviceSession {
   sessionId: string
@@ -62,6 +63,7 @@ export default function DeviceSessionsTab() {
 
   return (
     <div>
+      <SharedDevicesPanel />
       <div style={{ marginBottom: 20 }}>
         <h2 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "var(--hf-text)" }}>Device Sessions</h2>
         <p style={{ margin: "2px 0 0", fontSize: 12, color: "var(--hf-text-muted)" }}>

@@ -19,7 +19,6 @@ za/co/handyflow/platform/property/api/PropPortalAuthController.java
 za/co/handyflow/platform/recruitmentagency/api/RecruitmentAgencyPortalAuthController.java
 za/co/handyflow/platform/secureaccess/api/SecureCollaboratorPortalController.java
 za/co/handyflow/platform/secureaccess/api/SecureShareController.java
-za/co/handyflow/platform/security/api/GuardCpController.java
 za/co/handyflow/platform/shared/GlobalExceptionHandler.java
 za/co/handyflow/platform/trainingprovider/api/TrainProvPortalAuthController.java
 za/co/handyflow/platform/warehousing/api/WhsePortalAuthController.java

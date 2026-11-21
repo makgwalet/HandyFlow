@@ -110,6 +110,6 @@ public class PatrolRouteController {
     public ResponseEntity<ApiResponse<List<PatrolRound>>> getRoundsForShift(
             @RequestParam UUID shiftId) {
         return ResponseEntity.ok(ApiResponse.success(
-                patrolRoundService.getRoundsForShift(shiftId)));
+                patrolRoundService.getRoundsForShift(TenantContext.getTenantIdAsObject(), shiftId)));
     }
 }

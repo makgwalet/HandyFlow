@@ -2,6 +2,7 @@
 import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
+import { useSecurityAccess } from "./useSecurityAccess"
 import { DollarSign, Plus, CheckCircle, Download, AlertTriangle, List } from "lucide-react"
 
 interface PayrollPeriod {
@@ -46,6 +47,7 @@ const sbtn = { padding:"8px 16px", borderRadius:8, border:"1px solid var(--hf-bo
 
 export default function PayrollTab() {
   const qc = useQueryClient()
+  const acc = useSecurityAccess()
   const [view, setView] = useState<"periods"|"create"|"lines"|"grades"|"add-grade">("periods")
   const [selected, setSelected] = useState<PayrollPeriod | null>(null)
   const [err, setErr] = useState("")
@@ -107,6 +109,14 @@ export default function PayrollTab() {
     <th key={label} style={{textAlign:"left",padding:"9px 14px",fontSize:11,fontWeight:700,color:"var(--hf-text-faint)",textTransform:"uppercase" as const,letterSpacing:"0.5px"}}>{label}</th>
   )
 
+  if (!acc.payrollRead) {
+    return (
+      <div style={{padding:"40px 0",textAlign:"center",color:"var(--hf-text-muted)",fontSize:14}}>
+        You do not have access to guard payroll. Ask an administrator for the payroll permission.
+      </div>
+    )
+  }
+
   return (
     <div style={{fontFamily:"'Inter',system-ui,sans-serif"}}>
       {/* Header */}
@@ -120,9 +130,11 @@ export default function PayrollTab() {
         </div>
         <div style={{display:"flex",gap:8}}>
           <button style={sbtn} onClick={()=>{setView("grades");setErr("")}}>Grade Rates</button>
-          <button style={{...btn("var(--hf-primary)"),display:"flex",alignItems:"center",gap:6}} onClick={()=>{setView("create");setErr("")}}>
-            <Plus size={14}/> New Period
-          </button>
+          {acc.payrollManage && (
+            <button style={{...btn("var(--hf-primary)"),display:"flex",alignItems:"center",gap:6}} onClick={()=>{setView("create");setErr("")}}>
+              <Plus size={14}/> New Period
+            </button>
+          )}
         </div>
       </div>
 
@@ -173,7 +185,7 @@ export default function PayrollTab() {
             </div>
             <div style={{display:"flex",gap:8}}>
               <button style={sbtn} onClick={()=>setView("periods")}>← Back</button>
-              <button style={btn("var(--hf-primary)")} onClick={()=>setView("add-grade")}>Set Rate</button>
+              {acc.payrollManage && <button style={btn("var(--hf-primary)")} onClick={()=>setView("add-grade")}>Set Rate</button>}
             </div>
           </div>
           {view === "add-grade" && (
@@ -239,7 +251,7 @@ export default function PayrollTab() {
                 <Download size={14}/> Export CSV
               </button>
             )}
-            {selected.status==="EXPORTED" && (
+            {selected.status==="EXPORTED" && acc.payrollPay && (
               <button style={btn("var(--hf-info)")} onClick={()=>paidMut.mutate(selected.id)}>Mark Paid</button>
             )}
           </div>
@@ -302,7 +314,7 @@ export default function PayrollTab() {
                         <td style={{padding:"11px 14px",color:"var(--hf-text-muted)"}}>{p.lineItemCount}</td>
                         <td style={{padding:"11px 14px"}}>
                           <div style={{display:"flex",gap:5,flexWrap:"wrap" as const}}>
-                            {p.status==="DRAFT" && (
+                            {p.status==="DRAFT" && acc.payrollApprove && (
                               <button disabled={approveMut.isPending}
                                 style={{display:"flex",alignItems:"center",gap:4,padding:"5px 10px",borderRadius:7,border:"none",background:"var(--hf-success-solid-strong)",color:"var(--hf-text-on-solid)",fontSize:12,cursor:"pointer",fontWeight:600}}
                                 onClick={()=>{setErr("");approveMut.mutate(p.id)}}>
@@ -315,7 +327,7 @@ export default function PayrollTab() {
                                 <Download size={12}/> CSV
                               </button>
                             )}
-                            {p.status==="EXPORTED" && (
+                            {p.status==="EXPORTED" && acc.payrollPay && (
                               <button style={{padding:"5px 10px",borderRadius:7,border:"1px solid var(--hf-border)",background:"var(--hf-surface)",fontSize:12,cursor:"pointer",color:"var(--hf-text-secondary)"}}
                                 onClick={()=>paidMut.mutate(p.id)}>Mark Paid</button>
                             )}

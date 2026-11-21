@@ -63,4 +63,19 @@ public interface GuardTokenRepository extends JpaRepository<GuardToken, UUID> {
         AND t.revokedAt IS NULL
         """)
     List<GuardToken> findActiveByTenantAndGuard(TenantId tenantId, UUID guardId);
+
+    /**
+     * Shared device handover: signing in on a shared device ends every session still open on it (the previous
+     * guard's), so two guards can never act under one device at once.
+     */
+    @Modifying
+    @Query("""
+        UPDATE GuardToken t
+        SET t.revokedAt    = :now,
+            t.revokeReason = :reason
+        WHERE t.tenantId   = :tenantId
+        AND t.deviceId     = :deviceId
+        AND t.revokedAt    IS NULL
+        """)
+    int revokeActiveOnDevice(TenantId tenantId, String deviceId, Instant now, String reason);
 }

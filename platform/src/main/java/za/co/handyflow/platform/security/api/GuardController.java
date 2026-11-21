@@ -174,7 +174,7 @@ public class GuardController {
     // FIX: closes the confirmed "no structured banking fields" gap —
     // payroll export needed manual cross-referencing without this.
     @PostMapping("/{id}/bank-details")
-    @PreAuthorize("hasAuthority('SECURITY_MANAGE')")
+    @PreAuthorize("hasAuthority('SECURITY_GUARD_BANKING_MANAGE')")
     @Operation(summary = "Set a guard's banking details for payroll")
     public ResponseEntity<ApiResponse<GuardResponse>> updateBankDetails(
             @PathVariable UUID id, @RequestBody za.co.handyflow.platform.security.dto.UpdateBankDetailsRequest req) {

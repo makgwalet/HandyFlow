@@ -59,6 +59,13 @@ public class GuardService {
     // (suspend, terminate, reactivate) with previously no generic
     // audit trail entry at all.
     private final za.co.handyflow.platform.security.domain.repository.AuditEventRepository auditRepository;
+    private final za.co.handyflow.platform.security.domain.repository.GuardTokenRepository tokenRepository;
+
+    // Optional, so existing constructor callers (tests) keep compiling. Used when a guard leaves.
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private za.co.handyflow.platform.security.domain.repository.SecurityDeviceRepository deviceRepository;
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private za.co.handyflow.platform.security.domain.repository.DeviceActivationCodeRepository activationCodeRepository;
 
     // ── Queries ───────────────────────────────────────────────────────────────
 
@@ -187,7 +194,18 @@ public class GuardService {
         guardRepository.save(guard);
 
         writeAudit(tenantId, changedBy, id, "STATUS_CHANGED",
-                "{\"status\":\"" + req.status() + "\",\"note\":" + (req.note() != null ? "\"" + req.note().replace("\"", "\\\"") + "\"" : "null") + "}");
+                AuditJson.statusChange(req.status(), req.note()));
+
+        // A guard who is no longer ACTIVE must not keep working on a token issued earlier.
+        if (!"ACTIVE".equals(req.status())) {
+            int revoked = tokenRepository.revokeAllForGuard(id, java.time.Instant.now(),
+                    "Guard status set to " + req.status());
+            log.info("[Security] Guard={} status={} tokensRevoked={}", id, req.status(), revoked);
+        }
+        // Leaving for good: also pull their phone out of service and void any unused activation code.
+        if ("TERMINATED".equals(req.status())) {
+            offboardAppAccess(tenantId, id);
+        }
 
         log.info("[Security] Guard status changed guard={} status={} by={} tenant={}",
                 id, req.status(), changedBy, tenantId);
@@ -200,6 +218,8 @@ public class GuardService {
         guard.softDelete(deletedBy);
         guardRepository.save(guard);
         writeAudit(tenantId, deletedBy, id, "DELETED", null);
+        tokenRepository.revokeAllForGuard(id, java.time.Instant.now(), "Guard deleted");
+        offboardAppAccess(tenantId, id);
         log.info("[Security] Soft-deleted guard={} by={} tenant={}", id, deletedBy, tenantId);
     }
 
@@ -461,6 +481,29 @@ public class GuardService {
     // FIX: closes the confirmed AuditEvent coverage gap for Guard.
     // Mirrors ShiftService.writeAudit()'s own established helper
     // pattern exactly, entityType "GUARD".
+    /**
+     * Ends everything that lets a former guard's phone talk to the app: active/pending devices are revoked (so the
+     * hardware can be issued to someone else) and unused activation codes expire immediately. Sessions' tokens are
+     * revoked by the caller.
+     */
+    private void offboardAppAccess(TenantId tenantId, UUID guardId) {
+        if (activationCodeRepository != null) {
+            int voided = activationCodeRepository.voidUnusedForGuard(guardId, java.time.Instant.now());
+            if (voided > 0) log.info("[Security] Voided {} unused activation codes guard={}", voided, guardId);
+        }
+        if (deviceRepository != null) {
+            int n = 0;
+            for (var d : deviceRepository.findByGuard(tenantId, guardId)) {
+                if (d.isActive() || d.getStatus() == za.co.handyflow.platform.security.domain.model.SecurityDevice.DeviceStatus.PENDING) {
+                    d.revoke();
+                    deviceRepository.save(d);
+                    n++;
+                }
+            }
+            if (n > 0) log.info("[Security] Revoked {} devices guard={}", n, guardId);
+        }
+    }
+
     private void writeAudit(TenantId tenantId, UUID actorId, UUID guardId, String action, String metadataJson) {
         auditRepository.save(za.co.handyflow.platform.security.domain.model.AuditEvent.record(
                 tenantId, actorId,

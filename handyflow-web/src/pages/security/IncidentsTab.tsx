@@ -17,6 +17,7 @@ import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { Link } from "react-router-dom"
 import { apiClient } from "../../api/client"
+import { getAllGuards } from "./fetchAllPages"
 import { Plus, X, AlertTriangle, AlertCircle, FileText } from "lucide-react"
 
 const SEV_CONFIG: Record<string, { color: string; bg: string; border: string }> = {
@@ -78,7 +79,7 @@ export default function IncidentsTab() {
   })
 
   const { data: sites = [] }  = useQuery<any[]>({ queryKey: ["sites-list"],  queryFn: async () => { const r = await apiClient.get("/api/v1/security/sites?size=100");  const p = r.data?.data ?? r.data; return p?.content ?? [] } })
-  const { data: guards = [] } = useQuery<any[]>({ queryKey: ["guards-list"], queryFn: async () => { const r = await apiClient.get("/api/v1/security/guards?size=100"); const p = r.data?.data ?? r.data; return p?.content ?? [] } })
+  const { data: guards = [] } = useQuery<any[]>({ queryKey: ["guards-list"], queryFn: async () => { const r = await getAllGuards(); const p = r.data?.data ?? r.data; return p?.content ?? [] } })
 
   const createIncident = useMutation({
     mutationFn: (body: any) => apiClient.post("/api/v1/security/incidents", body),

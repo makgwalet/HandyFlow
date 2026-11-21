@@ -20,6 +20,7 @@
 import { useState } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
+import { getAllGuards } from "./fetchAllPages"
 import { Route, Plus, MapPin, Radio, AlertTriangle, CheckCircle2, Clock3 } from "lucide-react"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 
@@ -139,7 +140,7 @@ export default function PatrolRoutesTab() {
   const { data: guards = [] } = useQuery<Guard[]>({
     queryKey: ["guards-list-for-patrol"],
     queryFn: async () => {
-      const r = await apiClient.get("/api/v1/security/guards?size=200")
+      const r = await getAllGuards()
       const p = r.data?.data ?? r.data
       return (p?.content ?? p) as Guard[]
     },

@@ -20,6 +20,10 @@ public interface PayrollLineItemRepository extends JpaRepository<PayrollLineItem
     @Query("SELECT COUNT(li) > 0 FROM PayrollLineItem li WHERE li.periodId = :periodId AND li.shiftId = :shiftId")
     boolean existsForShift(UUID periodId, UUID shiftId);
 
+    /** Which of these shifts already have pay in ANY period of this tenant (periods are never cancelled, so any line item is pay that was committed). */
+    @Query("SELECT DISTINCT li.shiftId FROM PayrollLineItem li WHERE li.tenantId = :tenantId AND li.shiftId IN :shiftIds")
+    List<UUID> findPaidShiftIds(TenantId tenantId, java.util.Collection<UUID> shiftIds);
+
     @Query("SELECT COALESCE(SUM(li.grossAmountCents), 0) FROM PayrollLineItem li WHERE li.periodId = :periodId")
     long sumGrossAmountForPeriod(UUID periodId);
 }

@@ -131,6 +131,10 @@ public class RateLimitFilter extends OncePerRequestFilter {
             // typical login limit since unlike a password this is a
             // short, fixed-length numeric space genuinely worth slowing
             // down further.
+            // Guard login: per-IP ceiling on top of the per-account PIN lockout. Generous (guards at one site share a
+            // NAT address) but stops one address cycling through many phone numbers / employee codes.
+            new Limit("guard:login", "/api/v1/auth/guard/login", 30, 10 * 60 * 1_000L),
+
             new Limit("guard:activate-device", "/api/v1/auth/guard/activate-device", 5, 15 * 60 * 1_000L),
 
             // NEW (identity module modernization): main-app invitation

@@ -195,4 +195,43 @@ public interface ShiftRepository extends JpaRepository<Shift, UUID> {
     ORDER BY s.siteId, s.endAt
     """)
     List<Shift> findOvertimeNotYetAlerted(TenantId tenantId, Instant overtimeThreshold);
+
+    /**
+     * Marks SCHEDULED shifts whose end time has passed as MISSED, in one atomic statement.
+     * Safe to run from several instances: the status condition makes a second run a no-op.
+     */
+    @Modifying
+    @org.springframework.transaction.annotation.Transactional
+    @Query("""
+        UPDATE Shift s
+        SET s.status = :missed, s.updatedAt = :now
+        WHERE s.status = :scheduled
+        AND s.endAt < :cutoff
+        AND s.deletedAt IS NULL
+        """)
+    int markEndedScheduledAsMissed(za.co.handyflow.platform.security.domain.model.ShiftStatus scheduled,
+                                   za.co.handyflow.platform.security.domain.model.ShiftStatus missed,
+                                   Instant cutoff, Instant now);
+
+    /** The shifts the missed-sweep is about to mark, so a SHIFT_MISSED webhook can be sent for each. */
+    @Query("""
+        SELECT s FROM Shift s
+        WHERE s.status = :scheduled
+        AND s.endAt < :cutoff
+        AND s.deletedAt IS NULL
+        ORDER BY s.endAt
+        """)
+    List<Shift> findEndedScheduled(za.co.handyflow.platform.security.domain.model.ShiftStatus scheduled,
+                                   Instant cutoff, org.springframework.data.domain.Pageable page);
+
+    /** Marks one shift MISSED only if it is still SCHEDULED; returns 1 if this call did it, 0 if someone else did. */
+    @Modifying
+    @org.springframework.transaction.annotation.Transactional
+    @Query("""
+        UPDATE Shift s
+        SET s.status = :missed, s.updatedAt = :now
+        WHERE s.id = :id AND s.status = :scheduled AND s.deletedAt IS NULL
+        """)
+    int markMissedIfScheduled(UUID id, za.co.handyflow.platform.security.domain.model.ShiftStatus scheduled,
+                              za.co.handyflow.platform.security.domain.model.ShiftStatus missed, Instant now);
 }

@@ -143,6 +143,12 @@ public class SecurityDevice {
         this.updatedAt = Instant.now();
     }
 
+    /** Hands a phone that its previous guard was already moved off to a new guard. */
+    public void rebindTo(UUID newGuardId) {
+        this.guardId   = newGuardId;
+        this.updatedAt = Instant.now();
+    }
+
     public void markLost() {
         this.status    = DeviceStatus.LOST;
         this.updatedAt = Instant.now();

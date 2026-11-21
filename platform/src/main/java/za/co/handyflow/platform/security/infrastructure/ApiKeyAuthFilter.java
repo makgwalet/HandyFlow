@@ -112,6 +112,14 @@ public class ApiKeyAuthFilter extends OncePerRequestFilter {
                 return;
             }
 
+            // Security audit 1.5: the key's branch limit was never enforced anywhere, so a branch-limited key silently saw every branch. Refuse it
+            // (fail closed) until the security endpoints filter by branch.
+            if (apiKey.getBranchId() != null) {
+                log.warn("[ApiKeyAuthFilter] Key '{}' is limited to a branch, which is not enforced yet: refused", apiKey.getName());
+                sendError(response, HttpServletResponse.SC_FORBIDDEN, ApiKeyAccess.BRANCH_UNSUPPORTED);
+                return;
+            }
+
             if (!isPathInScope(apiKey, request.getRequestURI())) {
                 log.warn("[ApiKeyAuthFilter] Key '{}' attempted out-of-scope path {}",
                         apiKey.getName(), request.getRequestURI());
@@ -119,12 +127,6 @@ public class ApiKeyAuthFilter extends OncePerRequestFilter {
                         "This API key is not scoped to access this endpoint");
                 return;
             }
-
-            // NOTE: apiKey.getBranchId() is NOT enforced here -- branch-level
-            // scoping isn't wired anywhere in this module yet (same gap as
-            // GuardController/SiteController/etc). Flagged, not silently
-            // ignored -- see the branch-scoping conversation this filter
-            // came out of for what's still needed.
 
             TenantContext.setTenantId(apiKey.getTenantId().getValue().toString());
             // The API key's own ID stands in for "acting user" -- there is no
@@ -137,11 +139,10 @@ public class ApiKeyAuthFilter extends OncePerRequestFilter {
             TenantContext.setUserId(apiKey.getId().toString());
             TenantContext.setUserName("API Key: " + apiKey.getName());
 
+            // Security authorities only (audit 1.5). USER_READ/USER_UPDATE used to be granted here: no security endpoint accepts them, yet they opened the
+            // identity user, tenant and HR employee endpoints.
             Set<SimpleGrantedAuthority> authorities = new HashSet<>();
-            authorities.add(new SimpleGrantedAuthority("USER_READ"));
-            if (!apiKey.isReadOnly()) {
-                authorities.add(new SimpleGrantedAuthority("USER_UPDATE"));
-            }
+            for (String a : ApiKeyAccess.authorities(apiKey.isReadOnly())) authorities.add(new SimpleGrantedAuthority(a));
 
             SecurityContextHolder.getContext().setAuthentication(
                     new UsernamePasswordAuthenticationToken(
@@ -163,25 +164,18 @@ public class ApiKeyAuthFilter extends OncePerRequestFilter {
     /**
      * scopePrefixesJson: JSON array of allowed path prefixes, e.g.
      * ["/api/v1/security/reports", "/api/v1/security/sites"]. Null/blank =
-     * full access to all security endpoints (per CreateApiKeyRequest's own
-     * documented semantics). A non-null value that fails to parse is
-     * treated as "no scope granted" (fail closed), not "full access" --
-     * malformed data should never silently widen access.
+     * all SECURITY endpoints (never the rest of the platform: see ApiKeyAccess).
+     * A non-null value that fails to parse is treated as "no scope granted"
+     * (fail closed), not "full access" -- malformed data should never silently
+     * widen access.
      */
     private boolean isPathInScope(ApiKey apiKey, String requestUri) {
-        String scopeJson = apiKey.getScopePrefixes();
-        if (scopeJson == null || scopeJson.isBlank()) {
-            return true;
-        }
-        try {
-            List<String> prefixes = objectMapper.readValue(scopeJson, List.class);
-            if (prefixes.isEmpty()) return true;
-            return prefixes.stream().anyMatch(requestUri::startsWith);
-        } catch (Exception e) {
-            log.error("[ApiKeyAuthFilter] Malformed scopePrefixes for key '{}' — failing closed: {}",
-                    apiKey.getName(), e.getMessage());
+        java.util.Optional<List<String>> prefixes = ApiKeyScopeJson.parse(apiKey.getScopePrefixes());
+        if (prefixes.isEmpty()) {
+            log.error("[ApiKeyAuthFilter] Malformed scopePrefixes for key '{}' — failing closed", apiKey.getName());
             return false;
         }
+        return ApiKeyAccess.inScope(requestUri, prefixes.get());
     }
 
     private void sendError(HttpServletResponse response, int status, String message) throws IOException {

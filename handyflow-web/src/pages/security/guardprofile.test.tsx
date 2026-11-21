@@ -49,7 +49,7 @@ function page(data: any = overview()) {
 }
 
 describe('Guard 360 page', () => {
-  beforeEach(() => { vi.clearAllMocks(); perms.clear(); perms.add('SECURITY_MANAGE') })
+  beforeEach(() => { vi.clearAllMocks(); perms.clear(); perms.add('SECURITY_MANAGE'); perms.add('SECURITY_SCREENING_DECIDE') })
 
   it('loads the overview for the guard in the URL and shows the header', async () => {
     page()
@@ -214,7 +214,7 @@ describe('Guard 360 page', () => {
 })
 
 describe('Skills tab', () => {
-  beforeEach(() => { vi.clearAllMocks(); perms.clear(); perms.add('SECURITY_MANAGE') })
+  beforeEach(() => { vi.clearAllMocks(); perms.clear(); perms.add('SECURITY_MANAGE'); perms.add('SECURITY_SCREENING_DECIDE') })
   const openSkills = async () => { page(); fireEvent.click(await screen.findByRole('tab', { name: 'Skills' })) }
 
   it('lists competencies with status, certificate count and the required flag', async () => {
@@ -256,11 +256,12 @@ describe('Skills tab', () => {
     await openSkills()
     fireEvent.click(screen.getByRole('button', { name: /Add competency/ }))
     fireEvent.change(screen.getByLabelText('Competency'), { target: { value: 'FIREARM_COMPETENCY' } })
+    fireEvent.change(screen.getByLabelText('Firearm category'), { target: { value: 'HANDGUN' } })
     fireEvent.change(screen.getByLabelText('Expiry date'), { target: { value: '2028-03-01' } })
     fireEvent.click(screen.getByLabelText(/Required for deployment/))
     fireEvent.click(screen.getAllByRole('button', { name: 'Add competency' }).pop()!)
     await waitFor(() => expect(api.post).toHaveBeenCalledWith('/api/v1/security/guards/g1/competencies',
-      expect.objectContaining({ competencyType: 'FIREARM_COMPETENCY', expiryDate: '2028-03-01', issueDate: null, required: true })))
+      expect.objectContaining({ competencyType: 'FIREARM_COMPETENCY', firearmCategory: 'HANDGUN', expiryDate: '2028-03-01', issueDate: null, required: true })))
   })
 
   it('asks for a name when the type is Other and does not call the server', async () => {

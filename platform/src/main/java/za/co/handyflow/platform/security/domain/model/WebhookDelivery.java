@@ -24,6 +24,8 @@ public class WebhookDelivery {
     @Column(name = "event_type", nullable = false, length = 50) private String eventType;
     @Column(name = "event_id", nullable = false) private UUID eventId;
     @Column(name = "payload_hash", length = 64) private String payloadHash;
+    /** The body that was sent, kept only while retries remain (V847). */
+    @Column(name = "payload_json") private String payloadJson;
     @Column(name = "attempt_number", nullable = false) private int attemptNumber = 1;
     @Column(name = "http_status") private Integer httpStatus;
     @Column(name = "response_body") private String responseBody;
@@ -36,7 +38,14 @@ public class WebhookDelivery {
     public static WebhookDelivery attempt(TenantId tenantId, UUID subscriptionId,
                                           String eventType, UUID eventId,
                                           String payloadHash, int attemptNumber) {
+        return attempt(tenantId, subscriptionId, eventType, eventId, payloadHash, null, attemptNumber);
+    }
+
+    public static WebhookDelivery attempt(TenantId tenantId, UUID subscriptionId,
+                                          String eventType, UUID eventId,
+                                          String payloadHash, String payloadJson, int attemptNumber) {
         WebhookDelivery d = new WebhookDelivery();
+        d.payloadJson = payloadJson;
         d.tenantId = tenantId; d.subscriptionId = subscriptionId;
         d.eventType = eventType; d.eventId = eventId;
         d.payloadHash = payloadHash; d.attemptNumber = attemptNumber;
@@ -46,16 +55,21 @@ public class WebhookDelivery {
 
     public void markDelivered(int httpStatus, String responseBody) {
         this.httpStatus = httpStatus; this.responseBody = truncate(responseBody);
-        this.deliveredAt = Instant.now(); this.nextRetryAt = null;
+        this.deliveredAt = Instant.now(); this.nextRetryAt = null; this.payloadJson = null;
     }
+
+    /** A newer attempt took over this one: never pick it up for retry again. */
+    public void supersede() { this.nextRetryAt = null; this.payloadJson = null; }
 
     public void markFailed(int httpStatus, String reason, Instant nextRetryAt) {
         this.httpStatus = httpStatus; this.failureReason = reason;
         this.failedAt = Instant.now(); this.nextRetryAt = nextRetryAt;
+        if (nextRetryAt == null) this.payloadJson = null;
     }
 
     public void markNetworkFailed(String reason, Instant nextRetryAt) {
         this.failureReason = reason; this.failedAt = Instant.now(); this.nextRetryAt = nextRetryAt;
+        if (nextRetryAt == null) this.payloadJson = null;
     }
 
     public boolean succeeded() { return deliveredAt != null; }

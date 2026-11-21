@@ -1,10 +1,10 @@
 // src/pages/security/ClientPortalPage.tsx
-// Route: /portal/:token  (public — no auth required)
-// Add to your router: <Route path="/portal/:token" element={<ClientPortalPage />} />
+// Route: /site-portal/:token  (public — no auth required)
+// Routed in App.tsx. (/portal/:token belongs to the Projects portal.)
 
 import { useParams } from "react-router-dom"
 import { useQuery } from "@tanstack/react-query"
-import axios from "axios"
+import { apiClient } from "../../api/client"
 import { Shield, AlertTriangle, CheckCircle, Clock, Calendar, MapPin, Activity } from "lucide-react"
 
 const SEV_CONFIG: Record<string, { color: string; bg: string }> = {
@@ -48,7 +48,7 @@ export default function ClientPortalPage() {
   const { data, isLoading, isError } = useQuery({
     queryKey: ["portal", token],
     queryFn: async () => {
-      const r = await axios.get(`/api/v1/portal/${token}`)
+      const r = await apiClient.get(`/api/v1/portal/${token}`)
       return r.data?.data ?? r.data
     },
     refetchInterval: 60_000, // refresh every minute

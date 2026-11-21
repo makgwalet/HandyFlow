@@ -14,6 +14,7 @@ import StatTile from "../../components/ui/StatTile"
 import { PageHeader } from "../../components/ui/PageHeader"
 import GuardScreeningPanel, { RequestScreening } from "./GuardScreeningPanel"
 import SkillsTab from "./GuardCompetencyPanel"
+import GuardDevicesPanel from "./GuardDevicesPanel"
 import ComplaintsTab from "./ComplaintsTab"
 import GuardPerformancePanel from "./GuardPerformancePanel"
 import GuardHrLinkCard from "./GuardHrLinkCard"
@@ -44,7 +45,7 @@ interface Overview {
   complaintCounts?: ComplaintCounts
 }
 
-const TABS = ["Overview", "Compliance", "Skills", "Documents", "Shifts", "Incidents", "Complaints", "Performance"] as const
+const TABS = ["Overview", "Compliance", "Skills", "Documents", "Shifts", "Incidents", "Complaints", "Performance", "Devices"] as const
 type Tab = typeof TABS[number]
 
 const STATUS_TONE: Record<string, "ok" | "warn" | "bad" | "info" | "neutral"> = { ACTIVE: "ok", ON_LEAVE: "info", SUSPENDED: "bad", UNDER_INVESTIGATION: "warn", TERMINATED: "neutral" }
@@ -204,6 +205,8 @@ export default function GuardProfilePage() {
       )}
 
       {tab === "Performance" && <GuardPerformancePanel guardId={guard.id} canManage={canManage} />}
+
+      {tab === "Devices" && <GuardDevicesPanel guardId={guard.id} canManage={canManage} />}
 
       {tab === "Complaints" && <ComplaintsTab guardId={guard.id} />}
 

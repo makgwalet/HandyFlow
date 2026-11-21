@@ -19,9 +19,6 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 import za.co.handyflow.platform.security.application.internal.GuardAuthService;
 import za.co.handyflow.platform.security.domain.model.GuardToken;
-import za.co.handyflow.platform.shared.TenantContext;
-import za.co.handyflow.platform.shared.TenantId;
-import org.springframework.security.core.context.SecurityContextHolder;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -62,6 +59,10 @@ import java.util.UUID;
 public class GuardJwtFilter extends OncePerRequestFilter {
 
     private final GuardAuthService guardAuthService;
+
+    /** Optional so existing constructor callers keep working. */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private za.co.handyflow.platform.security.application.internal.TenantAccessService tenantAccess;
 
     @Value("${app.security.jwt.secret}")
     private String jwtSecret;
@@ -121,6 +122,20 @@ public class GuardJwtFilter extends OncePerRequestFilter {
             log.info("[GuardJwtFilter] Revoked or expired token jti={}", jti);
             sendUnauthorized(response, "Session has been revoked or expired");
             return;
+        }
+
+        // Company standing: a suspended tenant's guards keep panic, close-out and uploads only; cancelled is blocked.
+        if (tenantAccess != null && claims.get("tenantId", String.class) != null) {
+            var access = tenantAccess.accessFor(UUID.fromString(claims.get("tenantId", String.class)));
+            if (!za.co.handyflow.platform.security.application.internal.TenantAccessRules
+                    .permits(access, request.getMethod(), request.getRequestURI())) {
+                response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+                response.setContentType("application/json");
+                response.getWriter().write("{\"success\":false,\"code\":\"TENANT_SUSPENDED\",\"message\":"
+                        + "\"Your company's HandyFlow account is inactive. Only emergency and close-out actions are available. "
+                        + "Contact your supervisor.\"}");
+                return;
+            }
         }
 
         // Extract claims

@@ -95,6 +95,17 @@ public class ArmouryController {
                 armouryService.recordService(tenantId, id, req)));
     }
 
+    @PostMapping("/{id}/saps-case")
+    @PreAuthorize("hasAuthority('SECURITY_MANAGE')")
+    @Operation(summary = "Record the SAPS case number for a lost or stolen firearm")
+    public ResponseEntity<ApiResponse<ArmouryResponse>> recordSapsCase(
+            @PathVariable UUID id,
+            @Valid @RequestBody RecordSapsCaseRequest req) {
+        TenantId tenantId = TenantContext.getTenantIdAsObject();
+        return ResponseEntity.ok(ApiResponse.success(
+                armouryService.recordSapsCase(tenantId, id, req, TenantContext.getCurrentUserId())));
+    }
+
     @PostMapping("/{id}/report-lost")
     @PreAuthorize("hasAuthority('SECURITY_ADMIN')")
     @Operation(
@@ -106,7 +117,7 @@ public class ArmouryController {
             @Valid @RequestBody ReportLostFirearmRequest req) {
         TenantId tenantId = TenantContext.getTenantIdAsObject();
         return ResponseEntity.ok(ApiResponse.success(
-                armouryService.reportLost(tenantId, id, req)));
+                armouryService.reportLost(tenantId, id, req, TenantContext.getCurrentUserId())));
     }
 
     @PostMapping("/{id}/decommission")
@@ -125,7 +136,7 @@ public class ArmouryController {
     // ── Witnessed Issue / Return ───────────────────────────────────────────────
 
     @PostMapping("/{id}/issue")
-    @PreAuthorize("hasAuthority('SECURITY_MANAGE')")
+    @PreAuthorize("hasAuthority('SECURITY_ARMOURY_ISSUE')")
     @Operation(
             summary = "Issue a firearm to a guard (mandatory two-person witness)",
             description = """
@@ -146,7 +157,7 @@ public class ArmouryController {
     }
 
     @PostMapping("/{id}/return")
-    @PreAuthorize("hasAuthority('SECURITY_MANAGE')")
+    @PreAuthorize("hasAuthority('SECURITY_ARMOURY_ISSUE')")
     @Operation(summary = "Return an issued firearm to the armoury (mandatory two-person witness)")
     public ResponseEntity<ApiResponse<ArmouryResponse>> returnFirearm(
             @PathVariable UUID id,

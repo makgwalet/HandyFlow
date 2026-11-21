@@ -74,6 +74,7 @@ public class GuardCompetencyService {
         } catch (IllegalArgumentException e) {
             throw bad(e.getMessage(), "INVALID_COMPETENCY");
         }
+        c.setFirearmCategory(firearmCategoryFor(type, req));
         repository.save(c);
         log.info("[Security] Competency added guardId={} type={} by={}", guardId, type, by);
         return toResponse(c, today);
@@ -89,8 +90,23 @@ public class GuardCompetencyService {
         } catch (IllegalArgumentException e) {
             throw bad(e.getMessage(), "INVALID_COMPETENCY");
         }
+        c.setFirearmCategory(firearmCategoryFor(type, req));
         repository.save(c);
         return toResponse(c, today);
+    }
+
+    /** A firearm competency is issued per category and is only usable with an expiry date. */
+    private static String firearmCategoryFor(GuardCompetency.Type type, SaveGuardCompetencyRequest req) {
+        if (type != GuardCompetency.Type.FIREARM_COMPETENCY) return null;
+        String category;
+        try {
+            category = CompetencyChecks.parseCategory(req.firearmCategory());
+        } catch (IllegalArgumentException e) {
+            throw bad(e.getMessage(), "INVALID_FIREARM_CATEGORY");
+        }
+        if (category == null) throw bad("Choose the firearm category: handgun, shotgun or rifle", "FIREARM_CATEGORY_REQUIRED");
+        if (req.expiryDate() == null) throw bad("A firearm competency needs an expiry date", "EXPIRY_REQUIRED");
+        return category;
     }
 
     /** Verification needs a certificate on file: there is nothing to verify otherwise. */
@@ -196,7 +212,7 @@ public class GuardCompetencyService {
                 GuardReadinessCalculator.labelOfCompetency(c.getType().name()), c.getTitle(), c.getIssuedBy(),
                 c.getIssueDate(), c.getExpiryDate(), c.getCertificateRef(), c.isRequired(), c.getNotes(),
                 item.state().name(), item.detail(), c.getVerifiedByName(), c.getVerifiedAt(), c.getVerificationNote(),
-                files, c.getCreatedAt());
+                files, c.getCreatedAt(), c.getFirearmCategory());
     }
 
     static GuardReadinessCalculator.CompetencyFacts facts(GuardCompetency c, int evidenceCount) {

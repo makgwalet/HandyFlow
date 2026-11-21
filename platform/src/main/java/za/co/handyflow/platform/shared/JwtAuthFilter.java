@@ -30,7 +30,10 @@ public class JwtAuthFilter extends OncePerRequestFilter {
 
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
-        return request.getRequestURI().startsWith("/api/v1/admin/");
+        // Guard-app requests carry a guard token (no permissions, different claims) and are handled only by GuardJwtFilter. Running this filter on them used to
+        // replace the guard's authorities with an empty set.
+        String uri = request.getRequestURI();
+        return uri.startsWith("/api/v1/admin/") || GuardPaths.isGuardPath(uri);
     }
 
     /** Real tenant tokens only: admin and impersonation tokens carry no tenant version. */

@@ -42,7 +42,7 @@ public class PublicApiController {
     }
 
     @PostMapping("/keys")
-    @PreAuthorize("hasAuthority('SECURITY_MANAGE')")
+    @PreAuthorize("hasAuthority('SECURITY_INTEGRATIONS_MANAGE')")
     @Operation(
             summary = "Create an API key",
             description = """
@@ -65,7 +65,7 @@ public class PublicApiController {
     }
 
     @DeleteMapping("/keys/{id}")
-    @PreAuthorize("hasAuthority('SECURITY_ADMIN')")
+    @PreAuthorize("hasAnyAuthority('SECURITY_ADMIN','SECURITY_INTEGRATIONS_MANAGE')")
     @Operation(summary = "Revoke an API key — immediate, cannot be undone")
     public ResponseEntity<ApiResponse<Void>> revokeApiKey(
             @PathVariable UUID id,
@@ -87,7 +87,7 @@ public class PublicApiController {
     }
 
     @PostMapping("/webhooks")
-    @PreAuthorize("hasAuthority('SECURITY_MANAGE')")
+    @PreAuthorize("hasAuthority('SECURITY_INTEGRATIONS_MANAGE')")
     @Operation(
             summary = "Subscribe to webhook events",
             description = """
@@ -111,7 +111,7 @@ public class PublicApiController {
     }
 
     @DeleteMapping("/webhooks/{id}")
-    @PreAuthorize("hasAuthority('SECURITY_MANAGE')")
+    @PreAuthorize("hasAuthority('SECURITY_INTEGRATIONS_MANAGE')")
     @Operation(summary = "Deactivate a webhook subscription")
     public ResponseEntity<ApiResponse<Void>> deactivateWebhook(@PathVariable UUID id) {
         TenantId tenantId = TenantContext.getTenantIdAsObject();
@@ -120,7 +120,7 @@ public class PublicApiController {
     }
 
     @PostMapping("/webhooks/{id}/reactivate")
-    @PreAuthorize("hasAuthority('SECURITY_MANAGE')")
+    @PreAuthorize("hasAuthority('SECURITY_INTEGRATIONS_MANAGE')")
     @Operation(summary = "Reactivate a suspended webhook and reset failure count")
     public ResponseEntity<ApiResponse<Void>> reactivateWebhook(@PathVariable UUID id) {
         TenantId tenantId = TenantContext.getTenantIdAsObject();

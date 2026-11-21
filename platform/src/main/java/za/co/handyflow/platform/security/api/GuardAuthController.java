@@ -10,6 +10,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import za.co.handyflow.platform.security.application.internal.GuardAuthService;
+import za.co.handyflow.platform.security.application.internal.GuardBulkAccessService;
 import za.co.handyflow.platform.security.dto.*;
 import za.co.handyflow.platform.shared.ApiResponse;
 import za.co.handyflow.platform.shared.TenantContext;
@@ -45,6 +46,8 @@ import java.util.UUID;
 @RestController
 @RequiredArgsConstructor
 public class GuardAuthController {
+
+    private final GuardBulkAccessService bulkAccessService;
 
     private final GuardAuthService guardAuthService;
 
@@ -159,7 +162,8 @@ public class GuardAuthController {
             - Registered device hardware ID (for Phase 2 device binding)
 
             After enrollment:
-            - pin_must_change is set to false (supervisor set PIN in person)
+            - pin_must_change stays true: the guard chooses their own PIN at first login
+              (leave pin blank and the server generates a temporary one, returned once)
             - All existing guard tokens are revoked (clean slate)
             - Guard can immediately log in with the new PIN
 
@@ -171,7 +175,31 @@ public class GuardAuthController {
             @Valid @RequestBody GuardEnrollRequest req) {
         UUID supervisorId = TenantContext.getCurrentUserId();
         return ResponseEntity.ok(ApiResponse.success("Guard enrolled",
-                guardAuthService.enroll(id, req, supervisorId)));
+                guardAuthService.enroll(TenantContext.getTenantIdAsObject(), id, req, supervisorId)));
+    }
+
+    @PostMapping(value = "/api/v1/security/guards/app-access/bulk")
+    @PreAuthorize("hasAuthority('SECURITY_MANAGE')")
+    @Operation(
+            summary = "Give many guards app access at once",
+            description = """
+            Enrols guards (all eligible active guards when guardIds is empty, max 100 per request) with generated
+            temporary PINs, each of which must be changed at first login. Guards that already have app access are
+            skipped unless resetExisting is true. One guard failing never affects the others.
+            Add ?format=csv to get a printable/SMS sheet. The response contains temporary PINs: shown once.
+            If moreRemaining is true, call again to continue.
+            """)
+    public ResponseEntity<?> bulkAppAccess(@RequestBody(required = false) BulkAppAccessRequest req,
+                                           @RequestParam(defaultValue = "json") String format) {
+        var res = bulkAccessService.provision(TenantContext.getTenantIdAsObject(), req, TenantContext.getCurrentUserId());
+        if ("csv".equalsIgnoreCase(format)) {
+            return ResponseEntity.ok()
+                    .header("Content-Type", "text/csv; charset=utf-8")
+                    .header("Content-Disposition", "attachment; filename=\"guard-app-access.csv\"")
+                    .header("Cache-Control", "no-store")
+                    .body(bulkAccessService.toCsv(res));
+        }
+        return ResponseEntity.ok(ApiResponse.success("Bulk app access processed", res));
     }
 
     @PostMapping("/api/v1/security/guards/{id}/initiate-device-replacement")
@@ -190,7 +218,7 @@ public class GuardAuthController {
             @PathVariable UUID id) {
         UUID supervisorId = TenantContext.getCurrentUserId();
         return ResponseEntity.ok(ApiResponse.success("Replacement code issued",
-                guardAuthService.initiateDeviceReplacement(id, supervisorId)));
+                guardAuthService.initiateDeviceReplacement(TenantContext.getTenantIdAsObject(), id, supervisorId)));
     }
 
     @GetMapping("/api/v1/security/guards/{id}/devices")
@@ -224,7 +252,7 @@ public class GuardAuthController {
     public ResponseEntity<ApiResponse<RevokeTokensResponse>> revokeAllTokens(
             @PathVariable UUID id,
             @RequestParam(defaultValue = "Supervisor action") String reason) {
-        int count = guardAuthService.revokeAllTokens(id, reason);
+        int count = guardAuthService.revokeAllTokens(TenantContext.getTenantIdAsObject(), id, reason);
         return ResponseEntity.ok(ApiResponse.success("Tokens revoked",
                 new RevokeTokensResponse(id, count, reason)));
     }

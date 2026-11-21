@@ -59,6 +59,10 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class PsiraComplianceScheduler {
 
+    /** Lease + per-tenant transactions (optional so hand-built instances in tests keep working). */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private SecurityJobRunner jobs;
+
     private static final int WARN_DAYS_BEFORE = 30;
 
     private final GuardRepository guardRepository;
@@ -66,9 +70,13 @@ public class PsiraComplianceScheduler {
     private final NotificationService notificationService;
     private final TenantAdminRecipients tenantAdminRecipients;
 
-    @Scheduled(cron = "0 0 7 * * *")
+    @Scheduled(cron = "0 0 7 * * *", zone = "Africa/Johannesburg")
     public void checkPsiraExpiry() {
-        LocalDate today    = LocalDate.now();
+        SecurityJobRunner.exclusively(jobs, "security-psira-expiry", java.time.Duration.ofMinutes(30), this::checkPsiraExpiryNow);
+    }
+
+    void checkPsiraExpiryNow() {
+        LocalDate today    = LocalDate.now(java.time.ZoneId.of("Africa/Johannesburg"));
         LocalDate warnDate = today.plusDays(WARN_DAYS_BEFORE);
 
         log.info("[Security] PSiRA compliance check starting date={}", today);
@@ -78,7 +86,7 @@ public class PsiraComplianceScheduler {
 
         for (UUID tenantId : tenantIds) {
             try {
-                int alerts = checkForTenant(TenantId.of(tenantId), today, warnDate);
+                int alerts = SecurityJobRunner.txGet(jobs, true, () -> checkForTenant(TenantId.of(tenantId), today, warnDate));
                 totalAlerts += alerts;
             } catch (Exception ex) {
                 log.error("[Security] PSiRA check failed for tenant={}: {}", tenantId, ex.getMessage(), ex);

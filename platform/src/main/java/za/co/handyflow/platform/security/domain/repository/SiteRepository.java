@@ -15,6 +15,10 @@ import java.util.UUID;
 
 public interface SiteRepository extends JpaRepository<Site, UUID> {
 
+    /** Every site of a branch, including deleted ones: a deleted site's completed shifts are still owed. */
+    @Query("SELECT s.id FROM Site s WHERE s.tenantId = :tenantId AND s.branchId = :branchId")
+    List<UUID> findIdsByBranch(TenantId tenantId, UUID branchId);
+
     @Query("SELECT s FROM Site s WHERE s.tenantId = :tenantId AND s.deletedAt IS NULL ORDER BY s.name")
     Page<Site> findAllActive(TenantId tenantId, Pageable pageable);
 

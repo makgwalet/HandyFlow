@@ -22,6 +22,7 @@
 import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
+import { getAllGuards } from "./fetchAllPages"
 import { RefreshCw, Plus, Users2, UserMinus, Ban, CalendarRange, AlertTriangle, CheckCircle2 } from "lucide-react"
 
 // ── Types ──────────────────────────────────────────────────────────────────────
@@ -84,7 +85,7 @@ export default function RotationPatternsTab() {
   const { data: guards = [] } = useQuery<Guard[]>({
     queryKey: ["guards-list-for-rotation"],
     queryFn: async () => {
-      const r = await apiClient.get("/api/v1/security/guards?size=200")
+      const r = await getAllGuards()
       const p = r.data?.data ?? r.data
       return (p?.content ?? p) as Guard[]
     },

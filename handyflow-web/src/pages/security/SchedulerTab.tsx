@@ -9,6 +9,7 @@ import { Link } from "react-router-dom"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { AlertTriangle, ChevronLeft, ChevronRight, Plus, Users, CalendarClock, Clock } from "lucide-react"
 import { apiClient } from "../../api/client"
+import { getAllGuards } from "./fetchAllPages"
 import { usePermission } from "../../hooks/usePermission"
 import Chip from "../../components/ui/Chip"
 import StatTile from "../../components/ui/StatTile"
@@ -76,7 +77,7 @@ export default function SchedulerTab() {
     queryKey: ["scheduler-shifts", monday],
     queryFn: async () => { const w = fetchWindow(monday); return unwrap(await apiClient.get(`/api/v1/security/shifts/range?from=${encodeURIComponent(w.from.toISOString())}&to=${encodeURIComponent(w.to.toISOString())}`)) },
   })
-  const { data: guards = [] } = useQuery<GridGuard[]>({ queryKey: ["scheduler-guards"], queryFn: async () => unwrap(await apiClient.get("/api/v1/security/guards?size=200")) })
+  const { data: guards = [] } = useQuery<GridGuard[]>({ queryKey: ["scheduler-guards"], queryFn: async () => unwrap(await getAllGuards()) })
   const { data: sites = [] } = useQuery<Site[]>({ queryKey: ["scheduler-sites"], queryFn: async () => unwrap(await apiClient.get("/api/v1/security/sites?size=200")) })
 
   const siteName = useMemo(() => new Map(sites.map(s => [s.id, s.name])), [sites])

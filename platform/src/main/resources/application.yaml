@@ -50,6 +50,9 @@ spring:
     locations: classpath:db/migration
     baseline-on-migrate: true
     out-of-order: true
+    # The demo seed migrations moved to db/seed. Databases that already applied them would otherwise fail
+    # validation ("applied but missing"). Missing is tolerated; pending or changed migrations still fail.
+    ignore-migration-patterns: "*:missing,*:future"
 
   # ==================== Email — using Gmail SMTP (replace with real credentials) ====================
   mail:
@@ -84,7 +87,7 @@ app:
       expiration-ms: 900000  # 15 minutes — this is the config change that
         # actually makes the refresh-token mechanism
         # built earlier this session matter day-to-day.
-        # A 24h token made refresh a rarely-exercised
+      # A 24h token made refresh a rarely-exercised
       # path; short-lived access + rotation is the
       # whole point of that design.
       refresh-expiration-ms: 604800000  # 7 days
@@ -100,7 +103,7 @@ app:
       secret: ${PORTAL_JWT_SECRET}
       expiration-ms: 604800000  # 7 days — portal sessions are long-lived
         # by design (a client checking their fee notes monthly
-        # shouldn't need to re-login every day), unlike the 15-minute
+      # shouldn't need to re-login every day), unlike the 15-minute
       # staff token above.
     encryption:
       # FIX: same issue as jwt.secret above — was a hardcoded literal.
@@ -237,6 +240,7 @@ handyflow:
     trusted-proxies: ${CONTRACTING_TRUSTED_PROXIES:}
   entitlement:
     enforce: ${ENTITLEMENT_ENFORCE:false}   # false = log ENTITLEMENT-REPORT lines only; true = refuse with 402/403
+    enforce-modules: ${ENTITLEMENT_ENFORCE_MODULES:}   # e.g. "security": enforce only these modules while enforce is false
   dev:
     otp-endpoint:
       enabled: ${DEV_OTP_ENDPOINT:false}   # local development only; never true in production

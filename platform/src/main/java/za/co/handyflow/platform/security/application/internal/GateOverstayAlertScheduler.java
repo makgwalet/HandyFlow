@@ -54,6 +54,10 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class GateOverstayAlertScheduler {
 
+    /** Lease + per-tenant transactions (optional so hand-built instances in tests keep working). */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private SecurityJobRunner jobs;
+
     @Value("${security.gate-access.overstay-threshold-hours:12}")
     private int overstayThresholdHours;
 
@@ -64,15 +68,19 @@ public class GateOverstayAlertScheduler {
     private final TenantAdminRecipients       tenantAdminRecipients;
 
     /** Hourly — overstays don't need NoShowAlertScheduler's 5-minute granularity; a visitor being on site an extra hour isn't urgent the way a guard no-show is. */
-    @Scheduled(cron = "0 0 * * * *")
+    @Scheduled(cron = "0 0 * * * *", zone = "Africa/Johannesburg")
     public void checkOverstays() {
+        SecurityJobRunner.exclusively(jobs, "security-gate-overstay", java.time.Duration.ofMinutes(30), this::checkOverstaysNow);
+    }
+
+    void checkOverstaysNow() {
         Instant now = Instant.now();
         log.debug("[Security] Running gate overstay check at {}", now);
 
         List<UUID> tenantIds = siteRepository.findDistinctActiveTenantIds();
         for (UUID tenantId : tenantIds) {
             try {
-                checkForTenant(TenantId.of(tenantId), now);
+                SecurityJobRunner.tx(jobs, false, () -> checkForTenant(TenantId.of(tenantId), now));
             } catch (Exception e) {
                 log.error("[Security] Gate overstay check failed for tenant={}: {}",
                         tenantId, e.getMessage(), e);

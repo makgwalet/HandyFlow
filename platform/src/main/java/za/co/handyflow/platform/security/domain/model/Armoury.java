@@ -78,6 +78,22 @@ public class Armoury {
     @Column
     private String notes;
 
+    /** Optimistic lock: two concurrent issues of the same firearm cannot both succeed. */
+    @Version
+    private Long version;
+
+    @Column(name = "lost_reported_at")
+    private Instant lostReportedAt;
+
+    @Column(name = "saps_case_number", length = 60)
+    private String sapsCaseNumber;
+
+    @Column(name = "saps_report_due_at")
+    private Instant sapsReportDueAt;
+
+    @Column(name = "saps_overdue_alerted_at")
+    private Instant sapsOverdueAlertedAt;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
@@ -129,10 +145,29 @@ public class Armoury {
         this.updatedAt       = Instant.now();
     }
 
-    public void reportLost(String notes) {
-        this.status    = ArmouryStatus.LOST;
-        this.notes     = appendNote(this.notes, notes);
-        this.updatedAt = Instant.now();
+    /** Marks the firearm lost and starts the 24-hour SAPS reporting clock. */
+    public void reportLost(String notes, String sapsCaseNumber, Instant now, Instant sapsDueAt) {
+        if (this.status == ArmouryStatus.LOST) {
+            throw new IllegalStateException("Firearm is already reported lost");
+        }
+        this.status          = ArmouryStatus.LOST;
+        this.notes           = appendNote(this.notes, notes);
+        this.lostReportedAt  = now;
+        this.sapsCaseNumber  = sapsCaseNumber;
+        this.sapsReportDueAt = sapsDueAt;
+        this.updatedAt       = now;
+    }
+
+    public void markSapsOverdueAlerted(Instant now) {
+        this.sapsOverdueAlertedAt = now;
+    }
+
+    public void recordSapsCase(String caseNumber, Instant now) {
+        if (this.status != ArmouryStatus.LOST) {
+            throw new IllegalStateException("Only a lost firearm has a SAPS case");
+        }
+        this.sapsCaseNumber = caseNumber;
+        this.updatedAt      = now;
     }
 
     public void decommission(String reason) {

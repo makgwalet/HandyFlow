@@ -1,10 +1,12 @@
 package za.co.handyflow.platform.security.domain.repository;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import za.co.handyflow.platform.security.domain.model.DeviceActivationCode;
 import za.co.handyflow.platform.shared.TenantId;
 
+import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -25,4 +27,9 @@ public interface DeviceActivationCodeRepository extends JpaRepository<DeviceActi
     // uses the found row's own tenantId, never one trusted from the caller.
     @Query("SELECT c FROM DeviceActivationCode c WHERE c.code = :code AND c.usedAt IS NULL")
     Optional<DeviceActivationCode> findUnusedByCodeAnyTenant(String code);
+
+    /** Offboarding: a code issued before the guard left must not work afterwards. */
+    @Modifying
+    @Query("UPDATE DeviceActivationCode c SET c.expiresAt = :now WHERE c.guardId = :guardId AND c.usedAt IS NULL AND c.expiresAt > :now")
+    int voidUnusedForGuard(UUID guardId, Instant now);
 }

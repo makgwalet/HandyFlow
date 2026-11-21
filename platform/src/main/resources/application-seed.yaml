@@ -1,0 +1,6 @@
+# Demo / pilot data. Activate with SPRING_PROFILES_ACTIVE=...,seed on a dev or demo database ONLY.
+# It adds db/seed to the Flyway locations, so the demo tenant (Zeta Earthmoving, 19 guards, 382 shifts)
+# is created. Never enable this in production.
+spring:
+  flyway:
+    locations: classpath:db/migration,classpath:db/seed

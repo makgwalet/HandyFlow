@@ -1,8 +1,10 @@
 // src/pages/security/ControlRoomTab.tsx
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
-import { Siren, Send, CheckCircle, AlertTriangle, XCircle, Clock, ChevronRight, RefreshCw } from "lucide-react"
+import { getAllGuards } from "./fetchAllPages"
+import { Siren, Send, CheckCircle, AlertTriangle, XCircle, Clock, ChevronRight, RefreshCw, Volume2, VolumeX } from "lucide-react"
+import { ALARM_POLL_MS, BEEP_EVERY_MS, attentionList, bannerText, errorMessage, playBeep, readSoundPref, writeSoundPref } from "./alarmLogic"
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -89,6 +91,7 @@ export default function ControlRoomTab() {
   const [showDispatch, setShowDispatch] = useState(false)
   const [showResolve,  setShowResolve]  = useState<string | null>(null)
   const [apiError, setApiError]         = useState("")
+  const [soundOn, setSoundOn]           = useState<boolean>(() => readSoundPref())
 
   // Queries
   const { data: events = [], isLoading, refetch } = useQuery<AlarmEvent[]>({
@@ -98,7 +101,7 @@ export default function ControlRoomTab() {
       const p = r.data?.data ?? r.data
       return (p?.content ?? p) as AlarmEvent[]
     },
-    refetchInterval: 15000, // auto-refresh every 15s
+    refetchInterval: ALARM_POLL_MS, // panics must show within seconds
   })
 
   const { data: openDispatches = [] } = useQuery<Dispatch[]>({
@@ -107,13 +110,13 @@ export default function ControlRoomTab() {
       const r = await apiClient.get("/api/v1/security/dispatches/open")
       return (r.data?.data ?? r.data) as Dispatch[]
     },
-    refetchInterval: 15000,
+    refetchInterval: ALARM_POLL_MS,
   })
 
   const { data: guards = [] } = useQuery<{ id: string; fullName: string }[]>({
     queryKey: ["guards-list"],
     queryFn: async () => {
-      const r = await apiClient.get("/api/v1/security/guards?size=100")
+      const r = await getAllGuards()
       const p = r.data?.data ?? r.data
       return (p?.content ?? p) as any[]
     },
@@ -123,7 +126,8 @@ export default function ControlRoomTab() {
   const triage = useMutation({
     mutationFn: (id: string) =>
       apiClient.post(`/api/v1/security/alarm-events/${id}/triage`, {}),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["alarm-events"] }),
+    onSuccess: () => { setApiError(""); qc.invalidateQueries({ queryKey: ["alarm-events"] }) },
+    onError: (e: unknown) => setApiError(errorMessage(e, "Could not acknowledge the alarm")),
   })
 
   const markFalse = useMutation({
@@ -133,6 +137,7 @@ export default function ControlRoomTab() {
       qc.invalidateQueries({ queryKey: ["alarm-events"] })
       setSelected(null)
     },
+    onError: (e: unknown) => setApiError(errorMessage(e, "Could not mark as false alarm")),
   })
 
   const dispatch = useMutation({
@@ -143,13 +148,14 @@ export default function ControlRoomTab() {
       qc.invalidateQueries({ queryKey: ["dispatches-open"] })
       setShowDispatch(false)
     },
-    onError: (e: any) => setApiError(e.response?.data?.message ?? "Dispatch failed"),
+    onError: (e: unknown) => setApiError(errorMessage(e, "Dispatch failed")),
   })
 
   const arrive = useMutation({
     mutationFn: (id: string) =>
       apiClient.post(`/api/v1/security/dispatches/${id}/arrive`, {}),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["dispatches-open"] }),
+    onError: (e: unknown) => setApiError(errorMessage(e, "Could not record arrival")),
   })
 
   const resolve = useMutation({
@@ -160,7 +166,25 @@ export default function ControlRoomTab() {
       qc.invalidateQueries({ queryKey: ["dispatches-open"] })
       setShowResolve(null)
     },
+    onError: (e: unknown) => setApiError(errorMessage(e, "Could not resolve the dispatch")),
   })
+
+  const urgent = attentionList(events)
+  const urgentCount = urgent.length
+
+  // Repeat the siren while something urgent is unacknowledged.
+  useEffect(() => {
+    if (!soundOn || urgentCount === 0) return
+    playBeep()
+    const t = setInterval(() => playBeep(), BEEP_EVERY_MS)
+    return () => clearInterval(t)
+  }, [soundOn, urgentCount])
+
+  const toggleSound = () => {
+    const next = !soundOn
+    setSoundOn(next); writeSoundPref(next)
+    if (next) playBeep() // user gesture: lets the browser allow later beeps
+  }
 
   const openEvents = events.filter(e => ["NEW","TRIAGED","DISPATCHED"].includes(e.status))
 
@@ -174,10 +198,32 @@ export default function ControlRoomTab() {
             {openEvents.length} open event{openEvents.length !== 1 ? "s" : ""} · {openDispatches.length} active dispatch{openDispatches.length !== 1 ? "es" : ""}
           </p>
         </div>
+        <div style={{ display: "flex", gap: 8 }}>
+        <button onClick={toggleSound} aria-pressed={soundOn} title="Sound an alarm for unacknowledged panic and critical events"
+          style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 14px", border: "1px solid var(--hf-border)", borderRadius: 8, background: soundOn ? "var(--hf-success-soft)" : "var(--hf-surface)", color: soundOn ? "var(--hf-success-text-strong)" : "var(--hf-text-muted)", fontSize: 12, cursor: "pointer" }}>
+          {soundOn ? <Volume2 size={13} /> : <VolumeX size={13} />} {soundOn ? "Sound on" : "Enable sound"}
+        </button>
         <button onClick={() => refetch()} style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 14px", border: "1px solid var(--hf-border)", borderRadius: 8, background: "var(--hf-surface)", color: "var(--hf-text-muted)", fontSize: 12, cursor: "pointer" }}>
           <RefreshCw size={13} /> Refresh
         </button>
+        </div>
       </div>
+
+      {apiError && (
+        <div role="alert" style={{ marginBottom: 12, padding: "8px 12px", borderRadius: 8, background: "var(--hf-danger-soft)", color: "var(--hf-danger-text-strong)", fontSize: 12, display: "flex", justifyContent: "space-between" }}>
+          <span>{apiError}</span>
+          <button onClick={() => setApiError("")} style={{ background: "none", border: "none", color: "inherit", cursor: "pointer", fontSize: 12 }}>Dismiss</button>
+        </div>
+      )}
+
+      {urgentCount > 0 && (
+        <div role="alert" style={{ marginBottom: 16, padding: "12px 16px", borderRadius: 10, background: "var(--hf-danger-soft)", border: "2px solid var(--hf-danger)", color: "var(--hf-danger-text-strong)", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+          <strong style={{ fontSize: 14 }}><Siren size={16} style={{ verticalAlign: "middle", marginRight: 8 }} />{bannerText(urgent)}</strong>
+          <button onClick={() => setSelected(urgent[0])} style={{ padding: "6px 14px", borderRadius: 6, border: "1px solid var(--hf-danger)", background: "var(--hf-danger)", color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
+            Open
+          </button>
+        </div>
+      )}
 
       {/* Active dispatches strip */}
       {openDispatches.length > 0 && (

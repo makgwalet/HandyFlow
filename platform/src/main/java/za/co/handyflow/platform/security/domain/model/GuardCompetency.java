@@ -57,6 +57,10 @@ public class GuardCompetency {
     @Column(length = 1000)
     private String notes;
 
+    /** HANDGUN, SHOTGUN or RIFLE. Only for FIREARM_COMPETENCY; null on older rows. */
+    @Column(name = "firearm_category", length = 20)
+    private String firearmCategory;
+
     @Column(name = "verified_by")
     private UUID verifiedBy;
 
@@ -122,6 +126,11 @@ public class GuardCompetency {
         this.required       = required;
         this.notes          = blankToNull(notes);
         this.updatedAt      = Instant.now();
+    }
+
+    public void setFirearmCategory(String category) {
+        this.firearmCategory = category;
+        this.updatedAt       = Instant.now();
     }
 
     public void verify(UUID by, String byName, String note) {

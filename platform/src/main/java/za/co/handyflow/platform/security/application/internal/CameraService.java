@@ -129,7 +129,7 @@ public class CameraService {
         new SecureRandom().nextBytes(randomBytes);
         String secret = Base64.getUrlEncoder().withoutPadding().encodeToString(randomBytes);
 
-        camera.rotateWebhookSecret(secret);
+        camera.rotateWebhookSecret(WebhookSecrets.forStorage(secret)); // stored hashed; the raw secret is shown once
         cameraRepository.save(camera);
 
         log.info("[Security] Webhook secret rotated for camera={}", id);
@@ -140,15 +140,12 @@ public class CameraService {
 
     @Transactional
     public AlarmEvent ingestMotionEvent(CameraMotionWebhookRequest req) {
-        Camera camera = cameraRepository.findById(req.cameraId())
-                .orElseThrow(() -> new HandyFlowException(
-                        "Unknown camera", HttpStatus.UNAUTHORIZED, "UNKNOWN_CAMERA"));
-
-        if (camera.getWebhookSecret() == null
-                || !camera.getWebhookSecret().equals(req.webhookSecret())) {
+        // An unknown camera and a wrong secret must look the same to the caller.
+        Camera camera = cameraRepository.findById(req.cameraId()).orElse(null);
+        if (camera == null || !WebhookSecrets.matches(camera.getWebhookSecret(), req.webhookSecret())) {
             log.warn("[Security] Camera webhook auth failed cameraId={}", req.cameraId());
             throw new HandyFlowException(
-                    "Invalid webhook secret", HttpStatus.UNAUTHORIZED, "INVALID_WEBHOOK_SECRET");
+                    "Invalid camera credentials", HttpStatus.UNAUTHORIZED, "INVALID_WEBHOOK_CREDENTIALS");
         }
 
         if (!camera.isActive()) {

@@ -2,6 +2,7 @@
 import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
+import { getAllGuards } from "./fetchAllPages"
 import {
   Plus, Clock, CheckCircle, PlayCircle, AlertCircle,
   X, Calendar, Edit2, AlertTriangle, UserX, TimerOff, LogOut,
@@ -81,7 +82,7 @@ export default function ShiftsTab() {
   const { data: guards = [] } = useQuery<Guard[]>({
     queryKey: ["guards-list"],
     queryFn: async () => {
-      const res = await apiClient.get("/api/v1/security/guards?size=100")
+      const res = await getAllGuards()
       const payload = res.data?.data ?? res.data
       return (payload?.content ?? payload) as Guard[]
     },
@@ -140,7 +141,7 @@ export default function ShiftsTab() {
   // + modal for all three, matching the backend's own shared
   // ShiftSupervisorActionRequest DTO (all three take just a mandatory
   // written reason).
-  const [interrupting, setInterrupting] = useState<{ shift: any; action: "dismiss-no-show" | "close-overtime" | "pull"; label: string } | null>(null)
+  const [interrupting, setInterrupting] = useState<{ shift: any; action: "dismiss-no-show" | "close-overtime" | "pull" | "cancel"; label: string } | null>(null)
   const [interruptReason, setInterruptReason] = useState("")
   const interruptMut = useMutation({
     mutationFn: ({ id, action, reason }: { id: string; action: string; reason: string }) =>
@@ -340,6 +341,13 @@ export default function ShiftsTab() {
                     <button onClick={() => setInterrupting({ shift, action: "dismiss-no-show", label: "Dismiss No-Show" })} title="Dismiss a no-show/late alert for this shift"
                       style={{ display: "flex", alignItems: "center", gap: 5, background: "var(--hf-surface-muted)", color: "var(--hf-text-muted)", border: "1px solid var(--hf-border)", borderRadius: 7, padding: "7px 12px", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
                       <UserX size={13} /> Dismiss No-Show
+                    </button>
+                  )}
+
+                  {isScheduled && (
+                    <button onClick={() => setInterrupting({ shift, action: "cancel", label: "Cancel Shift" })} title="Cancel a shift that has not started"
+                      style={{ display: "flex", alignItems: "center", gap: 5, background: "var(--hf-danger-soft)", color: "var(--hf-danger-text)", border: "1px solid var(--hf-danger-border)", borderRadius: 7, padding: "7px 12px", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+                      <X size={13} /> Cancel Shift
                     </button>
                   )}
 

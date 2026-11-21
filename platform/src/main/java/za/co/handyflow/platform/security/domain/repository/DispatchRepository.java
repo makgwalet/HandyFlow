@@ -27,6 +27,14 @@ public interface DispatchRepository extends JpaRepository<Dispatch, UUID> {
         """)
     List<Dispatch> findByAlarmEvent(UUID alarmEventId);
 
+    @Query("""
+        SELECT d FROM Dispatch d
+        WHERE d.tenantId = :tenantId
+        AND d.alarmEventId = :alarmEventId
+        ORDER BY d.dispatchedAt DESC
+        """)
+    List<Dispatch> findByTenantAndAlarmEvent(TenantId tenantId, UUID alarmEventId);
+
     /** Currently open (unresolved) dispatches — the control room's "in progress" view. */
     @Query("""
         SELECT d FROM Dispatch d

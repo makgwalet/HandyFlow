@@ -50,6 +50,10 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class PatrolRoundService {
 
+    /** Lease so only one app instance sweeps at a time (optional so hand-built instances in tests keep working). */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private SecurityJobRunner jobs;
+
     /** Used only when a round's route cannot be found. */
     private static final int DEFAULT_TOLERANCE_MINUTES = 20;
 
@@ -224,9 +228,14 @@ public class PatrolRoundService {
      * Runs every 5 minutes — marks overdue EXPECTED rounds as MISSED.
      * Same cron as NoShowAlertScheduler (co-located in the same 5-minute window).
      */
-    @Scheduled(cron = "0 */5 * * * *")
+    @Scheduled(cron = "0 */5 * * * *", zone = "Africa/Johannesburg")
     @Transactional
     public void detectMissedRounds() {
+        SecurityJobRunner.exclusively(jobs, "security-patrol-missed-rounds", java.time.Duration.ofMinutes(4),
+                this::detectMissedRoundsNow);
+    }
+
+    private void detectMissedRoundsNow() {
         // Get all tenants with active sites
         List<UUID> tenantIds = siteRepository.findDistinctActiveTenantIds();
 
@@ -294,6 +303,12 @@ public class PatrolRoundService {
     @Transactional(readOnly = true)
     public List<PatrolRound> getRoundsForShift(UUID shiftId) {
         return roundRepository.findByShift(shiftId);
+    }
+
+    /** For requests that carry a shift id from outside (the supervisor endpoint): only this tenant's rounds, so another tenant's shift id returns nothing. */
+    @Transactional(readOnly = true)
+    public List<PatrolRound> getRoundsForShift(TenantId tenantId, UUID shiftId) {
+        return roundRepository.findByTenantAndShift(tenantId, shiftId);
     }
 
     // ── Route CRUD ─────────────────────────────────────────────────────────────

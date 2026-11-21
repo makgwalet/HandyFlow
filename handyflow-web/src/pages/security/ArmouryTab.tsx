@@ -8,7 +8,10 @@
 import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
-import { Crosshair, Plus, ArrowRight, ArrowLeft, AlertTriangle, FileText } from "lucide-react"
+import { getAllGuards } from "./fetchAllPages"
+import { useSecurityAccess } from "./useSecurityAccess"
+import { Crosshair, Plus, ArrowRight, ArrowLeft, AlertTriangle, FileText, ShieldAlert } from "lucide-react"
+import { ammoReturnProblem, ammoText, parseRounds, sapsLine } from "./armouryLogic"
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -27,6 +30,11 @@ interface Firearm {
   nextServiceDueAt: string | null
   notes: string | null
   createdAt: string
+  sapsCaseNumber?: string | null
+  sapsReportDueAt?: string | null
+  sapsReportOverdue?: boolean
+  ammoRoundsIssued?: number | null
+  ammoCalibre?: string | null
 }
 
 // ── Config ─────────────────────────────────────────────────────────────────────
@@ -50,15 +58,18 @@ async function openPdfInNewTab(url: string) {
 
 export default function ArmouryTab() {
   const qc = useQueryClient()
-  const [view,     setView]     = useState<"list" | "register" | "issue" | "return">("list")
+  const acc = useSecurityAccess()
+  const [view,     setView]     = useState<"list" | "register" | "issue" | "return" | "lost" | "saps">("list")
   const [selected, setSelected] = useState<Firearm | null>(null)
   const [form,     setForm]     = useState({ firearmSerial: "", firearmType: "", makeModel: "", sapsLicenseNumber: "", licenseExpiry: "", notes: "" })
-  const [issueForm, setIssueForm] = useState({ guardId: "", witnessedByGuardId: "", conditionNotes: "" })
-  const [returnForm, setReturnForm] = useState({ witnessedByGuardId: "", conditionNotes: "" })
+  const [issueForm, setIssueForm] = useState({ guardId: "", witnessedByGuardId: "", conditionNotes: "", ammoRounds: "", ammoCalibre: "" })
+  const [lostForm, setLostForm] = useState({ notes: "", sapsCaseNumber: "" })
+  const [sapsCase, setSapsCase] = useState("")
+  const [returnForm, setReturnForm] = useState({ witnessedByGuardId: "", conditionNotes: "", ammoRoundsReturned: "", ammoUnaccountedReason: "" })
   const [apiError, setApiError] = useState("")
   const [loadingHistoryId, setLoadingHistoryId] = useState<string | null>(null)
 
-  const { data: firearms = [], isLoading } = useQuery<Firearm[]>({
+  const { data: firearms = [], isLoading, dataUpdatedAt } = useQuery<Firearm[]>({
     queryKey: ["armoury"],
     queryFn: async () => {
       const r = await apiClient.get("/api/v1/security/armoury?size=100")
@@ -70,7 +81,7 @@ export default function ArmouryTab() {
   const { data: guards = [] } = useQuery<{ id: string; fullName: string }[]>({
     queryKey: ["guards-list"],
     queryFn: async () => {
-      const r = await apiClient.get("/api/v1/security/guards?size=100")
+      const r = await getAllGuards()
       const p = r.data?.data ?? r.data
       return (p?.content ?? p) as any[]
     },
@@ -92,6 +103,18 @@ export default function ArmouryTab() {
     mutationFn: ({ id, body }: any) => apiClient.post(`/api/v1/security/armoury/${id}/return`, body),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["armoury"] }); setView("list"); setSelected(null) },
     onError: (e: any) => setApiError(e.response?.data?.message ?? "Return failed"),
+  })
+
+  const reportLost = useMutation({
+    mutationFn: ({ id, body }: { id: string; body: { notes: string; sapsCaseNumber?: string } }) => apiClient.post(`/api/v1/security/armoury/${id}/report-lost`, body),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["armoury"] }); setView("list"); setSelected(null) },
+    onError: (e: { response?: { data?: { message?: string } } }) => setApiError(e.response?.data?.message ?? "Could not report the firearm lost"),
+  })
+
+  const recordSaps = useMutation({
+    mutationFn: ({ id, caseNumber }: { id: string; caseNumber: string }) => apiClient.post(`/api/v1/security/armoury/${id}/saps-case`, { caseNumber }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["armoury"] }); setView("list"); setSelected(null) },
+    onError: (e: { response?: { data?: { message?: string } } }) => setApiError(e.response?.data?.message ?? "Could not record the SAPS case number"),
   })
 
   const downloadHistory = useMutation({
@@ -159,9 +182,27 @@ export default function ArmouryTab() {
         <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: "var(--hf-text-secondary)", marginBottom: 4 }}>Condition Notes</label>
         <input value={issueForm.conditionNotes} onChange={e => setIssueForm(p => ({ ...p, conditionNotes: e.target.value }))} style={inputStyle} />
       </div>
+      <div style={{ display: "flex", gap: 10, marginBottom: 14 }}>
+        <div style={{ flex: 1 }}>
+          <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: "var(--hf-text-secondary)", marginBottom: 4 }}>Rounds issued</label>
+          <input inputMode="numeric" aria-label="Rounds issued" value={issueForm.ammoRounds} onChange={e => setIssueForm(p => ({ ...p, ammoRounds: e.target.value }))} style={inputStyle} />
+        </div>
+        <div style={{ flex: 1 }}>
+          <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: "var(--hf-text-secondary)", marginBottom: 4 }}>Calibre</label>
+          <input aria-label="Calibre" value={issueForm.ammoCalibre} onChange={e => setIssueForm(p => ({ ...p, ammoCalibre: e.target.value }))} style={inputStyle} />
+        </div>
+      </div>
+      {issueForm.ammoRounds.trim() !== "" && parseRounds(issueForm.ammoRounds) === null && (
+        <p style={{ color: "var(--hf-danger-text)", fontSize: 12, margin: "0 0 12px" }}>Rounds must be a whole number from 0 to 2000.</p>
+      )}
       <div style={{ display: "flex", gap: 10 }}>
         <button onClick={() => setView("list")} style={secondaryBtn}>Cancel</button>
-        <button onClick={() => issue.mutate({ id: selected.id, body: issueForm })} style={primaryBtn}>Issue Firearm</button>
+        <button
+          disabled={issueForm.ammoRounds.trim() !== "" && parseRounds(issueForm.ammoRounds) === null}
+          onClick={() => issue.mutate({ id: selected.id, body: {
+            guardId: issueForm.guardId, witnessedByGuardId: issueForm.witnessedByGuardId, conditionNotes: issueForm.conditionNotes,
+            ammoRounds: parseRounds(issueForm.ammoRounds) ?? undefined, ammoCalibre: issueForm.ammoCalibre.trim() || undefined } })}
+          style={primaryBtn}>Issue Firearm</button>
       </div>
     </div>
   )
@@ -184,9 +225,82 @@ export default function ArmouryTab() {
         <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: "var(--hf-text-secondary)", marginBottom: 4 }}>Condition Notes</label>
         <input value={returnForm.conditionNotes} onChange={e => setReturnForm(p => ({ ...p, conditionNotes: e.target.value }))} style={inputStyle} />
       </div>
+      {(() => {
+        const issued = selected.ammoRoundsIssued
+        const problem = ammoReturnProblem(issued, returnForm.ammoRoundsReturned, returnForm.ammoUnaccountedReason)
+        const short = issued != null && parseRounds(returnForm.ammoRoundsReturned) !== null && (parseRounds(returnForm.ammoRoundsReturned) as number) < issued
+        return (
+          <>
+            <div style={{ marginBottom: 14 }}>
+              <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: "var(--hf-text-secondary)", marginBottom: 4 }}>
+                Rounds handed back{issued != null ? ` (issued: ${ammoText(issued, selected.ammoCalibre)})` : ""}
+              </label>
+              <input inputMode="numeric" aria-label="Rounds handed back" value={returnForm.ammoRoundsReturned}
+                onChange={e => setReturnForm(p => ({ ...p, ammoRoundsReturned: e.target.value }))} style={inputStyle} />
+            </div>
+            {short && (
+              <div style={{ marginBottom: 14 }}>
+                <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: "var(--hf-text-secondary)", marginBottom: 4 }}>Explain the missing rounds *</label>
+                <input aria-label="Explain the missing rounds" value={returnForm.ammoUnaccountedReason}
+                  onChange={e => setReturnForm(p => ({ ...p, ammoUnaccountedReason: e.target.value }))} style={inputStyle} />
+              </div>
+            )}
+            {problem && returnForm.ammoRoundsReturned !== "" && <p style={{ color: "var(--hf-danger-text)", fontSize: 12, margin: "0 0 12px" }}>{problem}</p>}
+            <div style={{ display: "flex", gap: 10 }}>
+              <button onClick={() => setView("list")} style={secondaryBtn}>Cancel</button>
+              <button disabled={problem !== null}
+                onClick={() => returnFirearm.mutate({ id: selected.id, body: {
+                  witnessedByGuardId: returnForm.witnessedByGuardId, conditionNotes: returnForm.conditionNotes,
+                  ammoRoundsReturned: parseRounds(returnForm.ammoRoundsReturned) ?? undefined,
+                  ammoUnaccountedReason: short ? returnForm.ammoUnaccountedReason.trim() : undefined } })}
+                style={primaryBtn}>Return to Armoury</button>
+            </div>
+          </>
+        )
+      })()}
+    </div>
+  )
+
+  if (view === "lost" && selected) return (
+    <div style={{ maxWidth: 480 }}>
+      <h3 style={{ margin: "0 0 4px", fontSize: 14, fontWeight: 700 }}>Report Firearm Lost or Stolen</h3>
+      <p style={{ margin: "0 0 12px", fontSize: 12, color: "var(--hf-text-muted)" }}>
+        {selected.firearmSerial} — {selected.firearmType}{selected.assignedGuardName ? ` · Held by ${selected.assignedGuardName}` : ""}
+      </p>
+      <p style={{ margin: "0 0 16px", fontSize: 12, color: "var(--hf-warning-text-deep)" }}>
+        A lost or stolen firearm must be reported to SAPS within 24 hours. The control room is alerted when you submit. The firearm cannot be issued again after this.
+      </p>
+      {apiError && <p role="alert" style={{ color: "var(--hf-danger-text)", fontSize: 12, marginBottom: 12 }}>{apiError}</p>}
+      <div style={{ marginBottom: 14 }}>
+        <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: "var(--hf-text-secondary)", marginBottom: 4 }}>What happened *</label>
+        <textarea aria-label="What happened" value={lostForm.notes} onChange={e => setLostForm(p => ({ ...p, notes: e.target.value }))} rows={3} style={inputStyle} />
+      </div>
+      <div style={{ marginBottom: 14 }}>
+        <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: "var(--hf-text-secondary)", marginBottom: 4 }}>SAPS case number (if already reported)</label>
+        <input aria-label="SAPS case number" value={lostForm.sapsCaseNumber} onChange={e => setLostForm(p => ({ ...p, sapsCaseNumber: e.target.value }))} style={inputStyle} />
+      </div>
       <div style={{ display: "flex", gap: 10 }}>
         <button onClick={() => setView("list")} style={secondaryBtn}>Cancel</button>
-        <button onClick={() => returnFirearm.mutate({ id: selected.id, body: returnForm })} style={primaryBtn}>Return to Armoury</button>
+        <button disabled={lostForm.notes.trim() === "" || reportLost.isPending}
+          onClick={() => reportLost.mutate({ id: selected.id, body: { notes: lostForm.notes.trim(), sapsCaseNumber: lostForm.sapsCaseNumber.trim() || undefined } })}
+          style={{ ...primaryBtn, background: "var(--hf-danger)" }}>Report lost</button>
+      </div>
+    </div>
+  )
+
+  if (view === "saps" && selected) return (
+    <div style={{ maxWidth: 480 }}>
+      <h3 style={{ margin: "0 0 4px", fontSize: 14, fontWeight: 700 }}>SAPS Case Number</h3>
+      <p style={{ margin: "0 0 16px", fontSize: 12, color: "var(--hf-text-muted)" }}>{selected.firearmSerial} — {selected.firearmType}</p>
+      {apiError && <p role="alert" style={{ color: "var(--hf-danger-text)", fontSize: 12, marginBottom: 12 }}>{apiError}</p>}
+      <div style={{ marginBottom: 14 }}>
+        <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: "var(--hf-text-secondary)", marginBottom: 4 }}>Case (CAS) number *</label>
+        <input aria-label="Case number" value={sapsCase} onChange={e => setSapsCase(e.target.value)} style={inputStyle} />
+      </div>
+      <div style={{ display: "flex", gap: 10 }}>
+        <button onClick={() => setView("list")} style={secondaryBtn}>Cancel</button>
+        <button disabled={sapsCase.trim() === "" || recordSaps.isPending}
+          onClick={() => recordSaps.mutate({ id: selected.id, caseNumber: sapsCase.trim() })} style={primaryBtn}>Save</button>
       </div>
     </div>
   )
@@ -203,6 +317,8 @@ export default function ArmouryTab() {
           <Plus size={14} /> Register Firearm
         </button>
       </div>
+
+      {apiError && <p role="alert" style={{ color: "var(--hf-danger-text)", fontSize: 12, marginBottom: 12 }}>{apiError}</p>}
 
       {expiring.length > 0 && (
         <div style={{ background: "var(--hf-warning-soft-strong)", border: "1px solid var(--hf-warning-border)", borderRadius: 10, padding: "10px 14px", marginBottom: 16, display: "flex", gap: 8, alignItems: "center" }}>
@@ -240,7 +356,12 @@ export default function ArmouryTab() {
                     {f.firearmType}{f.makeModel ? ` · ${f.makeModel}` : ""} · SAPS {f.sapsLicenseNumber}
                     {f.status === "ISSUED" && f.assignedGuardName && ` · Issued to ${f.assignedGuardName}`}
                     {" · "}License expires {fmtDate(f.licenseExpiry)}
+                    {f.status === "ISSUED" && ammoText(f.ammoRoundsIssued, f.ammoCalibre) && ` · ${ammoText(f.ammoRoundsIssued, f.ammoCalibre)} out`}
                   </p>
+                  {(() => {
+                    const s = sapsLine(f, dataUpdatedAt)
+                    return s ? <p style={{ margin: "3px 0 0", fontSize: 11, fontWeight: 600, color: s.urgent ? "var(--hf-danger-text-strong)" : "var(--hf-text-muted)" }}>{s.text}</p> : null
+                  })()}
                 </div>
                 <div style={{ display: "flex", gap: 8 }}>
                   <button onClick={() => downloadHistory.mutate(f.id)}
@@ -249,14 +370,27 @@ export default function ArmouryTab() {
                     style={{ display: "flex", alignItems: "center", gap: 5, padding: "6px 12px", borderRadius: 7, border: "1px solid var(--hf-border)", background: "var(--hf-surface-muted)", color: "var(--hf-text-secondary)", fontSize: 11, fontWeight: 600, cursor: "pointer" }}>
                     <FileText size={12} /> {loadingHistoryId === f.id ? "…" : "History"}
                   </button>
-                  {f.status === "IN_ARMOURY" && (
-                    <button onClick={() => { setSelected(f); setIssueForm({ guardId: "", witnessedByGuardId: "", conditionNotes: "" }); setApiError(""); setView("issue") }}
+                  {f.status === "IN_ARMOURY" && acc.armouryIssue && (
+                    <button onClick={() => { setSelected(f); setIssueForm({ guardId: "", witnessedByGuardId: "", conditionNotes: "", ammoRounds: "", ammoCalibre: "" }); setApiError(""); setView("issue") }}
                       style={{ display: "flex", alignItems: "center", gap: 5, padding: "6px 12px", borderRadius: 7, border: "1px solid var(--hf-info)", background: "var(--hf-info-soft)", color: "var(--hf-info-text)", fontSize: 11, fontWeight: 600, cursor: "pointer" }}>
                       <ArrowRight size={12} /> Issue
                     </button>
                   )}
-                  {f.status === "ISSUED" && (
-                    <button onClick={() => { setSelected(f); setReturnForm({ witnessedByGuardId: "", conditionNotes: "" }); setApiError(""); setView("return") }}
+                  {(f.status === "IN_ARMOURY" || f.status === "ISSUED") && (
+                    <button onClick={() => { setSelected(f); setLostForm({ notes: "", sapsCaseNumber: "" }); setApiError(""); setView("lost") }}
+                      title="Report this firearm lost or stolen"
+                      style={{ display: "flex", alignItems: "center", gap: 5, padding: "6px 12px", borderRadius: 7, border: "1px solid var(--hf-danger-border, var(--hf-border))", background: "var(--hf-surface)", color: "var(--hf-danger-text-strong)", fontSize: 11, fontWeight: 600, cursor: "pointer" }}>
+                      <ShieldAlert size={12} /> Report lost
+                    </button>
+                  )}
+                  {f.status === "LOST" && !f.sapsCaseNumber && (
+                    <button onClick={() => { setSelected(f); setSapsCase(""); setApiError(""); setView("saps") }}
+                      style={{ display: "flex", alignItems: "center", gap: 5, padding: "6px 12px", borderRadius: 7, border: "1px solid var(--hf-border)", background: "var(--hf-surface-muted)", color: "var(--hf-text-secondary)", fontSize: 11, fontWeight: 600, cursor: "pointer" }}>
+                      SAPS case
+                    </button>
+                  )}
+                  {f.status === "ISSUED" && acc.armouryIssue && (
+                    <button onClick={() => { setSelected(f); setReturnForm({ witnessedByGuardId: "", conditionNotes: "", ammoRoundsReturned: "", ammoUnaccountedReason: "" }); setApiError(""); setView("return") }}
                       style={{ display: "flex", alignItems: "center", gap: 5, padding: "6px 12px", borderRadius: 7, border: "1px solid var(--hf-accent)", background: "var(--hf-accent-soft)", color: "var(--hf-accent-text)", fontSize: 11, fontWeight: 600, cursor: "pointer" }}>
                       <ArrowLeft size={12} /> Return
                     </button>

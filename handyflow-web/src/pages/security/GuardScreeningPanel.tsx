@@ -6,6 +6,7 @@ import { useState } from "react"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { RefreshCw, X } from "lucide-react"
 import { apiClient } from "../../api/client"
+import { useSecurityAccess } from "./useSecurityAccess"
 import Chip from "../../components/ui/Chip"
 import EvidenceFiles from "./EvidenceFiles"
 import { SCREENING_REASONS, SCREENING_TYPES, screeningLabel, todayIso, type ScreeningItem } from "./guard360.logic"
@@ -65,6 +66,7 @@ export default function GuardScreeningPanel({ guardId, record, canManage, onClos
     mutationFn: () => apiClient.post(`${base}/result`, { ...result, conductedBy: result.conductedBy.trim() || null, conductedAt: result.conductedAt || null, nextDueAt: result.nextDueAt || null, reportRef: result.reportRef.trim() || null, notes: result.notes.trim() || null }),
     onSuccess: () => { setRecording(false); setErr(""); refresh() }, onError: fail,
   })
+  const acc = useSecurityAccess()
   const decide = useMutation({
     mutationFn: (decision: "CLEARED" | "NOT_CLEARED") => apiClient.post(`${base}/decision`, { decision, note: note.trim() || null }),
     onSuccess: () => { setNote(""); setErr(""); refresh() }, onError: fail,
@@ -101,7 +103,10 @@ export default function GuardScreeningPanel({ guardId, record, canManage, onClos
           </div>
         ) : pending ? <div style={{ fontSize: 13, color: "var(--hf-text-muted)" }}>Record the result first, then a reviewer signs it off.</div>
           : <div style={{ fontSize: 13, color: "var(--hf-text-muted)" }}>Awaiting sign-off.</div>}
-        {canManage && !pending && (
+        {canManage && !pending && !acc.screeningDecide && !record.decision && (
+          <div style={{ fontSize: 13, color: "var(--hf-text-muted)", marginTop: 8 }}>Only a screening officer can clear or reject this screening.</div>
+        )}
+        {canManage && acc.screeningDecide && !pending && (
           <div style={{ display: "grid", gap: 8, marginTop: 8, maxWidth: 480 }}>
             <input aria-label="Decision note" placeholder="Note (required if not cleared)" value={note} onChange={e => setNote(e.target.value)} style={input} />
             <div style={{ display: "flex", gap: 8 }}>

@@ -12,5 +12,6 @@ public record GuardCompetencyResponse(
         LocalDate issueDate, LocalDate expiryDate, String certificateRef, boolean required, String notes,
         String state, String detail,
         String verifiedByName, Instant verifiedAt, String verificationNote,
-        List<GuardOverviewResponse.EvidenceItem> evidence, Instant createdAt
+        List<GuardOverviewResponse.EvidenceItem> evidence, Instant createdAt,
+        String firearmCategory
 ) {}

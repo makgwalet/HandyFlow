@@ -34,6 +34,7 @@ public class ControlRoomController {
     // ── Ingestion ──────────────────────────────────────────────────────────────
 
     @PostMapping("/alarm-events")
+    @PreAuthorize("hasAuthority('SECURITY_MANAGE')")
     @Operation(
             summary = "Ingest a new alarm event",
             description = """
@@ -144,20 +145,18 @@ public class ControlRoomController {
     // ── Duress Trigger ─────────────────────────────────────────────────────────
 
     @PostMapping("/duress")
+    @PreAuthorize("hasAuthority('SECURITY_MANAGE')")
     @Operation(
             summary = "Trigger a duress event (panic)",
             description = """
             The highest-priority alarm source — severity is hard-set to
             CRITICAL regardless of any input, and no triage step is required
-            before dispatch. Per Part 9.4, this deliberately has no
-            authority gate beyond standard authentication: any guard in
-            distress must be able to trigger this without needing elevated
-            permissions, since the whole point is sub-second alerting under
-            pressure. Optionally links to a protection detail if the duress
-            occurred during a CP engagement.
-
-            NOT touched by this permission sweep — confirmed deliberate,
-            not an instance of the generic-tier bug.
+            before dispatch. This is the control-room (supervisor) entry for an operator
+            raising a panic on a guard's behalf, so it needs SECURITY_MANAGE. A guard in
+            distress uses POST /api/v1/guard/duress (SECURITY_GUARD, identity from the
+            token), which is the path that must work without elevated permissions.
+            Optionally links to a protection detail if the duress occurred during a CP
+            engagement.
             """)
     public ResponseEntity<ApiResponse<AlarmEvent>> triggerDuress(
             @Valid @RequestBody TriggerDuressRequest req) {
@@ -183,6 +182,6 @@ public class ControlRoomController {
     public ResponseEntity<ApiResponse<List<Dispatch>>> getDispatchesForEvent(
             @PathVariable UUID id) {
         return ResponseEntity.ok(ApiResponse.success(
-                controlRoomService.getDispatchesForEvent(id)));
+                controlRoomService.getDispatchesForEvent(TenantContext.getTenantIdAsObject(), id)));
     }
 }

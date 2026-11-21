@@ -2,6 +2,7 @@
 import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
+import { useSecurityAccess } from "./useSecurityAccess"
 import { Key, Webhook, Plus, Trash2, AlertTriangle, RefreshCw, Copy, Check, Eye, EyeOff, ChevronDown, ChevronUp } from "lucide-react"
 
 interface ApiKey {
@@ -31,6 +32,7 @@ const sbtn = { padding:"8px 16px", borderRadius:8, border:"1px solid var(--hf-bo
 
 export default function PublicApiTab() {
   const qc = useQueryClient()
+  const acc = useSecurityAccess()
   const [section, setSection] = useState<"keys"|"webhooks">("keys")
   const [view, setView] = useState<"list"|"create">("list")
   const [err, setErr] = useState("")
@@ -126,10 +128,12 @@ export default function PublicApiTab() {
             onClick={()=>{setSection("webhooks");setView("list");setErr("")}}>
             <Webhook size={12} style={{marginRight:5}}/> Webhooks
           </button>
-          <button style={{...btn(section==="keys"?"var(--hf-info)":"var(--hf-violet)"),display:"flex",alignItems:"center",gap:6}}
-            onClick={()=>{setView("create");setErr("");setNewKey(null)}}>
-            <Plus size={14}/> New {section==="keys"?"Key":"Webhook"}
-          </button>
+          {acc.integrationsManage && (
+            <button style={{...btn(section==="keys"?"var(--hf-info)":"var(--hf-violet)"),display:"flex",alignItems:"center",gap:6}}
+              onClick={()=>{setView("create");setErr("");setNewKey(null)}}>
+              <Plus size={14}/> New {section==="keys"?"Key":"Webhook"}
+            </button>
+          )}
         </div>
       </div>
 
@@ -278,7 +282,7 @@ export default function PublicApiTab() {
                     <td style={{padding:"11px 14px",color:"var(--hf-text-muted)",fontSize:12}}>{fmtDateTime(k.lastUsedAt)}</td>
                     <td style={{padding:"11px 14px",color:"var(--hf-text-muted)",fontSize:12}}>{fmtDate(k.expiresAt)}</td>
                     <td style={{padding:"11px 14px"}}>
-                      {k.active && (
+                      {k.active && (acc.integrationsManage || acc.securityAdmin) && (
                         <button style={{display:"flex",alignItems:"center",gap:4,padding:"5px 10px",borderRadius:7,border:"1px solid var(--hf-danger-border)",background:"var(--hf-danger-soft)",fontSize:12,cursor:"pointer",color:"var(--hf-danger-text-strong)"}}
                           onClick={()=>{ if(confirm(`Revoke key "${k.name}"? This cannot be undone.`)) revokeKeyMut.mutate({id:k.id,reason:"Revoked by administrator"}) }}>
                           <Trash2 size={11}/> Revoke
@@ -337,13 +341,13 @@ export default function PublicApiTab() {
                           </div>
                         </div>
                         <div style={{display:"flex",gap:8}}>
-                          {s.active && !s.suspended && (
+                          {s.active && !s.suspended && acc.integrationsManage && (
                             <button style={{display:"flex",alignItems:"center",gap:4,padding:"6px 12px",borderRadius:7,border:"1px solid var(--hf-danger-border)",background:"var(--hf-danger-soft)",fontSize:12,cursor:"pointer",color:"var(--hf-danger-text-strong)"}}
                               onClick={()=>{ if(confirm(`Deactivate webhook "${s.name}"?`)) deactivateWhMut.mutate(s.id) }}>
                               <Trash2 size={11}/> Deactivate
                             </button>
                           )}
-                          {(s.suspended || !s.active) && (
+                          {(s.suspended || !s.active) && acc.integrationsManage && (
                             <button style={{display:"flex",alignItems:"center",gap:4,padding:"6px 12px",borderRadius:7,border:"none",background:"var(--hf-violet)",fontSize:12,cursor:"pointer",color:"var(--hf-text-on-solid)",fontWeight:600}}
                               onClick={()=>reactivateWhMut.mutate(s.id)}>
                               <RefreshCw size={11}/> Reactivate

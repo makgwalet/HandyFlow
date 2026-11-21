@@ -22,6 +22,8 @@ import java.util.concurrent.atomic.AtomicLong;
  * Mode is set by handyflow.entitlement.enforce:
  *  false (default) = report only: a request the tenant is not entitled to is logged as a warning and allowed;
  *  true            = enforce: FeatureGuard.requireModule throws 402/403.
+ * handyflow.entitlement.enforce-modules (comma-separated keys, e.g. "security") enforces just those modules
+ * while the global flag stays off.
  * Modules in ModuleEntitlementPaths.REPORT_ONLY (no catalogue row) are reported even when enforcing.
  * Run in report mode first and check the log for "ENTITLEMENT-REPORT" lines, because trial, internal and demo
  * tenants may use a module without a subscription row and would be locked out by enforcing straight away.
@@ -31,13 +33,14 @@ import java.util.concurrent.atomic.AtomicLong;
 public class ModuleEntitlementInterceptorConfig implements WebMvcConfigurer {
 
     private final ObjectProvider<FeatureGuard> featureGuard;
-    private final boolean enforce;
+    private final EntitlementMode mode;
     private final ConcurrentHashMap<String, AtomicLong> reported = new ConcurrentHashMap<>();
 
     public ModuleEntitlementInterceptorConfig(ObjectProvider<FeatureGuard> featureGuard,
-                                              @Value("${handyflow.entitlement.enforce:false}") boolean enforce) {
+                                              @Value("${handyflow.entitlement.enforce:false}") boolean enforce,
+                                              @Value("${handyflow.entitlement.enforce-modules:}") String enforceModules) {
         this.featureGuard = featureGuard;
-        this.enforce = enforce;
+        this.mode = new EntitlementMode(enforce, enforceModules);
     }
 
     @Override
@@ -50,7 +53,7 @@ public class ModuleEntitlementInterceptorConfig implements WebMvcConfigurer {
                 if (guard == null || !TenantContext.hasTenant()) return true;
                 String key = ModuleEntitlementPaths.moduleFor(request.getRequestURI()).orElse(null);
                 if (key == null) return true;
-                if (enforce && ModuleEntitlementPaths.enforceable(key)) {
+                if (mode.enforces(key)) {
                     guard.requireModule(key);
                 } else if (!guard.hasModule(key)) {
                     String id = TenantContext.getTenantIdAsObject().getValue() + "|" + key;

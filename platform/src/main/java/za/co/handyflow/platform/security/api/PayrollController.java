@@ -34,7 +34,7 @@ public class PayrollController {
     // ── Periods ────────────────────────────────────────────────────────────────
 
     @GetMapping("/periods")
-    @PreAuthorize("hasAuthority('SECURITY_READ')")
+    @PreAuthorize("hasAuthority('SECURITY_PAYROLL_READ')")
     @Operation(summary = "List all payroll periods")
     public ResponseEntity<ApiResponse<Page<PayrollPeriodResponse>>> listPeriods(Pageable pageable) {
         TenantId tenantId = TenantContext.getTenantIdAsObject();
@@ -42,7 +42,7 @@ public class PayrollController {
     }
 
     @GetMapping("/periods/{id}")
-    @PreAuthorize("hasAuthority('SECURITY_READ')")
+    @PreAuthorize("hasAuthority('SECURITY_PAYROLL_READ')")
     @Operation(summary = "Get a single payroll period")
     public ResponseEntity<ApiResponse<PayrollPeriodResponse>> getPeriod(@PathVariable UUID id) {
         TenantId tenantId = TenantContext.getTenantIdAsObject();
@@ -50,7 +50,7 @@ public class PayrollController {
     }
 
     @PostMapping("/periods")
-    @PreAuthorize("hasAuthority('SECURITY_MANAGE')")
+    @PreAuthorize("hasAuthority('SECURITY_PAYROLL_MANAGE')")
     @Operation(
             summary = "Create a payroll period",
             description = "Starts as DRAFT. No line items are computed until the period is approved.")
@@ -63,7 +63,7 @@ public class PayrollController {
     }
 
     @PostMapping("/periods/{id}/approve")
-    @PreAuthorize("hasAuthority('SECURITY_MANAGE')")
+    @PreAuthorize("hasAuthority('SECURITY_PAYROLL_APPROVE')")
     @Operation(
             summary = "Approve a payroll period — computes and freezes line items",
             description = "Finds all COMPLETED shifts in the period window, resolves each guard's " +
@@ -77,7 +77,7 @@ public class PayrollController {
     }
 
     @PostMapping("/periods/{id}/mark-paid")
-    @PreAuthorize("hasAuthority('SECURITY_MANAGE')")
+    @PreAuthorize("hasAuthority('SECURITY_PAYROLL_PAY')")
     @Operation(summary = "Mark an EXPORTED period as PAID")
     public ResponseEntity<ApiResponse<PayrollPeriodResponse>> markPaid(@PathVariable UUID id) {
         TenantId tenantId = TenantContext.getTenantIdAsObject();
@@ -87,7 +87,7 @@ public class PayrollController {
     // ── Line items ─────────────────────────────────────────────────────────────
 
     @GetMapping("/periods/{id}/lines")
-    @PreAuthorize("hasAuthority('SECURITY_READ')")
+    @PreAuthorize("hasAuthority('SECURITY_PAYROLL_READ')")
     @Operation(summary = "List all line items for a period")
     public ResponseEntity<ApiResponse<List<PayrollLineItem>>> getLineItems(@PathVariable UUID id) {
         TenantId tenantId = TenantContext.getTenantIdAsObject();
@@ -97,7 +97,8 @@ public class PayrollController {
     // ── Export ─────────────────────────────────────────────────────────────────
 
     @GetMapping("/periods/{id}/export/csv")
-    @PreAuthorize("hasAuthority('SECURITY_READ')")
+    // SECURITY_MANAGE, not READ: the first export moves the period to EXPORTED, which a read-only user must not be able to do (audit 1.6).
+    @PreAuthorize("hasAuthority('SECURITY_PAYROLL_READ')")
     @Operation(
             summary = "Export period as CSV (Sage/VIP Payroll compatible)",
             description = "One row per line item. Marks the period as EXPORTED. " +
@@ -113,7 +114,7 @@ public class PayrollController {
     }
 
     @GetMapping("/periods/{id}/export/json")
-    @PreAuthorize("hasAuthority('SECURITY_READ')")
+    @PreAuthorize("hasAuthority('SECURITY_PAYROLL_READ')")
     @Operation(
             summary = "Export period as JSON (BI tools / public API clients)",
             description = "Returns a structured summary grouped by guard. Same data as CSV " +
@@ -126,7 +127,7 @@ public class PayrollController {
     // ── Guard pay statement PDF ────────────────────────────────────────────────
 
     @GetMapping("/periods/{id}/guards/{guardId}/pdf")
-    @PreAuthorize("hasAuthority('SECURITY_READ')")
+    @PreAuthorize("hasAuthority('SECURITY_PAYROLL_READ')")
     @Operation(
             summary = "Guard gross pay statement (PDF)",
             description = "Per-guard PDF for one payroll period — shift-by-shift regular/overtime " +
@@ -145,7 +146,7 @@ public class PayrollController {
     // ── Grade rates ────────────────────────────────────────────────────────────
 
     @GetMapping("/grade-rates")
-    @PreAuthorize("hasAuthority('SECURITY_READ')")
+    @PreAuthorize("hasAuthority('SECURITY_PAYROLL_READ')")
     @Operation(summary = "List all configured grade rates for this tenant")
     public ResponseEntity<ApiResponse<List<GradeRate>>> getGradeRates() {
         TenantId tenantId = TenantContext.getTenantIdAsObject();
@@ -153,7 +154,7 @@ public class PayrollController {
     }
 
     @PostMapping("/grade-rates")
-    @PreAuthorize("hasAuthority('SECURITY_MANAGE')")
+    @PreAuthorize("hasAuthority('SECURITY_PAYROLL_MANAGE')")
     @Operation(
             summary = "Set a default hourly rate for a PSiRA grade",
             description = "grade: A | B | C | D | E. hourlyRateCents: ZAR in cents (e.g. 3500 = R35.00). " +

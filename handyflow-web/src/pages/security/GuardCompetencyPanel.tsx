@@ -9,7 +9,7 @@ import { BadgeCheck, Pencil, Plus, Trash2, X } from "lucide-react"
 import { apiClient } from "../../api/client"
 import Chip from "../../components/ui/Chip"
 import EvidenceFiles from "./EvidenceFiles"
-import { COMPETENCY_TYPES, competencyFormError, readinessState, todayIso, type CompetencyItem } from "./guard360.logic"
+import { COMPETENCY_TYPES, FIREARM_CATEGORIES, competencyFormError, firearmCategoryLabel, readinessState, todayIso, type CompetencyItem } from "./guard360.logic"
 
 const card: React.CSSProperties = { background: "var(--hf-surface)", border: "1px solid var(--hf-border)", borderRadius: 12, padding: 16 }
 const input: React.CSSProperties = { padding: "8px 10px", border: "1px solid var(--hf-border)", borderRadius: 8, fontSize: 13, background: "var(--hf-surface)", color: "var(--hf-text-primary)", width: "100%", boxSizing: "border-box" }
@@ -27,12 +27,12 @@ function CompetencyForm({ guardId, existing, onClose }: { guardId: string; exist
   const [f, setF] = useState({
     competencyType: existing?.competencyType ?? "FIRST_AID", title: existing?.title ?? "", issuedBy: existing?.issuedBy ?? "",
     issueDate: existing?.issueDate ?? "", expiryDate: existing?.expiryDate ?? "", certificateRef: existing?.certificateRef ?? "",
-    required: existing?.required ?? false, notes: existing?.notes ?? "",
+    required: existing?.required ?? false, notes: existing?.notes ?? "", firearmCategory: existing?.firearmCategory ?? "",
   })
   const [err, setErr] = useState("")
   const save = useMutation({
     mutationFn: () => {
-      const body = { ...f, title: f.title.trim() || null, issuedBy: f.issuedBy.trim() || null, issueDate: f.issueDate || null, expiryDate: f.expiryDate || null, certificateRef: f.certificateRef.trim() || null, notes: f.notes.trim() || null }
+      const body = { ...f, firearmCategory: f.competencyType === "FIREARM_COMPETENCY" ? f.firearmCategory || null : null, title: f.title.trim() || null, issuedBy: f.issuedBy.trim() || null, issueDate: f.issueDate || null, expiryDate: f.expiryDate || null, certificateRef: f.certificateRef.trim() || null, notes: f.notes.trim() || null }
       return existing ? apiClient.put(`/api/v1/security/guards/${guardId}/competencies/${existing.id}`, body) : apiClient.post(`/api/v1/security/guards/${guardId}/competencies`, body)
     },
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["guard-overview", guardId] }); onClose() },
@@ -47,6 +47,11 @@ function CompetencyForm({ guardId, existing, onClose }: { guardId: string; exist
         <select value={f.competencyType} onChange={e => setF({ ...f, competencyType: e.target.value })} style={input}>
           {COMPETENCY_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
         </select></label>
+      {f.competencyType === "FIREARM_COMPETENCY" && <label style={{ fontSize: 12 }}>Firearm category
+        <select aria-label="Firearm category" value={f.firearmCategory} onChange={e => setF({ ...f, firearmCategory: e.target.value })} style={input}>
+          <option value="">Choose…</option>
+          {FIREARM_CATEGORIES.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
+        </select></label>}
       {f.competencyType === "OTHER" && <label style={{ fontSize: 12 }}>Name
         <input value={f.title} onChange={e => setF({ ...f, title: e.target.value })} style={input} /></label>}
       <label style={{ fontSize: 12 }}>Issued by
@@ -93,6 +98,7 @@ function CompetencyDetail({ guardId, c, canManage, onClose }: { guardId: string;
         <button aria-label="Close competency" onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--hf-text-muted)" }}><X size={16} /></button>
       </div>
       <div style={{ display: "grid", gap: 10, gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", fontSize: 13 }}>
+        {c.firearmCategory && <div><div style={lab}>Firearm category</div>{firearmCategoryLabel(c.firearmCategory) ?? c.firearmCategory}</div>}
         <div><div style={lab}>Issued by</div>{c.issuedBy ?? "-"}</div>
         <div><div style={lab}>Issued</div>{fmt(c.issueDate)}</div>
         <div><div style={lab}>Expires</div>{fmt(c.expiryDate)}</div>

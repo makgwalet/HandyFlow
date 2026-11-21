@@ -24,10 +24,13 @@ import { useState, useEffect, useRef } from "react"
 import { useNavigate } from "react-router-dom"
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
+import { useSecurityAccess } from "./useSecurityAccess"
 import { Plus, Search, Shield, Phone, BadgeCheck, Trash2, X, Edit2, Eye, AlertCircle, Fingerprint, Upload, CheckCircle, AlertTriangle, Clock, Ban, HelpCircle, Calendar, ShieldCheck, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, Download } from "lucide-react"
 import Chip from "../../components/ui/Chip"
 import { DEFAULT_DIR_QUERY, directoryParams, nextSort, withFilter, pageInfo, complianceFlags, activityLabel, guardsCsv, bulkSummary, type DirQuery, type DirResult, type DirSort, type BulkResult } from "./guardDirectory.logic"
 import { usePermission } from "../../hooks/usePermission"
+import AppAccessResultPanel from "./AppAccessResultPanel"
+import { chunkIds, mergeBatches, pinValid, SMS_NOTE, type AccessBatch } from "./appAccessLogic"
 // ── Types ──────────────────────────────────────────────────────────────────────
 
 interface Guard {
@@ -320,6 +323,7 @@ export default function GuardsTab() {
   // section is only shown to users who actually have it — same
   // client-side-mirror convention as the fuel margin report.
   const canViewCpTier = usePermission("VIP_DETAIL_ACCESS")
+  const acc = useSecurityAccess()
 
   const [q,               setQ]               = useState<DirQuery>(DEFAULT_DIR_QUERY)
   const [searchText,      setSearchText]      = useState("")
@@ -328,6 +332,9 @@ export default function GuardsTab() {
   const [bulkNote,        setBulkNote]        = useState("")
   const [bulkMsg,         setBulkMsg]         = useState("")
   const [bulkBusy,        setBulkBusy]        = useState(false)
+  const canManageAccess = usePermission("SECURITY_MANAGE")
+  const [accessResult,    setAccessResult]    = useState<AccessBatch | null>(null)
+  const [issuedPin,       setIssuedPin]       = useState<string | null>(null)
   const [showAdd,         setShowAdd]         = useState(false)
   const [editing,         setEditing]         = useState<Guard | null>(null)
   const [viewing,         setViewing]         = useState<Guard | null>(null)
@@ -402,9 +409,13 @@ export default function GuardsTab() {
   })
 
   const enrollGuard = useMutation({
+    // A blank PIN lets the server generate one (returned once, guard must change it at first login).
     mutationFn: ({ id, pin }: { id: string; pin: string }) =>
-      apiClient.post(`/api/v1/security/guards/${id}/enrol`, { pin }),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["guards"] }); setEnrollPin("") },
+      apiClient.post(`/api/v1/security/guards/${id}/enrol`, pin ? { pin } : {}),
+    onSuccess: (r: { data?: { data?: { temporaryPin?: string | null }; temporaryPin?: string | null } }) => {
+      qc.invalidateQueries({ queryKey: ["guards"] }); setEnrollPin(""); setApiError("")
+      setIssuedPin((r?.data?.data ?? r?.data)?.temporaryPin ?? null)
+    },
     onError:   (e: any) => setApiError(e.response?.data?.message ?? "Failed to enroll guard"),
   })
 
@@ -434,7 +445,7 @@ export default function GuardsTab() {
   // ── Helpers ────────────────────────────────────────────────────────────────
 
   const closeAdd  = () => { setShowAdd(false);  setForm(EMPTY_FORM); setFieldErrors({}); setApiError(""); stopCamera(); setCapturedPhoto(null) }
-  const closeEdit = () => { setEditing(null);   setForm(EMPTY_FORM); setFieldErrors({}); setApiError(""); stopCamera(); setCapturedPhoto(null); setEnrollPin("") }
+  const closeEdit = () => { setIssuedPin(null); setEditing(null);   setForm(EMPTY_FORM); setFieldErrors({}); setApiError(""); stopCamera(); setCapturedPhoto(null); setEnrollPin("") }
 
   const openEdit = (g: Guard) => {
     setEditing(g)
@@ -498,6 +509,24 @@ export default function GuardsTab() {
 
   // One request per guard through the same status endpoint the single-guard dialog uses, so the lifecycle rules apply
   // exactly as they do there; a guard the server refuses is named in the result and the rest still go through.
+  // Gives the selected guards app access, 100 per request (the server's cap). PINs come back once, in the result panel.
+  const giveAppAccess = async () => {
+    const n = selectedRows.length
+    if (!window.confirm(`Give ${n} guard${n === 1 ? "" : "s"} Shield app access? Guards who already have it are skipped.`)) return
+    setBulkBusy(true); setBulkMsg(""); setAccessResult(null)
+    const done: AccessBatch[] = []
+    try {
+      for (const ids of chunkIds(selectedRows.map(r => r.guard.id))) {
+        const r = await apiClient.post("/api/v1/security/guards/app-access/bulk", { guardIds: ids, resetExisting: false })
+        done.push((r.data?.data ?? r.data) as AccessBatch)
+      }
+    } catch (e) {
+      setBulkMsg((e as { response?: { data?: { message?: string } } })?.response?.data?.message ?? "Could not finish giving app access. Check the result below and try the rest again.")
+    }
+    if (done.length) setAccessResult(mergeBatches(done))
+    setBulkBusy(false); qc.invalidateQueries({ queryKey: ["guards"] })
+  }
+
   const applyBulkStatus = async () => {
     const label = STATUS_MAP[bulkStatus]?.label ?? bulkStatus
     if (!window.confirm(`Set ${selectedRows.length} guard${selectedRows.length === 1 ? "" : "s"} to ${label}?`)) return
@@ -612,10 +641,12 @@ export default function GuardsTab() {
           </select>
           <input aria-label="Bulk note" value={bulkNote} onChange={e => setBulkNote(e.target.value)} placeholder="Note (optional)" style={{ ...selectSt, width: 220 }} />
           <button disabled={bulkBusy} onClick={applyBulkStatus} style={{ ...selectSt, cursor: "pointer", fontWeight: 600 }}>{bulkBusy ? "Updating..." : "Set status"}</button>
+          {canManageAccess && <button disabled={bulkBusy} onClick={giveAppAccess} style={{ ...selectSt, cursor: "pointer", fontWeight: 600 }}>Give app access</button>}
           <button onClick={exportSelected} style={{ ...selectSt, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6 }}><Download size={13} /> Export CSV</button>
           <button onClick={() => setSelected(new Set())} style={{ ...selectSt, cursor: "pointer" }}>Clear selection</button>
         </div>
       )}
+      {accessResult && <AppAccessResultPanel result={accessResult} onClose={() => setAccessResult(null)} />}
       {bulkMsg && <div role="status" style={{ marginBottom: 12, fontSize: 13, color: "var(--hf-text-secondary)" }}>{bulkMsg}</div>}
 
       {/* Guard table */}
@@ -739,23 +770,30 @@ export default function GuardsTab() {
           <div style={{ marginTop: 12, padding: 16, background: "var(--hf-surface-muted)", borderRadius: 10, border: "1px solid var(--hf-border)" }}>
             <div style={{ fontSize: 13, fontWeight: 700, color: "var(--hf-text-secondary)", marginBottom: 2 }}>Mobile App Access</div>
             <div style={{ fontSize: 11, color: "var(--hf-text-faint)", marginBottom: 10 }}>
-              Set or reset this guard's PIN to enable Shield app login. Communicate the PIN verbally or via SMS — never email.
+              Give this guard Shield app access. Leave the PIN blank and a temporary one is generated for you to pass on; the guard must change it at first login. {SMS_NOTE}
             </div>
             <div style={{ display: "flex", gap: 8 }}>
               <input
                 value={enrollPin}
                 onChange={e => setEnrollPin(e.target.value.replace(/\D/g, "").slice(0, 6))}
-                placeholder="6-digit PIN"
+                placeholder="Leave blank to generate"
+                aria-label="PIN (optional)"
                 inputMode="numeric"
                 style={{ flex: 1, padding: "9px 12px", border: "1.5px solid var(--hf-border)", borderRadius: 8, fontSize: 14, outline: "none", letterSpacing: 2 }}
               />
               <button
-                onClick={() => enrollGuard.mutate({ id: editing.id, pin: enrollPin })}
-                disabled={enrollPin.length !== 6 || enrollGuard.isPending}
-                style={{ padding: "9px 16px", background: enrollPin.length === 6 ? "var(--hf-accent)" : "var(--hf-surface-sunken)", color: enrollPin.length === 6 ? "var(--hf-text-on-solid)" : "var(--hf-text-faint)", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: enrollPin.length === 6 ? "pointer" : "not-allowed" }}>
-                {enrollGuard.isPending ? "Enrolling…" : enrollGuard.isSuccess && enrollPin === "" ? "Enrolled ✓" : "Set PIN"}
+                onClick={() => { setIssuedPin(null); enrollGuard.mutate({ id: editing.id, pin: enrollPin }) }}
+                disabled={!pinValid(enrollPin) || enrollGuard.isPending || !canManageAccess}
+                style={{ padding: "9px 16px", background: pinValid(enrollPin) ? "var(--hf-accent)" : "var(--hf-surface-sunken)", color: pinValid(enrollPin) ? "var(--hf-text-on-solid)" : "var(--hf-text-faint)", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: pinValid(enrollPin) ? "pointer" : "not-allowed" }}>
+                {enrollGuard.isPending ? "Working…" : "Give app access"}
               </button>
             </div>
+            {issuedPin && (
+              <div role="status" style={{ marginTop: 10, padding: 12, borderRadius: 10, background: "var(--hf-info-soft)", border: "1px solid var(--hf-info-border)" }}>
+                <div style={{ fontSize: 12, color: "var(--hf-text-muted)" }}>Temporary PIN. Shown once; it cannot be looked up later.</div>
+                <div style={{ fontSize: 26, fontWeight: 800, letterSpacing: 4, color: "var(--hf-text-primary)" }}>{issuedPin}</div>
+              </div>
+            )}
           </div>
 
           {canViewCpTier && (
@@ -797,6 +835,7 @@ export default function GuardsTab() {
               Visible to any user who can already edit a guard (SECURITY_MANAGE)
               — unlike the CP tier section above, this doesn't need the
               special VIP_DETAIL_ACCESS gate. */}
+          {acc.bankingManage && (
           <div style={{ marginTop: 12, padding: 16, background: "var(--hf-surface-muted)", borderRadius: 10, border: "1px solid var(--hf-border)" }}>
             <div style={{ fontSize: 13, fontWeight: 700, color: "var(--hf-text-secondary)", marginBottom: 10 }}>Banking Details (for payroll)</div>
             <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
@@ -816,6 +855,7 @@ export default function GuardsTab() {
               </button>
             </div>
           </div>
+          )}
           {apiError && <ErrBanner msg={apiError} />}
           <Footer onCancel={closeEdit} onSubmit={() => handleSubmit(true)} loading={updateGuard.isPending} label="Save Changes" />
         </Modal>

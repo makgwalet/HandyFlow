@@ -64,6 +64,10 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class NoShowAlertScheduler {
 
+    /** Lease + per-tenant transactions (optional so hand-built instances in tests keep working). */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private SecurityJobRunner jobs;
+
     private static final int GRACE_MINUTES      = ShiftPunctuality.GRACE_MINUTES;
     private static final int NO_SHOW_MINUTES    = 45;
     private static final int OVERTIME_GRACE_MIN = 20;
@@ -76,15 +80,19 @@ public class NoShowAlertScheduler {
     private final NotificationService notificationService;
     private final TenantAdminRecipients tenantAdminRecipients;
 
-    @Scheduled(cron = "0 */5 * * * *")
+    @Scheduled(cron = "0 */5 * * * *", zone = "Africa/Johannesburg")
     public void checkShiftAlerts() {
+        SecurityJobRunner.exclusively(jobs, "security-no-show-alerts", java.time.Duration.ofMinutes(4), this::checkShiftAlertsNow);
+    }
+
+    void checkShiftAlertsNow() {
         Instant now = Instant.now();
         log.debug("[Security] Running shift alert checks at {}", now);
 
         List<UUID> tenantIds = siteRepository.findDistinctActiveTenantIds();
         for (UUID tenantId : tenantIds) {
             try {
-                checkForTenant(TenantId.of(tenantId), now);
+                SecurityJobRunner.tx(jobs, false, () -> checkForTenant(TenantId.of(tenantId), now));
             } catch (Exception e) {
                 log.error("[Security] Shift alert check failed for tenant={}: {}",
                         tenantId, e.getMessage(), e);

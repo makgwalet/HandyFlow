@@ -27,7 +27,6 @@ public interface PayrollPeriodRepository extends JpaRepository<PayrollPeriod, UU
     @Query("""
         SELECT COUNT(p) > 0 FROM PayrollPeriod p
         WHERE p.tenantId = :tenantId
-        AND p.status NOT IN ('PAID')
         AND p.periodStart <= :periodEnd
         AND p.periodEnd >= :periodStart
         AND (:branchId IS NULL OR p.branchId = :branchId OR p.branchId IS NULL)

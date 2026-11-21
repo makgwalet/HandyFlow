@@ -41,8 +41,8 @@ import java.util.UUID;
  * <p>
  * ⚠ ONE THING FLAGGED, NOT CHANGED: resolveGuardId() (GET /resolve-guard)
  * is documented as "used INTERNALLY by CheckpointScanController and
- * IncidentController" — but is also a real, public HTTP endpoint with no
- * @PreAuthorize at all. Unlike the other unguarded endpoints here (which
+ * IncidentController" — but is also a real HTTP endpoint. It now needs
+ * SECURITY_READ (security audit): it answers "which guard is on device X". Unlike the other unguarded endpoints here (which
  * only ever expose the CALLING guard's own session/identity), this one
  * lets any caller ask "which guard is on device X right now" — a
  * third-party identity/whereabouts lookup, not self-service. Whether
@@ -97,6 +97,7 @@ public class DeviceSessionController {
     }
 
     @GetMapping("/resolve-guard")
+    @PreAuthorize("hasAuthority('SECURITY_READ')")
     @Operation(
             summary = "Resolve the currently active guard on a device",
             description = """

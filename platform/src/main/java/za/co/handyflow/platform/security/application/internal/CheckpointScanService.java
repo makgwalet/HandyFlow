@@ -50,6 +50,10 @@ public class CheckpointScanService {
 
     static final int SCAN_COOLDOWN_SECONDS = 60;
 
+    /** When true a scan with no phone position is refused. Off by default so indoor GPS failures don't stop patrols. */
+    @org.springframework.beans.factory.annotation.Value("${handyflow.security.scan.require-gps:false}")
+    private boolean requireGps;
+
     private final CheckpointRepository    checkpointRepository;
     private final CheckpointLogRepository logRepository;
     private final ShiftRepository         shiftRepository;
@@ -68,6 +72,22 @@ public class CheckpointScanService {
         // Per-site enforcement (V215), not a global constant.
         if ("QR".equals(scanType) && checkpoint.getSite().isRequireSignedQr()) {
             verifyQrHmac(checkpoint, req.qrCode());
+        }
+
+        // A scan has to be made at the site: a photographed QR code is useless from somewhere else.
+        var site = checkpoint.getSite();
+        switch (ScanGeofence.decide(site.getLatitude(), site.getLongitude(),
+                req.latitude(), req.longitude(), req.accuracy(), requireGps)) {
+            case TOO_FAR -> {
+                log.warn("[Security] Scan rejected: too far from site checkpoint={} guard={}",
+                        checkpoint.getId(), authenticatedGuardId);
+                throw new HandyFlowException("You are not at the site. Scan the checkpoint where it is installed.",
+                        HttpStatus.BAD_REQUEST, "SCAN_NOT_AT_SITE");
+            }
+            case GPS_REQUIRED -> throw new HandyFlowException(
+                    "Turn on location so the scan can be placed at the site.",
+                    HttpStatus.BAD_REQUEST, "SCAN_GPS_REQUIRED");
+            case OK -> { }
         }
 
         if (req.shiftId() != null) {
@@ -131,22 +151,11 @@ public class CheckpointScanService {
         String payload   = parts[0] + ":" + parts[1];
         String signature = parts[2];
 
-        try {
-            Mac mac = Mac.getInstance("HmacSHA256");
-            mac.init(new SecretKeySpec(checkpoint.getQrSecret().getBytes(), "HmacSHA256"));
-            String expected = Base64.getUrlEncoder().withoutPadding()
-                    .encodeToString(mac.doFinal(payload.getBytes()));
-            if (!expected.equals(signature)) {
-                log.warn("[Security] QR HMAC mismatch checkpoint={}", checkpoint.getId());
-                throw new HandyFlowException(
-                        "QR code signature is invalid — scan the original printed QR",
-                        HttpStatus.UNAUTHORIZED, "INVALID_QR_SIGNATURE");
-            }
-        } catch (HandyFlowException e) {
-            throw e;
-        } catch (Exception e) {
-            throw new HandyFlowException("QR verification failed",
-                    HttpStatus.INTERNAL_SERVER_ERROR, "HMAC_ERROR");
+        if (!QrSignature.matches(checkpoint.getQrSecret(), payload, signature)) {
+            log.warn("[Security] QR HMAC mismatch checkpoint={}", checkpoint.getId());
+            throw new HandyFlowException(
+                    "QR code signature is invalid — scan the original printed QR",
+                    HttpStatus.UNAUTHORIZED, "INVALID_QR_SIGNATURE");
         }
     }
 

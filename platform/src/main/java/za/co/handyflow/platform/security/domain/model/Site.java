@@ -109,11 +109,14 @@ public class Site {
     @Column(name = "portal_enabled", nullable = false)
     private boolean portalEnabled = false;
 
+    @Column(name = "portal_expires_at")
+    private java.time.Instant portalExpiresAt;
+
     @Column(name = "portal_label")
     private String portalLabel;
 
     @Column(name = "require_signed_qr", nullable = false)
-    private boolean requireSignedQr = false;
+    private boolean requireSignedQr = true; // new sites sign QR codes from day one; existing rows keep their stored value
 
     @Column(name = "clock_in_window_minutes")
     private Integer clockInWindowMinutes;
@@ -164,6 +167,7 @@ public class Site {
     public String generatePortalToken(String customLabel) {
         this.portalToken   = java.util.UUID.randomUUID().toString();
         this.portalEnabled = true;
+        this.portalExpiresAt = java.time.Instant.now().plus(java.time.Duration.ofDays(90));
         this.portalLabel   = customLabel != null ? customLabel : this.name;
         this.updatedAt     = java.time.Instant.now();
         return this.portalToken;
@@ -172,6 +176,7 @@ public class Site {
     public void disablePortal() {
         this.portalToken   = null;
         this.portalEnabled = false;
+        this.portalExpiresAt = null;
         this.updatedAt     = java.time.Instant.now();
     }
 

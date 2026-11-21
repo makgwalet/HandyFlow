@@ -191,6 +191,8 @@ public class RotationService {
 
         int created = 0;
         int skipped = 0;
+        int overlapSkipped = 0;
+        boolean customWarned = false;
         List<String> warnings = new ArrayList<>();
 
         for (LocalDate date = req.fromDate(); !date.isAfter(req.toDate()); date = date.plusDays(1)) {
@@ -229,13 +231,23 @@ public class RotationService {
                     continue;
                 }
 
-                // Determine if this guard is "on" today based on pattern type
-                if (!isOnDuty(pattern, assignment, date)) {
+                // Which shift (day or night), if any, this guard works today
+                long daysSinceStart = assignment.getStartsAt().until(date, java.time.temporal.ChronoUnit.DAYS)
+                        + assignment.getPositionInCycle();
+                var slot = RotationRules.slot(pattern.getPatternType(), pattern.getCycleDefinition(),
+                        daysSinceStart, date.getDayOfWeek());
+                if (slot.isEmpty()) {
+                    if (pattern.getPatternType() == RotationPattern.PatternType.CUSTOM && !customWarned) {
+                        warnings.add("CUSTOM patterns cannot be generated automatically — no shifts were created. "
+                                + "Use a fixed, weekly or day/night pattern, or add shifts by hand.");
+                        customWarned = true;
+                    }
                     continue;  // off-day in the cycle
                 }
 
                 // Build shift window
-                Instant shiftStart = buildShiftStart(pattern, date);
+                Instant shiftStart = date.atTime(slot.get().hour(), slot.get().minute())
+                        .atZone(ZoneId.of("Africa/Johannesburg")).toInstant();
                 Instant shiftEnd   = shiftStart.plus(
                         Duration.ofHours(pattern.getShiftLengthHours()));
 
@@ -243,6 +255,7 @@ public class RotationService {
                 if (shiftRepository.hasOverlap(tenantId, assignment.getGuardId(),
                         shiftStart, shiftEnd, null)) {
                     skipped++;
+                    overlapSkipped++;
                     continue;
                 }
 
@@ -254,6 +267,11 @@ public class RotationService {
             }
         }
 
+        if (overlapSkipped > 0) {
+            warnings.add(overlapSkipped + " shift(s) were not created because the guard already has a shift at that time "
+                    + "(this also happens when you run the same range twice).");
+        }
+
         log.info("[Security] Schedule generated pattern={} range={}/{} created={} skipped={}",
                 pattern.getId(), req.fromDate(), req.toDate(), created, skipped);
 
@@ -262,48 +280,6 @@ public class RotationService {
     }
 
     // ── Private helpers ────────────────────────────────────────────────────────
-
-    /**
-     * Determines whether a guard is "on duty" on a given date based on their
-     * positionInCycle and the pattern's cycle definition.
-     *
-     * FIXED_DAYS_ON_OFF: days since startsAt + positionInCycle, modulo (onDays + offDays)
-     * WEEKLY_FIXED: extract day-of-week from cycleDefinition
-     * ALTERNATING_DAY_NIGHT: which week in the two-week cycle (both are on-duty, just different shifts)
-     * CUSTOM: always returns true (let the caller interpret the definition)
-     */
-    private boolean isOnDuty(RotationPattern pattern, RotationAssignment assignment, LocalDate date) {
-        long daysSinceStart = assignment.getStartsAt().until(date, java.time.temporal.ChronoUnit.DAYS)
-                + assignment.getPositionInCycle();
-
-        return switch (pattern.getPatternType()) {
-            case FIXED_DAYS_ON_OFF -> {
-                int onDays  = intVal(pattern.getCycleDefinition(), "onDays",  4);
-                int offDays = intVal(pattern.getCycleDefinition(), "offDays", 2);
-                yield (daysSinceStart % (onDays + offDays)) < onDays;
-            }
-            case WEEKLY_FIXED -> {
-                // cycleDefinition: {"monday": "DAY", "tuesday": "OFF", ...}
-                String dow    = date.getDayOfWeek().name().toLowerCase();
-                String status = (String) pattern.getCycleDefinition().getOrDefault(dow, "OFF");
-                yield !"OFF".equalsIgnoreCase(status);
-            }
-            case ALTERNATING_DAY_NIGHT ->
-                // Both weeks are on-duty; this just controls start hour (handled in buildShiftStart)
-                    true;
-            case CUSTOM -> true;
-        };
-    }
-
-    private Instant buildShiftStart(RotationPattern pattern, LocalDate date) {
-        // Default: shifts start at 06:00 SAST (UTC+2)
-        int startHour = 6;
-        if (pattern.getCycleDefinition().containsKey("startHour")) {
-            startHour = intVal(pattern.getCycleDefinition(), "startHour", 6);
-        }
-        ZoneId zone = ZoneId.of("Africa/Johannesburg");
-        return date.atTime(startHour, 0).atZone(zone).toInstant();
-    }
 
     private int intVal(Map<String, Object> map, String key, int defaultVal) {
         Object v = map.get(key);

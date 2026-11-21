@@ -79,6 +79,11 @@ public class ClientPortalService {
                 .orElseThrow(() -> new HandyFlowException(
                         "Portal not found or has been disabled",
                         HttpStatus.NOT_FOUND, "PORTAL_NOT_FOUND"));
+        // Same answer as an unknown link, so an expired link reveals nothing.
+        if (PortalRules.expired(site.getPortalExpiresAt(), java.time.Instant.now())) {
+            throw new HandyFlowException("Portal not found or has been disabled",
+                    HttpStatus.NOT_FOUND, "PORTAL_NOT_FOUND");
+        }
 
         UUID siteId = site.getId();
         LocalDate today = LocalDate.now();
@@ -140,8 +145,7 @@ public class ClientPortalService {
 
         List<Map<String, Object>> onSite = jdbc.queryForList("""
                 SELECT
-                    e.id, e.entry_type, e.person_name, e.company,
-                    e.vehicle_registration, e.host_name, e.logged_in_at, e.status
+                    e.id, e.entry_type, e.company, e.logged_in_at, e.status
                 FROM security_gate_register_entries e
                 WHERE e.site_id = ?
                   AND e.logged_out_at IS NULL
@@ -149,8 +153,7 @@ public class ClientPortalService {
                 LIMIT 50
                 """, siteId);
 
-        log.info("[Portal] View site={} token={}...{}", site.getName(),
-                token.substring(0, 8), token.substring(token.length() - 4));
+        log.info("[Portal] View site={}", site.getName());
 
         return new ClientPortalResponse(
                 site.getId(),
@@ -167,12 +170,31 @@ public class ClientPortalService {
         );
     }
 
+    /** What a manager sees for a site's portal. The token is a credential, so only managers may call this. */
+    public record PortalStatus(boolean enabled, boolean expired, String token, String path, java.time.Instant expiresAt, String label) {}
+
+    @Transactional(readOnly = true)
+    public PortalStatus portalStatus(UUID siteId, za.co.handyflow.platform.shared.TenantId tenantId) {
+        Site site = siteRepository.findActiveById(tenantId, siteId)
+                .orElseThrow(() -> new HandyFlowException(
+                        "Site not found", HttpStatus.NOT_FOUND, "SITE_NOT_FOUND"));
+        boolean enabled = site.isPortalEnabled() && site.getPortalToken() != null;
+        boolean expired = enabled && PortalRules.expired(site.getPortalExpiresAt(), java.time.Instant.now());
+        return new PortalStatus(enabled, expired, enabled ? site.getPortalToken() : null,
+                enabled ? PortalRules.path(site.getPortalToken()) : null, site.getPortalExpiresAt(), site.getPortalLabel());
+    }
+
+    /** Returns the current link while it is live; makes a new one (the old stops working) if none, expired, or regenerate. */
     @Transactional
-    public String generatePortalToken(UUID siteId, String label,
+    public String generatePortalToken(UUID siteId, String label, boolean regenerate,
                                       za.co.handyflow.platform.shared.TenantId tenantId) {
         Site site = siteRepository.findActiveById(tenantId, siteId)
                 .orElseThrow(() -> new HandyFlowException(
                         "Site not found", HttpStatus.NOT_FOUND, "SITE_NOT_FOUND"));
+        if (PortalRules.keepExisting(site.isPortalEnabled(), site.getPortalToken(),
+                site.getPortalExpiresAt(), java.time.Instant.now(), regenerate)) {
+            return site.getPortalToken();
+        }
         String token = site.generatePortalToken(label);
         siteRepository.save(site);
         log.info("[Portal] Token generated site={} tenant={}", siteId, tenantId);
@@ -206,13 +228,14 @@ public class ClientPortalService {
                 .orElseThrow(() -> new HandyFlowException(
                         "Site not found", HttpStatus.NOT_FOUND, "SITE_NOT_FOUND"));
 
-        if (!site.isPortalEnabled() || site.getPortalToken() == null) {
+        if (!site.isPortalEnabled() || site.getPortalToken() == null
+                || PortalRules.expired(site.getPortalExpiresAt(), java.time.Instant.now())) {
             throw new HandyFlowException(
-                    "This site has no active portal link yet — generate one first",
+                    "This site has no active portal link — generate a new one first",
                     HttpStatus.CONFLICT, "PORTAL_NOT_ENABLED");
         }
 
-        String portalPath = "/portal/" + site.getPortalToken();
+        String portalPath = PortalRules.path(site.getPortalToken());
         String portalUrl  = (frontendBaseUrl != null && !frontendBaseUrl.isBlank())
                 ? frontendBaseUrl.replaceAll("/$", "") + portalPath
                 : portalPath;
@@ -228,8 +251,7 @@ public class ClientPortalService {
 
         emailService.send(recipientEmail, subject, html);
 
-        log.info("[Portal] Link sent site={} tenant={} to={}",
-                siteId, tenantId.getValue(), recipientEmail);
+        log.info("[Portal] Link sent site={} tenant={}", siteId, tenantId.getValue());
     }
 
     private String buildEmailHtml(Site site, String portalUrl, String customMessage) {

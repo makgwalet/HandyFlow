@@ -40,6 +40,10 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class GuardPerformanceSnapshotJob {
 
+    /** Lease + per-tenant transactions (optional so hand-built instances in tests keep working). */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private SecurityJobRunner jobs;
+
     private static final ZoneId SAST = ZoneId.of("Africa/Johannesburg");
 
     private final GuardRepository guardRepository;
@@ -51,10 +55,14 @@ public class GuardPerformanceSnapshotJob {
 
     @Scheduled(cron = "0 15 2 * * *", zone = "Africa/Johannesburg")
     public void run() {
+        SecurityJobRunner.exclusively(jobs, "security-performance-snapshot", java.time.Duration.ofMinutes(60), this::runNow);
+    }
+
+    void runNow() {
         Instant now = Instant.now();
         for (UUID tenantId : siteRepository.findDistinctActiveTenantIds()) {
             try {
-                runForTenant(TenantId.of(tenantId), now);
+                SecurityJobRunner.tx(jobs, false, () -> runForTenant(TenantId.of(tenantId), now));
             } catch (Exception e) {
                 log.error("[Security] Performance snapshot failed for tenant={}: {}", tenantId, e.getMessage(), e);
             }

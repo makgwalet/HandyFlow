@@ -64,6 +64,20 @@ public class PublicApiService {
     @Transactional
     public CreateApiKeyResponse createApiKey(TenantId tenantId, CreateApiKeyRequest req,
                                              UUID createdBy) {
+        // Security audit 1.5: refuse what the filter would refuse anyway, so nobody is handed a key that cannot work or that claims a limit it does not have.
+        if (req.branchId() != null) {
+            throw new HandyFlowException(
+                    za.co.handyflow.platform.security.infrastructure.ApiKeyAccess.BRANCH_UNSUPPORTED, HttpStatus.BAD_REQUEST, "VALIDATION");
+        }
+        var scope = za.co.handyflow.platform.security.infrastructure.ApiKeyScopeJson.parse(req.scopePrefixesJson());
+        if (scope.isEmpty()) {
+            throw new HandyFlowException(
+                    "The scope must be a JSON array of paths, for example [\"/api/v1/security/reports\"]", HttpStatus.BAD_REQUEST, "VALIDATION");
+        }
+        String scopeProblem = za.co.handyflow.platform.security.infrastructure.ApiKeyAccess.scopeProblem(scope.get());
+        if (scopeProblem != null) {
+            throw new HandyFlowException(scopeProblem, HttpStatus.BAD_REQUEST, "VALIDATION");
+        }
         // Generate a secure random key: "hf_live_" + 32 random URL-safe bytes
         byte[] randomBytes = new byte[32];
         new SecureRandom().nextBytes(randomBytes);
@@ -118,6 +132,9 @@ public class PublicApiService {
     public WebhookSubscriptionResponse createWebhook(TenantId tenantId,
                                                      CreateWebhookRequest req,
                                                      UUID createdBy) {
+        WebhookUrlRules.problem(req.endpointUrl()).ifPresent(msg -> {
+            throw new HandyFlowException(msg, org.springframework.http.HttpStatus.BAD_REQUEST, "INVALID_WEBHOOK_URL");
+        });
         // Generate a per-subscription HMAC signing secret
         byte[] secretBytes = new byte[32];
         new SecureRandom().nextBytes(secretBytes);
@@ -179,18 +196,22 @@ public class PublicApiService {
         }
     }
 
-    /** Called by WebhookRetryScheduler for failed deliveries. */
+    /** Called by WebhookRetryScheduler for failed deliveries. Resends the payload stored with the failed attempt. */
     @Transactional
     public void retryDelivery(WebhookDelivery delivery) {
-        WebhookSubscription sub = webhookRepository.findById(delivery.getSubscriptionId())
-                .orElse(null);
-        if (sub == null || !sub.isActive()) return;
+        // Whatever happens below, this row has had its turn: the new attempt (if any) carries on the chain.
+        // Before this, the old row kept its next_retry_at and was picked up again every 5 minutes.
+        String payload = delivery.getPayloadJson();
+        delivery.supersede();
+        deliveryRepository.save(delivery);
 
-        // Re-fetch original payload from delivery — in a real implementation
-        // the payload would be reconstructed or stored in a payload store.
-        // For this implementation we store the payload hash as a reference.
-        deliverToSubscription(sub, delivery.getEventType(), delivery.getEventId(),
-                "{\"retry\":true,\"originalPayloadHash\":\"" + delivery.getPayloadHash() + "\"}",
+        WebhookSubscription sub = webhookRepository.findById(delivery.getSubscriptionId()).orElse(null);
+        if (sub == null || !sub.isActive()) return;
+        if (!WebhookRetryRules.canReplay(payload)) {
+            log.warn("[Webhook] Not retrying delivery {}: payload was not stored (sent before V847)", delivery.getId());
+            return;
+        }
+        deliverToSubscription(sub, delivery.getEventType(), delivery.getEventId(), payload,
                 delivery.getAttemptNumber() + 1);
     }
 
@@ -200,7 +221,7 @@ public class PublicApiService {
         String signature   = hmacSha256Hex(sub.getSigningSecret(), payloadJson);
 
         WebhookDelivery delivery = WebhookDelivery.attempt(
-                sub.getTenantId(), sub.getId(), eventType, eventId, payloadHash, attempt);
+                sub.getTenantId(), sub.getId(), eventType, eventId, payloadHash, payloadJson, attempt);
         deliveryRepository.save(delivery);
 
         try {
@@ -220,15 +241,13 @@ public class PublicApiService {
                 sub.recordSuccess();
                 log.info("[Webhook] Delivered eventType={} sub={} status={}", eventType, sub.getId(), status);
             } else {
-                Instant retry = nextRetryAt(attempt);
-                delivery.markFailed(status, "HTTP " + status, retry);
+                delivery.markFailed(status, "HTTP " + status, WebhookRetryRules.nextRetryAt(attempt, Instant.now()));
                 sub.recordFailure();
                 log.warn("[Webhook] Delivery failed eventType={} sub={} status={} attempt={}",
                         eventType, sub.getId(), status, attempt);
             }
         } catch (Exception e) {
-            Instant retry = nextRetryAt(attempt);
-            delivery.markNetworkFailed(e.getMessage(), attempt < 5 ? retry : null);
+            delivery.markNetworkFailed(e.getMessage(), WebhookRetryRules.nextRetryAt(attempt, Instant.now()));
             sub.recordFailure();
             log.warn("[Webhook] Network error eventType={} sub={} error={} attempt={}",
                     eventType, sub.getId(), e.getMessage(), attempt);
@@ -236,13 +255,6 @@ public class PublicApiService {
             deliveryRepository.save(delivery);
             webhookRepository.save(sub);
         }
-    }
-
-    private Instant nextRetryAt(int attempt) {
-        // Exponential backoff: 1m, 5m, 15m, 30m, 60m
-        int[] delaysMinutes = { 1, 5, 15, 30, 60 };
-        int delayMin = delaysMinutes[Math.min(attempt - 1, delaysMinutes.length - 1)];
-        return Instant.now().plusSeconds(delayMin * 60L);
     }
 
     // ── Crypto helpers ─────────────────────────────────────────────────────────

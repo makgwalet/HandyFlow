@@ -66,6 +66,16 @@ public class ArmouryLog {
     @Column(name = "condition_notes")
     private String conditionNotes;
 
+    @Column(name = "ammo_calibre", length = 30)
+    private String ammoCalibre;
+
+    /** ISSUE: rounds handed out. RETURN: rounds handed back. Null = not recorded. */
+    @Column(name = "ammo_rounds")
+    private Integer ammoRounds;
+
+    @Column(name = "ammo_unaccounted_reason")
+    private String ammoUnaccountedReason;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
@@ -94,6 +104,12 @@ public class ArmouryLog {
         log.occurredAt         = Instant.now();
         log.createdAt          = Instant.now();
         return log;
+    }
+
+    public void recordAmmo(String calibre, Integer rounds, String unaccountedReason) {
+        this.ammoCalibre           = calibre == null || calibre.isBlank() ? null : calibre.trim();
+        this.ammoRounds            = rounds;
+        this.ammoUnaccountedReason = unaccountedReason == null || unaccountedReason.isBlank() ? null : unaccountedReason.trim();
     }
 
     // ── Mutations ──────────────────────────────────────────────────────────────

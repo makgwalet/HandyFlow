@@ -33,11 +33,20 @@ import java.util.List;
 @RequiredArgsConstructor
 public class WebhookRetryScheduler {
 
+    /** Lease + per-tenant transactions (optional so hand-built instances in tests keep working). */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private za.co.handyflow.platform.security.application.internal.SecurityJobRunner jobs;
+
     private final WebhookDeliveryRepository deliveryRepository;
     private final PublicApiService          publicApiService;
 
     @Scheduled(fixedDelay = 5 * 60 * 1000)  // every 5 minutes
     public void retryFailedDeliveries() {
+        za.co.handyflow.platform.security.application.internal.SecurityJobRunner.exclusively(
+                jobs, "security-webhook-retry", java.time.Duration.ofMinutes(4), this::retryFailedDeliveriesNow);
+    }
+
+    void retryFailedDeliveriesNow() {
         List<WebhookDelivery> due = deliveryRepository.findDueForRetry(Instant.now());
         if (due.isEmpty()) return;
 

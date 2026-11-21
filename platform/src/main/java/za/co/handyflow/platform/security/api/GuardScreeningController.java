@@ -84,6 +84,7 @@ public class GuardScreeningController {
     }
 
     @PostMapping("/{screeningId}/decision")
+    @PreAuthorize("hasAuthority('SECURITY_SCREENING_DECIDE')")
     @Operation(
             summary = "Sign off a screening that has a result",
             description = """

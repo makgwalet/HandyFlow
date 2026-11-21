@@ -61,6 +61,24 @@ public class ControlRoomService {
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     private GuardPushService push;
 
+    /** Optional for the same reason as push. Never throws. */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private SecurityAlertNotifier alerts;
+
+    /** Optional; delivers events to customers' webhook subscriptions. Never throws. */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private PublicApiService webhooks;
+
+    private void fireWebhook(TenantId tenantId, String type, UUID id, UUID siteId, String severity, String detail) {
+        if (webhooks == null) return;
+        try {
+            webhooks.dispatchWebhookEvent(tenantId, type, id,
+                    WebhookPayloads.event(type, id, siteId, severity, detail, java.time.Instant.now()));
+        } catch (Exception e) {
+            log.warn("[Security] Webhook dispatch failed type={} id={}: {}", type, id, e.getMessage());
+        }
+    }
+
     private void pushTo(TenantId tenantId, UUID guardId, String title, String body, String screen) {
         if (push != null) push.notifyGuard(tenantId, guardId, title, body, java.util.Map.of("screen", screen));
     }
@@ -105,6 +123,10 @@ public class ControlRoomService {
 
         log.info("[Security] Alarm event ingested id={} source={} site={} severity={}",
                 event.getId(), source, req.siteId(), event.getSeverity());
+
+        if (alerts != null) alerts.criticalAlarm(tenantId, event);
+        fireWebhook(tenantId, "ALARM_EVENT", event.getId(), event.getSiteId(),
+                event.getSeverity() == null ? null : event.getSeverity().name(), source.name());
 
         return event;
     }
@@ -185,6 +207,7 @@ public class ControlRoomService {
 
         log.info("[Security] Dispatch created eventId={} unitType={} guard={} by={}",
                 eventId, unitType, req.dispatchedGuardId(), operatorId);
+        fireWebhook(tenantId, "DISPATCH_CREATED", dispatchRecord.getId(), event.getSiteId(), null, unitType.name());
 
         return toDispatchResponse(dispatchRecord, tenantId);
     }
@@ -240,6 +263,7 @@ public class ControlRoomService {
 
         log.info("[Security] Dispatch resolved id={} outcome={} resolutionTime={}min incident={}",
                 dispatchId, outcome, dispatchRecord.resolutionTimeMinutes(), linkedIncidentId);
+        fireWebhook(tenantId, "DISPATCH_RESOLVED", dispatchRecord.getId(), event.getSiteId(), null, outcome.name());
 
         return toDispatchResponse(dispatchRecord, tenantId);
     }
@@ -318,6 +342,8 @@ public class ControlRoomService {
 
         log.warn("[Security] DURESS TRIGGERED eventId={} guard={} detail={}",
                 event.getId(), req.triggeredByGuardId(), req.protectionDetailId());
+        if (alerts != null) alerts.duress(tenantId, event);
+        fireWebhook(tenantId, "DURESS_TRIGGERED", event.getId(), event.getSiteId(), "CRITICAL", "DURESS");
         if (push != null) {
             push.notifySiteSupervisorsOf(tenantId, req.triggeredByGuardId(), "PANIC ALERT",
                     "A guard at your site pressed panic. Check the site overview and call the control room.", java.util.Map.of("screen", "Supervisor"));
@@ -341,8 +367,9 @@ public class ControlRoomService {
     }
 
     @Transactional(readOnly = true)
-    public List<Dispatch> getDispatchesForEvent(UUID alarmEventId) {
-        return dispatchRepository.findByAlarmEvent(alarmEventId);
+    public List<Dispatch> getDispatchesForEvent(TenantId tenantId, UUID alarmEventId) {
+        findEvent(tenantId, alarmEventId);   // 404 for an event that is not this tenant's (security audit: cross-tenant read)
+        return dispatchRepository.findByTenantAndAlarmEvent(tenantId, alarmEventId);
     }
 
     // ── Helpers ────────────────────────────────────────────────────────────────

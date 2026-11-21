@@ -93,6 +93,7 @@ import { PayrollBureauPortalClientDetailPage }  from "./pages/payroll-bureau-por
 // ── Projects module ────────────────────────────────────────────────────────────
 import { ProjectsPage }     from "./pages/projects/ProjectsPage"
 import { ClientPortalPage }  from "./pages/projects/ClientPortalPage"
+import SecuritySitePortalPage from "./pages/security/ClientPortalPage"
 import { ClientPortalLoginPage }        from "./pages/projects/client-portal/ClientPortalLoginPage"
 import { ClientPortalAcceptInvitePage } from "./pages/projects/client-portal/ClientPortalAcceptInvitePage"
 import { ClientPortalHomePage }         from "./pages/projects/client-portal/ClientPortalHomePage"
@@ -291,6 +292,7 @@ export default function App() {
           <Route path="/projects/client-portal/projects/:projectId" element={<ProjectClientPortalProtectedRoute><ClientPortalProjectPage /></ProjectClientPortalProtectedRoute>} />
           <Route path="/projects/portal/:token" element={<ClientPortalPage />} />
           <Route path="/portal/:token" element={<ClientPortalPage />} />
+          <Route path="/site-portal/:token" element={<SecuritySitePortalPage />} />
           <Route path="/secure/share/:token" element={<RecipientTransmittalPage />} />
           <Route path="/secure/workspace/:token" element={<CollaboratorWorkspacePage />} />
 

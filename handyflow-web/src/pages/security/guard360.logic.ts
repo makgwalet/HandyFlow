@@ -25,6 +25,7 @@ export interface CompetencyItem {
   state: string; detail: string
   verifiedByName: string | null; verifiedAt: string | null; verificationNote: string | null
   evidence: EvidenceItem[]; createdAt: string
+  firearmCategory?: string | null
 }
 export interface Readiness { percent: number; ready: boolean; items: ReadinessItem[]; reasons: string[] }
 export interface DocumentItem { id: string; category: string; fileUrl: string; fileName: string | null; notes: string | null; createdAt: string }
@@ -110,11 +111,22 @@ export const COMPETENCY_TYPES: { value: string; label: string }[] = [
   { value: "OTHER", label: "Other (name it)" },
 ]
 
+/** A firearm competency is issued per category, so the register's firearm type must match one of these. */
+export const FIREARM_CATEGORIES: { value: string; label: string }[] = [
+  { value: "HANDGUN", label: "Handgun" }, { value: "SHOTGUN", label: "Shotgun" }, { value: "RIFLE", label: "Rifle" },
+]
+
+export const firearmCategoryLabel = (v?: string | null) => FIREARM_CATEGORIES.find(c => c.value === v)?.label ?? null
+
 /** What a competency form may send. Mirrors the server's checks so the supervisor hears about a mistake before saving. */
-export function competencyFormError(f: { competencyType: string; title: string; issueDate: string; expiryDate: string }, today: string): string | null {
+export function competencyFormError(f: { competencyType: string; title: string; issueDate: string; expiryDate: string; firearmCategory?: string }, today: string): string | null {
   if (f.competencyType === "OTHER" && !f.title.trim()) return "Give the competency a name"
   if (f.issueDate && f.issueDate > today) return "The issue date cannot be in the future"
   if (f.issueDate && f.expiryDate && f.expiryDate < f.issueDate) return "The expiry date cannot be before the issue date"
+  if (f.competencyType === "FIREARM_COMPETENCY") {
+    if (!f.firearmCategory) return "Choose the firearm category: handgun, shotgun or rifle"
+    if (!f.expiryDate) return "A firearm competency needs an expiry date"
+  }
   return null
 }
 
