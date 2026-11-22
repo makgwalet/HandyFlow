@@ -39,10 +39,10 @@ public final class SecurityRoleTemplates {
                 "SECURITY_READ");
         add("CONTROL_ROOM_OPERATOR", "Control room operator",
                 "Runs day-to-day operations: guards, shifts, incidents, patrols, armoury records. No firearm issue, screening decisions, bank details, payroll or integrations.",
-                "SECURITY_READ", "SECURITY_MANAGE");
+                "SECURITY_READ", "SECURITY_MANAGE", "SECURITY_ALERTS_RECEIVE");
         add("FIELD_SUPERVISOR", "Field supervisor",
                 "Operations plus issuing and taking back firearms. No screening decisions, bank details, payroll or integrations.",
-                "SECURITY_READ", "SECURITY_MANAGE", "SECURITY_ARMOURY_ISSUE");
+                "SECURITY_READ", "SECURITY_MANAGE", "SECURITY_ARMOURY_ISSUE", "SECURITY_ALERTS_RECEIVE");
         add("ARMOURER", "Armourer",
                 "Issues and takes back firearms and ammunition; read-only elsewhere.",
                 "SECURITY_READ", "SECURITY_ARMOURY_ISSUE");
@@ -68,7 +68,7 @@ public final class SecurityRoleTemplates {
                 "Operations plus module administration and integrations. Sees payroll but cannot prepare, approve or pay it.",
                 "SECURITY_READ", "SECURITY_MANAGE", "SECURITY_ADMIN", "SECURITY_PAYROLL_READ",
                 "SECURITY_INTEGRATIONS_MANAGE", "SECURITY_ARMOURY_ISSUE", "SECURITY_SCREENING_DECIDE",
-                "SECURITY_GUARD_BANKING_MANAGE");
+                "SECURITY_GUARD_BANKING_MANAGE", "SECURITY_ALERTS_RECEIVE");
     }
 
     public static Map<String, Template> all() { return Map.copyOf(ALL); }

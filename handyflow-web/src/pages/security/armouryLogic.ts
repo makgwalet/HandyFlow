@@ -44,3 +44,15 @@ export function ammoText(rounds: number | null | undefined, calibre?: string | n
   const c = (calibre ?? "").trim()
   return c ? `${rounds} x ${c}` : `${rounds} rounds`
 }
+
+/** The firearm types the register accepts (the server enforces the same list). */
+export const FIREARM_TYPES = ["Handgun", "Shotgun", "Rifle"] as const
+
+/** First problem with the register form that can be caught before sending, or null. */
+export function registerProblem(f: { firearmSerial: string; firearmType: string; sapsLicenseNumber: string; licenseExpiry: string }): string | null {
+  if (!f.firearmSerial.trim()) return "Enter the serial number."
+  if (!(FIREARM_TYPES as readonly string[]).includes(f.firearmType)) return "Choose a firearm type."
+  if (!f.sapsLicenseNumber.trim()) return "Enter the SAPS license number."
+  if (!f.licenseExpiry) return "Enter the license expiry date."
+  return null
+}

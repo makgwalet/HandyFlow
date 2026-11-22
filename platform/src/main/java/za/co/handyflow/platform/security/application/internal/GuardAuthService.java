@@ -91,6 +91,10 @@ public class GuardAuthService {
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     private TenantAccessService tenantAccess;
 
+    /** Used to close the outgoing guard's session on a shared-device handover (optional so existing constructors keep working). */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private za.co.handyflow.platform.security.domain.repository.DeviceSessionRepository sessionRepository;
+
     private final java.security.SecureRandom random = new java.security.SecureRandom();
 
     @Value("${app.security.jwt.secret}")
@@ -198,6 +202,19 @@ public class GuardAuthService {
             int ended = tokenRepository.revokeActiveOnDevice(guard.getTenantId(), req.deviceId(), Instant.now(),
                     "Shared device handover");
             if (ended > 0) log.info("[Security] Shared device handover device={} sessionsEnded={}", req.deviceId(), ended);
+            // The previous guard's device session must end too, or the next guard cannot start one on this device.
+            // Their shift is left as it is (the overtime/no-show checks flag it) and anything still in their custody stays
+            // checked out to them: a handover ends the session, it does not pretend resources were returned.
+            if (sessionRepository != null && requestDevice.isPresent()) {
+                sessionRepository.findOpenByDevice(requestDevice.get().getId())
+                        .filter(open -> HandoverRules.shouldClose(open.getGuardId(), guard.getId()))
+                        .ifPresent(open -> {
+                            open.forceClose(guard.getId(), HandoverRules.REASON);
+                            sessionRepository.save(open);
+                            log.warn("[Security] Shared device handover closed session={} of guard={} (next guard={})",
+                                    open.getId(), open.getGuardId(), guard.getId());
+                        });
+            }
         }
 
         // 6. PIN change required?
@@ -286,8 +303,17 @@ public class GuardAuthService {
 
         guard.setPinHash(pinHash, pinExpiresAt);
 
-        if (req.faceEmbeddingBase64() != null) {
-            guard.setFaceEmbedding(req.faceEmbeddingBase64());
+        // A face template is kept only with the guard's recorded consent, and only if it looks like a template.
+        var faceDecision = FaceDataRules.decide(req.faceEmbeddingBase64(), req.faceConsent());
+        if (faceDecision == FaceDataRules.Decision.REJECT_INVALID) {
+            throw new HandyFlowException("The face data is not a valid template",
+                    HttpStatus.BAD_REQUEST, "INVALID_FACE_DATA");
+        }
+        boolean faceStored = faceDecision == FaceDataRules.Decision.STORE;
+        if (faceStored) {
+            guard.storeFaceEmbedding(req.faceEmbeddingBase64().trim(), Instant.now());
+        } else if (faceDecision == FaceDataRules.Decision.SKIP_NO_CONSENT) {
+            log.warn("[Security] Face data sent for guard={} without consent: not stored", guardId);
         }
 
         String previousDeviceId = guard.getRegisteredDeviceId();
@@ -357,7 +383,7 @@ public class GuardAuthService {
 
         return new GuardEnrollResponse(
                 guardId, guard.getFullName(),
-                req.faceEmbeddingBase64() != null,
+                faceStored,
                 req.deviceHardwareId() != null,
                 pinExpiresAt,
                 temporaryPin);

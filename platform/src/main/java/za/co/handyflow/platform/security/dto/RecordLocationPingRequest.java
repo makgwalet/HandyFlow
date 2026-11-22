@@ -14,5 +14,11 @@ import java.math.BigDecimal;
 public record RecordLocationPingRequest(
         @NotNull BigDecimal latitude,
         @NotNull BigDecimal longitude,
-        BigDecimal accuracyMetres
-) {}
+        BigDecimal accuracyMetres,
+        Integer batteryPct,      // optional: lets the phone report its battery with each ping
+        String appVersion        // optional
+) {
+    public RecordLocationPingRequest(BigDecimal latitude, BigDecimal longitude, BigDecimal accuracyMetres) {
+        this(latitude, longitude, accuracyMetres, null, null);
+    }
+}

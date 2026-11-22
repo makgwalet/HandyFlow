@@ -70,6 +70,10 @@ public class ClientPortalService {
     private final JdbcTemplate   jdbc;
     private final EmailService emailService;
 
+    /** Company standing (optional so hand-built instances in tests keep working). */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private TenantAccessService tenantAccess;
+
     @Value("${app.frontend.base-url:}")
     private String frontendBaseUrl;
 
@@ -82,6 +86,13 @@ public class ClientPortalService {
         // Same answer as an unknown link, so an expired link reveals nothing.
         if (PortalRules.expired(site.getPortalExpiresAt(), java.time.Instant.now())) {
             throw new HandyFlowException("Portal not found or has been disabled",
+                    HttpStatus.NOT_FOUND, "PORTAL_NOT_FOUND");
+        }
+
+        // A company that is not in good standing does not serve its clients: same answer as a disabled portal.
+        if (tenantAccess != null && !TenantEntryRules.portalAllowed(tenantAccess.accessFor(site.getTenantId().getValue()))) {
+            throw new HandyFlowException(
+                    "Portal not found or has been disabled",
                     HttpStatus.NOT_FOUND, "PORTAL_NOT_FOUND");
         }
 

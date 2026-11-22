@@ -16,6 +16,8 @@ import { PageHeader } from "../../components/ui/PageHeader"
 import { GPS_LABEL, GPS_TONE, withPosition } from "./liveops.logic"
 import { CONTRACT_LABEL, CONTRACT_TONE, checkpointState, contractNote, formatAddress, hasPosition, unscannedCount, type SiteOverview } from "./site.logic"
 import { SEVERITY_TONE, STATUS_TONE, titleCase } from "./incident.logic"
+import OccurrenceBookCard from "./OccurrenceBookCard"
+import MonthlyPackCard from "./MonthlyPackCard"
 
 const card: React.CSSProperties = { background: "var(--hf-surface)", border: "1px solid var(--hf-border)", borderRadius: 12, padding: 16 }
 const h: React.CSSProperties = { fontSize: 11, color: "var(--hf-text-muted)", fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.4, marginBottom: 8 }
@@ -144,6 +146,9 @@ export default function SiteDetailPage() {
           })}
         </div>
       </div>
+
+      <OccurrenceBookCard siteId={site.id} />
+      <MonthlyPackCard siteId={site.id} />
     </div>
   )
 }

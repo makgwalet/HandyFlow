@@ -30,6 +30,8 @@ import Chip from "../../components/ui/Chip"
 import { DEFAULT_DIR_QUERY, directoryParams, nextSort, withFilter, pageInfo, complianceFlags, activityLabel, guardsCsv, bulkSummary, type DirQuery, type DirResult, type DirSort, type BulkResult } from "./guardDirectory.logic"
 import { usePermission } from "../../hooks/usePermission"
 import AppAccessResultPanel from "./AppAccessResultPanel"
+import RevealPii from "./RevealPii"
+import { editableValue } from "./piiRevealLogic"
 import { chunkIds, mergeBatches, pinValid, SMS_NOTE, type AccessBatch } from "./appAccessLogic"
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -203,7 +205,7 @@ function GuardFormFields({
           <label style={lbl}>SA ID Number</label>
           <input value={form.idNumber}
             onChange={e => { setForm(f => ({ ...f, idNumber: e.target.value.replace(/\D/g, "").slice(0, 13) })); setFieldErrors(f => omit(f, "idNumber")) }}
-            placeholder="8501015026088" inputMode="numeric" style={inpSt("idNumber")} />
+            placeholder={editing && editing.idNumber ? `${editing.idNumber} (leave blank to keep)` : "8501015026088"} inputMode="numeric" style={inpSt("idNumber")} />
           <FieldError fieldErrors={fieldErrors} name="idNumber" />
           {form.idNumber.length === 13 && (
             idFeedback.valid ? (
@@ -450,11 +452,11 @@ export default function GuardsTab() {
   const openEdit = (g: Guard) => {
     setEditing(g)
     setForm({ firstName: g.firstName, lastName: g.lastName,
-              psiraNumber: g.psiraNumber ?? "", idNumber: g.idNumber ?? "",
+              psiraNumber: g.psiraNumber ?? "", idNumber: editableValue(g.idNumber),
               phone: g.phone ?? "", grade: g.grade, notes: g.notes ?? "",
               psiraExpiryDate: g.psiraExpiryDate ?? "" })
     setCapturedPhoto(g.photoUrl && g.photoUrl !== "PENDING_UPLOAD" ? g.photoUrl : null)
-    setBankForm({ bankName: g.bankName ?? "", bankAccountNumber: g.bankAccountNumber ?? "", bankBranchCode: g.bankBranchCode ?? "" })
+    setBankForm({ bankName: g.bankName ?? "", bankAccountNumber: editableValue(g.bankAccountNumber), bankBranchCode: g.bankBranchCode ?? "" })
     setFieldErrors({}); setApiError("")
   }
 
@@ -846,7 +848,7 @@ export default function GuardsTab() {
             </div>
             <div style={{ display: "flex", gap: 8 }}>
               <input value={bankForm.bankAccountNumber} onChange={e => setBankForm(f => ({ ...f, bankAccountNumber: e.target.value }))}
-                placeholder="Account number" style={{ flex: 1, padding: "9px 12px", border: "1.5px solid var(--hf-border)", borderRadius: 8, fontSize: 13, outline: "none" }} />
+                placeholder={editing?.bankAccountNumber ? `${editing.bankAccountNumber} (leave blank to keep)` : "Account number"} style={{ flex: 1, padding: "9px 12px", border: "1.5px solid var(--hf-border)", borderRadius: 8, fontSize: 13, outline: "none" }} />
               <button
                 onClick={() => updateBankDetails.mutate({ id: editing.id, body: bankForm })}
                 disabled={updateBankDetails.isPending}
@@ -854,6 +856,11 @@ export default function GuardsTab() {
                 {updateBankDetails.isPending ? "Saving…" : "Save Bank Details"}
               </button>
             </div>
+            {editing.bankAccountNumber && (
+              <div style={{ marginTop: 8, fontSize: 12, color: "var(--hf-text-muted)" }}>
+                Current account: <RevealPii guardId={editing.id} field="BANK_ACCOUNT" masked={editing.bankAccountNumber} canReveal={acc.bankingManage} />
+              </div>
+            )}
           </div>
           )}
           {apiError && <ErrBanner msg={apiError} />}
@@ -882,7 +889,7 @@ export default function GuardsTab() {
             {[
               { label: "Employee Code", value: viewing.employeeCode || "—" },
               { label: "PSiRA Number", value: viewing.psiraNumber || "—" },
-              { label: "SA ID Number", value: viewing.idNumber || "—" },
+              { label: "SA ID Number", value: <RevealPii guardId={viewing.id} field="ID_NUMBER" masked={viewing.idNumber} canReveal={canManageAccess} /> },
               { label: "Phone",        value: viewing.phone || "—" },
               { label: "Active",       value: viewing.active ? "Yes" : "No" },
             ].map(f => (

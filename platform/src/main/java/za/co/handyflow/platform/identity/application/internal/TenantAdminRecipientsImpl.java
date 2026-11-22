@@ -1,4 +1,4 @@
-package za.co.handyflow.platform.identity.internal;
+package za.co.handyflow.platform.identity.application.internal;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -103,6 +103,35 @@ public class TenantAdminRecipientsImpl implements TenantAdminRecipients {
                     args.toArray());
         } catch (Exception e) {
             log.warn("Could not resolve named recipients for tenant={}: {}", tenantId.getValue(), e.getMessage());
+            return List.of();
+        }
+    }
+
+    @Override
+    @Transactional(propagation = Propagation.REQUIRES_NEW, readOnly = true)
+    public List<Recipient> resolveByPermission(TenantId tenantId, String permission, int limit) {
+        if (permission == null || permission.isBlank() || limit <= 0) return List.of();
+        try {
+            return jdbc.query("""
+                    SELECT u.id AS user_id, u.email, u.first_name, u.last_name, u.phone, MIN(u.created_at) AS created_at
+                    FROM users u
+                    JOIN user_roles ur ON ur.user_id = u.id
+                    JOIN roles r ON r.id = ur.role_id AND r.tenant_id = u.tenant_id
+                    JOIN role_permissions rp ON rp.role_id = r.id
+                    JOIN permissions p ON p.id = rp.permission_id
+                    WHERE u.tenant_id = ? AND u.status = 'ACTIVE' AND u.email IS NOT NULL AND p.name = ?
+                    GROUP BY u.id, u.email, u.first_name, u.last_name, u.phone
+                    ORDER BY MIN(u.created_at)
+                    LIMIT ?
+                    """,
+                    (rs, rowNum) -> Recipient.user(
+                            UUID.fromString(rs.getString("user_id")),
+                            trim(rs.getString("first_name")) + " " + trim(rs.getString("last_name")),
+                            rs.getString("email"),
+                            rs.getString("phone")),
+                    tenantId.getValue(), permission, limit);
+        } catch (Exception e) {
+            log.warn("Could not resolve recipients holding {} for tenant={}: {}", permission, tenantId.getValue(), e.getMessage());
             return List.of();
         }
     }

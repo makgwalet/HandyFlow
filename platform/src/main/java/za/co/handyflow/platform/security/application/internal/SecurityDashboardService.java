@@ -32,6 +32,13 @@ public class SecurityDashboardService {
 
     private final JdbcTemplate jdbc;
 
+    /** Optional, so the dashboard still works without the coverage feature. */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private CoverageService coverage;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private WeeklyHoursService weeklyHours;
+
     @Transactional(readOnly = true)
     public Dashboard dashboard(TenantId tenantId) { return dashboard(tenantId, Instant.now()); }
 
@@ -129,7 +136,8 @@ public class SecurityDashboardService {
                         rs.getTimestamp("created_at").toLocalDateTime().toInstant(ZoneOffset.UTC)), tenant, ROW_LIMIT);
 
         int openAlarms = n(alarmRow, "open");
-        var attention = DashboardAttention.build(openAlarms, n(alarmRow, "new_alarms"), shifts, workforce, incidents, complaints, gate);
+        int[] cov = coverageCounts(tenantId, now);
+        var attention = DashboardAttention.build(openAlarms, n(alarmRow, "new_alarms"), shifts, workforce, incidents, complaints, gate, cov[0], cov[1], hoursCounts(tenantId, now));
         return new Dashboard(now, sites == null ? 0 : sites, openAlarms, shifts, workforce, incidents, complaints, gate, attention, active, openRows);
     }
 
@@ -148,4 +156,18 @@ public class SecurityDashboardService {
 
     /** Gate times are stored with a zone, so the bound is the instant itself. */
     private static Timestamp dayStartTz(LocalDate today) { return Timestamp.from(today.atStartOfDay(SAST).toInstant()); }
+
+    /** Coverage never breaks the dashboard: if it cannot be worked out, it simply adds nothing. */
+    private int[] coverageCounts(TenantId tenantId, Instant now) {
+        if (coverage == null) return new int[]{0, 0};
+        try { return coverage.attentionCounts(tenantId, now); }
+        catch (RuntimeException e) { return new int[]{0, 0}; }
+    }
+
+    /** Weekly hours never break the dashboard either. */
+    private HoursAttention.Counts hoursCounts(TenantId tenantId, Instant now) {
+        if (weeklyHours == null) return HoursAttention.Counts.NONE;
+        try { return weeklyHours.attentionCounts(tenantId, now); }
+        catch (RuntimeException e) { return HoursAttention.Counts.NONE; }
+    }
 }

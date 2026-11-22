@@ -23,7 +23,7 @@ public final class ApiKeyAccess {
     /** Shown to the person creating a key and returned to a key that cannot be used. */
     public static final String BRANCH_UNSUPPORTED = "Branch-limited API keys are not supported yet (the security endpoints do not filter by branch). Create the key without a branch.";
 
-    private static final Pattern GUARD_CREDENTIALS = Pattern.compile("^/api/v1/security/guards/[^/]+/(enrol|initiate-device-replacement|revoke-tokens)(/.*)?$");
+    private static final Pattern GUARD_CREDENTIALS = Pattern.compile("^/api/v1/security/guards/[^/]+/(enrol|initiate-device-replacement|revoke-tokens|reveal|face)(/.*)?$");
     private static final List<String> BLOCKED_PREFIXES = List.of(SECURITY_ROOT + "public-api", SECURITY_ROOT + "payroll");
 
     private ApiKeyAccess() {}

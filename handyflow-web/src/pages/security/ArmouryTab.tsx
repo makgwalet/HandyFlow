@@ -11,7 +11,7 @@ import { apiClient } from "../../api/client"
 import { getAllGuards } from "./fetchAllPages"
 import { useSecurityAccess } from "./useSecurityAccess"
 import { Crosshair, Plus, ArrowRight, ArrowLeft, AlertTriangle, FileText, ShieldAlert } from "lucide-react"
-import { ammoReturnProblem, ammoText, parseRounds, sapsLine } from "./armouryLogic"
+import { ammoReturnProblem, ammoText, FIREARM_TYPES, parseRounds, registerProblem, sapsLine } from "./armouryLogic"
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -137,7 +137,6 @@ export default function ArmouryTab() {
       {apiError && <p style={{ color: "var(--hf-danger-text)", fontSize: 12, marginBottom: 12 }}>{apiError}</p>}
       {[
         { key: "firearmSerial",    label: "Serial Number *" },
-        { key: "firearmType",      label: "Firearm Type *" },
         { key: "makeModel",        label: "Make & Model" },
         { key: "sapsLicenseNumber",label: "SAPS License Number *" },
       ].map(f => (
@@ -148,13 +147,20 @@ export default function ArmouryTab() {
         </div>
       ))}
       <div style={{ marginBottom: 14 }}>
+        <label htmlFor="firearm-type" style={{ display: "block", fontSize: 11, fontWeight: 600, color: "var(--hf-text-secondary)", marginBottom: 4 }}>Firearm Type *</label>
+        <select id="firearm-type" value={form.firearmType} onChange={e => setForm(p => ({ ...p, firearmType: e.target.value }))} style={inputStyle}>
+          <option value="">Select a type</option>
+          {FIREARM_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+        </select>
+      </div>
+      <div style={{ marginBottom: 14 }}>
         <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: "var(--hf-text-secondary)", marginBottom: 4 }}>License Expiry *</label>
         <input type="date" value={form.licenseExpiry} onChange={e => setForm(p => ({ ...p, licenseExpiry: e.target.value }))}
           style={inputStyle} />
       </div>
       <div style={{ display: "flex", gap: 10, marginTop: 20 }}>
         <button onClick={() => setView("list")} style={secondaryBtn}>Cancel</button>
-        <button onClick={() => register.mutate(form)} style={primaryBtn}>Register</button>
+        <button onClick={() => { const p = registerProblem(form); if (p) { setApiError(p); return } setApiError(""); register.mutate(form) }} style={primaryBtn}>Register</button>
       </div>
     </div>
   )

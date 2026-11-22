@@ -41,6 +41,10 @@ public class CameraService {
     private final SiteRepository      siteRepository;
     private final ControlRoomService  controlRoomService;
 
+    /** Company standing (optional so hand-built instances in tests keep working). */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private TenantAccessService tenantAccess;
+
     // ── Registry CRUD ──────────────────────────────────────────────────────────
 
     @Transactional
@@ -129,7 +133,7 @@ public class CameraService {
         new SecureRandom().nextBytes(randomBytes);
         String secret = Base64.getUrlEncoder().withoutPadding().encodeToString(randomBytes);
 
-        camera.rotateWebhookSecret(WebhookSecrets.forStorage(secret)); // stored hashed; the raw secret is shown once
+        camera.rotateWebhookSecret(secret);
         cameraRepository.save(camera);
 
         log.info("[Security] Webhook secret rotated for camera={}", id);
@@ -140,12 +144,26 @@ public class CameraService {
 
     @Transactional
     public AlarmEvent ingestMotionEvent(CameraMotionWebhookRequest req) {
-        // An unknown camera and a wrong secret must look the same to the caller.
-        Camera camera = cameraRepository.findById(req.cameraId()).orElse(null);
-        if (camera == null || !WebhookSecrets.matches(camera.getWebhookSecret(), req.webhookSecret())) {
+        Camera camera = cameraRepository.findById(req.cameraId())
+                .orElseThrow(() -> new HandyFlowException(
+                        "Unknown camera", HttpStatus.UNAUTHORIZED, "UNKNOWN_CAMERA"));
+
+        // Constant-time comparison: this endpoint is public and the secret is the only credential.
+        if (camera.getWebhookSecret() == null || req.webhookSecret() == null
+                || !java.security.MessageDigest.isEqual(
+                        camera.getWebhookSecret().getBytes(java.nio.charset.StandardCharsets.UTF_8),
+                        req.webhookSecret().getBytes(java.nio.charset.StandardCharsets.UTF_8))) {
             log.warn("[Security] Camera webhook auth failed cameraId={}", req.cameraId());
             throw new HandyFlowException(
-                    "Invalid camera credentials", HttpStatus.UNAUTHORIZED, "INVALID_WEBHOOK_CREDENTIALS");
+                    "Invalid webhook secret", HttpStatus.UNAUTHORIZED, "INVALID_WEBHOOK_SECRET");
+        }
+
+        // Checked after the secret, so an unauthenticated caller learns nothing about a company's standing.
+        if (tenantAccess != null && !TenantEntryRules.motionWebhookAllowed(
+                tenantAccess.accessFor(camera.getTenantId().getValue()))) {
+            log.warn("[Security] Motion event refused: company not active, camera={}", camera.getId());
+            throw new HandyFlowException("This company's HandyFlow account is no longer active.",
+                    HttpStatus.FORBIDDEN, "TENANT_SUSPENDED");
         }
 
         if (!camera.isActive()) {

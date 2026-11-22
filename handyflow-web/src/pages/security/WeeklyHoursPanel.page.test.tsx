@@ -1,0 +1,88 @@
+import { afterEach, beforeEach, describe, it, expect, vi } from "vitest"
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react"
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
+
+const api = vi.hoisted(() => ({ get: vi.fn() }))
+vi.mock("../../api/client", () => ({ apiClient: api }))
+
+import WeeklyHoursPanel from "./WeeklyHoursPanel"
+
+const T = { warnAt: 40, limit: 45, ceiling: 55, minRestHours: 12 }
+const report = (rows: unknown[], o: Record<string, unknown> = {}) => ({ data: { data: { weekStart: "2026-11-16", guardsRostered: 12, flagged: rows.length, thresholds: T, truncated: false, rows, ...o } } })
+const row = (o: Record<string, unknown> = {}) => ({ guardId: "g1", guardName: "Thabo Mokoena", hours: 48, state: "OVER", shifts: 4, overlaps: false, restBreaches: [], ...o })
+function show() {
+  const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  return render(<QueryClientProvider client={qc}><WeeklyHoursPanel /></QueryClientProvider>)
+}
+
+describe("WeeklyHoursPanel", () => {
+  beforeEach(() => { api.get.mockReset() })
+  afterEach(() => cleanup())
+
+  it("lists flagged guards with hours, status and problems", async () => {
+    api.get.mockResolvedValue(report([row({ overlaps: true, restBreaches: [{ from: "2026-11-16T16:00:00Z", to: "2026-11-16T20:00:00Z", hours: 4 }] })]))
+    show()
+    expect(await screen.findByText("Thabo Mokoena")).toBeTruthy()
+    expect(screen.getByText("48 h")).toBeTruthy()
+    expect(screen.getByText("Over 45 h")).toBeTruthy()
+    expect(screen.getByText("Double booked: two shifts overlap")).toBeTruthy()
+    expect(screen.getByText(/Only 4 h rest/)).toBeTruthy()
+    expect(screen.getByText("1 of 12 rostered guards needs attention.")).toBeTruthy()
+    expect(api.get.mock.calls[0][0]).toBe("/api/v1/security/workforce/weekly-hours")
+    expect(api.get.mock.calls[0][1].params.flaggedOnly).toBe(true)
+  })
+
+  it("says nobody needs attention when nobody is flagged", async () => {
+    api.get.mockResolvedValue(report([], { flagged: 0 }))
+    show()
+    expect(await screen.findByText("None of the 12 rostered guards needs attention.")).toBeTruthy()
+    expect(screen.queryByRole("table")).toBeNull()
+  })
+
+  it("shows an error, not a clean result, when loading fails", async () => {
+    api.get.mockImplementation(() => Promise.reject(new Error("x")))
+    show()
+    await waitFor(() => expect(screen.getByRole("alert")).toBeTruthy())
+    expect(screen.queryByText(/needs attention|need attention/)).toBeNull()
+  })
+
+  it("treats a malformed answer as an error", async () => {
+    api.get.mockResolvedValue({ data: { data: { weekStart: "x" } } })
+    show()
+    await waitFor(() => expect(screen.getByRole("alert")).toBeTruthy())
+  })
+
+  it("going back a week asks for the earlier Monday; next is off on this week", async () => {
+    api.get.mockResolvedValue(report([]))
+    show()
+    await screen.findByText(/None of the 12/)
+    expect((screen.getByLabelText("Next week") as HTMLButtonElement).disabled).toBe(true)
+    const first = api.get.mock.calls[0][1].params.week as string
+    fireEvent.click(screen.getByLabelText("Previous week"))
+    await waitFor(() => expect(api.get.mock.calls.length).toBe(2))
+    const second = api.get.mock.calls[1][1].params.week as string
+    expect(new Date(first).getTime() - new Date(second).getTime()).toBe(7 * 86400000)
+    expect(new Date(first).getUTCDay()).toBe(1) // a Monday
+    expect((screen.getByLabelText("Next week") as HTMLButtonElement).disabled).toBe(false)
+  })
+
+  it("'show all' asks for every rostered guard", async () => {
+    api.get.mockResolvedValue(report([]))
+    show()
+    await screen.findByText(/None of the 12/)
+    fireEvent.click(screen.getByLabelText("Show all rostered guards"))
+    await waitFor(() => expect(api.get.mock.calls.at(-1)![1].params.flaggedOnly).toBe(false))
+  })
+
+  it("states the limits in use, from the server", async () => {
+    api.get.mockResolvedValue(report([], { thresholds: { warnAt: 44, limit: 48, ceiling: 58, minRestHours: 10 } }))
+    show()
+    expect(await screen.findByText(/48 h ordinary limit, 58 h ceiling, 10 h rest/)).toBeTruthy()
+  })
+
+  it("names a guard the server could not name", async () => {
+    api.get.mockResolvedValue(report([row({ guardName: null })]))
+    show()
+    expect(await screen.findByText("Unknown guard")).toBeTruthy()
+  })
+})

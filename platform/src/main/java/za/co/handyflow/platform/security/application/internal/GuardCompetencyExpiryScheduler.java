@@ -69,7 +69,7 @@ public class GuardCompetencyExpiryScheduler {
         List<GuardCompetency> due = competencyRepository.findExpiringBetween(tenantId, today, today.plusDays(WARN_DAYS_BEFORE));
         if (due.isEmpty()) return;
 
-        List<Recipient> admins = tenantAdminRecipients.resolveTenantAdmins(tenantId);
+        List<Recipient> admins = SecurityRecipients.forAlerts(tenantAdminRecipients, tenantId);
         if (admins.isEmpty()) {
             log.warn("[Security] {} competencies expiring for tenant={} but no admin recipients could be resolved", due.size(), tenantId.getValue());
             return;

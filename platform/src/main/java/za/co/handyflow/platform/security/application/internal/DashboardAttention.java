@@ -17,6 +17,20 @@ public final class DashboardAttention {
 
     public static List<AttentionItem> build(int openAlarms, int newAlarms, Shifts shifts, Workforce workforce,
                                             Incidents incidents, Complaints complaints, Gate gate) {
+        return build(openAlarms, newAlarms, shifts, workforce, incidents, complaints, gate, 0, 0);
+    }
+
+    public static List<AttentionItem> build(int openAlarms, int newAlarms, Shifts shifts, Workforce workforce,
+                                            Incidents incidents, Complaints complaints, Gate gate,
+                                            int postsUncovered, int postsShort) {
+        return build(openAlarms, newAlarms, shifts, workforce, incidents, complaints, gate, postsUncovered, postsShort, HoursAttention.Counts.NONE);
+    }
+
+    /** As above, plus today's posts with no one rostered and posts short of guards (from the coverage board). */
+    /** As above, plus guards past their weekly hours or short of rest on this week's roster. */
+    public static List<AttentionItem> build(int openAlarms, int newAlarms, Shifts shifts, Workforce workforce,
+                                            Incidents incidents, Complaints complaints, Gate gate,
+                                            int postsUncovered, int postsShort, HoursAttention.Counts hours) {
         List<AttentionItem> out = new ArrayList<>();
         add(out, "CRITICAL_INCIDENTS", "DANGER", plural(incidents.criticalOpen(), "critical incident") + " open",
                 "Not yet resolved. Open the incident to act on it.", incidents.criticalOpen(), "incidents");
@@ -26,6 +40,16 @@ public final class DashboardAttention {
                 "An expired registration means the guard may not work.", workforce.psiraExpired(), "guards");
         add(out, "URGENT_COMPLAINTS", "DANGER", plural(complaints.urgent(), "urgent complaint") + " open",
                 "Critical, or in an urgent category such as theft or excessive force.", complaints.urgent(), "complaints");
+        add(out, "COVERAGE_NONE", "DANGER", plural(postsUncovered, "post") + " with no one rostered today",
+                "A post that must be staffed has no guard on the roster. Open Coverage to see which.", postsUncovered, "coverage");
+        add(out, "COVERAGE_SHORT", "WARNING", plural(postsShort, "post") + " short of guards today",
+                "Fewer guards are rostered than the post needs, for part of the day.", postsShort, "coverage");
+        add(out, "HOURS_EXCEEDS", "DANGER", plural(hours.exceeds(), "guard") + " rostered past the weekly ceiling",
+                "More hours than the weekly ceiling allows. Open Coverage, weekly hours, to see who.", hours.exceeds(), "coverage");
+        add(out, "HOURS_OVER", "WARNING", plural(hours.over(), "guard") + " rostered past the ordinary weekly limit",
+                "Overtime. Check it is agreed and paid.", hours.over(), "coverage");
+        add(out, "REST_BREACH", "WARNING", plural(hours.rest(), "guard") + " double-booked or short of rest between shifts",
+                "Overlapping shifts, or less rest than required between two shifts.", hours.rest(), "coverage");
         add(out, "NOT_STARTED", "WARNING", plural(shifts.notStarted(), "shift") + " past the start time with no clock-in",
                 "More than " + ShiftPunctuality.GRACE_MINUTES + " minutes after the scheduled start.", shifts.notStarted(), "shifts");
         add(out, "MISSED", "WARNING", plural(shifts.missedToday(), "shift") + " missed today", "Marked as missed.", shifts.missedToday(), "shifts");

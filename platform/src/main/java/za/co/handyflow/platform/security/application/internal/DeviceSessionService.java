@@ -50,6 +50,10 @@ public class DeviceSessionService {
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     private GuardPushService push;
 
+    /** Optional so hand-built instances in tests keep working. Remembers phone-generated ids of check-outs. */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private GuardClientLedger ledger;
+
     // ── Session Open ───────────────────────────────────────────────────────────
 
     /**
@@ -74,6 +78,17 @@ public class DeviceSessionService {
     @Transactional
     public DeviceSessionResponse openGuardSession(TenantId tenantId, UUID authenticatedGuardId,
                                                   GuardOpenSessionRequest req) {
+        // A repeated clock-in (the answer never reached the phone) gets the session it already opened.
+        var existing = deviceRepository.findByTenantIdAndDeviceHardwareId(tenantId, req.deviceHardwareId());
+        if (existing.isPresent()) {
+            var open = sessionRepository.findOpenByDevice(existing.get().getId());
+            if (open.isPresent() && SessionRetryRules.isOpenReplay(open.get().getGuardId(), authenticatedGuardId)) {
+                DeviceSession s = open.get();
+                Guard g = guardRepository.findById(s.getGuardId()).orElse(null);
+                var shift = s.getShiftId() != null ? shiftRepository.findById(s.getShiftId()).orElse(null) : null;
+                return toResponse(s, g, existing.get(), shift);
+            }
+        }
         return doOpen(tenantId, req.deviceHardwareId(), authenticatedGuardId, true, null,
                 (device, shift) -> evaluateGeofence(tenantId, device, shift, req));
     }
@@ -211,6 +226,13 @@ public class DeviceSessionService {
     public DeviceSessionResponse closeGuardSession(TenantId tenantId, UUID authenticatedGuardId,
                                                    UUID sessionId, CloseSessionRequest req) {
         assertSessionOwnedBy(tenantId, sessionId, authenticatedGuardId);
+        // A repeated clock-out gets the session as it was closed, not an error.
+        DeviceSession existing = sessionRepository.findById(sessionId).orElse(null);
+        if (existing != null && SessionRetryRules.isCloseReplay(existing.isClosed())) {
+            Guard g = guardRepository.findById(existing.getGuardId()).orElse(null);
+            SecurityDevice d = deviceRepository.findById(existing.getDeviceId()).orElse(null);
+            return toResponse(existing, g, d, null);
+        }
         return doClose(tenantId, sessionId, new CloseSessionRequest(
                 true, null, req.handoverNotes(), req.resourcesReturned(), req.incompletePatrolReason()), true);
     }
@@ -346,10 +368,27 @@ public class DeviceSessionService {
         if (req.resourceRef().length() > 100) {
             throw new HandyFlowException("The item name is too long (100 characters at most).", HttpStatus.BAD_REQUEST, "VALIDATION_ERROR");
         }
+        // A repeated check-out (same clientRef) returns the first one instead of signing the item out again.
+        if (req.clientRef() != null && ledger != null) {
+            var first = ledger.find(tenantId, GuardClientLedger.Kind.CHECKOUT, req.clientRef(), session.getGuardId());
+            if (first.isPresent()) {
+                return custodyRepository.findById(first.get())
+                        .orElseThrow(() -> new ResourceNotFoundException("ResourceCustody", first.get().toString()));
+            }
+        }
         ResourceCustody custody = ResourceCustody.checkout(
                 tenantId, sessionId, session.getGuardId(), session.getShiftId(), type,
                 req.resourceRef().trim(), req.witnessedBy(), req.notes());
-        return custodyRepository.save(custody);
+        ResourceCustody saved = custodyRepository.save(custody);
+        if (req.clientRef() != null && ledger != null) {
+            try {
+                ledger.record(tenantId, session.getGuardId(), GuardClientLedger.Kind.CHECKOUT, req.clientRef(), saved.getId());
+            } catch (org.springframework.dao.DataIntegrityViolationException raced) {
+                throw new HandyFlowException("That request is already being processed. Try again in a moment.",
+                        HttpStatus.CONFLICT, "REQUEST_IN_PROGRESS");
+            }
+        }
+        return saved;
     }
 
     @Transactional
@@ -366,7 +405,12 @@ public class DeviceSessionService {
         } catch (IllegalArgumentException e) {
             throw new HandyFlowException("Condition must be GOOD, DAMAGED or MISSING.", HttpStatus.BAD_REQUEST, "INVALID_CONDITION");
         }
-        if (!custody.isCheckedOut()) {
+        var outcome = SessionRetryRules.returnOutcome(custody.isCheckedOut(),
+                custody.getConditionOnReturn() == null ? null : custody.getConditionOnReturn().name(), condition.name());
+        if (outcome == SessionRetryRules.ReturnOutcome.REPLAY) {
+            return custody;   // the same return, sent again
+        }
+        if (outcome == SessionRetryRules.ReturnOutcome.CONFLICT) {
             throw new HandyFlowException("This item has already been returned.", HttpStatus.CONFLICT, "ALREADY_RETURNED");
         }
         custody.returnResource(condition, req.notes());

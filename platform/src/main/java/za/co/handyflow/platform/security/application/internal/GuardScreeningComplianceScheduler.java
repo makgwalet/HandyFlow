@@ -98,7 +98,7 @@ public class GuardScreeningComplianceScheduler {
         List<GuardScreeningRecord> dueSoon = screeningRepository.findDueSoon(tenantId, warnDate);
         if (dueSoon.isEmpty()) return;
 
-        List<Recipient> admins = tenantAdminRecipients.resolveTenantAdmins(tenantId);
+        List<Recipient> admins = SecurityRecipients.forAlerts(tenantAdminRecipients, tenantId);
         if (admins.isEmpty()) {
             log.warn("[Security] {} screening(s) due soon for tenant={} but no admin recipients "
                             + "could be resolved",

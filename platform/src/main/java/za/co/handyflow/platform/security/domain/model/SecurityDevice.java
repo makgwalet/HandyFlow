@@ -81,6 +81,16 @@ public class SecurityDevice {
     @Column(name = "battery_pct")
     private Integer batteryPct;
 
+    @Column(name = "app_version", length = 30)
+    private String appVersion;
+
+    /** Fleet problems already alerted for this phone (comma separated codes) and when. See FleetAlertRules. */
+    @Column(name = "fleet_alerted_issues", length = 100)
+    private String fleetAlertedIssues;
+
+    @Column(name = "fleet_alerted_at")
+    private Instant fleetAlertedAt;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
@@ -131,6 +141,19 @@ public class SecurityDevice {
     }
 
     // ── Mutations ──────────────────────────────────────────────────────────────
+
+    /** A check-in from the phone: when it was heard from, and (when sent) its battery and app version. Never blanks a known value. */
+    public void reportHeartbeat(Instant now, Integer batteryPct, String appVersion) {
+        this.lastSeenAt = now;
+        if (batteryPct != null) this.batteryPct = batteryPct;
+        if (appVersion != null && !appVersion.isBlank()) this.appVersion = appVersion;
+        this.updatedAt = now;
+    }
+
+    public void markFleetAlerted(String issues, Instant at) {
+        this.fleetAlertedIssues = issues;
+        this.fleetAlertedAt = at;
+    }
 
     public void heartbeat(Integer batteryPct) {
         this.lastSeenAt = Instant.now();

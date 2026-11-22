@@ -28,7 +28,7 @@ public class GuardComplaintAlerts {
 
     public void urgentComplaint(TenantId tenantId, GuardComplaint c, String guardName) {
         try {
-            List<Recipient> admins = tenantAdminRecipients.resolveTenantAdmins(tenantId);
+            List<Recipient> admins = SecurityRecipients.forAlerts(tenantAdminRecipients, tenantId);
             if (admins.isEmpty()) {
                 log.warn("[Security] Urgent complaint {} logged but no admin recipients could be resolved", c.getComplaintNumber());
                 return;

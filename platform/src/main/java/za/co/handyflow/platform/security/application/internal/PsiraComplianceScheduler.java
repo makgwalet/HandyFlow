@@ -115,7 +115,7 @@ public class PsiraComplianceScheduler {
             return 0;
         }
 
-        List<Recipient> admins = tenantAdminRecipients.resolveTenantAdmins(tenantId);
+        List<Recipient> admins = SecurityRecipients.forAlerts(tenantAdminRecipients, tenantId);
         if (admins.isEmpty()) {
             log.warn("[Security] PSiRA compliance issues found for tenant={} but no admin recipients "
                             + "could be resolved. Expired: {} Expiring soon: {}",

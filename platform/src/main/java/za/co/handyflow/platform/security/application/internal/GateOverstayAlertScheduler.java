@@ -100,7 +100,7 @@ public class GateOverstayAlertScheduler {
         overdue.forEach(GateRegisterEntry::markOverstayed);
         entryRepository.saveAll(overdue);
 
-        List<Recipient> admins = tenantAdminRecipients.resolveTenantAdmins(tenantId);
+        List<Recipient> admins = SecurityRecipients.forAlerts(tenantAdminRecipients, tenantId);
         if (admins.isEmpty()) {
             log.info("[Security] {} gate entry(ies) overstayed for tenant={} but no admin recipients resolved",
                     overdue.size(), tenantId.getValue());

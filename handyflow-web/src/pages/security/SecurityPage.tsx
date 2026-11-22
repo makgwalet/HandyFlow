@@ -17,6 +17,7 @@ import SchedulerTab       from "./SchedulerTab"
 import PatrolsTab         from "./PatrolsTab"
 import CheckpointsTab     from "./CheckpointsTab"
 import GateDashboardTab   from "./GateDashboardTab"
+import CoverageTab        from "./CoverageTab"
 import IncidentsTab       from "./IncidentsTab"
 import LiveMapTab         from "./LiveMapTab"
 import ArmouryTab         from "./ArmouryTab"
@@ -59,6 +60,7 @@ export function SecurityPage() {
     "live":              <LiveMapTab />,
     "shifts":            <ShiftsTab />,
     "scheduler":         <SchedulerTab />,
+    "coverage":          <CoverageTab />,
     "patrols":           <PatrolsTab />,
     "checkpoints":       <CheckpointsTab />,
     "gate-dashboard":    <GateDashboardTab />,

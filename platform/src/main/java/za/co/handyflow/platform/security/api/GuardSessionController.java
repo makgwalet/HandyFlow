@@ -12,7 +12,6 @@ import org.springframework.web.bind.annotation.*;
 import za.co.handyflow.platform.security.application.internal.DeviceSessionService;
 import za.co.handyflow.platform.security.application.internal.GuardLocationService;
 import za.co.handyflow.platform.security.domain.model.DeviceSession;
-import za.co.handyflow.platform.security.domain.model.ResourceCustody;
 import za.co.handyflow.platform.security.dto.*;
 import za.co.handyflow.platform.shared.ApiResponse;
 import za.co.handyflow.platform.shared.TenantContext;
@@ -59,6 +58,7 @@ public class GuardSessionController {
 
     private final DeviceSessionService sessionService;
     private final GuardLocationService guardLocationService;
+    private final za.co.handyflow.platform.security.application.internal.DeviceHeartbeatService heartbeat;
 
     @PostMapping("/open")
     @Operation(
@@ -117,6 +117,7 @@ public class GuardSessionController {
         TenantId tenantId = TenantContext.getTenantIdAsObject();
         sessionService.assertSessionOwnedBy(tenantId, sessionId, TenantContext.getCurrentUserId());
         guardLocationService.recordPing(tenantId, sessionId, req);
+        heartbeat.reportForSession(tenantId, TenantContext.getCurrentUserId(), sessionId, req.batteryPct(), req.appVersion());
         return ResponseEntity.ok(ApiResponse.success(null));
     }
 

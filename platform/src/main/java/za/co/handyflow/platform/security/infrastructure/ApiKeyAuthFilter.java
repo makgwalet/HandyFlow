@@ -82,6 +82,10 @@ public class ApiKeyAuthFilter extends OncePerRequestFilter {
     private final PublicApiService publicApiService;
     private final ObjectMapper     objectMapper;
 
+    /** Company standing (optional so hand-built instances in tests keep working). */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private za.co.handyflow.platform.security.application.internal.TenantAccessService tenantAccess;
+
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
         String authHeader = request.getHeader("Authorization");
@@ -117,6 +121,16 @@ public class ApiKeyAuthFilter extends OncePerRequestFilter {
             if (apiKey.getBranchId() != null) {
                 log.warn("[ApiKeyAuthFilter] Key '{}' is limited to a branch, which is not enforced yet: refused", apiKey.getName());
                 sendError(response, HttpServletResponse.SC_FORBIDDEN, ApiKeyAccess.BRANCH_UNSUPPORTED);
+                return;
+            }
+
+            // Company standing: suspended = read-only, cancelled = refused.
+            if (tenantAccess != null && !za.co.handyflow.platform.security.application.internal.TenantEntryRules.apiKeyAllowed(
+                    tenantAccess.accessFor(apiKey.getTenantId().getValue()), request.getMethod())) {
+                log.info("[ApiKeyAuthFilter] Key '{}' refused: company not in good standing ({} {})",
+                        apiKey.getName(), request.getMethod(), request.getRequestURI());
+                sendError(response, HttpServletResponse.SC_FORBIDDEN,
+                        "This company's HandyFlow account is not active. API keys are read-only or disabled until it is restored.");
                 return;
             }
 

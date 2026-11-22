@@ -34,4 +34,11 @@ public interface GuardCompetencyRepository extends JpaRepository<GuardCompetency
         ORDER BY c.expiryDate
         """)
     List<GuardCompetency> findExpiringBetween(TenantId tenantId, java.time.LocalDate from, java.time.LocalDate to);
+
+    /** Every in-force competency of one type across the tenant, for the strict-mode readiness report. */
+    @Query("""
+        SELECT c FROM GuardCompetency c
+        WHERE c.tenantId = :tenantId AND c.type = :type AND c.deletedAt IS NULL
+        """)
+    List<GuardCompetency> findByTypeForTenant(TenantId tenantId, GuardCompetency.Type type);
 }

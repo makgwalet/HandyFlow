@@ -56,4 +56,13 @@ public interface TenantAdminRecipients {
     default List<Recipient> resolveUsers(TenantId tenantId, java.util.Collection<UUID> userIds) {
         return List.of();
     }
+
+    /**
+     * Active users of this tenant (with an email) whose role holds the named permission, oldest account first, at most
+     * {@code limit}. Default is empty so existing implementations are unaffected; callers fall back to
+     * {@link #resolveTenantAdmins(TenantId)} when this is empty.
+     */
+    default List<Recipient> resolveByPermission(TenantId tenantId, String permission, int limit) {
+        return List.of();
+    }
 }

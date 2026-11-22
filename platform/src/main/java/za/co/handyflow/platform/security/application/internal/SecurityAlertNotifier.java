@@ -94,7 +94,7 @@ class SecurityAlertNotifier {
     }
 
     private void send(TenantId tenantId, String entityId, NotificationType type, AlarmAlertText.Text t) {
-        List<Recipient> to = recipients.resolveTenantAdmins(tenantId);
+        List<Recipient> to = SecurityRecipients.forAlerts(recipients, tenantId);
         if (to.isEmpty()) {
             log.warn("[Security] No recipients to alert for entity={} tenant={}", entityId, tenantId.getValue());
             return;

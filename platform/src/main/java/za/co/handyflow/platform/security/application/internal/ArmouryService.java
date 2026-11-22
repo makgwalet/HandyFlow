@@ -113,8 +113,14 @@ public class ArmouryService {
                     "A firearm with serial " + req.firearmSerial() + " is already registered",
                     HttpStatus.CONFLICT, "DUPLICATE_SERIAL");
         }
+        String firearmType = FirearmTypes.normalize(req.firearmType());
+        if (firearmType == null) {
+            throw new HandyFlowException(
+                    "Firearm type must be one of: " + String.join(", ", FirearmTypes.ALLOWED) + ".",
+                    HttpStatus.BAD_REQUEST, "INVALID_FIREARM_TYPE");
+        }
         Armoury firearm = Armoury.register(
-                tenantId, req.firearmSerial(), req.firearmType(), req.makeModel(),
+                tenantId, req.firearmSerial(), firearmType, req.makeModel(),
                 req.sapsLicenseNumber(), req.licenseIssuedAt(), req.licenseExpiry(),
                 req.notes());
         armouryRepository.save(firearm);

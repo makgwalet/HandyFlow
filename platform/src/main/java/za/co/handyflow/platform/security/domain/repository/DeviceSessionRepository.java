@@ -9,6 +9,7 @@ import org.springframework.data.jpa.repository.Query;
 import za.co.handyflow.platform.security.domain.model.DeviceSession;
 import za.co.handyflow.platform.shared.TenantId;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -49,4 +50,12 @@ public interface DeviceSessionRepository extends JpaRepository<DeviceSession, UU
         ORDER BY s.startedAt DESC
         """)
     Page<DeviceSession> findByTenant(TenantId tenantId, Pageable pageable);
+
+    /** Every session still open in the tenant (who is on shift right now). */
+    @Query("""
+        SELECT s FROM DeviceSession s
+        WHERE s.tenantId = :tenantId
+        AND s.endedAt IS NULL
+        """)
+    List<DeviceSession> findOpenByTenant(TenantId tenantId);
 }

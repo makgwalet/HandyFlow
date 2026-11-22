@@ -5,6 +5,7 @@ package za.co.handyflow.platform.security.domain.repository;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import za.co.handyflow.platform.security.domain.model.Guard;
 import za.co.handyflow.platform.shared.TenantId;
@@ -14,6 +15,16 @@ import java.util.Optional;
 import java.util.UUID;
 
 public interface GuardRepository extends JpaRepository<Guard, UUID> {
+
+    /** Deletes the face template of every guard who has left (terminated or removed). Returns how many were cleared. */
+    @Modifying
+    @Query(value = """
+        UPDATE security_guards
+           SET face_embedding = NULL, face_consent_at = NULL, updated_at = now()
+         WHERE face_embedding IS NOT NULL
+           AND (deleted_at IS NOT NULL OR status = 'TERMINATED')
+        """, nativeQuery = true)
+    int wipeFaceDataOfLeavers();
 
     @Query("""
         SELECT g FROM Guard g

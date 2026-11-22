@@ -171,6 +171,41 @@ public class GuardController {
                 guardService.updatePhoto(TenantContext.getTenantIdAsObject(), id, body.get("photoBase64"))));
     }
 
+    /** Full ID number or bank account, with a written reason. Logged; the value is never logged. */
+    @PostMapping("/{id}/reveal")
+    @PreAuthorize("hasAuthority('SECURITY_MANAGE') or hasAuthority('SECURITY_GUARD_BANKING_MANAGE')")
+    @Operation(summary = "Reveal a guard's full ID number or bank account (reason required, audited)")
+    public ResponseEntity<ApiResponse<RevealPiiResponse>> reveal(
+            @PathVariable UUID id, @RequestBody RevealPiiRequest req,
+            org.springframework.security.core.Authentication auth) {
+        String authority = "BANK_ACCOUNT".equalsIgnoreCase(req.field() == null ? "" : req.field().trim())
+                ? "SECURITY_GUARD_BANKING_MANAGE" : "SECURITY_MANAGE";
+        boolean allowed = auth != null && auth.getAuthorities().stream()
+                .anyMatch(a -> authority.equals(a.getAuthority()));
+        if (!allowed) {
+            throw new org.springframework.security.access.AccessDeniedException("Missing permission " + authority);
+        }
+        return ResponseEntity.ok(ApiResponse.success("OK",
+                guardService.revealPii(TenantContext.getTenantIdAsObject(), TenantContext.getCurrentUserId(),
+                        id, req.field(), req.reason())));
+    }
+
+    @GetMapping("/{id}/face")
+    @PreAuthorize("hasAuthority('SECURITY_READ')")
+    @Operation(summary = "Whether a face template is held for the guard, and when consent was recorded")
+    public ResponseEntity<ApiResponse<FaceStatusResponse>> faceStatus(@PathVariable UUID id) {
+        return ResponseEntity.ok(ApiResponse.success("OK",
+                guardService.faceStatus(TenantContext.getTenantIdAsObject(), id)));
+    }
+
+    @DeleteMapping("/{id}/face")
+    @PreAuthorize("hasAuthority('SECURITY_MANAGE')")
+    @Operation(summary = "Delete the guard's face template (consent withdrawn). Audited.")
+    public ResponseEntity<ApiResponse<FaceStatusResponse>> removeFace(@PathVariable UUID id) {
+        return ResponseEntity.ok(ApiResponse.success("Face data removed",
+                guardService.removeFace(TenantContext.getTenantIdAsObject(), TenantContext.getCurrentUserId(), id)));
+    }
+
     // FIX: closes the confirmed "no structured banking fields" gap —
     // payroll export needed manual cross-referencing without this.
     @PostMapping("/{id}/bank-details")

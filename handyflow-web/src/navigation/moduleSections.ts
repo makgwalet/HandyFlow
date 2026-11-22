@@ -95,6 +95,7 @@ export const SECURITY_SECTIONS: ModuleSections = {
       sections: [
         { id: 'shifts', label: 'Shifts', icon: Clock },
         { id: 'scheduler', label: 'Scheduler', icon: CalendarDays },
+        { id: 'coverage', label: 'Coverage', icon: Users },
         { id: 'incidents', label: 'Incidents', icon: AlertTriangle },
         { id: 'patrols', label: 'Patrols', icon: Footprints },
         { id: 'patrol-routes', label: 'Patrol Routes', icon: Route },
@@ -129,7 +130,7 @@ export const SECURITY_SECTIONS: ModuleSections = {
     {
       label: 'Services',
       sections: [
-        { id: 'close-protection', label: 'Close Protection', icon: Lock },
+        { id: 'close-protection', label: 'Close Protection', icon: Lock, permission: 'VIP_DETAIL_ACCESS' },
       ],
     },
     {

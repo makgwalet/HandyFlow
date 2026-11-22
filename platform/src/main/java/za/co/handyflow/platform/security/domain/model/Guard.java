@@ -121,6 +121,9 @@ public class Guard {
     @Column(name = "face_embedding", columnDefinition = "TEXT")
     private String faceEmbedding;
 
+    @Column(name = "face_consent_at")
+    private Instant faceConsentAt;
+
     // FIX: closes a confirmed gap — payroll export needed manual
     // cross-referencing to actually pay a guard since nothing here
     // captured bank details. Matches PayEmployee's own field shape
@@ -351,6 +354,24 @@ public class Guard {
     public void setFaceEmbedding(String embedding) {
         this.faceEmbedding = embedding;
         this.updatedAt     = Instant.now();
+    }
+
+    /** Stores a face template together with the time the guard's consent was recorded. */
+    public void storeFaceEmbedding(String embedding, Instant consentAt) {
+        this.faceEmbedding = embedding;
+        this.faceConsentAt = consentAt;
+        this.updatedAt     = Instant.now();
+    }
+
+    /** Deletes the face template and its consent record. */
+    public void clearFaceEmbedding() {
+        this.faceEmbedding = null;
+        this.faceConsentAt = null;
+        this.updatedAt     = Instant.now();
+    }
+
+    public boolean hasFaceEmbedding() {
+        return faceEmbedding != null && !faceEmbedding.isBlank();
     }
 
     /** Lets the guard see their current site's overview in the Guard app. Set by a manager. */

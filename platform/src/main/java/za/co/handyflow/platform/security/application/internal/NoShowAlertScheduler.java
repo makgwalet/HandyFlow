@@ -150,7 +150,7 @@ public class NoShowAlertScheduler {
      */
     private void sendGroupedDigest(TenantId tenantId, List<Shift> shifts, NotificationType type,
                                    String subjectSuffix, java.util.function.Consumer<Shift> marker) {
-        List<Recipient> admins = tenantAdminRecipients.resolveTenantAdmins(tenantId);
+        List<Recipient> admins = SecurityRecipients.forAlerts(tenantAdminRecipients, tenantId);
         if (admins.isEmpty()) {
             log.info("[Security] {} shift(s) flagged ({}) for tenant={} but no admin recipients resolved",
                     shifts.size(), type, tenantId.getValue());

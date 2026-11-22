@@ -101,7 +101,7 @@ public class ArmouryComplianceScheduler {
                     expiringNotYetExpired.size(), WARN_DAYS_BEFORE, tenantId.getValue());
         }
 
-        List<Recipient> admins = tenantAdminRecipients.resolveTenantAdmins(tenantId);
+        List<Recipient> admins = SecurityRecipients.forAlerts(tenantAdminRecipients, tenantId);
         if (admins.isEmpty()) {
             log.warn("[Security] Armoury compliance issues found for tenant={} but no admin recipients "
                             + "could be resolved. Expired: {} Expiring soon: {}",

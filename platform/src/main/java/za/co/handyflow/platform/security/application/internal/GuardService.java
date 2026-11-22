@@ -170,7 +170,7 @@ public class GuardService {
         }
 
         guard.update(req.firstName(), req.lastName(), req.psiraNumber(),
-                req.idNumber(), req.phone(), req.grade(), req.notes(),
+                PiiMask.keepIfMasked(req.idNumber(), guard.getIdNumber()), req.phone(), req.grade(), req.notes(),
                 req.psiraExpiryDate(), req.emergencyContactName(), req.emergencyContactPhone());
         guardRepository.save(guard);
         log.info("[Security] Updated guard={} tenant={}", id, tenantId);
@@ -205,6 +205,11 @@ public class GuardService {
         // Leaving for good: also pull their phone out of service and void any unused activation code.
         if ("TERMINATED".equals(req.status())) {
             offboardAppAccess(tenantId, id);
+            if (FaceDataRules.mustWipe(req.status(), false) && guard.hasFaceEmbedding()) {
+                guard.clearFaceEmbedding();
+                guardRepository.save(guard);
+                writeAudit(tenantId, changedBy, id, "FACE_DATA_REMOVED", "{\"reason\":\"guard terminated\"}");
+            }
         }
 
         log.info("[Security] Guard status changed guard={} status={} by={} tenant={}",
@@ -220,6 +225,11 @@ public class GuardService {
         writeAudit(tenantId, deletedBy, id, "DELETED", null);
         tokenRepository.revokeAllForGuard(id, java.time.Instant.now(), "Guard deleted");
         offboardAppAccess(tenantId, id);
+        if (guard.hasFaceEmbedding()) {
+            guard.clearFaceEmbedding();
+            guardRepository.save(guard);
+            writeAudit(tenantId, deletedBy, id, "FACE_DATA_REMOVED", "{\"reason\":\"guard deleted\"}");
+        }
         log.info("[Security] Soft-deleted guard={} by={} tenant={}", id, deletedBy, tenantId);
     }
 
@@ -243,7 +253,7 @@ public class GuardService {
     public GuardResponse updateBankDetails(TenantId tenantId, UUID id,
                                            String bankName, String bankAccountNumber, String bankBranchCode) {
         Guard guard = findActive(tenantId, id);
-        guard.setBankDetails(bankName, bankAccountNumber, bankBranchCode);
+        guard.setBankDetails(bankName, PiiMask.keepIfMasked(bankAccountNumber, guard.getBankAccountNumber()), bankBranchCode);
         guardRepository.save(guard);
         return toResponse(guard);
     }
@@ -424,6 +434,46 @@ public class GuardService {
                 .orElseThrow(() -> new ResourceNotFoundException("Guard", id.toString()));
     }
 
+    /**
+     * Shows the full ID number or bank account of one guard. The audit row is written first, in the same
+     * transaction, so no value is returned unless the access is on record. The row holds the field and the reason,
+     * never the value. The caller's permission for the field is checked in the controller.
+     */
+    @Transactional
+    public za.co.handyflow.platform.security.dto.RevealPiiResponse revealPii(
+            TenantId tenantId, UUID actorId, UUID guardId, String field, String reason) {
+        String problem = PiiReveal.problem(field, reason);
+        if (problem != null) {
+            throw new HandyFlowException(
+                    "INVALID_PII_FIELD".equals(problem)
+                            ? "field must be ID_NUMBER or BANK_ACCOUNT"
+                            : "Give a reason of at least " + PiiReveal.MIN_REASON + " characters (max " + PiiReveal.MAX_REASON + ")",
+                    HttpStatus.BAD_REQUEST, problem);
+        }
+        Guard guard = findActive(tenantId, guardId);
+        PiiReveal.Field f = PiiReveal.parse(field);
+        writeAudit(tenantId, actorId, guardId, "PII_REVEALED", PiiReveal.auditJson(f, reason));
+        String value = f == PiiReveal.Field.BANK_ACCOUNT ? guard.getBankAccountNumber() : guard.getIdNumber();
+        return new za.co.handyflow.platform.security.dto.RevealPiiResponse(f.name(), value);
+    }
+
+    @Transactional(readOnly = true)
+    public za.co.handyflow.platform.security.dto.FaceStatusResponse faceStatus(TenantId tenantId, UUID guardId) {
+        Guard guard = findActive(tenantId, guardId);
+        return new za.co.handyflow.platform.security.dto.FaceStatusResponse(guard.hasFaceEmbedding(), guard.getFaceConsentAt());
+    }
+
+    /** Deletes the guard's face template (for example when they withdraw consent). Audited. */
+    @Transactional
+    public za.co.handyflow.platform.security.dto.FaceStatusResponse removeFace(TenantId tenantId, UUID actorId, UUID guardId) {
+        Guard guard = findActive(tenantId, guardId);
+        boolean had = guard.hasFaceEmbedding();
+        guard.clearFaceEmbedding();
+        guardRepository.save(guard);
+        if (had) writeAudit(tenantId, actorId, guardId, "FACE_DATA_REMOVED", "{\"reason\":\"removed by user\"}");
+        return new za.co.handyflow.platform.security.dto.FaceStatusResponse(false, null);
+    }
+
     @Transactional
     public ResetPinResponse resetPin(TenantId tenantId, UUID guardId,
                                      UUID supervisorId, ResetPinRequest req) {
@@ -444,27 +494,10 @@ public class GuardService {
         return new ResetPinResponse(guardId, tempPin, expiresAt);
     }
 
-    /**
-     * Masks the ID/passport number before it leaves the backend at all --
-     * enforced here, not left to the frontend, since a frontend-only mask
-     * is trivially bypassed by anyone reading the raw network response.
-     * Shows the first 6 digits (the DOB portion of an SA ID: YYMMDD) and
-     * asterisks the rest. Non-13-digit values (passport numbers, foreign
-     * IDs) are left unmasked, since the "first 6 = DOB" convention is SA-ID
-     * specific and masking an arbitrary passport number the same way would
-     * just as often hide MORE of a shorter identifier than intended.
-     */
-    private String maskIdNumber(String idNumber) {
-        if (idNumber == null) return null;
-        String digitsOnly = idNumber.replaceAll("\\D", "");
-        if (digitsOnly.length() != 13) return idNumber; // not an SA ID shape -- leave as-is
-        return digitsOnly.substring(0, 6) + "*".repeat(digitsOnly.length() - 6);
-    }
-
     GuardResponse toResponse(Guard g) {
         return new GuardResponse(
                 g.getId(), g.getFirstName(), g.getLastName(),
-                g.getFullName(), g.getPsiraNumber(), maskIdNumber(g.getIdNumber()),
+                g.getFullName(), g.getPsiraNumber(), PiiMask.maskId(g.getIdNumber()),
                 g.getPhone(),
                 "PENDING_UPLOAD".equals(g.getPhotoUrl()) ? null : g.getPhotoUrl(),
                 g.getGrade(), g.isActive(), g.getNotes(), g.getCreatedAt(),
@@ -474,7 +507,7 @@ public class GuardService {
                 g.getEmergencyContactName(),
                 g.getEmergencyContactPhone(),
                 g.getCpVettingTier(),
-                g.getBankName(), g.getBankAccountNumber(), g.getBankBranchCode()
+                g.getBankName(), PiiMask.maskAccount(g.getBankAccountNumber()), g.getBankBranchCode()
         );
     }
 

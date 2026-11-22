@@ -19,5 +19,13 @@ public record GuardEnrollRequest(
         String faceEmbeddingBase64,   // Base64 float vector from on-device face model; null = skip
         String deviceHardwareId,      // hardware ID of the guard's assigned device; null = skip
 
-        Integer pinExpiryDays         // null = use default (90 days)
-) {}
+        Integer pinExpiryDays,        // null = use default (90 days)
+
+        // The guard agreed to keep a face template. Without true here the template is NOT stored.
+        Boolean faceConsent
+) {
+    /** For callers that send no face data (bulk app access): consent is not needed. */
+    public GuardEnrollRequest(String pin, String faceEmbeddingBase64, String deviceHardwareId, Integer pinExpiryDays) {
+        this(pin, faceEmbeddingBase64, deviceHardwareId, pinExpiryDays, null);
+    }
+}
