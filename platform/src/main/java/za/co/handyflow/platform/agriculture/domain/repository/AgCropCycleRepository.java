@@ -56,4 +56,15 @@ public interface AgCropCycleRepository extends JpaRepository<AgCropCycle, UUID> 
     // Trends: which farm and crop each (non-deleted) crop cycle belongs to: [cropCycleId, farmId, cropTypeId].
     @Query("SELECT c.id, c.farmId, c.cropTypeId FROM AgCropCycle c WHERE c.tenantId = :tenantId AND c.deletedAt IS NULL")
     List<Object[]> findCycleFarmsAndCrops(TenantId tenantId);
+
+    // The farm calendar: cycles still running or planned whose planting (if still planned) or expected harvest falls in the window.
+    @Query("""
+        SELECT c FROM AgCropCycle c
+        WHERE c.tenantId = :tenantId AND c.farmId = :farmId AND c.deletedAt IS NULL
+        AND c.status NOT IN ('HARVESTED', 'FAILED', 'ABANDONED')
+        AND ((c.status = 'PLANNED' AND c.plantingDate IS NOT NULL AND c.plantingDate >= :from AND c.plantingDate <= :to)
+             OR (c.expectedHarvestDate IS NOT NULL AND c.expectedHarvestDate >= :from AND c.expectedHarvestDate <= :to))
+        ORDER BY c.createdAt ASC, c.id ASC
+        """)
+    List<AgCropCycle> findForCalendar(TenantId tenantId, UUID farmId, LocalDate from, LocalDate to);
 }

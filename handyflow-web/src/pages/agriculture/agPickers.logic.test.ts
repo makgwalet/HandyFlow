@@ -1,8 +1,8 @@
 import { describe, it, expect } from "vitest"
-import { areaChoices, feedChoices, feedPrefill, feedStockProblem, movementFormError, isPartGroupMove } from "./agPickers.logic"
+import { bagsToKg, feedEquivalent, feedQuantityPayload, hasPackSize, isCountUnit, kgToBags, unitSingular, areaChoices, feedChoices, feedPrefill, feedStockProblem, movementFormError, isPartGroupMove } from "./agPickers.logic"
 
 const area = (id: string, name: string, status = "ACTIVE") => ({ id, name, areaType: "CAMP", status })
-const item = (o: Partial<{ id: string; itemName: string; unitOfMeasure: string; currentQuantity: number; unitCost: number | null; status: string }> = {}) =>
+const item = (o: Partial<{ id: string; itemName: string; unitOfMeasure: string; currentQuantity: number; unitCost: number | null; status: string; packSizeKg: number | null }> = {}) =>
   ({ id: "i1", itemName: "Starter", unitOfMeasure: "kg", currentQuantity: 100, unitCost: 5, status: "ACTIVE", ...o })
 
 describe("areaChoices", () => {
@@ -117,5 +117,54 @@ describe("movementFormError, farm transfer and sale", () => {
     expect(movementFormError({ ...g, reason: "Sold to Van der Merwe" })).toBeNull()
     expect(movementFormError({ ...g, type: "TRANSFER_OUT", reason: "x" })).toMatch(/reason/)
     expect(movementFormError({ ...b, type: "SALE" })).toBeNull()
+  })
+})
+
+describe("kg per bag", () => {
+  const bag = (o = {}) => item({ unitOfMeasure: "bags", currentQuantity: 10, unitCost: 450, packSizeKg: 50, ...o })
+  it("knows count units and singulars", () => {
+    expect(["bag", "Bags", " bale ", "sacks"].every(isCountUnit)).toBe(true)
+    expect(["kg", "t", "crates", ""].some(isCountUnit)).toBe(false)
+    expect(unitSingular("Bags")).toBe("bag")
+    expect(unitSingular("sack")).toBe("sack")
+  })
+  it("has a pack size only for a count unit with a positive value", () => {
+    expect(hasPackSize(bag())).toBe(true)
+    expect(hasPackSize(bag({ packSizeKg: null }))).toBe(false)
+    expect(hasPackSize(bag({ packSizeKg: 0 }))).toBe(false)
+    expect(hasPackSize(item({ unitOfMeasure: "kg", packSizeKg: 50 }))).toBe(false)
+  })
+  it("converts between kg and bags to three decimals", () => {
+    expect(kgToBags(120, 50)).toBe(2.4)
+    expect(kgToBags(10, 30)).toBe(0.333)
+    expect(bagsToKg(2.4, 50)).toBe(120)
+  })
+  it("offers a bag item with a pack size, and blocks one without, with the prompt", () => {
+    const ok = feedChoices([bag()])[0]
+    expect(ok.disabled).toBe(false)
+    expect(ok.label).toMatch(/50 kg per bag/)
+    const blocked = feedChoices([bag({ packSizeKg: null })])[0]
+    expect(blocked.disabled).toBe(true)
+    expect(blocked.label).toMatch(/set kg per bag in Stock/)
+  })
+  it("prefills cost per kg as price per bag over kg per bag", () => {
+    expect(feedPrefill(bag()).costPerKg).toBe(9)
+    expect(feedPrefill(bag({ unitCost: 260, packSizeKg: 30 })).costPerKg).toBe(8.6667)
+  })
+  it("checks stock in bags", () => {
+    expect(feedStockProblem(bag(), 120)).toBeNull()
+    expect(feedStockProblem(bag({ currentQuantity: 2 }), 120)).toMatch(/Only 2 bags of Starter on hand \(120 kg is 2.4 bags\)/)
+    expect(feedStockProblem(bag({ packSizeKg: null }), 120)).toMatch(/Set kg per bag in Stock/)
+  })
+  it("sends kg or bags, never both", () => {
+    expect(feedQuantityPayload("kg", "120")).toEqual({ quantityKg: 120, quantityBags: null })
+    expect(feedQuantityPayload("bags", "2.4")).toEqual({ quantityKg: null, quantityBags: 2.4 })
+  })
+  it("shows the other unit", () => {
+    expect(feedEquivalent(bag(), "kg", "120")).toBe("= 2.4 bags")
+    expect(feedEquivalent(bag(), "kg", "50")).toBe("= 1 bag")
+    expect(feedEquivalent(bag(), "bags", "2.4")).toBe("= 120 kg")
+    expect(feedEquivalent(bag({ packSizeKg: null }), "kg", "120")).toBe("")
+    expect(feedEquivalent(bag(), "kg", "")).toBe("")
   })
 })

@@ -22,11 +22,13 @@ import AgCropCyclesTab from "./AgCropCyclesTab"
 import AgSeasonsTab from "./AgSeasonsTab"
 import AgCostReportsTab from "./AgCostReportsTab"
 import AgRegistersTab from "./AgRegistersTab"
+import AgCalendarTab from "./AgCalendarTab"
+import AgFarmSetup from "./AgFarmSetup"
 import type { FarmLink } from "./agDeepLink.logic"
 
-type Tab = "areas" | "enterprises" | "animals" | "groups" | "inventory" | "crops" | "seasons" | "costs" | "registers"
+type Tab = "calendar" | "areas" | "enterprises" | "animals" | "groups" | "inventory" | "crops" | "seasons" | "costs" | "registers"
 const TABS: { key: Tab; label: string }[] = [
-  { key: "animals", label: "Animals" }, { key: "groups", label: "Groups" },
+  { key: "animals", label: "Animals" }, { key: "groups", label: "Groups" }, { key: "calendar", label: "Calendar" },
   { key: "areas", label: "Production Areas" }, { key: "enterprises", label: "Enterprises" }, { key: "inventory", label: "Inventory" },
   { key: "crops", label: "Crop cycles" }, { key: "seasons", label: "Seasons" }, { key: "costs", label: "Costs" }, { key: "registers", label: "Registers" },
 ]
@@ -67,10 +69,13 @@ export default function AgFarmDetail({ farm, onBack, link }: { farm: FarmRespons
         </div>
       </div>
 
+      <AgFarmSetup farmId={farm.id} activeTab={tab} onOpenTab={setTab} />
+
       <AgTabs label="Farm sections" tabs={TABS} active={tab} onChange={setTab} spacing={20} />
 
       {tab === "animals" && <AgAnimalsTab farmId={farm.id} onSelectAnimal={setSelectedAnimal} />}
       {tab === "groups" && <AgGroupsTab farmId={farm.id} onSelectGroup={setSelectedGroup} />}
+      {tab === "calendar" && <AgCalendarTab farmId={farm.id} onOpenAnimal={setLinkedAnimalId} onOpenGroup={setLinkedGroupId} onOpenCrops={() => setTab("crops")} />}
       {tab === "areas" && <AgProductionAreasTab farmId={farm.id} />}
       {tab === "enterprises" && <AgEnterprisesTab farmId={farm.id} />}
       {tab === "inventory" && <AgInventoryTab farmId={farm.id} />}

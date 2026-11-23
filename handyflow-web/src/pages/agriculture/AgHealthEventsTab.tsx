@@ -10,16 +10,18 @@ import type React from "react"
 import { useState } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { useAgToastMutation } from "./agMutation"
-import { Plus, HeartPulse, Check, BellOff } from "lucide-react"
+import { Plus, HeartPulse, Check, BellOff, Pencil } from "lucide-react"
 import AgPager from "./AgPager"
 import { PAGE_SIZE, rangeLabel } from "./agPaging.logic"
 import { apiClient } from "../../api/client"
 import { AG_ACCENT_TEXT, fmtMoney, statusBadge, type AgTargetType, targetBasePath, inp, btnPrimary, btnGhost } from "./constants"
+import AgAuditLine from "./AgAuditLine"
 import { Field, QueryError } from "./agUi"
 import AgManage from "./AgManage"
 import { usePermission } from "../../hooks/usePermission"
 import { clearOn, formatDay, periodProblem, withdrawalNote, produceNote } from "./agCompliance.logic"
 import { todayISO } from "./agCrops.logic"
+import { changeWarnings, editError, editPayload, editValuesFrom, hasChanges, type HealthEditValues } from "./agHealthEdit.logic"
 
 interface HealthEventResponse {
   id: string; animalId: string | null; groupId: string | null
@@ -50,6 +52,9 @@ export default function AgHealthEventsTab({ targetType, targetId }: { targetType
   const [milkDays, setMilkDays] = useState("")
   const [eggDays, setEggDays] = useState("")
   const [nextDueDate, setNextDueDate] = useState("")
+  // the event being edited, and its fields as typed
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editValues, setEditValues] = useState<HealthEditValues | null>(null)
 
   const queryKey = ["ag-health-events", targetType, targetId]
   // 50 a page, newest first; the server never sends more than 200 at a time
@@ -74,6 +79,14 @@ export default function AgHealthEventsTab({ targetType, targetId }: { targetType
     onSuccess: () => {
       invalidate(); setShowCreate(false)
       setDescription(""); setProductUsed(""); setDosage(""); setVeterinarian(""); setCost(""); setWithdrawalPeriodDays(""); setMilkDays(""); setEggDays(""); setNextDueDate("")
+    },
+  })
+  const updateMut = useAgToastMutation({
+    mutationFn: (v: { id: string; values: HealthEditValues }) => apiClient.put(`/api/v1/agriculture/health-events/${v.id}`, editPayload(v.values)),
+    onSuccess: () => {
+      invalidate(); setEditingId(null); setEditValues(null)
+      // a changed withdrawal period changes what the animal or group may be sold as
+      qc.invalidateQueries({ queryKey: ["ag", "withdrawal"] }); qc.invalidateQueries({ queryKey: ["ag", "produce-withdrawal"] }); qc.invalidateQueries({ queryKey: ["ag-calendar"] })
     },
   })
   const completeMut = useAgToastMutation({ mutationFn: (id: string) => apiClient.patch(`/api/v1/agriculture/health-events/${id}/complete`), onSuccess: invalidate })
@@ -128,7 +141,8 @@ export default function AgHealthEventsTab({ targetType, targetId }: { targetType
         events.length === 0 ? <p style={{ color: "var(--hf-text-faint)", fontSize: 12.5 }}>No health events recorded yet.</p> : (
         <div style={{ border: "1px solid var(--hf-border)", borderRadius: 10, overflow: "hidden" }}>
           {events.map((e, i) => (
-            <div key={e.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 14px", borderTop: i === 0 ? "none" : "1px solid var(--hf-border-subtle)" }}>
+            <div key={e.id} style={{ borderTop: i === 0 ? "none" : "1px solid var(--hf-border-subtle)" }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 14px" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                 <HeartPulse size={13} style={{ color: AG_ACCENT_TEXT }} />
                 <div>
@@ -140,6 +154,9 @@ export default function AgHealthEventsTab({ targetType, targetId }: { targetType
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                 <span style={statusBadge(e.status)}>{e.status}</span>
+                {canManage && (
+                  <button onClick={() => { setEditingId(e.id); setEditValues(editValuesFrom(e)) }} title="Edit" aria-label="Edit health event" style={iconBtn}><Pencil size={12} /></button>
+                )}
                 {canManage && e.status !== "COMPLETED" && (
                   <button onClick={() => completeMut.mutate(e.id)} title="Mark completed" style={iconBtn}><Check size={12} /></button>
                 )}
@@ -148,11 +165,60 @@ export default function AgHealthEventsTab({ targetType, targetId }: { targetType
                 )}
               </div>
             </div>
+            {editingId === e.id && editValues && (
+              <div style={{ padding: "0 14px 14px" }}>
+                <HealthEditForm event={e} values={editValues} onChange={setEditValues} saving={updateMut.isPending}
+                  onSave={() => updateMut.mutate({ id: e.id, values: editValues })} onCancel={() => { setEditingId(null); setEditValues(null) }} />
+              </div>
+            )}
+            </div>
           ))}
         </div>
       )}
       {total > PAGE_SIZE && <p style={{ fontSize: 12, color: "var(--hf-text-muted)", margin: "10px 0 0" }}>{rangeLabel(page, total, "health event")}</p>}
       <AgPager page={page} total={total} size={PAGE_SIZE} onPage={setPage} />
+    </div>
+  )
+}
+
+/** The edit form for one event. Type, date and status are not editable, so they are shown as plain text. */
+function HealthEditForm({ event, values, onChange, saving, onSave, onCancel }: {
+  event: HealthEventResponse; values: HealthEditValues; onChange: (v: HealthEditValues) => void; saving: boolean; onSave: () => void; onCancel: () => void
+}) {
+  const set = (k: keyof HealthEditValues) => (e: React.ChangeEvent<HTMLInputElement>) => onChange({ ...values, [k]: e.target.value })
+  const problem = editError(values)
+  const warnings = changeWarnings(event, values)
+  const blocked = saving || !!problem || !hasChanges(event, values)
+  return (
+    <div style={{ background: "var(--hf-surface-muted)", border: "1px solid var(--hf-border)", borderRadius: 10, padding: 14 }}>
+      <p style={{ fontSize: 12, color: "var(--hf-text-muted)", margin: "0 0 8px" }}>{event.eventType} on {event.eventDate}. Type and date cannot be changed here.</p>
+      <AgAuditLine type="health-events" id={event.id} />
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))", gap: 8, marginBottom: 8 }}>
+        <Field label="Description"><input value={values.description} onChange={set("description")} style={inp} /></Field>
+        <Field label="Product used"><input value={values.productUsed} onChange={set("productUsed")} style={inp} /></Field>
+        <Field label="Dosage"><input value={values.dosage} onChange={set("dosage")} style={inp} /></Field>
+        <Field label="Veterinarian"><input value={values.veterinarian} onChange={set("veterinarian")} style={inp} /></Field>
+        <Field label="Cost (R)"><input type="number" min={0} step="0.01" value={values.cost} onChange={set("cost")} style={inp} /></Field>
+        <Field label="Next due date"><input type="date" value={values.nextDueDate} onChange={set("nextDueDate")} style={inp} /></Field>
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))", gap: 8, marginBottom: 8 }}>
+        <Field label="Withdrawal period (days)" hint={clearOn(event.eventDate, values.withdrawalPeriodDays) ? `Not for sale or slaughter until ${formatDay(clearOn(event.eventDate, values.withdrawalPeriodDays))}` : undefined}>
+          <input type="number" min={0} max={730} value={values.withdrawalPeriodDays} onChange={set("withdrawalPeriodDays")} style={inp} />
+        </Field>
+        <Field label="Milk withdrawal (days)" hint={clearOn(event.eventDate, values.milkWithdrawalDays) ? `Milk not for sale until ${formatDay(clearOn(event.eventDate, values.milkWithdrawalDays))}` : "Dairy animals only"}>
+          <input type="number" min={0} max={730} value={values.milkWithdrawalDays} onChange={set("milkWithdrawalDays")} style={inp} />
+        </Field>
+        <Field label="Egg withdrawal (days)" hint={clearOn(event.eventDate, values.eggWithdrawalDays) ? `Eggs not for sale until ${formatDay(clearOn(event.eventDate, values.eggWithdrawalDays))}` : "Laying birds only"}>
+          <input type="number" min={0} max={730} value={values.eggWithdrawalDays} onChange={set("eggWithdrawalDays")} style={inp} />
+        </Field>
+        <Field label="Notes"><input value={values.notes} onChange={set("notes")} style={inp} /></Field>
+      </div>
+      {problem && <p role="alert" style={{ fontSize: 12.5, color: "var(--hf-danger-text)", margin: "0 0 8px" }}>{problem}</p>}
+      {warnings.map(w => <p key={w} style={{ fontSize: 12, color: "var(--hf-warning-text)", margin: "0 0 6px" }}>{w}</p>)}
+      <div style={{ display: "flex", gap: 8 }}>
+        <button disabled={blocked} onClick={onSave} style={{ ...btnPrimary, opacity: blocked ? 0.6 : 1 }}>{saving ? "Saving…" : "Save changes"}</button>
+        <button onClick={onCancel} style={btnGhost}>Cancel</button>
+      </div>
     </div>
   )
 }

@@ -56,32 +56,35 @@ public class AgFeedRecordService {
     @Transactional
     public FeedRecordResponse createFeedRecord(TenantId tenantId, CreateFeedRecordRequest req) {
         UUID targetFarmId = validateTarget(tenantId, req.animalId(), req.groupId());
-        AgFeedRules.requirePositive(req.quantityKg());
-
         AgInventoryItem item = null;
         BigDecimal costPerKg = req.costPerKg();
         if (req.inventoryItemId() != null) {
             item = inventoryItemRepository.findActiveById(tenantId, req.inventoryItemId())
                     .orElseThrow(() -> new ResourceNotFoundException("InventoryItem", req.inventoryItemId().toString()));
             AgFeedRules.requireStockItem(item.getFarmId(), item.getStatus(), targetFarmId, item.getItemName());
-            costPerKg = AgFeedRules.costPerKg(req.costPerKg(), item.getUnitCost(), item.getUnitOfMeasure());
         }
+        // kilograms, or bags of an item with a pack size (checked here, with the item in hand)
+        BigDecimal quantityKg = AgFeedRules.resolveQuantityKg(req.quantityKg(), req.quantityBags(), item != null,
+                item == null ? null : item.getItemName(), item == null ? null : item.getUnitOfMeasure(), item == null ? null : item.getPackSizeKg());
+        AgFeedRules.requirePositive(quantityKg);
+        if (item != null) costPerKg = AgFeedRules.costPerKg(req.costPerKg(), item.getUnitCost(), item.getUnitOfMeasure(), item.getPackSizeKg());
 
         AgFeedRecord record = AgFeedRecord.create(tenantId, req.animalId(), req.groupId(), req.feedDate(),
-                req.inventoryItemId(), req.feedType(), req.quantityKg(), costPerKg, req.notes());
+                req.inventoryItemId(), req.feedType(), quantityKg, costPerKg, req.notes());
         feedRecordRepository.save(record);
 
         if (item != null) {
             // the stock is counted in the item's own unit; the kilograms fed are converted into it
-            BigDecimal issued = AgFeedRules.quantityInItemUnit(req.quantityKg(), item.getUnitOfMeasure(), item.getItemName());
+            BigDecimal issued = AgFeedRules.quantityInItemUnit(quantityKg, item.getUnitOfMeasure(), item.getItemName(), item.getPackSizeKg());
             item.issue(issued);
             AgStockMovement movement = AgStockMovement.create(tenantId, item.getId(), "ISSUE",
                     req.feedDate(), issued, item.getUnitCost(), "AgFeedRecord", record.getId(),
                     null, null, "Feed issued: " + req.feedType());
+            movement.recordPackSize(item.getPackSizeKg());
             stockMovementRepository.save(movement);
         }
 
-        log.info("Feed record created id={} quantityKg={} tenant={}", record.getId(), req.quantityKg(), tenantId.getValue());
+        log.info("Feed record created id={} quantityKg={} tenant={}", record.getId(), quantityKg, tenantId.getValue());
         return toResponse(record);
     }
 

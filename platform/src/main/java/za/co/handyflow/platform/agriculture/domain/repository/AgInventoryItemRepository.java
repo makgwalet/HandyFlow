@@ -43,4 +43,8 @@ public interface AgInventoryItemRepository extends JpaRepository<AgInventoryItem
     /** Stock items of the farm with something on hand; backs the "can this farm be deactivated or deleted" check. */
     @Query("SELECT COUNT(i) FROM AgInventoryItem i WHERE i.tenantId = :tenantId AND i.farmId = :farmId AND i.deletedAt IS NULL AND i.currentQuantity > 0")
     long countWithStockForFarm(TenantId tenantId, UUID farmId);
+
+    // Names of the farm's active feed stock. Feeds the feed-type suggestions.
+    @Query("SELECT i.itemName FROM AgInventoryItem i WHERE i.tenantId = :tenantId AND i.farmId = :farmId AND i.deletedAt IS NULL AND i.category = 'FEED' AND i.status = 'ACTIVE'")
+    List<String> findActiveFeedNamesForFarm(TenantId tenantId, UUID farmId);
 }

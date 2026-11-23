@@ -2,6 +2,7 @@
 //
 // One crop cycle: lifecycle stepper with only the actions its state allows, cost summary, and the Inputs / Scouting /
 // Harvests / Evidence tabs. Costs only: Agriculture has no revenue data, so no margin is shown.
+import AgAuditLine from "./AgAuditLine"
 import { useState } from "react"
 import { ArrowLeft, Check } from "lucide-react"
 import { usePermission } from "../../hooks/usePermission"
@@ -101,6 +102,7 @@ export default function AgCropCycleDetail({ farmId, cycleId, onBack }: { farmId:
         <span style={statusBadge(cycle.status)}>{STATUS_LABEL[cycle.status]}</span>
       </div>
       <p style={{ fontSize: 12.5, color: "var(--hf-text-muted)", margin: "0 0 16px" }}>{[cropName(cycle, types), area?.name, season?.name, `${cycle.areaPlantedHectares} ha`].filter(Boolean).join(" · ")}</p>
+      <AgAuditLine type="crop-cycles" id={cycle.id} />
 
       {(cycle.status === "FAILED" || cycle.status === "ABANDONED")
         ? <div role="status" style={{ ...panel, color: "var(--hf-text-secondary)", fontSize: 13 }}><strong>This cycle was {cycle.status === "FAILED" ? "marked failed" : "abandoned"}.</strong>{cycle.notes ? ` ${cycle.notes}` : ""}</div>

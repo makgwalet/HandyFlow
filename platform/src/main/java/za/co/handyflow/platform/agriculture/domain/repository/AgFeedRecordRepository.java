@@ -36,4 +36,10 @@ public interface AgFeedRecordRepository extends JpaRepository<AgFeedRecord, UUID
     // Trends: [feedDate, totalCost, animalId, groupId] in a date range. Same cost definition as the cost reports (totalCost).
     @Query("SELECT f.feedDate, f.totalCost, f.animalId, f.groupId FROM AgFeedRecord f WHERE f.tenantId = :tenantId AND f.feedDate >= :startDate AND f.feedDate <= :endDate AND f.totalCost IS NOT NULL")
     List<Object[]> findCostsBetween(TenantId tenantId, LocalDate startDate, LocalDate endDate);
+
+    // Feed types already recorded against this farm's animals and groups. Feeds the feed-type suggestions.
+    @Query("SELECT DISTINCT f.feedType FROM AgFeedRecord f WHERE f.tenantId = :tenantId AND ("
+            + "f.animalId IN (SELECT a.id FROM AgAnimal a WHERE a.tenantId = :tenantId AND a.farmId = :farmId) "
+            + "OR f.groupId IN (SELECT g.id FROM AgGroup g WHERE g.tenantId = :tenantId AND g.farmId = :farmId))")
+    List<String> findDistinctFeedTypesForFarm(TenantId tenantId, UUID farmId);
 }

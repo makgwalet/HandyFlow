@@ -122,4 +122,32 @@ public interface AgHealthEventRepository extends JpaRepository<AgHealthEvent, UU
     // Trends: [eventDate, cost, animalId, groupId]. Like the cost reports, every event with a cost counts, whatever its status.
     @Query("SELECT e.eventDate, e.cost, e.animalId, e.groupId FROM AgHealthEvent e WHERE e.tenantId = :tenantId AND e.eventDate >= :startDate AND e.eventDate <= :endDate AND e.cost IS NOT NULL")
     List<Object[]> findCostsBetween(TenantId tenantId, LocalDate startDate, LocalDate endDate);
+
+    // The farm calendar: reminders falling due in the window (not yet acknowledged) and treatments scheduled in it, for the farm's
+    // animals and groups that are still on it. Overdue items are the attention list's job, so they only show here when the window reaches back.
+    @Query("""
+        SELECT e FROM AgHealthEvent e
+        WHERE e.tenantId = :tenantId
+        AND ((e.nextDueDate IS NOT NULL AND e.nextDueDate >= :from AND e.nextDueDate <= :to AND e.reminderAcknowledged = false)
+             OR (e.status = 'SCHEDULED' AND e.eventDate >= :from AND e.eventDate <= :to))
+        AND (e.animalId IN (SELECT a.id FROM AgAnimal a WHERE a.tenantId = :tenantId AND a.farmId = :farmId AND a.deletedAt IS NULL AND a.status = 'ACTIVE')
+             OR e.groupId IN (SELECT g.id FROM AgGroup g WHERE g.tenantId = :tenantId AND g.farmId = :farmId AND g.deletedAt IS NULL AND g.status = 'ACTIVE'))
+        ORDER BY e.eventDate ASC
+        """)
+    List<AgHealthEvent> findCalendarForFarm(TenantId tenantId, UUID farmId, LocalDate from, LocalDate to);
+
+    // The farm calendar: given (not merely scheduled) treatments with any withdrawal period, from `since` to `to`. The day each period
+    // ends is worked out by AgWithdrawalRules. Newest first, and the page size is the row cap.
+    @Query("""
+        SELECT e FROM AgHealthEvent e
+        WHERE e.tenantId = :tenantId AND e.status <> 'SCHEDULED'
+        AND e.eventDate >= :since AND e.eventDate <= :to
+        AND ((e.withdrawalPeriodDays IS NOT NULL AND e.withdrawalPeriodDays > 0)
+             OR (e.milkWithdrawalDays IS NOT NULL AND e.milkWithdrawalDays > 0)
+             OR (e.eggWithdrawalDays IS NOT NULL AND e.eggWithdrawalDays > 0))
+        AND (e.animalId IN (SELECT a.id FROM AgAnimal a WHERE a.tenantId = :tenantId AND a.farmId = :farmId AND a.deletedAt IS NULL AND a.status = 'ACTIVE')
+             OR e.groupId IN (SELECT g.id FROM AgGroup g WHERE g.tenantId = :tenantId AND g.farmId = :farmId AND g.deletedAt IS NULL AND g.status = 'ACTIVE'))
+        ORDER BY e.eventDate DESC, e.id DESC
+        """)
+    List<AgHealthEvent> findWithdrawalsForCalendar(TenantId tenantId, UUID farmId, LocalDate since, LocalDate to, Pageable pageable);
 }

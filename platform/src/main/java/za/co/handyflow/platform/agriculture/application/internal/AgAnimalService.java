@@ -189,7 +189,7 @@ public class AgAnimalService {
                 a.getTagNumber(), a.getName(), a.getBreed(), a.getSex(), a.getDateOfBirth(), a.isEstimatedAge(),
                 a.getSireId(), a.getDamId(), a.getAcquisitionType(), a.getAcquisitionDate(), a.getAcquisitionCost(),
                 a.getCurrentWeightKg(), a.getStatus(), a.getNotes(), a.getCreatedAt(), a.getUpdatedAt(), a.isBreedingStock(),
-                a.getWithdrawalOverrideReason(), a.getWithdrawalHeldUntil()
+                a.getWithdrawalOverrideReason(), a.getWithdrawalHeldUntil(), a.isTagTemporary(), a.getBirthRecordId()
         );
     }
 

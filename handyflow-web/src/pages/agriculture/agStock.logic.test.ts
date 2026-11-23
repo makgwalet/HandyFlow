@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { averageCostAfterReceipt, adjustmentPreview, adjustmentText, adjustError, receiveError } from "./agStock.logic"
+import { packSizeError, packSizeToSend, averageCostAfterReceipt, adjustmentPreview, adjustmentText, adjustError, receiveError } from "./agStock.logic"
 
 describe("averageCostAfterReceipt", () => {
   it("weighs what was on hand", () => {
@@ -44,5 +44,24 @@ describe("receiveError", () => {
     expect(receiveError("5", "-1")).toMatch(/negative/)
     expect(receiveError("5", "")).toBeNull()
     expect(receiveError("5", "12.5")).toBeNull()
+  })
+})
+
+describe("kg per bag", () => {
+  it("accepts empty, and a believable value for a count unit", () => {
+    expect(packSizeError("bags", "")).toBeNull()
+    expect(packSizeError("bags", "50")).toBeNull()
+    expect(packSizeError("sack", "10000")).toBeNull()
+  })
+  it("refuses zero, negatives, too much and a weighed unit", () => {
+    expect(packSizeError("bags", "0")).toMatch(/more than zero/)
+    expect(packSizeError("bags", "-5")).toMatch(/more than zero/)
+    expect(packSizeError("bags", "10001")).toMatch(/not credible/)
+    expect(packSizeError("kg", "50")).toMatch(/only applies/)
+  })
+  it("sends a number or null", () => {
+    expect(packSizeToSend("bags", "50")).toBe(50)
+    expect(packSizeToSend("bags", " ")).toBeNull()
+    expect(packSizeToSend("kg", "50")).toBeNull()
   })
 })

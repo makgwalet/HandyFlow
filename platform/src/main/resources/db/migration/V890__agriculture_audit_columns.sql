@@ -1,0 +1,7 @@
+-- Who added and who last changed the main agriculture records. Nullable: records that already exist keep no creator.
+ALTER TABLE ag_animals          ADD COLUMN IF NOT EXISTS created_by UUID, ADD COLUMN IF NOT EXISTS created_by_name VARCHAR(255), ADD COLUMN IF NOT EXISTS updated_by UUID, ADD COLUMN IF NOT EXISTS updated_by_name VARCHAR(255);
+ALTER TABLE ag_groups           ADD COLUMN IF NOT EXISTS created_by UUID, ADD COLUMN IF NOT EXISTS created_by_name VARCHAR(255), ADD COLUMN IF NOT EXISTS updated_by UUID, ADD COLUMN IF NOT EXISTS updated_by_name VARCHAR(255);
+ALTER TABLE ag_health_events    ADD COLUMN IF NOT EXISTS created_by UUID, ADD COLUMN IF NOT EXISTS created_by_name VARCHAR(255), ADD COLUMN IF NOT EXISTS updated_by UUID, ADD COLUMN IF NOT EXISTS updated_by_name VARCHAR(255);
+ALTER TABLE ag_breeding_records ADD COLUMN IF NOT EXISTS created_by UUID, ADD COLUMN IF NOT EXISTS created_by_name VARCHAR(255), ADD COLUMN IF NOT EXISTS updated_by UUID, ADD COLUMN IF NOT EXISTS updated_by_name VARCHAR(255);
+ALTER TABLE ag_inventory_items  ADD COLUMN IF NOT EXISTS created_by UUID, ADD COLUMN IF NOT EXISTS created_by_name VARCHAR(255), ADD COLUMN IF NOT EXISTS updated_by UUID, ADD COLUMN IF NOT EXISTS updated_by_name VARCHAR(255);
+ALTER TABLE ag_crop_cycles      ADD COLUMN IF NOT EXISTS created_by UUID, ADD COLUMN IF NOT EXISTS created_by_name VARCHAR(255), ADD COLUMN IF NOT EXISTS updated_by UUID, ADD COLUMN IF NOT EXISTS updated_by_name VARCHAR(255);

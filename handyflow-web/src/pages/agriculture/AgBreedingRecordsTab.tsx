@@ -21,7 +21,8 @@ import { usePermission } from "../../hooks/usePermission"
 import { AG_ACCENT_TEXT, statusBadge, type AgTargetType, targetBasePath, inp, btnPrimary, btnGhost } from "./constants"
 import { Field, QueryError } from "./agUi"
 import { apiErrorMessage } from "./agErrors"
-import { BREEDING_TYPES, breedingActions, breedingTypeLabel, outcomeLabel, birthFormError, birthPayload } from "./agBreeding.logic"
+import { toast } from "../../store/toast.store"
+import { BREEDING_TYPES, breedingActions, breedingTypeLabel, outcomeLabel, birthFormError, birthPayload, offspringRows, previewTemporaryTag, NEWBORN_SEXES, type OffspringRow } from "./agBreeding.logic"
 
 interface BreedingRecordResponse {
   id: string; animalId: string | null; groupId: string | null
@@ -32,7 +33,7 @@ interface BreedingRecordResponse {
 }
 interface Page<T> { content: T[]; totalElements: number }
 
-export default function AgBreedingRecordsTab({ targetType, targetId }: { targetType: AgTargetType; targetId: string }) {
+export default function AgBreedingRecordsTab({ targetType, targetId, damTag }: { targetType: AgTargetType; targetId: string; damTag?: string }) {
   const qc = useQueryClient()
   const base = targetBasePath(targetType, targetId)
   const [showCreate, setShowCreate] = useState(false)
@@ -45,6 +46,8 @@ export default function AgBreedingRecordsTab({ targetType, targetId }: { targetT
   const [actualBirthDate, setActualBirthDate] = useState(new Date().toISOString().slice(0, 10))
   const [liveCount, setLiveCount] = useState("1")
   const [stillbornCount, setStillbornCount] = useState("")
+  const [offspring, setOffspring] = useState<OffspringRow[]>([])
+  const individual = targetType === "animal"
   const [error, setError] = useState("")
   const canManage = usePermission("AGRICULTURE_MANAGE")
   const today = new Date().toISOString().slice(0, 10)
@@ -81,16 +84,21 @@ export default function AgBreedingRecordsTab({ targetType, targetId }: { targetT
   const failedMut = useMutation({ mutationFn: (id: string) => apiClient.patch(`/api/v1/agriculture/breeding-records/${id}/failed`), onSuccess: done, onError })
   const recordBirthMut = useMutation({
     mutationFn: () => apiClient.patch(`/api/v1/agriculture/breeding-records/${birthing!.id}/record-birth`, {
-      ...birthPayload({ date: actualBirthDate, live: liveCount, stillborn: stillbornCount }),
+      ...birthPayload({ date: actualBirthDate, live: liveCount, stillborn: stillbornCount, offspring: individual ? offspring : undefined }),
     }),
-    onSuccess: () => { done(); setBirthing(null) },
+    onSuccess: (res) => {
+      done(); setBirthing(null)
+      const made = (res?.data?.data?.offspringAnimalIds ?? res?.data?.offspringAnimalIds ?? []).length
+      if (individual && made > 0) toast.success(`${made} ${made === 1 ? "animal" : "animals"} added to the herd.`)
+      qc.invalidateQueries({ queryKey: ["ag-animals"] })
+    },
     onError,
   })
 
   const records = data?.content ?? []
   const submitBirth = () => {
     if (!birthing) return
-    const problem = birthFormError({ date: actualBirthDate, live: liveCount, stillborn: stillbornCount }, birthing.matingDate, today)
+    const problem = birthFormError({ date: actualBirthDate, live: liveCount, stillborn: stillbornCount, offspring: individual ? offspring : undefined }, birthing.matingDate, today)
     if (problem) { setError(problem); return }
     setError("")
     recordBirthMut.mutate()
@@ -144,7 +152,7 @@ export default function AgBreedingRecordsTab({ targetType, targetId }: { targetT
                       <>
                         {act.confirm && <button onClick={() => confirmPregnantMut.mutate({ id: r.id, expectedDueDate: r.expectedDueDate })} title="Confirm pregnant" aria-label="Confirm pregnant" style={iconBtn}><Check size={12} /></button>}
                         {act.notPregnant && <button onClick={() => notPregnantMut.mutate(r.id)} title="Not pregnant" aria-label="Not pregnant" style={iconBtn}><XIcon size={12} /></button>}
-                        {act.birth && <button onClick={() => { setBirthing(r); setError("") }} title="Record birth" aria-label="Record birth" style={iconBtn}><Baby size={12} /></button>}
+                        {act.birth && <button onClick={() => { setBirthing(r); setError(""); setOffspring(offspringRows(liveCount, [])) }} title="Record birth" aria-label="Record birth" style={iconBtn}><Baby size={12} /></button>}
                         {act.aborted && <button onClick={() => abortedMut.mutate(r.id)} title="Mark aborted" aria-label="Mark aborted" style={iconBtn}><Ban size={12} /></button>}
                         {act.failed && <button onClick={() => failedMut.mutate(r.id)} title="Mark failed" aria-label="Mark failed" style={{ ...iconBtn, color: "var(--hf-danger-text)" }}><XIcon size={12} /></button>}
                       </>
@@ -153,12 +161,38 @@ export default function AgBreedingRecordsTab({ targetType, targetId }: { targetT
                 </div>
               </div>
               {birthing?.id === r.id && (
-                <div style={{ padding: "0 14px 14px", display: "flex", gap: 8, alignItems: "flex-end" }}>
+                <div style={{ padding: "0 14px 14px" }}>
+                  <div style={{ display: "flex", gap: 8, alignItems: "flex-end", flexWrap: "wrap" }}>
                   <Field label="Birth date"><input type="date" min={birthing.matingDate} max={today} value={actualBirthDate} onChange={e => setActualBirthDate(e.target.value)} style={inp} /></Field>
-                  <Field label="Born alive"><input type="number" min={0} max={100} value={liveCount} onChange={e => setLiveCount(e.target.value)} style={{ ...inp, width: 90 }} /></Field>
+                  <Field label="Born alive"><input type="number" min={0} max={100} value={liveCount} onChange={e => { setLiveCount(e.target.value); setOffspring(cur => offspringRows(e.target.value, cur)) }} style={{ ...inp, width: 90 }} /></Field>
                   <Field label="Stillborn"><input type="number" min={0} max={100} value={stillbornCount} onChange={e => setStillbornCount(e.target.value)} style={{ ...inp, width: 90 }} /></Field>
+                  </div>
+                  {individual && offspring.length > 0 && (
+                    <div style={{ marginTop: 10 }}>
+                      <p style={{ fontSize: 12, color: "var(--hf-text-muted)", margin: "0 0 6px" }}>Each live offspring is added to the herd. Leave the tag empty to use a temporary one.</p>
+                      {offspring.map((o, i) => (
+                        <div key={i} style={{ display: "flex", gap: 8, alignItems: "flex-end", flexWrap: "wrap", marginBottom: 6 }}>
+                          <Field label={`Offspring ${i + 1} sex`}>
+                            <select value={o.sex} onChange={e => setOffspring(cur => cur.map((x, j) => j === i ? { ...x, sex: e.target.value } : x))} style={{ ...inp, width: 120 }}>
+                              <option value="">Choose…</option>
+                              {NEWBORN_SEXES.map(x => <option key={x} value={x}>{x}</option>)}
+                            </select>
+                          </Field>
+                          <Field label="Tag (optional)">
+                            <input value={o.tagNumber} onChange={e => setOffspring(cur => cur.map((x, j) => j === i ? { ...x, tagNumber: e.target.value } : x))}
+                              placeholder={damTag ? previewTemporaryTag(damTag, actualBirthDate, i + 1) : "Temporary tag"} style={{ ...inp, width: 160 }} />
+                          </Field>
+                          <Field label="Name (optional)">
+                            <input value={o.name} onChange={e => setOffspring(cur => cur.map((x, j) => j === i ? { ...x, name: e.target.value } : x))} style={{ ...inp, width: 140 }} />
+                          </Field>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
                   <button disabled={recordBirthMut.isPending} onClick={() => submitBirth()} style={{ ...btnPrimary, opacity: recordBirthMut.isPending ? 0.6 : 1 }}>Save</button>
                   <button onClick={() => setBirthing(null)} style={btnGhost}>Cancel</button>
+                  </div>
                 </div>
               )}
             </div>

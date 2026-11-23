@@ -10,5 +10,12 @@ public record CreateSpeciesRequest(
         String defaultUnitOfMeasure,
         String trackingMode,
         Integer gestationDays,
-        BigDecimal maturityWeightKg
-) {}
+        BigDecimal maturityWeightKg,
+        Integer tagReminderDays
+) {
+    /** Without the reminder setting (callers written before it existed). */
+    public CreateSpeciesRequest(String name, String category, String defaultUnitOfMeasure, String trackingMode,
+                                Integer gestationDays, BigDecimal maturityWeightKg) {
+        this(name, category, defaultUnitOfMeasure, trackingMode, gestationDays, maturityWeightKg, null);
+    }
+}

@@ -72,8 +72,18 @@ public class AgStockMovement {
     @Column(name = "supplier_id")
     private UUID supplierId;
 
+    /** Kg per bag used when this movement was posted (null for kg items). Kept so the history still reads right if the pack size is changed later. */
+    @Column(name = "pack_size_kg", precision = 10, scale = 3)
+    private BigDecimal packSizeKg;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
+
+    /** Notes the pack size used. Set once, before the movement is saved; the ledger is append-only. */
+    public void recordPackSize(BigDecimal packSizeKg) {
+        if (this.packSizeKg != null) throw new IllegalStateException("the pack size of a posted movement cannot be changed");
+        this.packSizeKg = packSizeKg;
+    }
 
     public static AgStockMovement create(TenantId tenantId, UUID inventoryItemId, String movementType,
                                           LocalDate movementDate, BigDecimal quantity, BigDecimal unitCost,

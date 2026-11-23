@@ -10,6 +10,9 @@ import org.mockito.quality.Strictness;
 import org.springframework.data.domain.PageImpl;
 import za.co.handyflow.platform.agriculture.domain.model.*;
 import za.co.handyflow.platform.agriculture.domain.repository.*;
+import za.co.handyflow.platform.agriculture.domain.repository.AgCropCycleRepository;
+import za.co.handyflow.platform.agriculture.domain.repository.AgHealthEventRepository;
+import za.co.handyflow.platform.agriculture.domain.repository.AgScoutingRecordRepository;
 import za.co.handyflow.platform.agriculture.dto.AgDashboardResponse;
 import za.co.handyflow.platform.agriculture.dto.AttentionItemResponse;
 import za.co.handyflow.platform.agriculture.dto.FarmTodaySummaryResponse;
@@ -35,9 +38,12 @@ class AgDashboardServiceTest {
     @Mock AgFarmRepository farmRepository;
     @Mock AgAnimalRepository animalRepository;
     @Mock AgGroupRepository groupRepository;
-    @Mock AgCropCycleRepository cropCycleRepository;
-    @Mock AgHealthEventRepository healthEventRepository;
-    @Mock AgScoutingRecordRepository scoutingRecordRepository;
+    @Mock
+    AgCropCycleRepository cropCycleRepository;
+    @Mock
+    AgHealthEventRepository healthEventRepository;
+    @Mock
+    AgScoutingRecordRepository scoutingRecordRepository;
     @Mock AgInventoryItemRepository inventoryItemRepository;
     @Mock AgSpeciesRepository speciesRepository;
     @Mock AgCropTypeRepository cropTypeRepository;

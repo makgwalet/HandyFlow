@@ -33,6 +33,7 @@ export interface SpeciesResponse {
   trackingMode: "INDIVIDUAL" | "GROUP" | "BOTH"
   gestationDays: number | null
   maturityWeightKg: number | null
+  tagReminderDays?: number | null
   status: string
   createdAt: string
 }
@@ -41,7 +42,7 @@ interface Page<T> { content: T[]; totalElements: number }
 const CATEGORIES = ["LIVESTOCK", "POULTRY", "AQUACULTURE"]
 const TRACKING_MODES = ["INDIVIDUAL", "GROUP", "BOTH"]
 
-type SpeciesValues = { name: string; category: string; defaultUnitOfMeasure: string; trackingMode: string; gestationDays: string; maturityWeightKg: string }
+type SpeciesValues = { name: string; category: string; defaultUnitOfMeasure: string; trackingMode: string; gestationDays: string; maturityWeightKg: string; tagReminderDays: string }
 
 function SpeciesForm({ initial, onCancel, onSave, saving }: {
   initial?: Partial<SpeciesResponse>; onCancel: () => void; saving: boolean
@@ -53,6 +54,7 @@ function SpeciesForm({ initial, onCancel, onSave, saving }: {
   const [trackingMode, setTrackingMode] = useState(initial?.trackingMode ?? "BOTH")
   const [gestationDays, setGestationDays] = useState(initial?.gestationDays != null ? String(initial.gestationDays) : "")
   const [maturityWeightKg, setMaturityWeightKg] = useState(initial?.maturityWeightKg != null ? String(initial.maturityWeightKg) : "")
+  const [tagReminderDays, setTagReminderDays] = useState(initial?.tagReminderDays != null ? String(initial.tagReminderDays) : "")
 
   return (
     <div style={{ background: "var(--hf-surface-muted)", border: "1px solid var(--hf-border)", borderRadius: 12, padding: 16, marginBottom: 16 }}>
@@ -71,10 +73,11 @@ function SpeciesForm({ initial, onCancel, onSave, saving }: {
           </select></Field>
         <Field label="Gestation (days)"><input type="number" min={0} value={gestationDays} onChange={e => setGestationDays(e.target.value)} style={inp} /></Field>
         <Field label="Maturity weight (kg)"><input type="number" min={0} step="0.1" value={maturityWeightKg} onChange={e => setMaturityWeightKg(e.target.value)} style={inp} /></Field>
+        <Field label="Remind to fit a tag (days after birth)"><input type="number" min={1} max={365} value={tagReminderDays} onChange={e => setTagReminderDays(e.target.value)} placeholder="No reminder" style={inp} /></Field>
       </div>
       <div style={{ display: "flex", gap: 8 }}>
         <button disabled={saving || !name.trim()}
-          onClick={() => onSave({ name, category, defaultUnitOfMeasure: uom, trackingMode, gestationDays, maturityWeightKg })}
+          onClick={() => onSave({ name, category, defaultUnitOfMeasure: uom, trackingMode, gestationDays, maturityWeightKg, tagReminderDays })}
           style={{ ...btnPrimary, opacity: saving || !name.trim() ? 0.6 : 1 }}>
           {saving ? "Saving…" : "Save"}
         </button>
@@ -101,6 +104,7 @@ export default function AgSpeciesTab() {
       name: v.name, category: v.category, defaultUnitOfMeasure: v.defaultUnitOfMeasure || "head",
       trackingMode: v.trackingMode, gestationDays: v.gestationDays ? Number(v.gestationDays) : null,
       maturityWeightKg: v.maturityWeightKg ? Number(v.maturityWeightKg) : null,
+      tagReminderDays: v.tagReminderDays ? Number(v.tagReminderDays) : null,
     }),
     onSuccess: () => { invalidate(); setShowCreate(false) },
   })
@@ -109,6 +113,7 @@ export default function AgSpeciesTab() {
       name: v.name, defaultUnitOfMeasure: v.defaultUnitOfMeasure || "head", trackingMode: v.trackingMode,
       gestationDays: v.gestationDays ? Number(v.gestationDays) : null,
       maturityWeightKg: v.maturityWeightKg ? Number(v.maturityWeightKg) : null,
+      tagReminderDays: v.tagReminderDays ? Number(v.tagReminderDays) : null,
     }),
     onSuccess: () => { invalidate(); setEditing(null) },
   })

@@ -45,6 +45,7 @@ public class AgSpeciesService {
         za.co.handyflow.platform.agriculture.domain.rules.AgLookupDefaults.requireNewName(existingNames(tenantId), req.name(), "species");
         AgSpecies species = AgSpecies.create(tenantId, req.name(), req.category(), req.defaultUnitOfMeasure(),
                 req.trackingMode(), req.gestationDays(), req.maturityWeightKg());
+        species.setTagReminderDays(req.tagReminderDays());
         speciesRepository.save(species);
         log.info("Species created id={} tenant={}", species.getId(), tenantId.getValue());
         return toResponse(species);
@@ -69,6 +70,7 @@ public class AgSpeciesService {
             za.co.handyflow.platform.agriculture.domain.rules.AgLookupDefaults.requireNewName(existingNames(tenantId), req.name(), "species");
         }
         species.update(req.name(), req.defaultUnitOfMeasure(), req.trackingMode(), req.gestationDays(), req.maturityWeightKg());
+        species.setTagReminderDays(req.tagReminderDays());
         return toResponse(species);
     }
 
@@ -101,7 +103,7 @@ public class AgSpeciesService {
     private SpeciesResponse toResponse(AgSpecies s) {
         return new SpeciesResponse(
                 s.getId(), s.getName(), s.getCategory(), s.getDefaultUnitOfMeasure(), s.getTrackingMode(),
-                s.getGestationDays(), s.getMaturityWeightKg(), s.getStatus(), s.getCreatedAt()
+                s.getGestationDays(), s.getMaturityWeightKg(), s.getStatus(), s.getCreatedAt(), s.getTagReminderDays()
         );
     }
 }

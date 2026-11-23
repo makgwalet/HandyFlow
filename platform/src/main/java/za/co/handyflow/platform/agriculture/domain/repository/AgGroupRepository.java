@@ -48,4 +48,8 @@ public interface AgGroupRepository extends JpaRepository<AgGroup, UUID> {
     // Trends: which farm each (non-deleted) group belongs to: [groupId, farmId].
     @Query("SELECT g.id, g.farmId FROM AgGroup g WHERE g.tenantId = :tenantId AND g.deletedAt IS NULL")
     List<Object[]> findGroupFarms(TenantId tenantId);
+
+    // Breeds already used on a farm, with their species: [speciesId, breed]. Feeds the breed suggestions.
+    @Query("SELECT DISTINCT g.speciesId, g.breed FROM AgGroup g WHERE g.tenantId = :tenantId AND g.farmId = :farmId AND g.deletedAt IS NULL AND g.breed IS NOT NULL")
+    List<Object[]> findDistinctBreedsForFarm(TenantId tenantId, UUID farmId);
 }

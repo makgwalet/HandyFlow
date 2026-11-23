@@ -26,4 +26,16 @@ public interface AgBreedingRecordRepository extends JpaRepository<AgBreedingReco
     // Trends: births that have been recorded: [actualBirthDate, offspringCount, animalId, groupId].
     @Query("SELECT b.actualBirthDate, b.offspringCount, b.animalId, b.groupId FROM AgBreedingRecord b WHERE b.tenantId = :tenantId AND b.actualBirthDate IS NOT NULL AND b.actualBirthDate >= :startDate AND b.actualBirthDate <= :endDate")
     List<Object[]> findBirthsBetween(TenantId tenantId, LocalDate startDate, LocalDate endDate);
+
+    // The farm calendar: births expected in the window, for pregnancies still open on animals and groups still on the farm.
+    @Query("""
+        SELECT b FROM AgBreedingRecord b
+        WHERE b.tenantId = :tenantId
+        AND b.expectedDueDate IS NOT NULL AND b.expectedDueDate >= :from AND b.expectedDueDate <= :to
+        AND b.outcome IN ('PENDING', 'CONFIRMED_PREGNANT')
+        AND (b.animalId IN (SELECT a.id FROM AgAnimal a WHERE a.tenantId = :tenantId AND a.farmId = :farmId AND a.deletedAt IS NULL AND a.status = 'ACTIVE')
+             OR b.groupId IN (SELECT g.id FROM AgGroup g WHERE g.tenantId = :tenantId AND g.farmId = :farmId AND g.deletedAt IS NULL AND g.status = 'ACTIVE'))
+        ORDER BY b.expectedDueDate ASC
+        """)
+    List<AgBreedingRecord> findExpectedBirthsForCalendar(TenantId tenantId, UUID farmId, LocalDate from, LocalDate to);
 }

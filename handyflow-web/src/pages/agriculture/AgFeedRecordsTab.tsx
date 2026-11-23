@@ -2,8 +2,8 @@
 //
 // Shared animal/group feed history. Feed can be drawn from one of the farm's stock items, chosen from a list: the kilograms
 // fed are taken off the item (converted into its own unit), the feed name and cost per kg are filled in from the item, and
-// the screen warns before saving if there is not enough on hand. Items counted in bags or bales cannot be used until their
-// unit is changed to kg or t.
+// the screen warns before saving if there is not enough on hand. A bag, bale or sack item can be used once it has a kg per
+// bag (set in Stock): the feed can then be typed in kg or in bags, and the other is shown beside it.
 import { useState } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { useAgToastMutation } from "./agMutation"
@@ -14,9 +14,11 @@ import { apiClient } from "../../api/client"
 import { AG_ACCENT_TEXT, fmtMoney, type AgTargetType, targetBasePath, inp, btnPrimary, btnGhost } from "./constants"
 import { Field, QueryError } from "./agUi"
 import { useInventory } from "./agCrops.api"
-import { feedChoices, feedPrefill, feedStockProblem } from "./agPickers.logic"
+import { feedChoices, feedEquivalent, feedPrefill, feedQuantityPayload, feedStockProblem, bagsToKg, hasPackSize, unitSingular, type FeedEntry } from "./agPickers.logic"
 import AgManage from "./AgManage"
-import { feedSuggestions } from "./agLookups"
+import { feedSuggestions, withOwn } from "./agLookups"
+import { useAuditBatch, useFarmSuggestions } from "./agLookups.api"
+import { byText } from "./agAudit.logic"
 
 interface FeedRecordResponse {
   id: string; animalId: string | null; groupId: string | null
@@ -35,12 +37,18 @@ export default function AgFeedRecordsTab({ targetType, targetId, farmId, species
   const [feedType, setFeedType] = useState("")
   const [quantityKg, setQuantityKg] = useState("")
   const [costPerKg, setCostPerKg] = useState("")
+  const [entry, setEntry] = useState<FeedEntry>("kg")
   const { data: stock = [], isLoading: stockLoading } = useInventory(farmId)
   const choices = feedChoices(stock)
   const chosen = stock.find(i => i.id === inventoryItemId) ?? null
-  const stockProblem = chosen ? feedStockProblem(chosen, Number(quantityKg)) : null
+  const bagItem = chosen != null && hasPackSize(chosen)
+  const entryNow: FeedEntry = bagItem ? entry : "kg"
+  // what the stock check compares: the kilograms, worked out from bags when bags were typed
+  const kgForCheck = chosen && bagItem && entryNow === "bags" ? bagsToKg(Number(quantityKg), chosen.packSizeKg as number) : Number(quantityKg)
+  const stockProblem = chosen ? feedStockProblem(chosen, kgForCheck) : null
   const pickItem = (id: string) => {
     setInventoryItemId(id)
+    setEntry("kg")
     const item = stock.find(i => i.id === id)
     if (item) {
       const p = feedPrefill(item)
@@ -63,7 +71,7 @@ export default function AgFeedRecordsTab({ targetType, targetId, farmId, species
     mutationFn: () => apiClient.post(`${base}/feed-records`, {
       [targetType === "animal" ? "animalId" : "groupId"]: targetId,
       feedDate, inventoryItemId: inventoryItemId || null, feedType,
-      quantityKg: Number(quantityKg), costPerKg: costPerKg ? Number(costPerKg) : null, notes: null,
+      ...feedQuantityPayload(entryNow, quantityKg), costPerKg: costPerKg ? Number(costPerKg) : null, notes: null,
     }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey })
@@ -75,6 +83,8 @@ export default function AgFeedRecordsTab({ targetType, targetId, farmId, species
   })
 
   const records = data?.content ?? []
+  const added = useAuditBatch("feed-records", records.map(r => r.id))
+  const farmSuggestions = useFarmSuggestions(farmId)
 
   return (
     <div>
@@ -95,10 +105,21 @@ export default function AgFeedRecordsTab({ targetType, targetId, farmId, species
                 </select>
               </Field>
             </div>
-            <><Field label="Feed type"><input list="ag-feed-options" value={feedType} onChange={e => setFeedType(e.target.value)} placeholder="e.g. Broiler starter" style={inp} /></Field><datalist id="ag-feed-options">{feedSuggestions(speciesName).map(f => <option key={f} value={f} />)}</datalist></>
-            <Field label="Quantity (kg)"><input type="number" min={0} step="0.1" value={quantityKg} onChange={e => setQuantityKg(e.target.value)} style={inp} /></Field>
+            <><Field label="Feed type"><input list="ag-feed-options" value={feedType} onChange={e => setFeedType(e.target.value)} placeholder="e.g. Broiler starter" style={inp} /></Field><datalist id="ag-feed-options">{withOwn(feedSuggestions(speciesName), [...farmSuggestions.feedTypes, ...records.map(r => r.feedType)]).map(f => <option key={f} value={f} />)}</datalist></>
+            {bagItem && chosen && (
+              <Field label="Enter amount in">
+                <select value={entryNow} onChange={e => { setEntry(e.target.value as FeedEntry); setQuantityKg("") }} style={inp}>
+                  <option value="kg">kg</option>
+                  <option value="bags">{unitSingular(chosen.unitOfMeasure)}s</option>
+                </select>
+              </Field>
+            )}
+            <Field label={entryNow === "bags" && chosen ? `Quantity (${unitSingular(chosen.unitOfMeasure)}s)` : "Quantity (kg)"}>
+              <input type="number" min={0} step={entryNow === "bags" ? "0.01" : "0.1"} value={quantityKg} onChange={e => setQuantityKg(e.target.value)} style={inp} />
+            </Field>
             <Field label="Cost/kg (R)"><input type="number" min={0} step="0.01" value={costPerKg} onChange={e => setCostPerKg(e.target.value)} placeholder={chosen ? "from stock cost" : ""} style={inp} /></Field>
           </div>
+          {chosen && feedEquivalent(chosen, entryNow, quantityKg) && <p style={{ fontSize: 12, color: "var(--hf-text-muted)", margin: "0 0 8px" }}>{quantityKg} {entryNow === "bags" ? unitSingular(chosen.unitOfMeasure) + "s" : "kg"} {feedEquivalent(chosen, entryNow, quantityKg)}</p>}
           {stockProblem && <p role="alert" style={{ fontSize: 12.5, color: "var(--hf-danger-text)", margin: "0 0 8px" }}>{stockProblem}</p>}
           <div style={{ display: "flex", gap: 8 }}>
             <button disabled={createMut.isPending || !feedType.trim() || !quantityKg || !!stockProblem} onClick={() => createMut.mutate()}
@@ -117,7 +138,7 @@ export default function AgFeedRecordsTab({ targetType, targetId, farmId, species
                 <Wheat size={13} style={{ color: AG_ACCENT_TEXT }} />
                 <div>
                   <p style={{ fontSize: 12.5, color: "var(--hf-text)", fontWeight: 600, margin: 0 }}>{r.feedType} — {r.quantityKg} kg</p>
-                  <p style={{ fontSize: 11, color: "var(--hf-text-faint)", margin: 0 }}>{r.feedDate}{r.totalCost != null ? ` · ${fmtMoney(r.totalCost)}` : ""}</p>
+                  <p style={{ fontSize: 11, color: "var(--hf-text-faint)", margin: 0 }}>{r.feedDate}{r.totalCost != null ? ` · ${fmtMoney(r.totalCost)}` : ""}{byText(added[r.id])}</p>
                 </div>
               </div>
             </div>

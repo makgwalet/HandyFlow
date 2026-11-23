@@ -13,5 +13,11 @@ public record CreateInventoryItemRequest(
         @NotBlank String unitOfMeasure,
         BigDecimal reorderLevel,
         BigDecimal unitCost,
-        String supplier
-) {}
+        String supplier,
+        BigDecimal packSizeKg   // kg in one bag, bale or sack; only for items counted in those units
+) {
+    public CreateInventoryItemRequest(UUID farmId, String itemName, String category, String unitOfMeasure,
+                                      BigDecimal reorderLevel, BigDecimal unitCost, String supplier) {
+        this(farmId, itemName, category, unitOfMeasure, reorderLevel, unitCost, supplier, null);
+    }
+}

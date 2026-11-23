@@ -25,9 +25,18 @@ import java.util.UUID;
  */
 @Entity
 @Table(name = "ag_breeding_records")
+@EntityListeners(AgAuditListener.class)
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class AgBreedingRecord {
+public class AgBreedingRecord implements AgAudited {
+
+    /** Who added this record and who last changed it (see {@link AgAuditListener}). Null on records from before it was kept. */
+    @Embedded
+    private AgAuditStamp audit = new AgAuditStamp();
+
+    @Override public AgAuditStamp getAudit() { return audit; }
+    @Override public void setAudit(AgAuditStamp audit) { this.audit = audit; }
+
 
     @Id
     private UUID id = UUID.randomUUID();

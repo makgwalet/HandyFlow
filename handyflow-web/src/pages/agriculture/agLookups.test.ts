@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { SOIL_TYPES, STOCK_UNITS, withCurrent, breedSuggestions, feedSuggestions } from "./agLookups"
+import { SOIL_TYPES, STOCK_UNITS, withCurrent, breedSuggestions, feedSuggestions, ownBreeds, withOwn } from "./agLookups"
 import { canonicalUnit } from "./agUnits"
 
 describe("withCurrent", () => {
@@ -32,5 +32,24 @@ describe("suggestions", () => {
     expect(breedSuggestions("Alpacas")).toEqual([])
     expect(breedSuggestions(null)).toEqual([])
     expect(feedSuggestions("Alpacas")).toContain("Lucerne hay")
+  })
+})
+
+describe("withOwn", () => {
+  it("adds what the farm already uses after the starter list, once, ignoring case and blanks", () => {
+    expect(withOwn(["Nguni", "Angus"], ["Zebu cross", "nguni", " ", null, undefined, "Afrikaner x", "zebu CROSS"])).toEqual(["Nguni", "Angus", "Afrikaner x", "Zebu cross"])
+  })
+  it("returns the starter list unchanged when there is nothing of its own", () => {
+    expect(withOwn(["A"], [])).toEqual(["A"])
+  })
+})
+
+describe("ownBreeds", () => {
+  const s = { breedsBySpecies: { cow: ["Nguni", "Zebu cross"] } }
+  it("gives the farm's breeds for the species", () => { expect(ownBreeds(s, "cow")).toEqual(["Nguni", "Zebu cross"]) })
+  it("gives nothing for another species, no species or nothing loaded", () => {
+    expect(ownBreeds(s, "sheep")).toEqual([])
+    expect(ownBreeds(s, null)).toEqual([])
+    expect(ownBreeds(undefined, "cow")).toEqual([])
   })
 })

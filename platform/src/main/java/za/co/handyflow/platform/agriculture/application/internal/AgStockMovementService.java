@@ -48,7 +48,7 @@ public class AgStockMovementService {
         return new StockMovementResponse(
                 m.getId(), m.getInventoryItemId(), m.getMovementType(), m.getMovementDate(), m.getQuantity(),
                 m.getUnitCost(), m.getTotalCost(), m.getReferenceType(), m.getReferenceId(), m.getPerformedBy(),
-                m.getPerformedByName(), m.getNotes(), m.getCreatedAt(), m.getSupplierId(), supplierName
+                m.getPerformedByName(), m.getNotes(), m.getCreatedAt(), m.getSupplierId(), supplierName, m.getPackSizeKg()
         );
     }
 }

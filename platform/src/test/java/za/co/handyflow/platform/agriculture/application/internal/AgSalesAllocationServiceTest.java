@@ -11,6 +11,7 @@ import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import za.co.handyflow.platform.agriculture.domain.model.*;
 import za.co.handyflow.platform.agriculture.domain.repository.*;
+import za.co.handyflow.platform.agriculture.domain.repository.AgCropCycleRepository;
 import za.co.handyflow.platform.agriculture.dto.SalesDtos.AllocateSaleRequest;
 import za.co.handyflow.platform.agriculture.dto.SalesDtos.SaleLineResponse;
 import za.co.handyflow.platform.agriculture.dto.SalesDtos.SaleShare;
@@ -44,7 +45,8 @@ class AgSalesAllocationServiceTest {
 
     @Mock AgSalesAllocationRepository allocationRepository;
     @Mock AgFarmRepository farmRepository;
-    @Mock AgCropCycleRepository cropCycleRepository;
+    @Mock
+    AgCropCycleRepository cropCycleRepository;
     @Mock AgGroupRepository groupRepository;
     @Mock AgAnimalRepository animalRepository;
     @Mock AgEnterpriseRepository enterpriseRepository;

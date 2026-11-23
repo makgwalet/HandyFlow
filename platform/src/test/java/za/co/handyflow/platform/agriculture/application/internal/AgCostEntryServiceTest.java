@@ -11,6 +11,7 @@ import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import za.co.handyflow.platform.agriculture.domain.model.*;
 import za.co.handyflow.platform.agriculture.domain.repository.*;
+import za.co.handyflow.platform.agriculture.domain.repository.AgCropCycleRepository;
 import za.co.handyflow.platform.agriculture.dto.CostEntryDtos.AllocationShare;
 import za.co.handyflow.platform.agriculture.dto.CostEntryDtos.CostEntryResponse;
 import za.co.handyflow.platform.agriculture.dto.CostEntryDtos.CostTotalsResponse;
@@ -40,7 +41,8 @@ class AgCostEntryServiceTest {
 
     @Mock AgCostEntryRepository costEntryRepository;
     @Mock AgFarmRepository farmRepository;
-    @Mock AgCropCycleRepository cropCycleRepository;
+    @Mock
+    AgCropCycleRepository cropCycleRepository;
     @Mock AgGroupRepository groupRepository;
     @Mock AgAnimalRepository animalRepository;
     @Mock AgEnterpriseRepository enterpriseRepository;

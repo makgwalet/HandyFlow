@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { breedingActions, birthFormError, birthPayload, breedingTypeLabel, outcomeLabel } from "./agBreeding.logic"
+import { offspringRows, previewTemporaryTag, offspringError, breedingActions, birthFormError, birthPayload, breedingTypeLabel, outcomeLabel } from "./agBreeding.logic"
 import { apiErrorMessage } from "./agErrors"
 
 describe("breedingActions", () => {
@@ -66,5 +66,38 @@ describe("apiErrorMessage", () => {
   })
   it("falls back when the body has no message", () => {
     expect(apiErrorMessage({ response: { status: 400, data: {} } }, "Could not save")).toBe("Could not save")
+  })
+})
+
+describe("offspring rows", () => {
+  it("builds one row per live offspring and keeps what was typed", () => {
+    const two = offspringRows("2", [])
+    expect(two).toHaveLength(2)
+    two[0].sex = "FEMALE"
+    expect(offspringRows("3", two)[0].sex).toBe("FEMALE")
+    expect(offspringRows("1", two)).toHaveLength(1)
+  })
+  it("gives no rows for empty, bad or negative input and caps at 100", () => {
+    expect(offspringRows("", [])).toHaveLength(0)
+    expect(offspringRows("abc", [])).toHaveLength(0)
+    expect(offspringRows("-1", [])).toHaveLength(0)
+    expect(offspringRows("500", [])).toHaveLength(100)
+  })
+  it("previews the temporary tag like the server", () => {
+    expect(previewTemporaryTag("1234", "2026-11-01", 1)).toBe("1234-26-01")
+    expect(previewTemporaryTag("1234", "2026-11-01", 12)).toBe("1234-26-12")
+  })
+  it("needs a sex per offspring and no repeated tag", () => {
+    const row = (sex: string, tagNumber = "") => ({ sex, tagNumber, name: "" })
+    expect(offspringError([row("MALE"), row("")])).toBe("Choose the sex of offspring 2.")
+    expect(offspringError([row("MALE", "A1"), row("FEMALE", " a1 ")])).toBe("The tag a1 is used twice.")
+    expect(offspringError([row("MALE", "A1"), row("FEMALE")])).toBeNull()
+  })
+  it("blocks the birth form until the offspring are valid, and sends them trimmed", () => {
+    const f = { date: "2026-11-01", live: "1", stillborn: "0", offspring: [{ sex: "", tagNumber: "", name: "" }] }
+    expect(birthFormError(f, "2026-03-01", "2026-11-23")).toBe("Choose the sex of offspring 1.")
+    f.offspring = [{ sex: "FEMALE", tagNumber: " 77 ", name: "" }]
+    expect(birthFormError(f, "2026-03-01", "2026-11-23")).toBeNull()
+    expect(birthPayload(f).offspring).toEqual([{ sex: "FEMALE", tagNumber: "77", name: null }])
   })
 })

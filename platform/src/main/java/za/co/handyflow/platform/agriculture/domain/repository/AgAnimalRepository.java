@@ -60,4 +60,20 @@ public interface AgAnimalRepository extends JpaRepository<AgAnimal, UUID> {
     // Trends: animal purchases [acquisitionDate, acquisitionCost, farmId].
     @Query("SELECT a.acquisitionDate, a.acquisitionCost, a.farmId FROM AgAnimal a WHERE a.tenantId = :tenantId AND a.deletedAt IS NULL AND a.acquisitionCost IS NOT NULL AND a.acquisitionDate >= :startDate AND a.acquisitionDate <= :endDate")
     List<Object[]> findPurchasesBetween(TenantId tenantId, LocalDate startDate, LocalDate endDate);
+
+    // Tags already on the farm that start with this text: backs the temporary-tag numbering of a birth (an extra match only skips a number).
+    @Query("SELECT a.tagNumber FROM AgAnimal a WHERE a.tenantId = :tenantId AND a.farmId = :farmId AND a.tagNumber LIKE CONCAT(:prefix, '%') AND a.deletedAt IS NULL")
+    List<String> findTagNumbersStartingWith(TenantId tenantId, UUID farmId, String prefix);
+
+    // Newborns still on a temporary tag whose reminder is not recently sent; the species' reminder days are applied in code.
+    @Query("SELECT a FROM AgAnimal a WHERE a.tagTemporary = true AND a.deletedAt IS NULL AND a.status = 'ACTIVE' AND a.dateOfBirth IS NOT NULL AND (a.tagReminderNotifiedOn IS NULL OR a.tagReminderNotifiedOn <= :repeatBefore) ORDER BY a.dateOfBirth, a.id")
+    List<AgAnimal> findTemporaryTagsAcrossTenants(LocalDate repeatBefore);
+
+    // The animals a birth created.
+    @Query("SELECT a FROM AgAnimal a WHERE a.tenantId = :tenantId AND a.birthRecordId = :birthRecordId AND a.deletedAt IS NULL ORDER BY a.tagNumber, a.id")
+    List<AgAnimal> findByBirthRecord(TenantId tenantId, UUID birthRecordId);
+
+    // Breeds already used on a farm, with their species: [speciesId, breed]. Feeds the breed suggestions.
+    @Query("SELECT DISTINCT a.speciesId, a.breed FROM AgAnimal a WHERE a.tenantId = :tenantId AND a.farmId = :farmId AND a.deletedAt IS NULL AND a.breed IS NOT NULL")
+    List<Object[]> findDistinctBreedsForFarm(TenantId tenantId, UUID farmId);
 }

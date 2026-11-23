@@ -13,7 +13,9 @@ import { AG_ACCENT_TEXT, statusBadge, inp, btnPrimary, btnGhost } from "./consta
 import { Field, EmptyNote, QueryError } from "./agUi"
 import { formGrid, rowButtonProps } from "./agUi.logic"
 import AgManage from "./AgManage"
-import { breedSuggestions } from "./agLookups"
+import AgAnimalImport from "./AgAnimalImport"
+import { breedSuggestions, ownBreeds, withOwn } from "./agLookups"
+import { useFarmSuggestions } from "./agLookups.api"
 import AgPager from "./AgPager"
 import { useDebounced } from "./useDebounced"
 import { PAGE_SIZE, lastPage, rangeLabel, searchParam } from "./agPaging.logic"
@@ -27,6 +29,7 @@ export interface AnimalResponse {
   acquisitionType: string; acquisitionDate: string; acquisitionCost: number | null
   currentWeightKg: number | null; status: string; notes: string | null
   withdrawalOverrideReason?: string | null; withdrawalHeldUntil?: string | null
+  tagTemporary?: boolean; birthRecordId?: string | null
   breedingStock: boolean   // capital, not a production cost: its purchase price is left out of margins (ADR-001 decision 7)
   createdAt: string; updatedAt: string
 }
@@ -40,6 +43,7 @@ const ACQUISITION_TYPES = ["BORN_ON_FARM", "PURCHASED", "TRANSFERRED_IN"]
 export default function AgAnimalsTab({ farmId, onSelectAnimal }: { farmId: string; onSelectAnimal: (a: AnimalResponse) => void }) {
   const qc = useQueryClient()
   const [showCreate, setShowCreate] = useState(false)
+  const [showImport, setShowImport] = useState(false)
   const [statusFilter, setStatusFilter] = useState("ACTIVE")
   const [search, setSearch] = useState("")
   const [page, setPage] = useState(0)
@@ -82,6 +86,7 @@ export default function AgAnimalsTab({ farmId, onSelectAnimal }: { farmId: strin
 
   const species = speciesData?.content ?? []
   const animals = data?.content ?? []
+  const farmSuggestions = useFarmSuggestions(farmId)
 
   return (
     <div>
@@ -99,8 +104,15 @@ export default function AgAnimalsTab({ farmId, onSelectAnimal }: { farmId: strin
             <option value="DECEASED">DECEASED</option><option value="CULLED">CULLED</option>
           </select>
         </div>
-        {!showCreate && <AgManage><button onClick={() => setShowCreate(true)} style={btnPrimary}><Plus size={14} style={{ marginRight: 5, verticalAlign: -2 }} />Register animal</button></AgManage>}
+        {!showCreate && !showImport && <AgManage>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button onClick={() => setShowImport(true)} style={btnGhost}>Import CSV</button>
+            <button onClick={() => setShowCreate(true)} style={btnPrimary}><Plus size={14} style={{ marginRight: 5, verticalAlign: -2 }} />Register animal</button>
+          </div>
+        </AgManage>}
       </div>
+
+      {showImport && <AgAnimalImport farmId={farmId} onClose={() => setShowImport(false)} />}
 
       {showCreate && (
         <div style={{ background: "var(--hf-surface-muted)", border: "1px solid var(--hf-border)", borderRadius: 12, padding: 16, marginBottom: 16 }}>
@@ -110,7 +122,7 @@ export default function AgAnimalsTab({ farmId, onSelectAnimal }: { farmId: strin
               </select></Field>
             <Field label="Tag number"><input value={tagNumber} onChange={e => setTagNumber(e.target.value)} style={inp} /></Field>
             <Field label="Name (optional)"><input value={name} onChange={e => setName(e.target.value)} style={inp} /></Field>
-            <><Field label="Breed"><input list="ag-breed-options" value={breed} onChange={e => setBreed(e.target.value)} style={inp} /></Field><datalist id="ag-breed-options">{breedSuggestions(species.find(s => s.id === speciesId)?.name).map(b => <option key={b} value={b} />)}</datalist></>
+            <><Field label="Breed"><input list="ag-breed-options" value={breed} onChange={e => setBreed(e.target.value)} style={inp} /></Field><datalist id="ag-breed-options">{withOwn(breedSuggestions(species.find(s => s.id === speciesId)?.name), [...ownBreeds(farmSuggestions, speciesId), ...animals.filter(a => a.speciesId === speciesId).map(a => a.breed)]).map(b => <option key={b} value={b} />)}</datalist></>
           </div>
           <div style={{ ...formGrid, marginBottom: 12 }}>
             <Field label="Sex"><select value={sex} onChange={e => setSex(e.target.value)} style={inp}>{SEXES.map(s => <option key={s} value={s}>{s}</option>)}</select></Field>

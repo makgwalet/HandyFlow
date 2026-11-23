@@ -59,6 +59,10 @@ public class AgSpecies {
     @Column(name = "maturity_weight_kg", precision = 10, scale = 2)
     private BigDecimal maturityWeightKg;
 
+    /** Days after a birth to remind the farmer to fit the permanent tag. Empty means no reminder; no legal number is assumed. */
+    @Column(name = "tag_reminder_days")
+    private Integer tagReminderDays;
+
     @Column(nullable = false)
     private String status = "ACTIVE"; // ACTIVE | INACTIVE
 
@@ -100,6 +104,11 @@ public class AgSpecies {
         if (trackingMode != null && !trackingMode.isBlank()) this.trackingMode = trackingMode;
         this.gestationDays = gestationDays;
         this.maturityWeightKg = maturityWeightKg;
+    }
+
+    /** Sets (or, with null, clears) the days before the permanent-tag reminder. A new method, so create() and update() keep their signatures. */
+    public void setTagReminderDays(Integer days) {
+        this.tagReminderDays = za.co.handyflow.platform.agriculture.domain.rules.AgBirthRules.requireReminderDays(days);
     }
 
     public void deactivate() { this.status = "INACTIVE"; }

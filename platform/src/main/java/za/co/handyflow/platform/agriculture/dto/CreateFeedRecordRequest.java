@@ -13,7 +13,13 @@ public record CreateFeedRecordRequest(
         @NotNull LocalDate feedDate,
         UUID inventoryItemId,
         @NotBlank String feedType,
-        @NotNull BigDecimal quantityKg,
+        BigDecimal quantityKg,      // give this or quantityBags, not both (the service checks)
         BigDecimal costPerKg,
-        String notes
-) {}
+        String notes,
+        BigDecimal quantityBags     // bags, bales or sacks of the chosen stock item; needs its kg per bag
+) {
+    public CreateFeedRecordRequest(UUID animalId, UUID groupId, LocalDate feedDate, UUID inventoryItemId, String feedType,
+                                   BigDecimal quantityKg, BigDecimal costPerKg, String notes) {
+        this(animalId, groupId, feedDate, inventoryItemId, feedType, quantityKg, costPerKg, notes, null);
+    }
+}

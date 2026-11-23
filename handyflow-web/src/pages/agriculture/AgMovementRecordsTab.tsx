@@ -23,6 +23,8 @@ import AgWithdrawalNotice from "./AgWithdrawalNotice"
 import { useWithdrawal } from "./agCompliance.api"
 import { isMarketMovement, overrideNote, overrideProblem, overrideReasonToSend } from "./agCompliance.logic"
 import { todayISO } from "./agCrops.logic"
+import { useAuditBatch } from "./agLookups.api"
+import { byText } from "./agAudit.logic"
 
 interface MovementRecordResponse {
   id: string; animalId: string | null; groupId: string | null
@@ -90,6 +92,7 @@ export default function AgMovementRecordsTab({ targetType, targetId, farmId, cur
   })
 
   const records = data?.content ?? []
+  const added = useAuditBatch("movements", records.map(r => r.id))
   const areaName = (id: string | null) => (id ? areas.find(a => a.id === id)?.name ?? "another area" : null)
   const submit = () => {
     const problem = movementFormError(form) || overrideProblem(held, overrideReason)
@@ -163,7 +166,7 @@ export default function AgMovementRecordsTab({ targetType, targetId, farmId, cur
                 <ArrowRightLeft size={13} style={{ color: AG_ACCENT_TEXT, flexShrink: 0 }} />
                 <div>
                   <p style={{ fontSize: 12.5, color: "var(--hf-text)", fontWeight: 600, margin: 0 }}>{r.movementType.replace(/_/g, " ")}{r.countMoved ? ` — ${r.countMoved} moved` : ""}</p>
-                  <p style={{ fontSize: 11, color: "var(--hf-text-faint)", margin: 0 }}>{r.movementDate}{r.toProductionAreaId ? ` · to ${areaName(r.toProductionAreaId)}` : ""}{r.reason ? ` · ${r.reason}` : ""}{r.buyerName ? ` · Buyer: ${r.buyerName}` : ""}{r.destination ? ` · ${r.destination}` : ""}</p>
+                  <p style={{ fontSize: 11, color: "var(--hf-text-faint)", margin: 0 }}>{r.movementDate}{r.toProductionAreaId ? ` · to ${areaName(r.toProductionAreaId)}` : ""}{r.reason ? ` · ${r.reason}` : ""}{r.buyerName ? ` · Buyer: ${r.buyerName}` : ""}{r.destination ? ` · ${r.destination}` : ""}{byText(added[r.id])}</p>
                   {overrideNote(r.withdrawalOverrideReason, r.withdrawalHeldUntil) && <p style={{ fontSize: 11, color: "var(--hf-warning-text)", margin: "2px 0 0" }}>{overrideNote(r.withdrawalOverrideReason, r.withdrawalHeldUntil)}</p>}
                 </div>
               </div>

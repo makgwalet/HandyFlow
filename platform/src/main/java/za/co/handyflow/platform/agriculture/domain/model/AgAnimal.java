@@ -30,9 +30,18 @@ import java.util.UUID;
  */
 @Entity
 @Table(name = "ag_animals")
+@EntityListeners(AgAuditListener.class)
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class AgAnimal {
+public class AgAnimal implements AgAudited {
+
+    /** Who added this record and who last changed it (see {@link AgAuditListener}). Null on records from before it was kept. */
+    @Embedded
+    private AgAuditStamp audit = new AgAuditStamp();
+
+    @Override public AgAuditStamp getAudit() { return audit; }
+    @Override public void setAudit(AgAuditStamp audit) { this.audit = audit; }
+
 
     @Id
     private UUID id = UUID.randomUUID();
@@ -101,6 +110,18 @@ public class AgAnimal {
     @Column(name = "withdrawal_held_until")
     private LocalDate withdrawalHeldUntil;
 
+    /** True while the tag is the temporary one given at birth (<dam tag>-<yy>-<nn>), until the permanent tag is entered. */
+    @Column(name = "tag_temporary", nullable = false)
+    private boolean tagTemporary = false;
+
+    /** The breeding record whose birth created this animal; null for animals entered by hand. */
+    @Column(name = "birth_record_id")
+    private UUID birthRecordId;
+
+    /** The day the reminder to fit the permanent tag was last sent. */
+    @Column(name = "tag_reminder_notified_on")
+    private LocalDate tagReminderNotifiedOn;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
@@ -166,6 +187,24 @@ public class AgAnimal {
         this.sireId = sireId;
         this.damId = damId;
         this.notes = notes;
+    }
+
+    /** Marks a newborn: which breeding record it came from, and whether its tag is still the temporary one. */
+    public void markNewborn(UUID birthRecordId, boolean tagTemporary) {
+        this.birthRecordId = birthRecordId;
+        this.tagTemporary = tagTemporary;
+        this.updatedAt = Instant.now();
+    }
+
+    /** Puts the permanent tag in place of the temporary one. The caller has already checked the new tag is free. */
+    public void replaceTag(String newTag) {
+        this.tagNumber = newTag;
+        this.tagTemporary = false;
+        this.updatedAt = Instant.now();
+    }
+
+    public void markTagReminderNotified(LocalDate day) {
+        this.tagReminderNotifiedOn = day;
     }
 
     public void recordWeight(BigDecimal weightKg) {

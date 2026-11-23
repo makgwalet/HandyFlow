@@ -10,7 +10,8 @@ import { AG_ACCENT_TEXT, statusBadge, inp, btnPrimary, btnGhost } from "./consta
 import { Field, EmptyNote, QueryError } from "./agUi"
 import { formGrid, rowButtonProps } from "./agUi.logic"
 import AgManage from "./AgManage"
-import { breedSuggestions } from "./agLookups"
+import { breedSuggestions, ownBreeds, withOwn } from "./agLookups"
+import { useFarmSuggestions } from "./agLookups.api"
 import AgPager from "./AgPager"
 import { useDebounced } from "./useDebounced"
 import { PAGE_SIZE, lastPage, rangeLabel, searchParam } from "./agPaging.logic"
@@ -68,6 +69,7 @@ export default function AgGroupsTab({ farmId, onSelectGroup }: { farmId: string;
 
   const species = speciesData?.content ?? []
   const groups = data?.content ?? []
+  const farmSuggestions = useFarmSuggestions(farmId)
 
   return (
     <div>
@@ -93,7 +95,7 @@ export default function AgGroupsTab({ farmId, onSelectGroup }: { farmId: string;
                 <option value="">Select…</option>{species.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
               </select></Field>
             <Field label="Batch number"><input value={batchNumber} onChange={e => setBatchNumber(e.target.value)} style={inp} /></Field>
-            <><Field label="Breed"><input list="ag-breed-options" value={breed} onChange={e => setBreed(e.target.value)} style={inp} /></Field><datalist id="ag-breed-options">{breedSuggestions(species.find(s => s.id === speciesId)?.name).map(b => <option key={b} value={b} />)}</datalist></>
+            <><Field label="Breed"><input list="ag-breed-options" value={breed} onChange={e => setBreed(e.target.value)} style={inp} /></Field><datalist id="ag-breed-options">{withOwn(breedSuggestions(species.find(s => s.id === speciesId)?.name), [...ownBreeds(farmSuggestions, speciesId), ...groups.filter(g => g.speciesId === speciesId).map(g => g.breed)]).map(b => <option key={b} value={b} />)}</datalist></>
           </div>
           <div style={{ ...formGrid, marginBottom: 12 }}>
             <Field label="Initial count"><input type="number" min={1} value={initialCount} onChange={e => setInitialCount(e.target.value)} style={inp} /></Field>

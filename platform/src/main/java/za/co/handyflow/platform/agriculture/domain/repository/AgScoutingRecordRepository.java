@@ -64,4 +64,14 @@ public interface AgScoutingRecordRepository extends JpaRepository<AgScoutingReco
     // Trends: [scoutingDate, severity, cropCycleId].
     @Query("SELECT r.scoutingDate, r.severity, r.cropCycleId FROM AgScoutingRecord r WHERE r.tenantId = :tenantId AND r.scoutingDate >= :startDate AND r.scoutingDate <= :endDate")
     List<Object[]> findBetween(TenantId tenantId, LocalDate startDate, LocalDate endDate);
+
+    // The farm calendar: scouting follow-ups falling due in the window, not yet acknowledged, on cycles still running.
+    @Query("""
+        SELECT r FROM AgScoutingRecord r
+        WHERE r.tenantId = :tenantId
+        AND r.followUpDate IS NOT NULL AND r.followUpDate >= :from AND r.followUpDate <= :to AND r.followUpAcknowledged = false
+        AND r.cropCycleId IN (SELECT c.id FROM AgCropCycle c WHERE c.tenantId = :tenantId AND c.farmId = :farmId AND c.deletedAt IS NULL AND c.status NOT IN ('HARVESTED', 'FAILED', 'ABANDONED'))
+        ORDER BY r.followUpDate ASC
+        """)
+    List<AgScoutingRecord> findFollowUpsForCalendar(TenantId tenantId, UUID farmId, LocalDate from, LocalDate to);
 }

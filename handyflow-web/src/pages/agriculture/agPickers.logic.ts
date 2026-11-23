@@ -4,7 +4,7 @@
 import { canonicalUnit, convertUnit, isMassUnit } from "./agUnits"
 
 export interface AreaLike { id: string; name: string; areaType: string; status: string }
-export interface StockLike { id: string; itemName: string; unitOfMeasure: string; currentQuantity: number; unitCost: number | null; status: string }
+export interface StockLike { id: string; itemName: string; unitOfMeasure: string; currentQuantity: number; unitCost: number | null; status: string; packSizeKg?: number | null }
 
 export interface Choice { id: string; label: string }
 
@@ -18,7 +18,36 @@ export function areaChoices(areas: AreaLike[], currentAreaId: string | null): Ch
 
 export interface FeedChoice extends Choice { disabled: boolean }
 
-/** Active stock items. An item not counted in a mass unit (bags, bales) is shown but cannot be picked, with the reason. */
+const COUNT_UNITS = ["bag", "bags", "bale", "bales", "sack", "sacks"]
+/** Bags, bales and sacks: counted, not weighed. Mirrors AgPackRules on the server. */
+export const isCountUnit = (unit: string | null | undefined) => COUNT_UNITS.includes((unit ?? "").trim().toLowerCase())
+/** "bags" becomes "bag", for labels. */
+export function unitSingular(unit: string | null | undefined): string {
+  const u = (unit ?? "").trim().toLowerCase()
+  return COUNT_UNITS.includes(u) && u.endsWith("s") ? u.slice(0, -1) : u
+}
+/** True for a bag, bale or sack item that says how many kg one holds. */
+export const hasPackSize = (item: StockLike) => isCountUnit(item.unitOfMeasure) && item.packSizeKg != null && item.packSizeKg > 0
+
+const round3 = (n: number) => Math.round(n * 1000) / 1000
+export const kgToBags = (kg: number, packKg: number) => round3(kg / packKg)
+export const bagsToKg = (bags: number, packKg: number) => round3(bags * packKg)
+
+export type FeedEntry = "kg" | "bags"
+/** The amount sent: kilograms or bags, never both. The server converts bags with the item's own kg per bag. */
+export function feedQuantityPayload(entry: FeedEntry, value: string): { quantityKg: number | null; quantityBags: number | null } {
+  const n = Number(value)
+  return entry === "bags" ? { quantityKg: null, quantityBags: n } : { quantityKg: n, quantityBags: null }
+}
+/** "= 2.4 bags" or "= 120 kg", for the entry the person did not use. Empty when there is nothing to show. */
+export function feedEquivalent(item: StockLike, entry: FeedEntry, value: string): string {
+  const n = Number(value)
+  if (!hasPackSize(item) || !(n > 0)) return ""
+  const pack = item.packSizeKg as number
+  return entry === "kg" ? `= ${kgToBags(n, pack)} ${unitSingular(item.unitOfMeasure)}${kgToBags(n, pack) === 1 ? "" : "s"}` : `= ${bagsToKg(n, pack)} kg`
+}
+
+/** Active stock items. A bag, bale or sack item can be picked once it has a kg per bag; any other item not counted in a mass unit is shown but cannot be picked, with the reason. */
 export function feedChoices(items: StockLike[]): FeedChoice[] {
   return items
     .filter(i => i.status === "ACTIVE")
@@ -26,6 +55,8 @@ export function feedChoices(items: StockLike[]): FeedChoice[] {
     .map(i => {
       const mass = isMassUnit(i.unitOfMeasure)
       const onHand = `${i.currentQuantity} ${i.unitOfMeasure.trim()} on hand`
+      if (hasPackSize(i)) return { id: i.id, disabled: false, label: `${i.itemName} · ${onHand} (${i.packSizeKg} kg per ${unitSingular(i.unitOfMeasure)})` }
+      if (isCountUnit(i.unitOfMeasure)) return { id: i.id, disabled: true, label: `${i.itemName} · counted in ${i.unitOfMeasure.trim()}, set kg per ${unitSingular(i.unitOfMeasure)} in Stock to use` }
       return { id: i.id, disabled: !mass, label: mass ? `${i.itemName} · ${onHand}` : `${i.itemName} · counted in ${i.unitOfMeasure.trim()}, change to kg or t to use` }
     })
 }
@@ -33,6 +64,7 @@ export function feedChoices(items: StockLike[]): FeedChoice[] {
 /** The feed name and cost per kg an item suggests. Cost is the item's unit cost converted to kg, or null if unknown. */
 export function feedPrefill(item: StockLike): { feedType: string; costPerKg: number | null } {
   if (item.unitCost == null) return { feedType: item.itemName, costPerKg: null }
+  if (hasPackSize(item)) return { feedType: item.itemName, costPerKg: Math.round((item.unitCost / (item.packSizeKg as number)) * 1e4) / 1e4 }
   const unitsPerKg = convertUnit(1, "kg", item.unitOfMeasure)
   return { feedType: item.itemName, costPerKg: unitsPerKg == null ? null : Math.round(item.unitCost * unitsPerKg * 1e4) / 1e4 }
 }
@@ -40,6 +72,11 @@ export function feedPrefill(item: StockLike): { feedType: string; costPerKg: num
 /** Why this much cannot be fed from this item, or null. Quantity is in kg; stock is compared in the item's own unit. */
 export function feedStockProblem(item: StockLike, quantityKg: number): string | null {
   if (!(quantityKg > 0)) return null
+  if (hasPackSize(item)) {
+    const bags = kgToBags(quantityKg, item.packSizeKg as number)
+    return bags > item.currentQuantity ? `Only ${item.currentQuantity} ${item.unitOfMeasure.trim()} of ${item.itemName} on hand (${quantityKg} kg is ${bags} ${unitSingular(item.unitOfMeasure)}${bags === 1 ? "" : "s"}).` : null
+  }
+  if (isCountUnit(item.unitOfMeasure)) return `${item.itemName} is counted in ${item.unitOfMeasure.trim()}, so kilograms cannot be taken off it. Set kg per ${unitSingular(item.unitOfMeasure)} in Stock to feed from it.`
   const needed = convertUnit(quantityKg, "kg", item.unitOfMeasure)
   if (needed == null) return `${item.itemName} is counted in ${item.unitOfMeasure.trim()}, so kilograms cannot be taken off it.`
   if (needed > item.currentQuantity) return `Only ${item.currentQuantity} ${item.unitOfMeasure.trim()} of ${item.itemName} on hand (${quantityKg} kg is ${needed} ${canonicalUnit(item.unitOfMeasure)}).`

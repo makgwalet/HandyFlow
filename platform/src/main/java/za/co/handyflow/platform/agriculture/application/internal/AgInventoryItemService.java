@@ -1,6 +1,7 @@
 package za.co.handyflow.platform.agriculture.application.internal;
 
 import za.co.handyflow.platform.agriculture.domain.rules.AgDates;
+import za.co.handyflow.platform.agriculture.domain.rules.AgFeedRules;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -20,6 +21,7 @@ import za.co.handyflow.platform.shared.TenantId;
 import za.co.handyflow.platform.supplychain.application.SupplierFacade;
 import za.co.handyflow.platform.supplychain.application.SupplierFacade.SupplierSummary;
 
+import java.time.LocalDate;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
@@ -64,6 +66,7 @@ public class AgInventoryItemService {
         references.requireActiveFarm(tenantId, req.farmId());
         AgInventoryItem item = AgInventoryItem.create(tenantId, req.farmId(), req.itemName(), req.category(),
                 req.unitOfMeasure(), req.reorderLevel(), req.unitCost(), req.supplier());
+        item.setPackSize(req.packSizeKg());
         inventoryItemRepository.save(item);
         log.info("Inventory item created id={} farm={} tenant={}", item.getId(), req.farmId(), tenantId.getValue());
         return toResponse(tenantId, item);
@@ -73,6 +76,7 @@ public class AgInventoryItemService {
     public InventoryItemResponse updateItem(TenantId tenantId, UUID id, UpdateInventoryItemRequest req) {
         AgInventoryItem item = findActive(tenantId, id);
         item.update(req.itemName(), req.reorderLevel(), req.unitCost(), req.supplier(), req.notes());
+        item.setPackSize(req.packSizeKg());
         return toResponse(tenantId, item);
     }
 
@@ -97,6 +101,7 @@ public class AgInventoryItemService {
         AgStockMovement movement = AgStockMovement.create(tenantId, id, "RECEIPT", AgDates.today(), req.quantity(),
                 req.newUnitCost() != null ? req.newUnitCost() : item.getUnitCost(), null, null,
                 req.performedBy(), performedByName, req.notes(), supplierId);
+        movement.recordPackSize(item.getPackSizeKg());
         stockMovementRepository.save(movement);
         return toResponse(tenantId, item);
     }
@@ -108,6 +113,7 @@ public class AgInventoryItemService {
         item.issue(req.quantity());
         AgStockMovement movement = AgStockMovement.create(tenantId, id, "ISSUE", AgDates.today(), req.quantity(),
                 item.getUnitCost(), req.referenceType(), req.referenceId(), req.performedBy(), performedByName, req.notes());
+        movement.recordPackSize(item.getPackSizeKg());
         stockMovementRepository.save(movement);
         return toResponse(tenantId, item);
     }
@@ -124,6 +130,7 @@ public class AgInventoryItemService {
         item.adjust(req.newQuantity());
         AgStockMovement movement = AgStockMovement.create(tenantId, id, type, AgDates.today(),
                 size, item.getUnitCost(), null, null, req.performedBy(), performedByName, reason);
+        movement.recordPackSize(item.getPackSizeKg());
         stockMovementRepository.save(movement);
         return toResponse(tenantId, item);
     }
@@ -188,7 +195,8 @@ public class AgInventoryItemService {
         return new InventoryItemResponse(
                 i.getId(), i.getFarmId(), i.getItemName(), i.getCategory(), i.getUnitOfMeasure(),
                 i.getCurrentQuantity(), i.getReorderLevel(), i.getUnitCost(), i.getSupplier(), i.getStatus(),
-                i.isBelowReorderLevel(), i.getNotes(), i.getCreatedAt(), i.getUpdatedAt(), i.getSupplierId(), supplierName
+                i.isBelowReorderLevel(), i.getNotes(), i.getCreatedAt(), i.getUpdatedAt(), i.getSupplierId(), supplierName,
+                i.getPackSizeKg(), AgFeedRules.costPerKg(null, i.getUnitCost(), i.getUnitOfMeasure(), i.getPackSizeKg())
         );
     }
 }

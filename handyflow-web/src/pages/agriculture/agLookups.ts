@@ -50,6 +50,22 @@ const FEEDS: Record<string, string[]> = {
 
 const GENERAL_FEEDS = ["Lucerne hay", "Eragrostis hay", "Silage", "Maize meal", "Winter lick", "Summer lick", "Hominy chop", "Wheat bran", "Molasses meal"]
 
+/** The starter list plus values this farm already uses (not in the list, ignoring case), blanks dropped, own values sorted after it. */
+export function withOwn(starter: string[], own: Array<string | null | undefined>): string[] {
+  const seen = new Set(starter.map(s => s.toLowerCase()))
+  const extra: string[] = []
+  for (const o of own) {
+    const v = (o ?? "").trim()
+    if (v && !seen.has(v.toLowerCase())) { seen.add(v.toLowerCase()); extra.push(v) }
+  }
+  return [...starter, ...extra.sort((a, b) => a.localeCompare(b))]
+}
+
+/** The farm's own breeds for a species (from the server), or nothing. */
+export function ownBreeds(s: { breedsBySpecies: Record<string, string[]> } | undefined, speciesId: string | null | undefined): string[] {
+  return (speciesId && s?.breedsBySpecies?.[speciesId]) || []
+}
+
 const key = (speciesName: string | null | undefined) => (speciesName ?? "").trim().toLowerCase()
 
 /** Breeds to suggest for a species (matched by name). Empty when the species is unknown. */

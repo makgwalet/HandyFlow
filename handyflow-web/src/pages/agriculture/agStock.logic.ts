@@ -37,3 +37,21 @@ export function receiveError(qty: string, cost: string): string | null {
   if (cost.trim() !== "" && !(Number(cost) >= 0)) return "The cost cannot be negative."
   return null
 }
+
+const COUNT_UNITS = ["bag", "bags", "bale", "bales", "sack", "sacks"]
+
+/** Why this kg per bag cannot be sent, or null. Empty is fine (no pack size). Mirrors AgPackRules on the server. */
+export function packSizeError(unit: string, value: string): string | null {
+  if (value.trim() === "") return null
+  if (!COUNT_UNITS.includes(unit.trim().toLowerCase())) return "Kg per bag only applies to items counted in bags, bales or sacks."
+  const n = Number(value)
+  if (!(n > 0)) return "Kg per bag must be more than zero."
+  if (n > 10000) return "Kg per bag is not credible. Check the number."
+  return null
+}
+
+/** The value to send: a number for a count unit, otherwise null (clears it). */
+export function packSizeToSend(unit: string, value: string): number | null {
+  if (value.trim() === "" || packSizeError(unit, value)) return null
+  return Number(value)
+}

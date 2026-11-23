@@ -6,7 +6,12 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
+import za.co.handyflow.platform.agriculture.domain.model.AgAnimal;
 import za.co.handyflow.platform.agriculture.domain.model.AgHealthEvent;
+import za.co.handyflow.platform.agriculture.domain.model.AgSpecies;
+import za.co.handyflow.platform.agriculture.domain.repository.AgAnimalRepository;
+import za.co.handyflow.platform.agriculture.domain.repository.AgSpeciesRepository;
+import za.co.handyflow.platform.agriculture.domain.rules.AgBirthRules;
 import za.co.handyflow.platform.agriculture.domain.model.AgInventoryItem;
 import za.co.handyflow.platform.agriculture.domain.repository.AgHealthEventRepository;
 import za.co.handyflow.platform.agriculture.domain.repository.AgInventoryItemRepository;
@@ -27,7 +32,8 @@ import java.util.Optional;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
- * Daily sweep at 09:30 SAST: health events whose next-due date has arrived, and stock below its reorder level.
+ * Daily sweep at 09:30 SAST: health events whose next-due date has arrived, stock below its reorder level, and newborns still on a
+ * temporary tag once the species' reminder days have passed since birth (it is sent as an {@code AG_HEALTH_EVENT_DUE} notice).
  * <ul>
  *   <li><b>Telling is not acknowledging.</b> The sweep records the day it sent a message ({@code reminderNotifiedOn},
  *       {@code lowStockNotifiedOn}) and never touches {@code reminderAcknowledged}, which only a person sets. The farm dashboard's
@@ -51,6 +57,8 @@ public class AgNotificationScheduler {
 
     private final AgHealthEventRepository healthEventRepository;
     private final AgInventoryItemRepository inventoryItemRepository;
+    private final AgAnimalRepository animalRepository;
+    private final AgSpeciesRepository speciesRepository;
     private final NotificationService notificationService;
     private final AgReminderSupport support;
     private final SchedulerLease lease;
@@ -62,7 +70,53 @@ public class AgNotificationScheduler {
             LocalDate today = AgDates.today();
             sweepHealthEventsDue(today);
             sweepLowStockInventory(today);
+            sweepTemporaryTags(today);
         });
+    }
+
+    /** Newborns still on a temporary tag: reminded once the species' reminder days after birth have passed, then every {@value AgReminderRules#REPEAT_DAYS} days until the tag is replaced. */
+    private void sweepTemporaryTags(LocalDate today) {
+        List<AgAnimal> candidates = animalRepository.findTemporaryTagsAcrossTenants(AgReminderRules.repeatBefore(today));
+        TransactionTemplate tx = new TransactionTemplate(transactionManager);
+        AtomicInteger sent = new AtomicInteger();
+        for (AgAnimal animal : candidates) {
+            try {
+                tx.executeWithoutResult(status -> {
+                    Integer days = speciesRepository.findById(animal.getSpeciesId()).map(AgSpecies::getTagReminderDays).orElse(null);
+                    if (!AgBirthRules.reminderDue(animal.getDateOfBirth(), days, today)) return;
+                    if (!AgReminderRules.isNoticeDue(animal.getTagReminderNotifiedOn(), today)) return;
+                    if (notifyTagDue(animal)) {
+                        animal.markTagReminderNotified(today);
+                        animalRepository.save(animal);
+                        sent.incrementAndGet();
+                    }
+                });
+            } catch (Exception e) {
+                log.error("Failed to send permanent-tag reminder for animal={}: {}", animal.getId(), e.getMessage(), e);
+            }
+        }
+        if (sent.get() > 0) log.info("Sent {} agriculture permanent-tag reminder(s)", sent.get());
+    }
+
+    private boolean notifyTagDue(AgAnimal animal) {
+        TenantId tenantId = animal.getTenantId();
+        Optional<AgReminderSupport.Target> target = support.forAnimalOrGroup(tenantId, animal.getId(), null);
+        if (target.isEmpty()) return false;
+        List<Recipient> recipients = support.recipientsFor(tenantId, target.get().farmId());
+        if (recipients.isEmpty()) return false;
+
+        notificationService.send(NotificationRequest.builder()
+                .tenantId(tenantId)
+                .type(NotificationType.AG_HEALTH_EVENT_DUE)
+                .title("Fit the permanent tag: " + animal.getTagNumber())
+                .message(target.get().label() + " on " + target.get().farmName() + " was born on " + animal.getDateOfBirth()
+                        + " and still has its temporary tag. Fit the permanent tag and enter it on the animal.")
+                .actionUrl(AgActionUrls.animalOrGroup(target.get().farmId(), animal.getId(), null))
+                .sourceModule("agriculture")
+                .sourceEntityId(animal.getId().toString())
+                .recipients(recipients)
+                .build());
+        return true;
     }
 
     private void sweepHealthEventsDue(LocalDate today) {

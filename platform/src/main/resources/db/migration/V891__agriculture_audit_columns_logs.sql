@@ -1,0 +1,8 @@
+-- Who added the log-style agriculture records (and who last changed those that can be edited). Nullable: existing rows keep no creator.
+ALTER TABLE ag_weight_records      ADD COLUMN IF NOT EXISTS created_by UUID, ADD COLUMN IF NOT EXISTS created_by_name VARCHAR(255), ADD COLUMN IF NOT EXISTS updated_by UUID, ADD COLUMN IF NOT EXISTS updated_by_name VARCHAR(255);
+ALTER TABLE ag_mortality_records   ADD COLUMN IF NOT EXISTS created_by UUID, ADD COLUMN IF NOT EXISTS created_by_name VARCHAR(255), ADD COLUMN IF NOT EXISTS updated_by UUID, ADD COLUMN IF NOT EXISTS updated_by_name VARCHAR(255);
+ALTER TABLE ag_movement_records    ADD COLUMN IF NOT EXISTS created_by UUID, ADD COLUMN IF NOT EXISTS created_by_name VARCHAR(255), ADD COLUMN IF NOT EXISTS updated_by UUID, ADD COLUMN IF NOT EXISTS updated_by_name VARCHAR(255);
+ALTER TABLE ag_feed_records        ADD COLUMN IF NOT EXISTS created_by UUID, ADD COLUMN IF NOT EXISTS created_by_name VARCHAR(255), ADD COLUMN IF NOT EXISTS updated_by UUID, ADD COLUMN IF NOT EXISTS updated_by_name VARCHAR(255);
+ALTER TABLE ag_scouting_records    ADD COLUMN IF NOT EXISTS created_by UUID, ADD COLUMN IF NOT EXISTS created_by_name VARCHAR(255), ADD COLUMN IF NOT EXISTS updated_by UUID, ADD COLUMN IF NOT EXISTS updated_by_name VARCHAR(255);
+ALTER TABLE ag_harvest_records     ADD COLUMN IF NOT EXISTS created_by UUID, ADD COLUMN IF NOT EXISTS created_by_name VARCHAR(255), ADD COLUMN IF NOT EXISTS updated_by UUID, ADD COLUMN IF NOT EXISTS updated_by_name VARCHAR(255);
+ALTER TABLE ag_input_applications  ADD COLUMN IF NOT EXISTS created_by UUID, ADD COLUMN IF NOT EXISTS created_by_name VARCHAR(255), ADD COLUMN IF NOT EXISTS updated_by UUID, ADD COLUMN IF NOT EXISTS updated_by_name VARCHAR(255);

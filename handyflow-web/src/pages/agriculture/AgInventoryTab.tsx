@@ -23,7 +23,11 @@ import { AG_ACCENT_TEXT, fmtMoney, statusBadge, inp, btnPrimary, btnGhost } from
 import { agConfirm } from "./agConfirm"
 import { Field, QueryError } from "./agUi"
 import AgManage from "./AgManage"
+import AgAuditLine from "./AgAuditLine"
+import AgStockImport from "./AgStockImport"
 import { STOCK_UNITS } from "./agLookups"
+import { isCountUnit, unitSingular } from "./agPickers.logic"
+import { packSizeError, packSizeToSend } from "./agStock.logic"
 import { adjustError, adjustmentText, averageCostAfterReceipt, receiveError } from "./agStock.logic"
 
 export interface InventoryItemResponse {
@@ -41,6 +45,8 @@ export interface InventoryItemResponse {
   notes: string | null
   createdAt: string
   updatedAt: string
+  packSizeKg?: number | null    // kg in one bag/bale/sack; only for items counted in those units
+  costPerKg?: number | null
 }
 interface Page<T> { content: T[]; totalElements: number }
 
@@ -50,6 +56,7 @@ type ActionKind = "receive" | "issue" | "adjust" | null
 export default function AgInventoryTab({ farmId }: { farmId: string }) {
   const qc = useQueryClient()
   const [showCreate, setShowCreate] = useState(false)
+  const [showImport, setShowImport] = useState(false)
   const [editing, setEditing] = useState<InventoryItemResponse | null>(null)
   const [acting, setActing] = useState<{ item: InventoryItemResponse; kind: ActionKind } | null>(null)
   const [qty, setQty] = useState("")
@@ -60,6 +67,7 @@ export default function AgInventoryTab({ farmId }: { farmId: string }) {
   const [itemName, setItemName] = useState(""); const [category, setCategory] = useState("FEED")
   const [uom, setUom] = useState("kg"); const [reorderLevel, setReorderLevel] = useState("")
   const [unitCost, setUnitCost] = useState(""); const [supplier, setSupplier] = useState("")
+  const [packSize, setPackSize] = useState("")
 
   const { data, isLoading, isError, refetch } = useQuery<Page<InventoryItemResponse>>({
     queryKey: ["ag-inventory", farmId],
@@ -72,17 +80,19 @@ export default function AgInventoryTab({ farmId }: { farmId: string }) {
       farmId, itemName, category, unitOfMeasure: uom,
       reorderLevel: reorderLevel ? Number(reorderLevel) : null,
       unitCost: unitCost ? Number(unitCost) : null, supplier: supplier || null,
+      packSizeKg: packSizeToSend(uom, packSize),
     }),
     onSuccess: () => {
       invalidate(); setShowCreate(false)
-      setItemName(""); setCategory("FEED"); setUom("kg"); setReorderLevel(""); setUnitCost(""); setSupplier("")
+      setItemName(""); setCategory("FEED"); setUom("kg"); setReorderLevel(""); setUnitCost(""); setSupplier(""); setPackSize("")
     },
   })
   const updateMut = useAgToastMutation({
-    mutationFn: (v: { itemName: string; reorderLevel: string; unitCost: string; supplier: string; notes: string }) =>
+    mutationFn: (v: { itemName: string; reorderLevel: string; unitCost: string; supplier: string; notes: string; packSize: string }) =>
       apiClient.put(`/api/v1/agriculture/inventory-items/${editing!.id}`, {
         itemName: v.itemName, reorderLevel: v.reorderLevel ? Number(v.reorderLevel) : null,
         unitCost: v.unitCost ? Number(v.unitCost) : null, supplier: v.supplier || null, notes: v.notes || null,
+        packSizeKg: packSizeToSend(editing!.unitOfMeasure, v.packSize),
       }),
     onSuccess: () => { invalidate(); setEditing(null) },
   })
@@ -124,8 +134,13 @@ export default function AgInventoryTab({ farmId }: { farmId: string }) {
 
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
         <p style={{ fontSize: 13, color: "var(--hf-text-muted)", margin: 0 }}>{items.length} stock item{items.length === 1 ? "" : "s"}.</p>
-        {!showCreate && <AgManage><button onClick={() => setShowCreate(true)} style={btnPrimary}><Plus size={14} style={{ marginRight: 5, verticalAlign: -2 }} />Add item</button></AgManage>}
+        {!showCreate && !showImport && <AgManage><div style={{ display: "flex", gap: 8 }}>
+          <button onClick={() => setShowImport(true)} style={btnGhost}>Import CSV</button>
+          <button onClick={() => setShowCreate(true)} style={btnPrimary}><Plus size={14} style={{ marginRight: 5, verticalAlign: -2 }} />Add item</button>
+        </div></AgManage>}
       </div>
+
+      {showImport && <AgStockImport farmId={farmId} onClose={() => setShowImport(false)} />}
 
       {showCreate && (
         <div style={{ background: "var(--hf-surface-muted)", border: "1px solid var(--hf-border)", borderRadius: 12, padding: 16, marginBottom: 16 }}>
@@ -138,10 +153,14 @@ export default function AgInventoryTab({ farmId }: { farmId: string }) {
             <Field label="Reorder level"><input type="number" min={0} value={reorderLevel} onChange={e => setReorderLevel(e.target.value)} style={inp} /></Field>
             <Field label="Unit cost (R)"><input type="number" min={0} step="0.01" value={unitCost} onChange={e => setUnitCost(e.target.value)} style={inp} /></Field>
             <Field label="Supplier"><input value={supplier} onChange={e => setSupplier(e.target.value)} style={inp} /></Field>
+            {isCountUnit(uom) && (
+              <Field label={`Kg per ${unitSingular(uom)} (optional)`}><input type="number" min={0} step="0.1" value={packSize} onChange={e => setPackSize(e.target.value)} placeholder="e.g. 50" style={inp} /></Field>
+            )}
           </div>
+          {packSizeError(uom, packSize) && <p role="alert" style={{ fontSize: 12.5, color: "var(--hf-danger-text)", margin: "0 0 8px" }}>{packSizeError(uom, packSize)}</p>}
           <div style={{ display: "flex", gap: 8 }}>
-            <button disabled={createMut.isPending || !itemName.trim()} onClick={() => createMut.mutate()}
-              style={{ ...btnPrimary, opacity: createMut.isPending || !itemName.trim() ? 0.6 : 1 }}>{createMut.isPending ? "Saving…" : "Save"}</button>
+            <button disabled={createMut.isPending || !itemName.trim() || !!packSizeError(uom, packSize)} onClick={() => createMut.mutate()}
+              style={{ ...btnPrimary, opacity: createMut.isPending || !itemName.trim() || packSizeError(uom, packSize) ? 0.6 : 1 }}>{createMut.isPending ? "Saving…" : "Save"}</button>
             <button onClick={() => setShowCreate(false)} style={btnGhost}>Cancel</button>
           </div>
         </div>
@@ -160,6 +179,7 @@ export default function AgInventoryTab({ farmId }: { farmId: string }) {
                     <p style={{ fontSize: 11, color: "var(--hf-text-faint)", margin: 0 }}>
                       {it.category} · {it.currentQuantity} {it.unitOfMeasure}{it.reorderLevel != null ? ` (reorder at ${it.reorderLevel})` : ""}
                       {it.unitCost != null ? ` · ${fmtMoney(it.unitCost)}/${it.unitOfMeasure}` : ""}{it.supplier ? ` · ${it.supplier}` : ""}
+                      {it.packSizeKg ? ` · ${it.packSizeKg} kg per ${unitSingular(it.unitOfMeasure)}${it.costPerKg != null ? ` (${fmtMoney(it.costPerKg)}/kg)` : ""}` : isCountUnit(it.unitOfMeasure) ? ` · kg per ${unitSingular(it.unitOfMeasure)} not set` : ""}
                     </p>
                   </div>
                 </div>
@@ -226,25 +246,32 @@ export default function AgInventoryTab({ farmId }: { farmId: string }) {
 
 function EditItemForm({ item, saving, onCancel, onSave }: {
   item: InventoryItemResponse; saving: boolean; onCancel: () => void
-  onSave: (v: { itemName: string; reorderLevel: string; unitCost: string; supplier: string; notes: string }) => void
+  onSave: (v: { itemName: string; reorderLevel: string; unitCost: string; supplier: string; notes: string; packSize: string }) => void
 }) {
   const [itemName, setItemName] = useState(item.itemName)
   const [reorderLevel, setReorderLevel] = useState(item.reorderLevel != null ? String(item.reorderLevel) : "")
   const [unitCost, setUnitCost] = useState(item.unitCost != null ? String(item.unitCost) : "")
   const [supplier, setSupplier] = useState(item.supplier ?? "")
   const [notes, setNotes] = useState(item.notes ?? "")
+  const [packSize, setPackSize] = useState(item.packSizeKg != null ? String(item.packSizeKg) : "")
+  const problem = packSizeError(item.unitOfMeasure, packSize)
   return (
     <div style={{ background: "var(--hf-surface-muted)", border: "1px solid var(--hf-border)", borderRadius: 12, padding: 16 }}>
+      <div style={{ marginBottom: 8 }}><AgAuditLine type="inventory-items" id={item.id} /></div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))", gap: 10, marginBottom: 12 }}>
         <Field label="Item name"><input value={itemName} onChange={e => setItemName(e.target.value)} style={inp} /></Field>
         <Field label="Reorder level"><input type="number" min={0} value={reorderLevel} onChange={e => setReorderLevel(e.target.value)} style={inp} /></Field>
         <Field label="Unit cost (R)"><input type="number" min={0} step="0.01" value={unitCost} onChange={e => setUnitCost(e.target.value)} style={inp} /></Field>
         <Field label="Supplier"><input value={supplier} onChange={e => setSupplier(e.target.value)} style={inp} /></Field>
+        {isCountUnit(item.unitOfMeasure) && (
+          <Field label={`Kg per ${unitSingular(item.unitOfMeasure)}`}><input type="number" min={0} step="0.1" value={packSize} onChange={e => setPackSize(e.target.value)} placeholder="e.g. 50" style={inp} /></Field>
+        )}
       </div>
+      {problem && <p role="alert" style={{ fontSize: 12.5, color: "var(--hf-danger-text)", margin: "0 0 8px" }}>{problem}</p>}
       <div style={{ marginBottom: 12 }}><Field label="Notes"><input value={notes} onChange={e => setNotes(e.target.value)} style={inp} /></Field></div>
       <div style={{ display: "flex", gap: 8 }}>
-        <button disabled={saving || !itemName.trim()} onClick={() => onSave({ itemName, reorderLevel, unitCost, supplier, notes })}
-          style={{ ...btnPrimary, opacity: saving || !itemName.trim() ? 0.6 : 1 }}>{saving ? "Saving…" : "Save"}</button>
+        <button disabled={saving || !itemName.trim() || !!problem} onClick={() => onSave({ itemName, reorderLevel, unitCost, supplier, notes, packSize })}
+          style={{ ...btnPrimary, opacity: saving || !itemName.trim() || problem ? 0.6 : 1 }}>{saving ? "Saving…" : "Save"}</button>
         <button onClick={onCancel} style={btnGhost}>Cancel</button>
       </div>
     </div>

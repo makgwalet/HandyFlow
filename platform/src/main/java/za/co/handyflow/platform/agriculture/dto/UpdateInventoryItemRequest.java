@@ -7,5 +7,10 @@ public record UpdateInventoryItemRequest(
         BigDecimal reorderLevel,
         BigDecimal unitCost,
         String supplier,
-        String notes
-) {}
+        String notes,
+        BigDecimal packSizeKg   // replaces the stored value: leaving it out clears it
+) {
+    public UpdateInventoryItemRequest(String itemName, BigDecimal reorderLevel, BigDecimal unitCost, String supplier, String notes) {
+        this(itemName, reorderLevel, unitCost, supplier, notes, null);
+    }
+}

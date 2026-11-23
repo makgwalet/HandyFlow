@@ -5,6 +5,7 @@ import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import za.co.handyflow.platform.agriculture.domain.rules.AgStockRules;
+import za.co.handyflow.platform.agriculture.domain.rules.AgPackRules;
 import za.co.handyflow.platform.shared.TenantId;
 
 import java.math.BigDecimal;
@@ -29,9 +30,18 @@ import java.util.UUID;
  */
 @Entity
 @Table(name = "ag_inventory_items")
+@EntityListeners(AgAuditListener.class)
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class AgInventoryItem {
+public class AgInventoryItem implements AgAudited {
+
+    /** Who added this record and who last changed it (see {@link AgAuditListener}). Null on records from before it was kept. */
+    @Embedded
+    private AgAuditStamp audit = new AgAuditStamp();
+
+    @Override public AgAuditStamp getAudit() { return audit; }
+    @Override public void setAudit(AgAuditStamp audit) { this.audit = audit; }
+
 
     @Id
     private UUID id = UUID.randomUUID();
@@ -73,6 +83,10 @@ public class AgInventoryItem {
     /** The day the sweep last sent a low-stock message about this item; null if it has not, or since it was restocked. */
     @Column(name = "low_stock_notified_on")
     private java.time.LocalDate lowStockNotifiedOn;
+
+    /** Kg in one bag, bale or sack. Only for items counted in those units; null otherwise or when not known. */
+    @Column(name = "pack_size_kg", precision = 10, scale = 3)
+    private BigDecimal packSizeKg;
 
     /** The item's usual Supply Chain supplier (a reference by id). A receipt with no supplier of its own takes this one. Null until set. The typed {@code supplier} text is kept for history. */
     @Column(name = "supplier_id")
@@ -120,6 +134,11 @@ public class AgInventoryItem {
         this.unitCost = unitCost;
         this.supplier = supplier;
         this.notes = notes;
+    }
+
+    /** Sets or clears (null) kg per bag. The unit is fixed at creation, so the check always uses the item's own unit. */
+    public void setPackSize(BigDecimal packSizeKg) {
+        this.packSizeKg = AgPackRules.requirePackSize(this.unitOfMeasure, packSizeKg);
     }
 
     public void receive(BigDecimal quantity, BigDecimal newUnitCost) {

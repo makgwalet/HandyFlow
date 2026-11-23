@@ -31,9 +31,11 @@ import AgFeedRecordsTab from "./AgFeedRecordsTab"
 import AgEvidenceTab from "./AgEvidenceTab"
 import { buildTextPatch } from "./agPatch"
 import AgManage from "./AgManage"
-import { breedSuggestions } from "./agLookups"
-import { useSpeciesNames } from "./agLookups.api"
+import { breedSuggestions, ownBreeds, withOwn } from "./agLookups"
+import { useFarmSuggestions, useSpeciesNames } from "./agLookups.api"
+import AgAuditLine from "./AgAuditLine"
 import { allowedAnimalStatuses, statusLabel } from "./agLifecycle.logic"
+import AgTemporaryTag from "./AgTemporaryTag"
 import AgWithdrawalNotice from "./AgWithdrawalNotice"
 import AgProduceNotice from "./AgProduceNotice"
 import { useWithdrawal } from "./agCompliance.api"
@@ -49,6 +51,7 @@ const SUB_TABS: { key: SubTab; label: string }[] = [
 export default function AgAnimalDetail({ animal, onBack }: { animal: AnimalResponse; onBack: () => void }) {
   const qc = useQueryClient()
   const speciesNames = useSpeciesNames()
+  const farmSuggestions = useFarmSuggestions(animal.farmId)
   const [sub, setSub] = useState<SubTab>("weight")
   const [editing, setEditing] = useState(false)
   const [name, setName] = useState(animal.name ?? "")
@@ -109,6 +112,7 @@ export default function AgAnimalDetail({ animal, onBack }: { animal: AnimalRespo
           <div>
             <h2 style={{ fontSize: 17, fontWeight: 800, color: "var(--hf-text)", margin: 0 }}>{a.tagNumber}{a.name ? ` — ${a.name}` : ""}</h2>
             <p style={{ fontSize: 12, color: "var(--hf-text-faint)", margin: 0 }}>{a.breed ?? "Breed unknown"} · {a.sex}{a.currentWeightKg ? ` · ${a.currentWeightKg} kg` : ""}{a.acquisitionCost ? ` · Acquired ${fmtMoney(a.acquisitionCost)}` : ""}</p>
+            <AgAuditLine type="animals" id={a.id} />
             {isMarketStatus(a.status) && overrideNote(a.withdrawalOverrideReason, a.withdrawalHeldUntil) && <p style={{ fontSize: 11.5, color: "var(--hf-warning-text)", margin: "2px 0 0" }}>{overrideNote(a.withdrawalOverrideReason, a.withdrawalHeldUntil)}</p>}
           </div>
         </div>
@@ -122,6 +126,8 @@ export default function AgAnimalDetail({ animal, onBack }: { animal: AnimalRespo
           </AgManage>
         </div>
       </div>
+
+      {a.tagTemporary && <AgTemporaryTag animalId={a.id} tagNumber={a.tagNumber} onReplaced={invalidate} />}
 
       {pendingStatus && (
         <div style={{ marginBottom: 14, maxWidth: 520 }}>
@@ -149,7 +155,7 @@ export default function AgAnimalDetail({ animal, onBack }: { animal: AnimalRespo
         <div style={{ background: "var(--hf-surface-muted)", border: "1px solid var(--hf-border)", borderRadius: 12, padding: 16, marginBottom: 16 }}>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))", gap: 10, marginBottom: 12 }}>
             <Field label="Name"><input value={name} onChange={e => setName(e.target.value)} style={inp} /></Field>
-            <><Field label="Breed"><input list="ag-breed-options" value={breed} onChange={e => setBreed(e.target.value)} style={inp} /></Field><datalist id="ag-breed-options">{breedSuggestions(speciesNames[a.speciesId]).map(b => <option key={b} value={b} />)}</datalist></>
+            <><Field label="Breed"><input list="ag-breed-options" value={breed} onChange={e => setBreed(e.target.value)} style={inp} /></Field><datalist id="ag-breed-options">{withOwn(breedSuggestions(speciesNames[a.speciesId]), ownBreeds(farmSuggestions, a.speciesId)).map(b => <option key={b} value={b} />)}</datalist></>
             <Field label="Notes"><input value={notes} onChange={e => setNotes(e.target.value)} style={inp} /></Field>
           </div>
           <div style={{ display: "flex", gap: 8 }}>
@@ -164,7 +170,7 @@ export default function AgAnimalDetail({ animal, onBack }: { animal: AnimalRespo
 
       {sub === "weight" && <AgWeightHistoryTab targetType="animal" targetId={a.id} />}
       {sub === "health" && <AgHealthEventsTab targetType="animal" targetId={a.id} />}
-      {sub === "breeding" && <AgBreedingRecordsTab targetType="animal" targetId={a.id} />}
+      {sub === "breeding" && <AgBreedingRecordsTab targetType="animal" targetId={a.id} damTag={a.tagNumber} />}
       {sub === "movement" && <AgMovementRecordsTab targetType="animal" targetId={a.id} farmId={a.farmId} currentAreaId={a.productionAreaId} />}
       {sub === "mortality" && <AgMortalityRecordsTab targetType="animal" targetId={a.id} />}
       {sub === "feed" && <AgFeedRecordsTab targetType="animal" targetId={a.id} farmId={a.farmId} speciesName={speciesNames[a.speciesId]} />}
