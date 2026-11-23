@@ -30,10 +30,17 @@ public class CheckpointAdminService {
     private final CheckpointRepository checkpoints;
 
     @Transactional(readOnly = true)
-    public List<Row> list(TenantId tenantId, UUID siteId, boolean includeInactive) { return list(tenantId, siteId, includeInactive, Instant.now()); }
+    public List<Row> list(TenantId tenantId, UUID siteId, boolean includeInactive) { return list(tenantId, siteId, includeInactive, Instant.now(), null); }
+
+    /** `allowed` null = the whole company; with no site chosen, a limited user sees the checkpoints at all their sites. */
+    @Transactional(readOnly = true)
+    public List<Row> list(TenantId tenantId, UUID siteId, boolean includeInactive, java.util.Set<UUID> allowed) { return list(tenantId, siteId, includeInactive, Instant.now(), allowed); }
 
     @Transactional(readOnly = true)
-    List<Row> list(TenantId tenantId, UUID siteId, boolean includeInactive, Instant now) {
+    List<Row> list(TenantId tenantId, UUID siteId, boolean includeInactive, Instant now) { return list(tenantId, siteId, includeInactive, now, null); }
+
+    @Transactional(readOnly = true)
+    List<Row> list(TenantId tenantId, UUID siteId, boolean includeInactive, Instant now, java.util.Set<UUID> allowed) {
         StringBuilder sql = new StringBuilder("""
                 SELECT c.id, c.site_id, s.name AS site_name, c.name, c.description, c.active,
                        c.nfc_tag_uid IS NOT NULL AS has_nfc, c.ble_beacon_id IS NOT NULL AS has_ble, s.require_signed_qr,
@@ -44,7 +51,8 @@ public class CheckpointAdminService {
                 FROM security_checkpoints c JOIN security_sites s ON s.id = c.site_id
                 WHERE c.tenant_id = ?""");
         List<Object> p = new ArrayList<>(List.of(Timestamp.from(now.minus(Duration.ofDays(30))), tenantId.getValue()));
-        if (siteId != null) { sql.append(" AND c.site_id = ?"); p.add(siteId); }
+        sql.append(SiteScopeRules.siteClause("c.site_id", siteId, allowed));
+        p.addAll(SiteScopeRules.siteArgs(siteId, allowed));
         if (!includeInactive) sql.append(" AND c.active = TRUE");
         sql.append(" ORDER BY s.name, c.sort_order, c.name");
         return jdbc.query(sql.toString(), (rs, n) -> {

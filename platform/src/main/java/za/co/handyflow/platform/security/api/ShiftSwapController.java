@@ -79,13 +79,35 @@ public class ShiftSwapController {
 
     private final ShiftSwapService swapService;
 
+
+    /** Optional so a controller built by hand still works; in the application it is always there. */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private za.co.handyflow.platform.security.application.internal.SiteScopeService scope;
+
+    private void site(UUID siteId) {
+        za.co.handyflow.platform.security.application.internal.SiteScopeService.check(scope, TenantContext.getTenantIdAsObject(), TenantContext.getCurrentUserId(), siteId);
+    }
+
+    /** Only a user with access to the whole company may use this: the records are not tied to one site. */
+    private void wholeCompany() {
+        za.co.handyflow.platform.security.application.internal.SiteScopeService.checkUnrestricted(scope, TenantContext.getTenantIdAsObject(), TenantContext.getCurrentUserId());
+    }
+
+    private void child(za.co.handyflow.platform.security.application.internal.SiteScopeService.Kind kind, UUID id) {
+        za.co.handyflow.platform.security.application.internal.SiteScopeService.checkChild(scope, TenantContext.getTenantIdAsObject(), TenantContext.getCurrentUserId(), kind, id);
+    }
+
+    private java.util.Set<UUID> allowed() {
+        return za.co.handyflow.platform.security.application.internal.SiteScopeService.allowedSites(scope, TenantContext.getTenantIdAsObject(), TenantContext.getCurrentUserId());
+    }
+
     @GetMapping
     @PreAuthorize("hasAuthority('SECURITY_READ')")
     @Operation(summary = "List open swap requests awaiting supervisor action")
     public ResponseEntity<ApiResponse<Page<ShiftSwapResponse>>> getPendingSwaps(Pageable pageable) {
         TenantId tenantId = TenantContext.getTenantIdAsObject();
         return ResponseEntity.ok(ApiResponse.success(
-                swapService.getPendingSwaps(tenantId, pageable)));
+                swapService.getPendingSwaps(tenantId, pageable, allowed())));
     }
 
     @GetMapping("/guard/{guardId}")
@@ -95,7 +117,7 @@ public class ShiftSwapController {
             @PathVariable UUID guardId, Pageable pageable) {
         TenantId tenantId = TenantContext.getTenantIdAsObject();
         return ResponseEntity.ok(ApiResponse.success(
-                swapService.getSwapsByGuard(tenantId, guardId, pageable)));
+                swapService.getSwapsByGuard(tenantId, guardId, pageable, allowed())));
     }
 
     @PostMapping
@@ -108,6 +130,7 @@ public class ShiftSwapController {
                """)
     public ResponseEntity<ApiResponse<ShiftSwapResponse>> createSwapRequest(
             @Valid @RequestBody CreateSwapRequest req) {
+        child(za.co.handyflow.platform.security.application.internal.SiteScopeService.Kind.SHIFT, req.originalShiftId());
         TenantId tenantId        = TenantContext.getTenantIdAsObject();
         UUID     requestingGuard = TenantContext.getCurrentUserId();
         return ResponseEntity.status(HttpStatus.CREATED)
@@ -123,6 +146,7 @@ public class ShiftSwapController {
                Only the guard named as proposedGuardId can call this.
                """)
     public ResponseEntity<ApiResponse<ShiftSwapResponse>> acceptSwap(@PathVariable UUID id) {
+        child(za.co.handyflow.platform.security.application.internal.SiteScopeService.Kind.SWAP, id);
         TenantId tenantId       = TenantContext.getTenantIdAsObject();
         UUID     acceptingGuard = TenantContext.getCurrentUserId();
         return ResponseEntity.ok(ApiResponse.success(
@@ -141,6 +165,7 @@ public class ShiftSwapController {
     public ResponseEntity<ApiResponse<ShiftSwapResponse>> approveSwap(
             @PathVariable UUID id,
             @RequestBody(required = false) SwapActionRequest req) {
+        child(za.co.handyflow.platform.security.application.internal.SiteScopeService.Kind.SWAP, id);
         TenantId tenantId    = TenantContext.getTenantIdAsObject();
         UUID     supervisorId = TenantContext.getCurrentUserId();
         return ResponseEntity.ok(ApiResponse.success(
@@ -154,6 +179,7 @@ public class ShiftSwapController {
     public ResponseEntity<ApiResponse<ShiftSwapResponse>> rejectSwap(
             @PathVariable UUID id,
             @Valid @RequestBody SwapActionRequest req) {
+        child(za.co.handyflow.platform.security.application.internal.SiteScopeService.Kind.SWAP, id);
         TenantId tenantId    = TenantContext.getTenantIdAsObject();
         UUID     supervisorId = TenantContext.getCurrentUserId();
         return ResponseEntity.ok(ApiResponse.success(
@@ -165,6 +191,7 @@ public class ShiftSwapController {
     @Operation(summary = "Requesting guard cancels their swap request",
             description = "Can only be done by the guard who created it, and only while PENDING or PROPOSED_ACCEPTED.")
     public ResponseEntity<ApiResponse<ShiftSwapResponse>> cancelSwap(@PathVariable UUID id) {
+        child(za.co.handyflow.platform.security.application.internal.SiteScopeService.Kind.SWAP, id);
         TenantId tenantId       = TenantContext.getTenantIdAsObject();
         UUID     requestingGuard = TenantContext.getCurrentUserId();
         return ResponseEntity.ok(ApiResponse.success(

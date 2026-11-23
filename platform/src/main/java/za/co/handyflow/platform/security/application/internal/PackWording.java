@@ -58,6 +58,8 @@ public final class PackWording {
         return total + " logged (" + String.join(", ", t) + "), " + withVehicle + " with a vehicle.";
     }
 
+    public static String alarms(int n) { return n == 0 ? "No alarm events." : n + (n == 1 ? " alarm event." : " alarm events."); }
+
     public static String book(int daysSigned, int daysInPeriod) {
         return "Occurrence Book signed off on " + daysSigned + " of " + daysInPeriod + " days.";
     }
@@ -65,6 +67,6 @@ public final class PackWording {
     public static String shifts(Map<String, Integer> byStatus) {
         List<String> p = new ArrayList<>();
         for (var e : SHIFT_LABEL.entrySet()) { Integer n = byStatus.get(e.getKey()); if (n != null && n > 0) p.add(n + " " + e.getValue().toLowerCase()); }
-        return p.isEmpty() ? "No shifts." : String.join(", ", p) + ".";
+        return p.isEmpty() ? "No shifts in this period." : String.join(", ", p) + ".";
     }
 }

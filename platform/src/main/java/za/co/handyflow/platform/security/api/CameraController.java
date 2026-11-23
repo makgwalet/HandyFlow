@@ -2,6 +2,7 @@
 
 package za.co.handyflow.platform.security.api;
 
+import za.co.handyflow.platform.security.application.internal.SiteScopeService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -28,6 +29,40 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class CameraController {
 
+    /** Optional so a hand-built controller still works; in the application it is always there. Limits a user to the sites in their scope. */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private za.co.handyflow.platform.security.application.internal.SiteScopeService scope;
+
+    /** A site outside the user's scope answers exactly like a site that does not exist. */
+    private void site(UUID siteId) {
+        za.co.handyflow.platform.security.application.internal.SiteScopeService.check(scope, TenantContext.getTenantIdAsObject(), TenantContext.getCurrentUserId(), siteId);
+    }
+
+    /** For a list whose site is optional: a user limited to some sites must name one of them, the whole company may leave it out. */
+    private void choice(UUID siteId) {
+        za.co.handyflow.platform.security.application.internal.SiteScopeService.checkChoice(scope, TenantContext.getTenantIdAsObject(), TenantContext.getCurrentUserId(), siteId);
+    }
+
+    /** For a view that spans every site and cannot be narrowed yet: only a user with the whole company may use it. */
+    private void wholeCompany() {
+        za.co.handyflow.platform.security.application.internal.SiteScopeService.checkUnrestricted(scope, TenantContext.getTenantIdAsObject(), TenantContext.getCurrentUserId());
+    }
+
+    /** The sites the user may see, or null for the whole company. */
+    private java.util.Set<UUID> allowed() {
+        return SiteScopeService.allowedSites(scope, TenantContext.getTenantIdAsObject(), TenantContext.getCurrentUserId());
+    }
+
+    /** A record that belongs to a site: one at a site outside the user's scope answers "not found". */
+    private void child(za.co.handyflow.platform.security.application.internal.SiteScopeService.Kind kind, UUID id) {
+        za.co.handyflow.platform.security.application.internal.SiteScopeService.checkChild(scope, TenantContext.getTenantIdAsObject(), TenantContext.getCurrentUserId(), kind, id);
+    }
+
+    /** For a site that is optional in the request: leaving it out means the whole company. */
+    private void optionalSite(UUID siteId) {
+        za.co.handyflow.platform.security.application.internal.SiteScopeService.checkOptionalSite(scope, TenantContext.getTenantIdAsObject(), TenantContext.getCurrentUserId(), siteId);
+    }
+
     private final CameraService cameraService;
 
     // ── Registry CRUD ──────────────────────────────────────────────────────────
@@ -37,14 +72,16 @@ public class CameraController {
     @Operation(summary = "List all active (non-decommissioned) cameras for this tenant, paginated")
     public ResponseEntity<ApiResponse<Page<CameraResponse>>> getAll(
             @PageableDefault(size = 100) Pageable pageable) {
+        java.util.Set<UUID> allowed = allowed();
         TenantId tenantId = TenantContext.getTenantIdAsObject();
-        return ResponseEntity.ok(ApiResponse.success(cameraService.getAllForTenant(tenantId, pageable)));
+        return ResponseEntity.ok(ApiResponse.success(cameraService.getAllForTenant(tenantId, pageable, allowed)));
     }
 
     @GetMapping("/{id}")
     @PreAuthorize("hasAuthority('SECURITY_READ')")
     @Operation(summary = "Get a single camera's registry record")
     public ResponseEntity<ApiResponse<CameraResponse>> getById(@PathVariable UUID id) {
+        child(SiteScopeService.Kind.CAMERA, id);
         TenantId tenantId = TenantContext.getTenantIdAsObject();
         return ResponseEntity.ok(ApiResponse.success(cameraService.getById(tenantId, id)));
     }
@@ -54,6 +91,7 @@ public class CameraController {
     @Operation(summary = "List all active cameras for a site")
     public ResponseEntity<ApiResponse<List<CameraResponse>>> getForSite(
             @PathVariable UUID siteId) {
+        site(siteId);
         TenantId tenantId = TenantContext.getTenantIdAsObject();
         return ResponseEntity.ok(ApiResponse.success(cameraService.getForSite(tenantId, siteId)));
     }
@@ -66,6 +104,7 @@ public class CameraController {
                     "POST /{id}/webhook-secret afterward to get one.")
     public ResponseEntity<ApiResponse<CameraResponse>> register(
             @Valid @RequestBody RegisterCameraRequest req) {
+        site(req.siteId());
         TenantId tenantId = TenantContext.getTenantIdAsObject();
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.success(cameraService.register(tenantId, req)));
@@ -76,6 +115,7 @@ public class CameraController {
     @Operation(summary = "Update a camera's registry details")
     public ResponseEntity<ApiResponse<CameraResponse>> update(
             @PathVariable UUID id, @Valid @RequestBody UpdateCameraRequest req) {
+        child(SiteScopeService.Kind.CAMERA, id);
         TenantId tenantId = TenantContext.getTenantIdAsObject();
         return ResponseEntity.ok(ApiResponse.success(cameraService.update(tenantId, id, req)));
     }
@@ -84,6 +124,7 @@ public class CameraController {
     @PreAuthorize("hasAuthority('SECURITY_MANAGE')")
     @Operation(summary = "Mark a camera offline (manual — not auto-detected from missed events)")
     public ResponseEntity<ApiResponse<CameraResponse>> markOffline(@PathVariable UUID id) {
+        child(SiteScopeService.Kind.CAMERA, id);
         TenantId tenantId = TenantContext.getTenantIdAsObject();
         return ResponseEntity.ok(ApiResponse.success(cameraService.markOffline(tenantId, id)));
     }
@@ -92,6 +133,7 @@ public class CameraController {
     @PreAuthorize("hasAuthority('SECURITY_MANAGE')")
     @Operation(summary = "Reactivate an offline camera")
     public ResponseEntity<ApiResponse<CameraResponse>> markActive(@PathVariable UUID id) {
+        child(SiteScopeService.Kind.CAMERA, id);
         TenantId tenantId = TenantContext.getTenantIdAsObject();
         return ResponseEntity.ok(ApiResponse.success(cameraService.markActive(tenantId, id)));
     }
@@ -100,6 +142,7 @@ public class CameraController {
     @PreAuthorize("hasAuthority('SECURITY_ADMIN')")
     @Operation(summary = "Permanently retire a camera from the registry")
     public ResponseEntity<ApiResponse<CameraResponse>> decommission(@PathVariable UUID id) {
+        child(SiteScopeService.Kind.CAMERA, id);
         TenantId tenantId = TenantContext.getTenantIdAsObject();
         return ResponseEntity.ok(ApiResponse.success(cameraService.decommission(tenantId, id)));
     }
@@ -114,6 +157,7 @@ public class CameraController {
                     "config immediately. Regenerating invalidates the previous secret.")
     public ResponseEntity<ApiResponse<CameraWebhookSecretResponse>> generateWebhookSecret(
             @PathVariable UUID id) {
+        child(SiteScopeService.Kind.CAMERA, id);
         TenantId tenantId = TenantContext.getTenantIdAsObject();
         return ResponseEntity.ok(ApiResponse.success(
                 cameraService.generateWebhookSecret(tenantId, id)));

@@ -13,6 +13,8 @@ import za.co.handyflow.platform.security.dto.ReportCatalogueDtos.Catalogue;
 import za.co.handyflow.platform.shared.ApiResponse;
 import za.co.handyflow.platform.shared.TenantContext;
 
+import java.util.UUID;
+
 @RestController
 @RequestMapping("/api/v1/security/reports")
 @RequiredArgsConstructor
@@ -22,11 +24,23 @@ public class ReportCatalogueController {
     private final ReportRunService runService;
     private final FeatureGuard featureGuard;
 
+
+    /** Optional so a controller built by hand still works; in the application it is always there. */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private za.co.handyflow.platform.security.application.internal.SiteScopeService scope;
+
+
+    
+
+    private java.util.Set<UUID> allowed() {
+        return za.co.handyflow.platform.security.application.internal.SiteScopeService.allowedSites(scope, TenantContext.getTenantIdAsObject(), TenantContext.getCurrentUserId());
+    }
+
     @GetMapping("/catalogue")
     @PreAuthorize("hasAuthority('SECURITY_READ')")
     @Operation(summary = "The reports on offer, each with when it was last generated and by whom, plus recent runs")
     public ResponseEntity<ApiResponse<Catalogue>> catalogue() {
         featureGuard.requireModule("security");
-        return ResponseEntity.ok(ApiResponse.success(runService.catalogue(TenantContext.getTenantIdAsObject())));
+        return ResponseEntity.ok(ApiResponse.success(runService.catalogue(TenantContext.getTenantIdAsObject(), allowed() != null)));
     }
 }

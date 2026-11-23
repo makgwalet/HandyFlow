@@ -2,6 +2,7 @@
 
 package za.co.handyflow.platform.security.api;
 
+import za.co.handyflow.platform.security.application.internal.SiteScopeService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -32,6 +33,39 @@ import java.util.UUID;
 @RequiredArgsConstructor
 @Tag(name = "Security - Incidents", description = "Incident reporting and lifecycle management")
 public class IncidentController {
+    /** Optional so a hand-built controller still works; in the application it is always there. Limits a user to the sites in their scope. */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private za.co.handyflow.platform.security.application.internal.SiteScopeService scope;
+
+    /** A site outside the user's scope answers exactly like a site that does not exist. */
+    private void site(UUID siteId) {
+        za.co.handyflow.platform.security.application.internal.SiteScopeService.check(scope, TenantContext.getTenantIdAsObject(), TenantContext.getCurrentUserId(), siteId);
+    }
+
+    /** For a list whose site is optional: a user limited to some sites must name one of them, the whole company may leave it out. */
+    private void choice(UUID siteId) {
+        za.co.handyflow.platform.security.application.internal.SiteScopeService.checkChoice(scope, TenantContext.getTenantIdAsObject(), TenantContext.getCurrentUserId(), siteId);
+    }
+
+    /** For a view that spans every site and cannot be narrowed yet: only a user with the whole company may use it. */
+    private void wholeCompany() {
+        za.co.handyflow.platform.security.application.internal.SiteScopeService.checkUnrestricted(scope, TenantContext.getTenantIdAsObject(), TenantContext.getCurrentUserId());
+    }
+
+    /** The sites the user may see, or null for the whole company. */
+    private java.util.Set<UUID> allowed() {
+        return SiteScopeService.allowedSites(scope, TenantContext.getTenantIdAsObject(), TenantContext.getCurrentUserId());
+    }
+
+    /** A record that belongs to a site: one at a site outside the user's scope answers "not found". */
+    private void child(za.co.handyflow.platform.security.application.internal.SiteScopeService.Kind kind, UUID id) {
+        za.co.handyflow.platform.security.application.internal.SiteScopeService.checkChild(scope, TenantContext.getTenantIdAsObject(), TenantContext.getCurrentUserId(), kind, id);
+    }
+
+    /** For a site that is optional in the request: leaving it out means the whole company. */
+    private void optionalSite(UUID siteId) {
+        za.co.handyflow.platform.security.application.internal.SiteScopeService.checkOptionalSite(scope, TenantContext.getTenantIdAsObject(), TenantContext.getCurrentUserId(), siteId);
+    }
 
     private final IncidentService incidentService;
     private final IncidentCaseService caseService;
@@ -50,9 +84,10 @@ public class IncidentController {
             @RequestParam(required = false) String severity,
             Pageable pageable) {
         featureGuard.requireModule("security");
+        java.util.Set<UUID> allowed = allowed();
         return ResponseEntity.ok(ApiResponse.success("Success",
                 incidentService.getIncidents(
-                        TenantContext.getTenantIdAsObject(), status, severity, pageable)));
+                        TenantContext.getTenantIdAsObject(), status, severity, pageable, allowed)));
     }
 
     @PostMapping
@@ -65,6 +100,7 @@ public class IncidentController {
     public ResponseEntity<ApiResponse<IncidentResponse>> createIncident(
             @Valid @RequestBody CreateIncidentRequest req) {
         featureGuard.requireModule("security");
+        site(req.siteId());
         return ResponseEntity.status(201).body(ApiResponse.success("Incident reported",
                 incidentService.createIncident(TenantContext.getTenantIdAsObject(), req)));
     }
@@ -77,6 +113,7 @@ public class IncidentController {
     )
     public ResponseEntity<ApiResponse<IncidentResponse>> acknowledge(@PathVariable UUID id) {
         featureGuard.requireModule("security");
+        child(SiteScopeService.Kind.INCIDENT, id);
         UUID actorId = TenantContext.getCurrentUserId();
         return ResponseEntity.ok(ApiResponse.success("Acknowledged",
                 incidentService.acknowledge(TenantContext.getTenantIdAsObject(), id, actorId, TenantContext.getCurrentUserName())));
@@ -90,6 +127,7 @@ public class IncidentController {
     )
     public ResponseEntity<ApiResponse<IncidentResponse>> resolve(@PathVariable UUID id, @RequestBody(required = false) ResolveRequest body) {
         featureGuard.requireModule("security");
+        child(SiteScopeService.Kind.INCIDENT, id);
         UUID actorId = TenantContext.getCurrentUserId();
         return ResponseEntity.ok(ApiResponse.success("Resolved",
                 incidentService.resolve(TenantContext.getTenantIdAsObject(), id, actorId, TenantContext.getCurrentUserName(), body == null ? null : body.note())));
@@ -102,6 +140,7 @@ public class IncidentController {
     @Operation(summary = "One incident with its timeline, evidence, assignee and the actions available now")
     public ResponseEntity<ApiResponse<CaseDetail>> get(@PathVariable UUID id) {
         featureGuard.requireModule("security");
+        child(SiteScopeService.Kind.INCIDENT, id);
         return ResponseEntity.ok(ApiResponse.success(caseService.get(TenantContext.getTenantIdAsObject(), id)));
     }
 
@@ -110,6 +149,7 @@ public class IncidentController {
     @Operation(summary = "Say who is dealing with the incident")
     public ResponseEntity<ApiResponse<CaseDetail>> assign(@PathVariable UUID id, @Valid @RequestBody AssignRequest req) {
         featureGuard.requireModule("security");
+        child(SiteScopeService.Kind.INCIDENT, id);
         return ResponseEntity.ok(ApiResponse.success("Assigned",
                 caseService.assign(TenantContext.getTenantIdAsObject(), id, req, TenantContext.getCurrentUserId(), TenantContext.getCurrentUserName())));
     }
@@ -119,6 +159,7 @@ public class IncidentController {
     @Operation(summary = "Raise the severity (one level, or to a named level) with a reason")
     public ResponseEntity<ApiResponse<CaseDetail>> escalate(@PathVariable UUID id, @Valid @RequestBody EscalateRequest req) {
         featureGuard.requireModule("security");
+        child(SiteScopeService.Kind.INCIDENT, id);
         return ResponseEntity.ok(ApiResponse.success("Escalated",
                 caseService.escalate(TenantContext.getTenantIdAsObject(), id, req, TenantContext.getCurrentUserId(), TenantContext.getCurrentUserName())));
     }
@@ -128,6 +169,7 @@ public class IncidentController {
     @Operation(summary = "Add a note to the timeline")
     public ResponseEntity<ApiResponse<CaseDetail>> note(@PathVariable UUID id, @Valid @RequestBody NoteRequest req) {
         featureGuard.requireModule("security");
+        child(SiteScopeService.Kind.INCIDENT, id);
         return ResponseEntity.ok(ApiResponse.success("Note added",
                 caseService.note(TenantContext.getTenantIdAsObject(), id, req, TenantContext.getCurrentUserId(), TenantContext.getCurrentUserName())));
     }
@@ -137,6 +179,7 @@ public class IncidentController {
     @Operation(summary = "Reopen a resolved incident, with a reason")
     public ResponseEntity<ApiResponse<CaseDetail>> reopen(@PathVariable UUID id, @Valid @RequestBody ReopenRequest req) {
         featureGuard.requireModule("security");
+        child(SiteScopeService.Kind.INCIDENT, id);
         return ResponseEntity.ok(ApiResponse.success("Reopened",
                 caseService.reopen(TenantContext.getTenantIdAsObject(), id, req, TenantContext.getCurrentUserId(), TenantContext.getCurrentUserName())));
     }
@@ -147,6 +190,7 @@ public class IncidentController {
     public ResponseEntity<ApiResponse<EvidenceResponse>> attach(@PathVariable UUID id, @RequestParam("file") MultipartFile file,
                                                                 @RequestParam(value = "label", required = false) String label) {
         featureGuard.requireModule("security");
+        child(SiteScopeService.Kind.INCIDENT, id);
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success("Evidence attached",
                 caseService.attach(TenantContext.getTenantIdAsObject(), id, file, label, TenantContext.getCurrentUserId(), TenantContext.getCurrentUserName())));
     }
@@ -156,6 +200,7 @@ public class IncidentController {
     @Operation(summary = "Download an evidence file")
     public ResponseEntity<byte[]> download(@PathVariable UUID id, @PathVariable UUID evidenceId) {
         featureGuard.requireModule("security");
+        child(SiteScopeService.Kind.INCIDENT, id);
         var d = caseService.download(TenantContext.getTenantIdAsObject(), id, evidenceId);
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + d.fileName().replace("\"", "") + "\"")
@@ -168,6 +213,7 @@ public class IncidentController {
     @Operation(summary = "Remove an evidence file")
     public ResponseEntity<ApiResponse<Void>> removeFile(@PathVariable UUID id, @PathVariable UUID evidenceId) {
         featureGuard.requireModule("security");
+        child(SiteScopeService.Kind.INCIDENT, id);
         caseService.removeFile(TenantContext.getTenantIdAsObject(), id, evidenceId, TenantContext.getCurrentUserId(), TenantContext.getCurrentUserName());
         return ResponseEntity.ok(ApiResponse.success("Evidence removed", null));
     }
@@ -177,6 +223,7 @@ public class IncidentController {
     @Operation(summary = "Incident report as a PDF: details, description, assignee, evidence on file and timeline")
     public ResponseEntity<byte[]> pdf(@PathVariable UUID id) {
         featureGuard.requireModule("security");
+        child(SiteScopeService.Kind.INCIDENT, id);
         var tenantId = TenantContext.getTenantIdAsObject();
         CaseDetail c = caseService.get(tenantId, id);
         byte[] bytes = pdfService.incidentPdf(c.incident(), c.assigneeName(), c.events(),

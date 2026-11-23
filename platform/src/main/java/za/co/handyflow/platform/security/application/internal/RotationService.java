@@ -49,8 +49,15 @@ public class RotationService {
 
     @Transactional(readOnly = true)
     public Page<RotationPatternResponse> getPatterns(TenantId tenantId, Pageable pageable) {
-        return patternRepository.findAllActive(tenantId, pageable)
-                .map(p -> toPatternResponse(p, tenantId));
+        return getPatterns(tenantId, pageable, null);
+    }
+
+    /** `allowedSites` null = the whole company; otherwise only patterns at those sites (an empty set sees none). */
+    @Transactional(readOnly = true)
+    public Page<RotationPatternResponse> getPatterns(TenantId tenantId, Pageable pageable, java.util.Set<UUID> allowedSites) {
+        if (allowedSites == null) return patternRepository.findAllActive(tenantId, pageable).map(p -> toPatternResponse(p, tenantId));
+        if (allowedSites.isEmpty()) return Page.empty(pageable);
+        return patternRepository.findAllActiveInSites(tenantId, allowedSites, pageable).map(p -> toPatternResponse(p, tenantId));
     }
 
     // FIX (P1 backlog): findActiveByPattern already existed at the

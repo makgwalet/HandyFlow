@@ -27,8 +27,10 @@ public final class MonthlyPackRules {
     private MonthlyPackRules() {}
 
     /** The month asked for ("2026-10"), or the month before the current one. A future month is refused. */
-    public static YearMonth month(String asked, Instant now) {
-        YearMonth current = YearMonth.from(now.atZone(SAST));
+    public static YearMonth month(String asked, Instant now) { return month(asked, now, SAST); }
+
+    public static YearMonth month(String asked, Instant now, java.time.ZoneId zone) {
+        YearMonth current = YearMonth.from(now.atZone(zone));
         if (asked == null || asked.isBlank()) return current.minusMonths(1);
         YearMonth m;
         try { m = YearMonth.parse(asked.strip()); }
@@ -40,22 +42,29 @@ public final class MonthlyPackRules {
     }
 
     /** [start, end) of the South African month. */
-    public static Instant[] window(YearMonth m) {
-        return new Instant[]{m.atDay(1).atStartOfDay(SAST).toInstant(), m.plusMonths(1).atDay(1).atStartOfDay(SAST).toInstant()};
+    public static Instant[] window(YearMonth m) { return window(m, SAST); }
+
+    /** [start, end) of the month in the company's zone. */
+    public static Instant[] window(YearMonth m, java.time.ZoneId zone) {
+        return new Instant[]{m.atDay(1).atStartOfDay(zone).toInstant(), m.plusMonths(1).atDay(1).atStartOfDay(zone).toInstant()};
     }
 
-    public static boolean inProgress(YearMonth m, Instant now) { return YearMonth.from(now.atZone(SAST)).equals(m); }
+    public static boolean inProgress(YearMonth m, Instant now) { return inProgress(m, now, SAST); }
+
+    public static boolean inProgress(YearMonth m, Instant now, java.time.ZoneId zone) { return YearMonth.from(now.atZone(zone)).equals(m); }
 
     /**
      * Cover delivered against the posts, for post-days that had finished by {@code until} (the end of the month, or now for
      * the current month). Required = hours of each finished post-day times guards needed. Covered = required minus the
      * guard-hours missing in each short stretch.
      */
-    public static CoverFigures cover(List<Post> posts, YearMonth m, Instant until, List<Cover> covers) {
+    public static CoverFigures cover(List<Post> posts, YearMonth m, Instant until, List<Cover> covers) { return cover(posts, m, until, covers, SAST); }
+
+    public static CoverFigures cover(List<Post> posts, YearMonth m, Instant until, List<Cover> covers, java.time.ZoneId zone) {
         int windows = 0, shortW = 0, noneW = 0;
         double required = 0, missing = 0;
         for (Post p : posts) {
-            for (Window w : CoverageRules.windows(p, m.atDay(1), m.lengthOfMonth())) {
+            for (Window w : CoverageRules.windows(p, m.atDay(1), m.lengthOfMonth(), zone)) {
                 if (w.end().isAfter(until)) continue;
                 Result r = CoverageRules.evaluate(w, covers);
                 windows++;
@@ -79,8 +88,10 @@ public final class MonthlyPackRules {
     static double round1(double v) { return Math.round(v * 10.0) / 10.0; }
 
     /** The days of the month that count for the Occurrence Book: all of a past month, up to today for the current one. */
-    public static int daysInPeriod(YearMonth m, Instant now) {
-        LocalDate today = now.atZone(SAST).toLocalDate();
+    public static int daysInPeriod(YearMonth m, Instant now) { return daysInPeriod(m, now, SAST); }
+
+    public static int daysInPeriod(YearMonth m, Instant now, java.time.ZoneId zone) {
+        LocalDate today = now.atZone(zone).toLocalDate();
         if (YearMonth.from(today).equals(m)) return today.getDayOfMonth();
         return m.lengthOfMonth();
     }

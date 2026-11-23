@@ -2,6 +2,9 @@ import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { apiClient } from '../../api/client'
 import SeatUsage from './SeatUsage'
+import SiteAccessPanel from '../security/SiteAccessPanel'
+import { usePermission } from '../../hooks/usePermission'
+import { useAuthStore } from '../../store/auth.store'
 import {
   Plus, X, Mail, Shield, UserCheck, UserX,
   ChevronDown, ChevronUp, Check, Pencil, Clock, AlertTriangle,
@@ -63,6 +66,9 @@ export default function TeamTab() {
   const [showInvite, setShowInvite]   = useState(false)
   const [showRole, setShowRole]       = useState(false)
   const [editUser, setEditUser]       = useState<User | null>(null)
+  const [accessUser, setAccessUser]   = useState<User | null>(null)
+  const canSiteAccess = usePermission('SECURITY_ADMIN')
+  const myUserId = useAuthStore(s => s.user?.userId)
   const [editRole, setEditRole]       = useState<Role | null>(null)
   const [error, setError]             = useState('')
   const [notice, setNotice]           = useState('')
@@ -277,6 +283,12 @@ export default function TeamTab() {
                         </td>
                         <td style={{ padding: '14px 16px' }}>
                           <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+                            {canSiteAccess && u.status === 'ACTIVE' && (
+                              <button onClick={() => setAccessUser(u)} aria-label={`Site access for ${u.firstName} ${u.lastName}`}
+                                style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '5px 10px', background: 'var(--hf-surface)', border: '1px solid var(--hf-border)', borderRadius: 7, fontSize: 12, color: 'var(--hf-text-secondary)', cursor: 'pointer' }}>
+                                <Shield size={12} /> Site access
+                              </button>
+                            )}
                             <button onClick={() => {
                               setEditUser(u)
                               setEditForm({ firstName: u.firstName, lastName: u.lastName, jobTitle: u.jobTitle ?? '', department: u.department ?? '', roleId: '' })
@@ -492,6 +504,11 @@ export default function TeamTab() {
       )}
 
       {/* ── EDIT USER MODAL ────────────────────────────────────────────── */}
+      {accessUser && (
+        <Modal title={`Site access — ${accessUser.firstName} ${accessUser.lastName}`} onClose={() => setAccessUser(null)}>
+          <SiteAccessPanel userId={accessUser.id} userName={`${accessUser.firstName} ${accessUser.lastName}`} actorId={myUserId} onClose={() => setAccessUser(null)} />
+        </Modal>
+      )}
       {editUser && (
         <Modal title={`Edit — ${editUser.firstName} ${editUser.lastName}`} onClose={() => { setEditUser(null); setError('') }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>

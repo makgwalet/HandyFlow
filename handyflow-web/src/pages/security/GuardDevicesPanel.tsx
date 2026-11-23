@@ -9,16 +9,18 @@ import { apiClient } from "../../api/client"
 import Chip from "../../components/ui/Chip"
 import { usePermission } from "../../hooks/usePermission"
 import { ACTION_CONFIRM, ACTION_LABEL, deviceActions, deviceLabel, minutesLeft, orderDevices, spacedCode, statusTone, type DeviceAction, type GuardDevice } from "./deviceLogic"
+import { getCompanyZone, useCompanyZone } from "./companyZone"
 
 const card: React.CSSProperties = { background: "var(--hf-surface)", border: "1px solid var(--hf-border)", borderRadius: 12, padding: 16 }
 const btn: React.CSSProperties = { display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 12px", border: "1px solid var(--hf-border)", borderRadius: 9, background: "var(--hf-surface)", color: "var(--hf-text-secondary)", fontSize: 13, fontWeight: 600, cursor: "pointer" }
 const primary: React.CSSProperties = { ...btn, background: "var(--hf-accent)", color: "var(--hf-text-on-solid)", border: "none" }
 const th: React.CSSProperties = { textAlign: "left", padding: "8px 10px", fontSize: 11, color: "var(--hf-text-muted)", fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.4 }
 const td: React.CSSProperties = { padding: "9px 10px", fontSize: 13, borderTop: "1px solid var(--hf-border-subtle)" }
-const fmt = (d?: string | null) => d ? new Date(d).toLocaleString("en-ZA", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", timeZone: "Africa/Johannesburg" }) : "-"
+const fmt = (d?: string | null) => d ? new Date(d).toLocaleString("en-ZA", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", timeZone: getCompanyZone() }) : "-"
 const errText = (e: unknown) => (e as { response?: { data?: { message?: string } } })?.response?.data?.message ?? "That did not work. Please try again."
 
 export default function GuardDevicesPanel({ guardId, canManage }: { guardId: string; canManage: boolean }) {
+  useCompanyZone()
   const qc = useQueryClient()
   const key = ["guard-devices", guardId]
   const [issued, setIssued] = useState<{ code: string; minutes: number } | null>(null)

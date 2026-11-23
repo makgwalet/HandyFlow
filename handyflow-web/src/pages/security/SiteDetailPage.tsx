@@ -18,12 +18,14 @@ import { CONTRACT_LABEL, CONTRACT_TONE, checkpointState, contractNote, formatAdd
 import { SEVERITY_TONE, STATUS_TONE, titleCase } from "./incident.logic"
 import OccurrenceBookCard from "./OccurrenceBookCard"
 import MonthlyPackCard from "./MonthlyPackCard"
+import SiteBillingCard from "./SiteBillingCard"
+import { getCompanyZone, useCompanyZone } from "./companyZone"
 
 const card: React.CSSProperties = { background: "var(--hf-surface)", border: "1px solid var(--hf-border)", borderRadius: 12, padding: 16 }
 const h: React.CSSProperties = { fontSize: 11, color: "var(--hf-text-muted)", fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.4, marginBottom: 8 }
 const muted: React.CSSProperties = { fontSize: 13, color: "var(--hf-text-muted)" }
 const link: React.CSSProperties = { color: "var(--hf-primary-text)", fontWeight: 600, textDecoration: "none" }
-const fmtT = (d: string) => new Date(d).toLocaleString("en-ZA", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: "Africa/Johannesburg" })
+const fmtT = (d: string) => new Date(d).toLocaleString("en-ZA", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: getCompanyZone() })
 
 const pin = (bg: string) => L.divIcon({
   className: "",
@@ -32,6 +34,7 @@ const pin = (bg: string) => L.divIcon({
 })
 
 export default function SiteDetailPage() {
+  useCompanyZone()
   const { id = "" } = useParams()
   const { data, isLoading, error } = useQuery<SiteOverview>({
     queryKey: ["site-overview", id],
@@ -101,7 +104,7 @@ export default function SiteDetailPage() {
             <div key={g.shiftId} style={{ display: "flex", justifyContent: "space-between", gap: 8, padding: "8px 0", borderBottom: "1px solid var(--hf-border)" }}>
               <div>
                 <Link to={`/security/guards/${g.guardId}`} style={link}>{g.guardName}</Link>
-                <div style={muted}>until {new Date(g.shiftEnd).toLocaleTimeString("en-ZA", { hour: "2-digit", minute: "2-digit", timeZone: "Africa/Johannesburg" })}{g.overrunning ? " (past end)" : ""}</div>
+                <div style={muted}>until {new Date(g.shiftEnd).toLocaleTimeString("en-ZA", { hour: "2-digit", minute: "2-digit", timeZone: getCompanyZone() })}{g.overrunning ? " (past end)" : ""}</div>
               </div>
               <Chip tone={GPS_TONE[g.gpsState] ?? "neutral"}>{GPS_LABEL[g.gpsState] ?? g.gpsState}</Chip>
             </div>
@@ -115,7 +118,7 @@ export default function SiteDetailPage() {
           {upcoming.length === 0 ? <div style={muted}>No shifts scheduled in the next 7 days.</div> : upcoming.map(s => (
             <div key={s.shiftId} style={{ padding: "6px 0", fontSize: 13 }}>
               <Link to={`/security/guards/${s.guardId}`} style={link}>{s.guardName}</Link>
-              <span style={muted}> · {fmtT(s.startAt)} to {new Date(s.endAt).toLocaleTimeString("en-ZA", { hour: "2-digit", minute: "2-digit", timeZone: "Africa/Johannesburg" })}</span>
+              <span style={muted}> · {fmtT(s.startAt)} to {new Date(s.endAt).toLocaleTimeString("en-ZA", { hour: "2-digit", minute: "2-digit", timeZone: getCompanyZone() })}</span>
             </div>
           ))}
           {counts.upcomingShifts7d > upcoming.length && <div style={{ ...muted, marginTop: 6 }}>Showing the first {upcoming.length} of {counts.upcomingShifts7d}.</div>}
@@ -149,6 +152,7 @@ export default function SiteDetailPage() {
 
       <OccurrenceBookCard siteId={site.id} />
       <MonthlyPackCard siteId={site.id} />
+      <SiteBillingCard siteId={site.id} />
     </div>
   )
 }

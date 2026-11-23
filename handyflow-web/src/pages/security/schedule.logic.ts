@@ -1,17 +1,17 @@
 // src/pages/security/schedule.logic.ts
 //
-// Pure rules for the scheduler grid: the week and its days (South African time, UTC+2, no daylight saving), grouping
+// Pure rules for the scheduler grid: the week and its days (in the company's zone, South Africa unless the company has set another), grouping
 // shifts into guard-by-day cells, and the conflicts shown on them. No React, no network.
 //
 // Conflicts describe the schedule; they never change it. The server still refuses an overlapping shift, an inactive
 // guard and an expired PSiRA registration when a shift is created. These flags also catch what was already scheduled
 // before a guard's status or registration changed.
 import type { Tone } from "./guard360.logic"
+import { dayIn, getCompanyZone, instantOf } from "./companyZone"
 
 export interface GridShift { id: string; siteId: string; guardId: string; startAt: string; endAt: string; status: string; notes?: string | null }
 export interface GridGuard { id: string; firstName: string; lastName: string; status: string; psiraExpiryDate: string | null }
 
-export const SAST_OFFSET_HOURS = 2
 export const MIN_REST_HOURS = 8
 export const WEEKLY_HOURS_FLAG = 45
 const HOUR = 3_600_000, DAY = 86_400_000
@@ -19,11 +19,11 @@ const HOUR = 3_600_000, DAY = 86_400_000
 /** Statuses that occupy the guard's time. Cancelled, pulled and missed shifts do not. */
 export const COUNTED = new Set(["SCHEDULED", "ACTIVE", "COMPLETED"])
 
-const sast = (d: Date) => new Date(d.getTime() + SAST_OFFSET_HOURS * HOUR)
-export const dayKey = (d: Date | string): string => sast(typeof d === "string" ? new Date(d) : d).toISOString().slice(0, 10)
+/** The calendar day an instant falls on in the company's zone (South Africa unless the company has set another). */
+export const dayKey = (d: Date | string): string => dayIn(getCompanyZone(), typeof d === "string" ? new Date(d) : d)
 export const addDays = (key: string, n: number): string => new Date(Date.parse(`${key}T00:00:00Z`) + n * DAY).toISOString().slice(0, 10)
-/** The instant a South African calendar day begins. */
-export const dayStart = (key: string): Date => new Date(Date.parse(`${key}T00:00:00+02:00`))
+/** The instant a calendar day begins in the company's zone. */
+export const dayStart = (key: string): Date => instantOf(getCompanyZone(), key)
 
 /** Monday of the week containing `d`, as a day key. */
 export function mondayOf(d: Date): string {
@@ -110,12 +110,13 @@ export function gridGuards(guards: GridGuard[], cells: Map<string, Map<string, G
     .sort((a, b) => guardName(a).localeCompare(guardName(b)))
 }
 
-/** An ISO instant from a day key and a clock time ("HH:mm") in South African time; the end rolls to the next day for a night shift. */
+/** An ISO instant from a day key and a clock time ("HH:mm") in the company's zone; the end rolls to the next day for a night shift. */
 export function toInstants(day: string, start: string, end: string): { startAt: string; endAt: string } | null {
   if (!/^\d{2}:\d{2}$/.test(start) || !/^\d{2}:\d{2}$/.test(end) || start === end) return null
-  const s = new Date(`${day}T${start}:00+02:00`)
-  let e = new Date(`${day}T${end}:00+02:00`)
-  if (e <= s) e = new Date(e.getTime() + DAY)
+  const zone = getCompanyZone()
+  const s = instantOf(zone, day, start)
+  let e = instantOf(zone, day, end)
+  if (e <= s) e = instantOf(zone, addDays(day, 1), end)
   if (Number.isNaN(s.getTime()) || Number.isNaN(e.getTime())) return null
   return { startAt: s.toISOString(), endAt: e.toISOString() }
 }
@@ -124,4 +125,4 @@ export function weekLabel(monday: string): string {
   const f = (k: string) => new Date(`${k}T00:00:00Z`).toLocaleDateString("en-ZA", { day: "numeric", month: "short", timeZone: "UTC" })
   return `${f(monday)} to ${f(addDays(monday, 6))}`
 }
-export const clock = (iso: string) => new Date(iso).toLocaleTimeString("en-ZA", { hour: "2-digit", minute: "2-digit", timeZone: "Africa/Johannesburg" })
+export const clock = (iso: string) => new Date(iso).toLocaleTimeString("en-ZA", { hour: "2-digit", minute: "2-digit", timeZone: getCompanyZone() })

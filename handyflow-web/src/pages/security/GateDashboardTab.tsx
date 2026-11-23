@@ -11,15 +11,17 @@ import { apiClient } from "../../api/client"
 import Chip from "../../components/ui/Chip"
 import StatTile from "../../components/ui/StatTile"
 import { STATUS_LABEL, STATUS_TONE, filterOnSite, onSiteFor, sortGates, typeLabel, typesPresent, type GateDashboard } from "./gate.logic"
+import { getCompanyZone, useCompanyZone } from "./companyZone"
 
 const sel: React.CSSProperties = { padding: "7px 10px", border: "1px solid var(--hf-border)", borderRadius: 8, fontSize: 13, background: "var(--hf-surface)", color: "var(--hf-text-primary)" }
 const card: React.CSSProperties = { background: "var(--hf-surface)", border: "1px solid var(--hf-border)", borderRadius: 12 }
 const th: React.CSSProperties = { textAlign: "left", padding: 10, fontSize: 11, color: "var(--hf-text-muted)", fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.4 }
 const td: React.CSSProperties = { padding: 10, fontSize: 13, borderTop: "1px solid var(--hf-border)", verticalAlign: "top" }
-const fmtT = (d: string) => new Date(d).toLocaleString("en-ZA", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: "Africa/Johannesburg" })
+const fmtT = (d: string) => new Date(d).toLocaleString("en-ZA", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: getCompanyZone() })
 const unwrap = (r: any) => { const p = r.data?.data ?? r.data; return Array.isArray(p) ? p : p?.content ?? [] }
 
 export default function GateDashboardTab() {
+  useCompanyZone()
   const [siteId, setSiteId] = useState("")
   const [type, setType] = useState("")
   const [search, setSearch] = useState("")

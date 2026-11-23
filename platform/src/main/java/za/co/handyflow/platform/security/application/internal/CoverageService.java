@@ -34,15 +34,27 @@ public class CoverageService {
     public record Board(LocalDate from, int days, int postCount, int shortCount, int uncoveredCount, List<Row> rows) {}
     public record PostView(UUID id, UUID siteId, String name, List<Integer> weekdays, LocalTime start, LocalTime end, int minGuards) {}
 
+    /** Optional so a service built by hand still works; without it South Africa's zone is used, never the server's. */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private za.co.handyflow.platform.shared.BusinessCalendar calendar;
+
     private final JdbcTemplate jdbc;
 
     @Transactional(readOnly = true)
-    public Board board(TenantId tenantId, UUID siteId, Integer daysAsked) { return board(tenantId, siteId, daysAsked, Instant.now()); }
+    public Board board(TenantId tenantId, UUID siteId, Integer daysAsked) { return board(tenantId, siteId, daysAsked, Instant.now(), null); }
+
+    /** The board for a user limited to some sites. `allowedSites` null means the whole company. */
+    @Transactional(readOnly = true)
+    public Board board(TenantId tenantId, UUID siteId, Integer daysAsked, Set<UUID> allowedSites) { return board(tenantId, siteId, daysAsked, Instant.now(), allowedSites); }
 
     @Transactional(readOnly = true)
-    Board board(TenantId tenantId, UUID siteId, Integer daysAsked, Instant now) {
+    Board board(TenantId tenantId, UUID siteId, Integer daysAsked, Instant now) { return board(tenantId, siteId, daysAsked, now, null); }
+
+    @Transactional(readOnly = true)
+    Board board(TenantId tenantId, UUID siteId, Integer daysAsked, Instant now, Set<UUID> allowedSites) {
         int days = CoverageRules.clampDays(daysAsked);
-        LocalDate from = now.atZone(CoverageRules.SAST).toLocalDate();
+        java.time.ZoneId zone = za.co.handyflow.platform.shared.BusinessCalendar.zoneOf(calendar, tenantId);
+        LocalDate from = now.atZone(zone).toLocalDate();
         UUID tenant = tenantId.getValue();
 
         Map<UUID, String> siteNames = new HashMap<>();
@@ -50,6 +62,12 @@ public class CoverageService {
         String siteFilter = siteId == null ? "" : " AND p.site_id = ?";
         List<Object> args = new ArrayList<>(List.of(tenant));
         if (siteId != null) args.add(siteId);
+        if (allowedSites != null) {
+            // A user limited to some sites: only their posts, and nothing at all when they have none.
+            if (allowedSites.isEmpty()) return new Board(from, days, 0, 0, 0, List.of());
+            siteFilter += " AND p.site_id IN (" + String.join(",", java.util.Collections.nCopies(allowedSites.size(), "?")) + ")";
+            args.addAll(allowedSites);
+        }
         jdbc.query("""
                 SELECT p.id, p.site_id, s.name AS site_name, p.name, p.weekdays, p.start_time, p.end_time, p.min_guards
                 FROM security_site_posts p JOIN security_sites s ON s.id = p.site_id AND s.tenant_id = p.tenant_id
@@ -61,8 +79,8 @@ public class CoverageService {
                             rs.getObject("start_time", LocalTime.class), rs.getObject("end_time", LocalTime.class), rs.getInt("min_guards")));
                 }, args.toArray());
 
-        Instant windowStart = from.atStartOfDay(CoverageRules.SAST).toInstant();
-        Instant windowEnd = from.plusDays(days + 1L).atStartOfDay(CoverageRules.SAST).toInstant();
+        Instant windowStart = from.atStartOfDay(zone).toInstant();
+        Instant windowEnd = from.plusDays(days + 1L).atStartOfDay(zone).toInstant();
         Map<UUID, List<Cover>> covers = new HashMap<>();
         if (!posts.isEmpty()) {
             List<Object> sargs = new ArrayList<>(List.of(tenant, utc(windowEnd), utc(windowStart)));
@@ -84,7 +102,7 @@ public class CoverageService {
         for (Post p : posts) bySite.computeIfAbsent(p.siteId(), k -> new ArrayList<>()).add(p);
         int shortC = 0, uncovered = 0;
         for (var e : bySite.entrySet()) {
-            for (Result r : CoverageRules.evaluateAll(e.getValue(), from, days, covers.getOrDefault(e.getKey(), List.of()))) {
+            for (Result r : CoverageRules.evaluateAll(e.getValue(), from, days, covers.getOrDefault(e.getKey(), List.of()), zone)) {
                 if (r.state() == CoverageRules.State.SHORT) shortC++;
                 if (r.state() == CoverageRules.State.UNCOVERED) uncovered++;
                 rows.add(new Row(e.getKey(), siteNames.get(e.getKey()), r.window().post().id(), r.window().post().name(), r.window().day(),

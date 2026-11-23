@@ -52,6 +52,27 @@ public class ReportingController {
     private final PdfReportService  pdfReportService;
     private final ReportRunService  runService;
 
+
+    /** Optional so a controller built by hand still works; in the application it is always there. */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private za.co.handyflow.platform.security.application.internal.SiteScopeService scope;
+
+    private void site(UUID siteId) {
+        za.co.handyflow.platform.security.application.internal.SiteScopeService.check(scope, TenantContext.getTenantIdAsObject(), TenantContext.getCurrentUserId(), siteId);
+    }
+
+    /** The sites the user may see, or null for the whole company. */
+    private java.util.Set<UUID> allowed() {
+        return za.co.handyflow.platform.security.application.internal.SiteScopeService.allowedSites(scope, TenantContext.getTenantIdAsObject(), TenantContext.getCurrentUserId());
+    }
+
+    /** Only a user with access to the whole company may use this: the records are not tied to one site. */
+    private void wholeCompany() {
+        za.co.handyflow.platform.security.application.internal.SiteScopeService.checkUnrestricted(scope, TenantContext.getTenantIdAsObject(), TenantContext.getCurrentUserId());
+    }
+
+
+
     // ── 1. Site Coverage ───────────────────────────────────────────────────────
 
     @GetMapping("/site-coverage")
@@ -64,6 +85,7 @@ public class ReportingController {
     public ResponseEntity<ApiResponse<SiteCoverageReport>> getSiteCoverage(
             @RequestParam UUID siteId,
             @RequestParam String month) {
+        site(siteId);
         TenantId tenantId = TenantContext.getTenantIdAsObject();
         SiteCoverageReport report = reportingService.getSiteCoverageReport(tenantId, siteId, parseMonth(month));
         runService.record(tenantId, ReportRunService.SITE_COVERAGE, month, report.siteName(), "VIEW");
@@ -80,6 +102,7 @@ public class ReportingController {
     public ResponseEntity<byte[]> getSiteCoveragePdf(
             @RequestParam UUID siteId,
             @RequestParam String month) {
+        site(siteId);
         TenantId tenantId = TenantContext.getTenantIdAsObject();
         SiteCoverageReport report = reportingService.getSiteCoverageReport(
                 tenantId, siteId, parseMonth(month));
@@ -101,6 +124,7 @@ public class ReportingController {
     public ResponseEntity<ApiResponse<GuardAttendanceReport>> getGuardAttendance(
             @RequestParam UUID guardId,
             @RequestParam String month) {
+        wholeCompany();
         TenantId tenantId = TenantContext.getTenantIdAsObject();
         GuardAttendanceReport report = reportingService.getGuardAttendanceReport(tenantId, guardId, parseMonth(month));
         runService.record(tenantId, ReportRunService.GUARD_ATTENDANCE, month, report.guardName(), "VIEW");
@@ -117,6 +141,7 @@ public class ReportingController {
     public ResponseEntity<byte[]> getGuardAttendancePdf(
             @RequestParam UUID guardId,
             @RequestParam String month) {
+        wholeCompany();
         TenantId tenantId = TenantContext.getTenantIdAsObject();
         GuardAttendanceReport report = reportingService.getGuardAttendanceReport(
                 tenantId, guardId, parseMonth(month));
@@ -134,11 +159,12 @@ public class ReportingController {
     @Operation(
             summary = "Company-wide monthly summary (JSON)",
             description = "Tenant-wide rollup: total shifts/hours, all-site coverage rates, " +
-                    "incident heat map by severity, active guard count. The executive view.")
+                    "incident heat map by severity, active guard count. The executive view. " +
+                    "A user limited to some sites gets the same figures for those sites only.")
     public ResponseEntity<ApiResponse<MonthlySummaryReport>> getMonthlySummary(
             @RequestParam String month) {
         TenantId tenantId = TenantContext.getTenantIdAsObject();
-        MonthlySummaryReport report = reportingService.getMonthlySummaryReport(tenantId, parseMonth(month));
+        MonthlySummaryReport report = reportingService.getMonthlySummaryReport(tenantId, parseMonth(month), allowed());
         runService.record(tenantId, ReportRunService.MONTHLY_SUMMARY, month, null, "VIEW");
         return ResponseEntity.ok(ApiResponse.success(report));
     }
@@ -150,6 +176,7 @@ public class ReportingController {
             description = "PDF version of the monthly summary, branded with the tenant's " +
                     "logo/company name. Suitable for board/management reporting.")
     public ResponseEntity<byte[]> getMonthlySummaryPdf(@RequestParam String month) {
+        wholeCompany();
         TenantId tenantId = TenantContext.getTenantIdAsObject();
         MonthlySummaryReport report = reportingService.getMonthlySummaryReport(
                 tenantId, parseMonth(month));

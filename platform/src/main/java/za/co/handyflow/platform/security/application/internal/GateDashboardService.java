@@ -41,15 +41,23 @@ public class GateDashboardService {
     }
 
     @Transactional(readOnly = true)
-    public Dashboard dashboard(TenantId tenantId, UUID siteId) { return dashboard(tenantId, siteId, Instant.now()); }
+    public Dashboard dashboard(TenantId tenantId, UUID siteId) { return dashboard(tenantId, siteId, Instant.now(), null); }
+
+    /** `allowed` null = the whole company; with no site chosen, a limited user sees all their sites together. */
+    @Transactional(readOnly = true)
+    public Dashboard dashboard(TenantId tenantId, UUID siteId, java.util.Set<UUID> allowed) { return dashboard(tenantId, siteId, Instant.now(), allowed); }
 
     @Transactional(readOnly = true)
-    Dashboard dashboard(TenantId tenantId, UUID siteId, Instant now) {
+    Dashboard dashboard(TenantId tenantId, UUID siteId, Instant now) { return dashboard(tenantId, siteId, now, null); }
+
+    @Transactional(readOnly = true)
+    Dashboard dashboard(TenantId tenantId, UUID siteId, Instant now, java.util.Set<UUID> allowed) {
         Instant today = todayStart(now);
         UUID tenant = tenantId.getValue();
-        String siteFilter = siteId == null ? "" : " AND e.site_id = ?";
+        String siteFilter = SiteScopeRules.siteClause("e.site_id", siteId, allowed);
         List<Object> base = new ArrayList<>(List.of(tenant));
-        if (siteId != null) base.add(siteId);
+        List<Object> siteArgs = SiteScopeRules.siteArgs(siteId, allowed);
+        base.addAll(siteArgs);
 
         List<OnSiteRow> onSite = jdbc.query("""
                 SELECT e.id, e.site_id, s.name AS site_name, ap.name AS access_point_name, e.entry_type, e.person_name, e.company,
@@ -89,7 +97,7 @@ public class GateDashboardService {
                 WHERE e.tenant_id = ?"""
                 + siteFilter + " AND (e.logged_out_at IS NULL OR e.logged_in_at >= ?) GROUP BY s.id, s.name ORDER BY s.name",
                 (rs, n) -> new SiteCount((UUID) rs.getObject("id"), rs.getString("name"), rs.getInt("on_site"), rs.getInt("entered_today")),
-                bySiteParams(today, tenant, siteId));
+                bySiteParams(today, tenant, siteArgs));
 
         List<GateCount> byGate = jdbc.query("""
                 SELECT ap.id, ap.name, s.id AS site_id, s.name AS site_name,
@@ -105,22 +113,22 @@ public class GateDashboardService {
                 + " GROUP BY ap.id, ap.name, s.id, s.name ORDER BY s.name, ap.name",
                 (rs, n) -> new GateCount((UUID) rs.getObject("id"), rs.getString("name"), (UUID) rs.getObject("site_id"), rs.getString("site_name"),
                         rs.getInt("on_site"), rs.getInt("overstayed"), rs.getInt("entered_today"), rs.getInt("departed_today")),
-                byGateParams(today, tenant, siteId));
+                byGateParams(today, tenant, siteArgs));
 
         return new Dashboard(new Counts(onSiteNow, overstayed, nz(entered), nz(departed), byType, vehicles), onSite, truncated, bySite, byGate, today);
     }
 
-    private static Object[] bySiteParams(Instant today, UUID tenant, UUID siteId) {
+    private static Object[] bySiteParams(Instant today, UUID tenant, List<Object> siteArgs) {
         List<Object> p = new ArrayList<>(List.of(Timestamp.from(today), tenant));
-        if (siteId != null) p.add(siteId);
+        p.addAll(siteArgs);
         p.add(Timestamp.from(today));
         return p.toArray();
     }
 
-    private static Object[] byGateParams(Instant today, UUID tenant, UUID siteId) {
+    private static Object[] byGateParams(Instant today, UUID tenant, List<Object> siteArgs) {
         Timestamp t = Timestamp.from(today);
         List<Object> p = new ArrayList<>(List.of(t, t, tenant));
-        if (siteId != null) p.add(siteId);
+        p.addAll(siteArgs);
         p.add(t); p.add(t);
         return p.toArray();
     }

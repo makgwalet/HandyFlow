@@ -44,6 +44,19 @@ public class VettingController {
 
     private final VettingService vettingService;
 
+
+    /** Optional so a controller built by hand still works; in the application it is always there. */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private za.co.handyflow.platform.security.application.internal.SiteScopeService scope;
+
+
+    /** Only a user with access to the whole company may use this: the records are not tied to one site. */
+    private void wholeCompany() {
+        za.co.handyflow.platform.security.application.internal.SiteScopeService.checkUnrestricted(scope, TenantContext.getTenantIdAsObject(), TenantContext.getCurrentUserId());
+    }
+
+
+
     // ── Part 9.5: Officer CP vetting tier ─────────────────────────────────────
 
     @PostMapping("/officers/{guardId}/tier")
@@ -61,6 +74,7 @@ public class VettingController {
     public ResponseEntity<ApiResponse<Void>> setGuardVettingTier(
             @PathVariable UUID guardId,
             @Valid @RequestBody SetCpVettingTierRequest req) {
+        wholeCompany();
         TenantId tenantId = TenantContext.getTenantIdAsObject();
         vettingService.setGuardCpVettingTier(tenantId, guardId, req);
         return ResponseEntity.ok(ApiResponse.success(null));
@@ -72,6 +86,7 @@ public class VettingController {
     @Operation(summary = "Get all vetting checks for a principal")
     public ResponseEntity<ApiResponse<List<PrincipalVetting>>> getVettingHistory(
             @PathVariable UUID principalId) {
+        wholeCompany();
         TenantId tenantId = TenantContext.getTenantIdAsObject();
         return ResponseEntity.ok(ApiResponse.success(
                 vettingService.getVettingHistory(tenantId, principalId)));
@@ -86,6 +101,7 @@ public class VettingController {
     public ResponseEntity<ApiResponse<PrincipalVetting>> createVettingCheck(
             @PathVariable UUID principalId,
             @Valid @RequestBody CreatePrincipalVettingRequest req) {
+        wholeCompany();
         TenantId tenantId   = TenantContext.getTenantIdAsObject();
         UUID     supervisorId = TenantContext.getCurrentUserId();
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(
@@ -101,6 +117,7 @@ public class VettingController {
     public ResponseEntity<ApiResponse<PrincipalVetting>> recordVettingResult(
             @PathVariable UUID checkId,
             @Valid @RequestBody RecordVettingResultRequest req) {
+        wholeCompany();
         TenantId tenantId = TenantContext.getTenantIdAsObject();
         return ResponseEntity.ok(ApiResponse.success(
                 vettingService.recordVettingResult(tenantId, checkId, req)));
@@ -111,6 +128,7 @@ public class VettingController {
     @GetMapping("/declined")
     @Operation(summary = "The declined principals register — companies formally decided against")
     public ResponseEntity<ApiResponse<List<DeclinedPrincipal>>> getDeclinedRegister() {
+        wholeCompany();
         TenantId tenantId = TenantContext.getTenantIdAsObject();
         return ResponseEntity.ok(ApiResponse.success(
                 vettingService.getDeclinedRegister(tenantId)));
@@ -130,6 +148,7 @@ public class VettingController {
     public ResponseEntity<ApiResponse<DeclinedPrincipal>> declinePrincipal(
             @PathVariable UUID principalId,
             @Valid @RequestBody DeclinePrincipalRequest req) {
+        wholeCompany();
         TenantId tenantId   = TenantContext.getTenantIdAsObject();
         UUID     declinedBy  = TenantContext.getCurrentUserId();
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(

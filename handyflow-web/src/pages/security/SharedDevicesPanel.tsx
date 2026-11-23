@@ -9,16 +9,18 @@ import { apiClient } from "../../api/client"
 import Chip from "../../components/ui/Chip"
 import { usePermission } from "../../hooks/usePermission"
 import { canRevokeShared, orderShared, registerBody, sharedLabel, sharedStatusTone, validateRegister, type SharedDevice } from "./sharedDeviceLogic"
+import { getCompanyZone, useCompanyZone } from "./companyZone"
 
 const btn: React.CSSProperties = { display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 12px", border: "1px solid var(--hf-border)", borderRadius: 9, background: "var(--hf-surface)", color: "var(--hf-text-secondary)", fontSize: 13, fontWeight: 600, cursor: "pointer" }
 const primary: React.CSSProperties = { ...btn, background: "var(--hf-accent)", color: "var(--hf-text-on-solid)", border: "none" }
 const input: React.CSSProperties = { padding: "8px 10px", border: "1px solid var(--hf-border)", borderRadius: 8, background: "var(--hf-surface)", color: "var(--hf-text-primary)", fontSize: 13 }
 const th: React.CSSProperties = { textAlign: "left", padding: "8px 10px", fontSize: 11, color: "var(--hf-text-muted)", fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.4 }
 const td: React.CSSProperties = { padding: "9px 10px", fontSize: 13, borderTop: "1px solid var(--hf-border-subtle)" }
-const fmt = (d?: string | null) => d ? new Date(d).toLocaleString("en-ZA", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: "Africa/Johannesburg" }) : "-"
+const fmt = (d?: string | null) => d ? new Date(d).toLocaleString("en-ZA", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: getCompanyZone() }) : "-"
 const errText = (e: unknown) => (e as { response?: { data?: { message?: string } } })?.response?.data?.message ?? "That did not work. Please try again."
 
 export default function SharedDevicesPanel() {
+  useCompanyZone()
   const qc = useQueryClient()
   const canManage = usePermission("SECURITY_MANAGE")
   const [form, setForm] = useState({ hardwareId: "", name: "", siteId: "" })

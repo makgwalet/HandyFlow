@@ -2,6 +2,7 @@
 
 package za.co.handyflow.platform.security.api;
 
+import za.co.handyflow.platform.security.application.internal.SiteScopeService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -43,6 +44,35 @@ import java.util.UUID;
 @Tag(name = "Security - Gate Access", description = "Supervisor-facing access point management and gate log")
 public class GateAccessController {
 
+    /** Optional so a hand-built controller still works; in the application it is always there. Limits a user to the sites in their scope. */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private za.co.handyflow.platform.security.application.internal.SiteScopeService scope;
+
+    /** A site outside the user's scope answers exactly like a site that does not exist. */
+    private void site(UUID siteId) {
+        za.co.handyflow.platform.security.application.internal.SiteScopeService.check(scope, TenantContext.getTenantIdAsObject(), TenantContext.getCurrentUserId(), siteId);
+    }
+
+    /** For a list whose site is optional: a user limited to some sites must name one of them, the whole company may leave it out. */
+    private void choice(UUID siteId) {
+        za.co.handyflow.platform.security.application.internal.SiteScopeService.checkChoice(scope, TenantContext.getTenantIdAsObject(), TenantContext.getCurrentUserId(), siteId);
+    }
+
+    /** For a view that spans every site and cannot be narrowed yet: only a user with the whole company may use it. */
+    private void wholeCompany() {
+        za.co.handyflow.platform.security.application.internal.SiteScopeService.checkUnrestricted(scope, TenantContext.getTenantIdAsObject(), TenantContext.getCurrentUserId());
+    }
+
+    /** A record that belongs to a site: one at a site outside the user's scope answers "not found". */
+    private void child(za.co.handyflow.platform.security.application.internal.SiteScopeService.Kind kind, UUID id) {
+        za.co.handyflow.platform.security.application.internal.SiteScopeService.checkChild(scope, TenantContext.getTenantIdAsObject(), TenantContext.getCurrentUserId(), kind, id);
+    }
+
+    /** For a site that is optional in the request: leaving it out means the whole company. */
+    private void optionalSite(UUID siteId) {
+        za.co.handyflow.platform.security.application.internal.SiteScopeService.checkOptionalSite(scope, TenantContext.getTenantIdAsObject(), TenantContext.getCurrentUserId(), siteId);
+    }
+
     private final GateAccessService     gateAccessService;
     private final ReportingService      reportingService;
     private final SiteAccessPdfService  siteAccessPdfService;
@@ -57,6 +87,7 @@ public class GateAccessController {
     public ResponseEntity<ApiResponse<AccessPointResponse>> createAccessPoint(
             @Valid @RequestBody CreateAccessPointRequest request) {
         featureGuard.requireModule("security");
+        site(request.siteId());
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success("Access point created",
                 gateAccessService.createAccessPoint(TenantContext.getTenantIdAsObject(), request)));
     }
@@ -65,6 +96,7 @@ public class GateAccessController {
     @PreAuthorize("hasAuthority('SECURITY_READ')")
     public ResponseEntity<ApiResponse<List<AccessPointResponse>>> getAccessPoints(@PathVariable UUID siteId) {
         featureGuard.requireModule("security");
+        site(siteId);
         return ResponseEntity.ok(ApiResponse.success(
                 gateAccessService.getAccessPoints(TenantContext.getTenantIdAsObject(), siteId)));
     }
@@ -74,6 +106,7 @@ public class GateAccessController {
     public ResponseEntity<ApiResponse<AccessPointResponse>> updateAccessPoint(
             @PathVariable UUID id, @Valid @RequestBody UpdateAccessPointRequest request) {
         featureGuard.requireModule("security");
+        child(SiteScopeService.Kind.ACCESS_POINT, id);
         return ResponseEntity.ok(ApiResponse.success("Access point updated",
                 gateAccessService.updateAccessPoint(TenantContext.getTenantIdAsObject(), id, request)));
     }
@@ -82,6 +115,7 @@ public class GateAccessController {
     @PreAuthorize("hasAuthority('SECURITY_MANAGE')")
     public ResponseEntity<ApiResponse<AccessPointResponse>> deactivateAccessPoint(@PathVariable UUID id) {
         featureGuard.requireModule("security");
+        child(SiteScopeService.Kind.ACCESS_POINT, id);
         return ResponseEntity.ok(ApiResponse.success("Access point deactivated",
                 gateAccessService.deactivateAccessPoint(TenantContext.getTenantIdAsObject(), id)));
     }
@@ -90,6 +124,7 @@ public class GateAccessController {
     @PreAuthorize("hasAuthority('SECURITY_MANAGE')")
     public ResponseEntity<ApiResponse<AccessPointResponse>> reactivateAccessPoint(@PathVariable UUID id) {
         featureGuard.requireModule("security");
+        child(SiteScopeService.Kind.ACCESS_POINT, id);
         return ResponseEntity.ok(ApiResponse.success("Access point reactivated",
                 gateAccessService.reactivateAccessPoint(TenantContext.getTenantIdAsObject(), id)));
     }
@@ -102,6 +137,7 @@ public class GateAccessController {
             description = "Same read model the client portal's currentlyOnSite extension reuses.")
     public ResponseEntity<ApiResponse<List<GateRegisterEntryResponse>>> getOnSite(@PathVariable UUID siteId) {
         featureGuard.requireModule("security");
+        site(siteId);
         return ResponseEntity.ok(ApiResponse.success(
                 gateAccessService.getOnSite(TenantContext.getTenantIdAsObject(), siteId)));
     }
@@ -112,6 +148,7 @@ public class GateAccessController {
     public ResponseEntity<ApiResponse<List<za.co.handyflow.platform.evidence.dto.EvidenceResponse>>> getAttachments(
             @PathVariable UUID entryId) {
         featureGuard.requireModule("security");
+        child(SiteScopeService.Kind.GATE_ENTRY, entryId);
         return ResponseEntity.ok(ApiResponse.success(
                 gateAccessService.getAttachments(TenantContext.getTenantIdAsObject(), entryId)));
     }
@@ -125,6 +162,7 @@ public class GateAccessController {
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant to,
             @PageableDefault(size = 50) Pageable pageable) {
         featureGuard.requireModule("security");
+        site(siteId);
         return ResponseEntity.ok(ApiResponse.success(
                 gateAccessService.getGateLog(TenantContext.getTenantIdAsObject(), siteId, from, to, pageable)));
     }
@@ -145,6 +183,7 @@ public class GateAccessController {
             @RequestParam UUID siteId,
             @RequestParam String month) {
         featureGuard.requireModule("security");
+        site(siteId);
         TenantId tenantId = TenantContext.getTenantIdAsObject();
         var report = reportingService.getSiteAccessReport(tenantId, siteId, java.time.YearMonth.parse(month));
         runService.record(tenantId, za.co.handyflow.platform.security.application.internal.ReportRunService.SITE_ACCESS,
@@ -159,6 +198,7 @@ public class GateAccessController {
             @RequestParam UUID siteId,
             @RequestParam String month) {
         featureGuard.requireModule("security");
+        site(siteId);
         TenantId tenantId = TenantContext.getTenantIdAsObject();
         var report = reportingService.getSiteAccessReport(tenantId, siteId, java.time.YearMonth.parse(month));
         byte[] pdf = siteAccessPdfService.siteAccessPdf(report, tenantId);

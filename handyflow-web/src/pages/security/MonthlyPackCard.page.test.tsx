@@ -5,7 +5,9 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 const api = vi.hoisted(() => ({ get: vi.fn() }))
 vi.mock("../../api/client", () => ({ apiClient: api }))
 
+vi.mock("./companyZone", async orig => ({ ...(await orig<typeof import("./companyZone")>()), useCompanyZone: () => ({ zone: "Africa/Johannesburg", ready: true }) }))
 import MonthlyPackCard from "./MonthlyPackCard"
+import { useAuthStore } from "../../store/auth.store"
 
 const pack = (o: Record<string, unknown> = {}) => ({ data: { data: {
   siteId: "s1", siteName: "Centurion Mall", month: "2026-10", from: "2026-10-01", to: "2026-10-31", inProgress: false, contractStatus: "ACTIVE",
@@ -23,7 +25,7 @@ function show() {
 
 describe("MonthlyPackCard", () => {
   beforeEach(() => { api.get.mockReset() })
-  afterEach(() => { cleanup(); delete document.body.dataset.printing; vi.restoreAllMocks() })
+  afterEach(() => { cleanup(); delete document.body.dataset.printing; vi.restoreAllMocks(); useAuthStore.setState({ user: null } as never) })
 
   it("shows last month's report with every figure, and asks the server for that month", async () => {
     api.get.mockResolvedValue(pack())
@@ -94,5 +96,18 @@ describe("MonthlyPackCard", () => {
     for (const k of ["Cover", "Shifts", "Patrols", "Incidents", "Visitors", "Alarms", "Occurrence Book"]) expect(t).toContain(k)
     expect(t).toContain("20 completed, 2 missed.")
     expect(t).toMatch(/Printed .*SAST/)
+  })
+  it("offers the email panel to managers only", async () => {
+    api.get.mockImplementation((url: string) => Promise.resolve(url.endsWith("/report-recipients") ? { data: { data: [] } } : pack()))
+    useAuthStore.setState({ user: { permissions: ["SECURITY_READ"] } } as never)
+    show()
+    await screen.findAllByText(/required guard-hours/)
+    expect(screen.queryByLabelText("Email this report")).toBeNull()
+    expect(api.get.mock.calls.some(c => String(c[0]).endsWith("/report-recipients"))).toBe(false)
+    cleanup()
+    useAuthStore.setState({ user: { permissions: ["SECURITY_MANAGE"] } } as never)
+    show()
+    expect(await screen.findByText("Email to client")).toBeTruthy()
+    expect(api.get.mock.calls.some(c => String(c[0]).endsWith("/report-recipients"))).toBe(true)
   })
 })

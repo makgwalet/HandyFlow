@@ -81,7 +81,7 @@ public class RotationAssignment {
     }
 
     public boolean isActive() {
-        LocalDate today = LocalDate.now();
+        LocalDate today = LocalDate.now(za.co.handyflow.platform.shared.BusinessTime.DEFAULT_ZONE);
         return !startsAt.isAfter(today) && (endsAt == null || !endsAt.isBefore(today));
     }
 }

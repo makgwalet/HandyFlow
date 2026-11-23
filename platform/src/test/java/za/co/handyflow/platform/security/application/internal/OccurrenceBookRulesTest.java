@@ -182,7 +182,7 @@ class OccurrenceBookRulesTest {
         int add = s.indexOf("public void addEntry");
         String body = s.substring(add, s.indexOf("private String siteName"));
         assertTrue(body.contains("requireOpenOrCorrection"));
-        assertTrue(body.contains("OccurrenceBookRules.dayOf(when)"));
+        assertTrue(body.contains("OccurrenceBookRules.dayOf(when, zone(tenantId))"));
         assertTrue(body.indexOf("requireOpenOrCorrection") < body.indexOf("INSERT INTO security_ob_entries"), "check before insert");
     }
 

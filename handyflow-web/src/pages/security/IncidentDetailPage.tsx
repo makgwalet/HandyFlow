@@ -15,13 +15,14 @@ import EvidenceFiles from "./EvidenceFiles"
 import {
   EVENT_LABELS, SEVERITY_TONE, STATUS_TONE, actionFormError, availableActions, elapsed, severitiesAbove, titleCase, type IncidentCase,
 } from "./incident.logic"
+import { getCompanyZone, useCompanyZone } from "./companyZone"
 
 const card: React.CSSProperties = { background: "var(--hf-surface)", border: "1px solid var(--hf-border)", borderRadius: 12, padding: 16 }
 const input: React.CSSProperties = { padding: "8px 10px", border: "1px solid var(--hf-border)", borderRadius: 8, fontSize: 13, background: "var(--hf-surface)", color: "var(--hf-text-primary)", width: "100%", boxSizing: "border-box" }
 const btn: React.CSSProperties = { display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 12px", border: "1px solid var(--hf-border)", borderRadius: 9, background: "var(--hf-surface)", color: "var(--hf-text-secondary)", fontSize: 13, fontWeight: 600, cursor: "pointer", textDecoration: "none" }
 const primary: React.CSSProperties = { ...btn, background: "var(--hf-accent)", color: "var(--hf-text-on-solid)", border: "none" }
 const h: React.CSSProperties = { fontSize: 11, color: "var(--hf-text-muted)", fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.4, marginBottom: 8 }
-const fmtT = (d: string) => new Date(d).toLocaleString("en-ZA", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: "Africa/Johannesburg" })
+const fmtT = (d: string) => new Date(d).toLocaleString("en-ZA", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: getCompanyZone() })
 const errText = (e: any) => e?.response?.data?.message ?? "That did not work. Please try again."
 
 const TEXT_LABEL: Record<string, string> = {
@@ -66,6 +67,7 @@ function ActionForm({ id, action, severity, onDone, onCancel }: { id: string; ac
 }
 
 export default function IncidentDetailPage() {
+  useCompanyZone()
   const { id } = useParams<{ id: string }>()
   const qc = useQueryClient()
   const canManage = usePermission("SECURITY_MANAGE") || usePermission("SECURITY_ADMIN")

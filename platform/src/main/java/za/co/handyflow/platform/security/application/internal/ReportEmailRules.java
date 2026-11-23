@@ -21,6 +21,9 @@ public final class ReportEmailRules {
     /** A line of the report: a heading and its sentence(s). */
     public record Line(String heading, String text) {}
     public record Content(String siteName, String monthTitle, String period, List<Line> lines) {}
+    /** The monitored contact a client can write or call about a report. Name and phone are optional; the address is not. */
+    public record Contact(String name, String email, String phone) {}
+    private static final Pattern PHONE = Pattern.compile("^[0-9+()\\- ]{5,40}$");
 
     private ReportEmailRules() {}
 
@@ -44,9 +47,31 @@ public final class ReportEmailRules {
     }
 
     /** Only a finished month goes to a client; a month to date is still changing. */
-    public static void requireFinished(YearMonth month, Instant now) {
-        if (!month.atEndOfMonth().isBefore(java.time.LocalDate.ofInstant(now, WeeklyHoursRules.SAST)))
+    public static void requireFinished(YearMonth month, Instant now) { requireFinished(month, now, WeeklyHoursRules.SAST); }
+
+    /** The month must have ended in the company's zone. */
+    public static void requireFinished(YearMonth month, Instant now, java.time.ZoneId zone) {
+        if (!month.atEndOfMonth().isBefore(java.time.LocalDate.ofInstant(now, zone)))
             throw new HandyFlowException("Only a finished month can be emailed", HttpStatus.CONFLICT, "MONTH_NOT_FINISHED");
+    }
+
+    /** A report is only sent when a monitored contact is set, so the client always knows who to ask. */
+    public static void requireContact(Contact c) {
+        if (c == null || c.email() == null || c.email().isBlank())
+            throw new HandyFlowException("Set the contact address for report questions first", HttpStatus.CONFLICT, "CONTACT_NOT_SET");
+    }
+
+    /** Optional name: blank becomes empty (null), otherwise cleaned like a recipient name. */
+    public static String cleanContactName(String raw) {
+        return raw == null || raw.isBlank() ? null : cleanName(raw);
+    }
+
+    /** Optional phone: digits, spaces, + ( ) and - only, 5 to 40 characters. */
+    public static String cleanPhone(String raw) {
+        if (raw == null || raw.isBlank()) return null;
+        String p = raw.trim();
+        if (!PHONE.matcher(p).matches()) throw new HandyFlowException("Enter a phone number using digits, spaces and + ( ) -", HttpStatus.BAD_REQUEST, "INVALID_PHONE");
+        return p;
     }
 
     public static void requireRecipients(int n) {
@@ -71,7 +96,10 @@ public final class ReportEmailRules {
         return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\"", "&quot;").replace("'", "&#39;");
     }
 
-    public static String html(Content c) {
+    public static String html(Content c) { return html(c, null); }
+
+    /** The report as an email, ending with who to contact when a contact is given. */
+    public static String html(Content c, Contact contact) {
         StringBuilder b = new StringBuilder();
         b.append("<div style=\"font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#111;max-width:640px\">");
         b.append("<h2 style=\"margin:0 0 4px\">Monthly service report</h2>");
@@ -83,7 +111,18 @@ public final class ReportEmailRules {
                     .append(esc(l.heading())).append("</td><td style=\"padding:6px 8px;border-bottom:1px solid #ddd\">")
                     .append(esc(l.text())).append("</td></tr>");
         }
-        b.append("</table><p style=\"margin:16px 0 0;color:#666;font-size:12px\">Figures are counts only. Sent on behalf of your security provider through HandyFlow.</p></div>");
+        b.append("</table>");
+        if (contact != null && contact.email() != null && !contact.email().isBlank()) b.append(contactParagraph(contact));
+        b.append("<p style=\"margin:16px 0 0;color:#666;font-size:12px\">Figures are counts only. Sent on behalf of your security provider through HandyFlow.</p></div>");
         return b.toString();
+    }
+
+    /** "Questions about this report? Contact Name, email, phone." Every part escaped. */
+    static String contactParagraph(Contact c) {
+        StringBuilder b = new StringBuilder("<p style=\"margin:16px 0 0\"><strong>Questions about this report?</strong> Contact ");
+        if (c.name() != null && !c.name().isBlank()) b.append(esc(c.name())).append(" at ");
+        b.append("<a href=\"mailto:").append(esc(c.email())).append("\">").append(esc(c.email())).append("</a>");
+        if (c.phone() != null && !c.phone().isBlank()) b.append(" or ").append(esc(c.phone()));
+        return b.append(". Please do not reply to this email; use this contact.</p>").toString();
     }
 }

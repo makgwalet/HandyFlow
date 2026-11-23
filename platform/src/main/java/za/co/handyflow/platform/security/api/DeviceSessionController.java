@@ -27,6 +27,10 @@ import java.util.UUID;
 /**
  * DeviceSessionController — Phase 2 session lifecycle and resource custody.
  * <p>
+ * LOCKED (verification finding SP-18): every endpoint here now needs a staff permission. These are the supervisor/staff paths; the guard's own app
+ * uses /api/v1/guard/** with a guard token, where the guard is taken from the token. Before this, open/close/location/checkout/return had no
+ * check and trusted guardId, PIN and geofence flags in the request body.
+ * <p>
  * FIX: only two endpoints in this file were actually the generic-
  * permission bug being fixed here — getSessions() and forceCloseSession(),
  * now SECURITY_READ/SECURITY_MANAGE. Every other endpoint's lack of
@@ -84,6 +88,7 @@ public class DeviceSessionController {
     }
 
     @GetMapping("/current")
+    @PreAuthorize("hasAuthority('SECURITY_READ')")
     @Operation(
             summary = "Get the currently open session on a device",
             description = "Used by the kiosk lock screen to determine whether to show " +
@@ -117,6 +122,7 @@ public class DeviceSessionController {
     // ── Session Lifecycle ──────────────────────────────────────────────────────
 
     @PostMapping("/open")
+    @PreAuthorize("hasAuthority('SECURITY_MANAGE')")
     @Operation(
             summary = "Open a guard session on a device (clock in)",
             description = """
@@ -135,6 +141,7 @@ public class DeviceSessionController {
     }
 
     @PostMapping("/{sessionId}/close")
+    @PreAuthorize("hasAuthority('SECURITY_MANAGE')")
     @Operation(
             summary = "Close a guard session (clock out)",
             description = """
@@ -175,6 +182,7 @@ public class DeviceSessionController {
     // ── GPS location ping ──────────────────────────────────────────────────────
 
     @PostMapping("/{sessionId}/location")
+    @PreAuthorize("hasAuthority('SECURITY_MANAGE')")
     @Operation(
             summary = "Record a GPS ping for the guard on this open session",
             description = """
@@ -199,6 +207,7 @@ public class DeviceSessionController {
     // ── Resource Custody ───────────────────────────────────────────────────────
 
     @PostMapping("/{sessionId}/resources/checkout")
+    @PreAuthorize("hasAuthority('SECURITY_MANAGE')")
     @Operation(
             summary = "Check out a resource (radio, key, firearm, vehicle) for this session",
             description = "Optionally requires witnessedBy (a second guard's ID) for " +
@@ -213,6 +222,7 @@ public class DeviceSessionController {
     }
 
     @PostMapping("/resources/{custodyId}/return")
+    @PreAuthorize("hasAuthority('SECURITY_MANAGE')")
     @Operation(
             summary = "Return a checked-out resource",
             description = "Records condition on return (GOOD/DAMAGED/MISSING). " +

@@ -17,6 +17,7 @@ import { apiClient } from "../../api/client"
 import Chip from "../../components/ui/Chip"
 import StatTile from "../../components/ui/StatTile"
 import { GPS_FILTERS, GPS_LABEL, GPS_TONE, ago, filterGuards, mapCenter, summarise, withPosition, type LiveGuard } from "./liveops.logic"
+import { getCompanyZone, useCompanyZone } from "./companyZone"
 
 // A div-icon, not Leaflet's default marker images, which avoids the well-known Leaflet/Vite asset-path problem.
 // Its HTML is inserted into this document, so the CSS variables follow the theme.
@@ -32,9 +33,10 @@ function guardIcon(state: string, selected: boolean) {
 }
 
 const sel: React.CSSProperties = { padding: "7px 10px", border: "1px solid var(--hf-border)", borderRadius: 8, fontSize: 13, background: "var(--hf-surface)", color: "var(--hf-text-primary)" }
-const fmtTime = (iso: string) => new Date(iso).toLocaleTimeString("en-ZA", { hour: "2-digit", minute: "2-digit", timeZone: "Africa/Johannesburg" })
+const fmtTime = (iso: string) => new Date(iso).toLocaleTimeString("en-ZA", { hour: "2-digit", minute: "2-digit", timeZone: getCompanyZone() })
 
 export default function LiveMapTab() {
+  useCompanyZone()
   const navigate = useNavigate()
   const [siteId, setSiteId] = useState("")
   const [gps, setGps] = useState("")

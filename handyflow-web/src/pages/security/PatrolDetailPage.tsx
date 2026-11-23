@@ -13,14 +13,16 @@ import Chip from "../../components/ui/Chip"
 import { PageHeader } from "../../components/ui/PageHeader"
 import { clock } from "./schedule.logic"
 import { METHOD_LABEL, STATUS_LABEL, STATUS_TONE, canAcknowledge, progress, unscanned, type PatrolDetail } from "./patrol.logic"
+import { getCompanyZone, useCompanyZone } from "./companyZone"
 
 const card: React.CSSProperties = { background: "var(--hf-surface)", border: "1px solid var(--hf-border)", borderRadius: 12, padding: 16, marginBottom: 16 }
 const h: React.CSSProperties = { fontSize: 11, color: "var(--hf-text-muted)", fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.4, marginBottom: 8 }
 const muted: React.CSSProperties = { fontSize: 13, color: "var(--hf-text-muted)" }
-const fmtT = (d: string) => new Date(d).toLocaleString("en-ZA", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: "Africa/Johannesburg" })
+const fmtT = (d: string) => new Date(d).toLocaleString("en-ZA", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: getCompanyZone() })
 const errText = (e: any) => e?.response?.data?.message ?? "That did not work. Please try again."
 
 export default function PatrolDetailPage() {
+  useCompanyZone()
   const { id = "" } = useParams()
   const qc = useQueryClient()
   const canManage = usePermission("SECURITY_MANAGE")

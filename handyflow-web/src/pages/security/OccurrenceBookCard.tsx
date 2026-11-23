@@ -7,6 +7,7 @@ import { BookOpen, ChevronLeft, ChevronRight, Printer } from "lucide-react"
 import { apiClient } from "../../api/client"
 import Chip from "../../components/ui/Chip"
 import { printSection } from "./printSection"
+import { useCompanyZone } from "./companyZone"
 import { useAuthStore } from "../../store/auth.store"
 import {
   KIND_TONE, MAX_TEXT, PRINT_CSS, printSignLine, printTitle, printedAt, allowedKinds, canGoNext, canSign, effectiveKind, signBody, signWarning, signedText, dayTitle, emptyText, entryBody, entryProblem, kindLabel, newClientRef, shiftDay, timeText, todaySast,
@@ -18,7 +19,10 @@ const muted: React.CSSProperties = { fontSize: 13, color: "var(--hf-text-muted)"
 const navBtn: React.CSSProperties = { padding: "4px 8px", border: "1px solid var(--hf-border)", borderRadius: 7, background: "var(--hf-surface)", color: "var(--hf-text-secondary)", cursor: "pointer", display: "inline-flex", alignItems: "center" }
 
 export default function OccurrenceBookCard({ siteId }: { siteId: string }) {
-  const [date, setDate] = useState(() => todaySast())
+  const { ready: zoneReady } = useCompanyZone()
+  const [picked, setPicked] = useState<string | null>(null)
+  const date = picked ?? todaySast()
+  const setDate = (d: string | ((x: string) => string)) => setPicked(typeof d === "function" ? d(date) : d)
   const [kind, setKind] = useState("NOTE")
   const [text, setText] = useState("")
   const [err, setErr] = useState("")
@@ -32,6 +36,7 @@ export default function OccurrenceBookCard({ siteId }: { siteId: string }) {
   const { data, isLoading, error } = useQuery<ObDay>({
     queryKey: ["occurrence-book", siteId, date],
     queryFn: async () => (await apiClient.get(`/api/v1/security/sites/${siteId}/occurrence-book`, { params: { date } })).data?.data,
+    enabled: zoneReady,
     refetchInterval: date === todaySast() ? 60000 : false,
   })
   const lines = Array.isArray(data?.lines) ? data!.lines : null

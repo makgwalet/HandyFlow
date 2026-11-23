@@ -86,8 +86,15 @@ public class CameraService {
      */
     @Transactional(readOnly = true)
     public Page<CameraResponse> getAllForTenant(TenantId tenantId, Pageable pageable) {
-        return cameraRepository.findAllActive(tenantId, pageable)
-                .map(c -> toResponse(c, tenantId));
+        return getAllForTenant(tenantId, pageable, null);
+    }
+
+    /** `allowedSites` null = the whole company; otherwise only cameras at those sites (an empty set sees none). */
+    @Transactional(readOnly = true)
+    public Page<CameraResponse> getAllForTenant(TenantId tenantId, Pageable pageable, java.util.Set<UUID> allowedSites) {
+        if (allowedSites == null) return cameraRepository.findAllActive(tenantId, pageable).map(c -> toResponse(c, tenantId));
+        if (allowedSites.isEmpty()) return Page.empty(pageable);
+        return cameraRepository.findAllActiveInSites(tenantId, allowedSites, pageable).map(c -> toResponse(c, tenantId));
     }
 
     @Transactional

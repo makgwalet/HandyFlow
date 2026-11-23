@@ -33,6 +33,15 @@ public class OccurrenceBookController {
     private final DeviceSessionService sessions;
     private final FeatureGuard featureGuard;
 
+    /** Optional so a hand-built controller still works; in the application it is always there. Limits a user to the sites in their scope. */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private za.co.handyflow.platform.security.application.internal.SiteScopeService scope;
+
+    private void site(UUID siteId) {
+        za.co.handyflow.platform.security.application.internal.SiteScopeService.check(scope, TenantContext.getTenantIdAsObject(), TenantContext.getCurrentUserId(), siteId);
+    }
+
+
     @GetMapping("/api/v1/security/sites/{siteId}/occurrence-book")
     @PreAuthorize("hasAuthority('SECURITY_READ')")
     @Operation(summary = "The Occurrence Book of a site for one day (South African time), oldest first",
@@ -41,6 +50,7 @@ public class OccurrenceBookController {
             @PathVariable UUID siteId,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
         featureGuard.requireModule("security");
+        site(siteId);
         return ResponseEntity.ok(ApiResponse.success("OK", book.day(TenantContext.getTenantIdAsObject(), siteId, date, TenantContext.getCurrentUserId())));
     }
 
@@ -49,6 +59,7 @@ public class OccurrenceBookController {
     @Operation(summary = "A supervisor adds an entry (NOTE, HANDOVER or CORRECTION). Entries cannot be edited or deleted.")
     public ResponseEntity<ApiResponse<Void>> supervisorEntry(@PathVariable UUID siteId, @Valid @RequestBody EntryRequest r) {
         featureGuard.requireModule("security");
+        site(siteId);
         book.addEntry(TenantContext.getTenantIdAsObject(), siteId, null, TenantContext.getCurrentUserId(),
                 r.kind(), true, r.text(), r.recordedAt(), r.clientRef());
         return ResponseEntity.ok(ApiResponse.success(null));
@@ -63,6 +74,7 @@ public class OccurrenceBookController {
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
             @RequestBody(required = false) SignRequest r) {
         featureGuard.requireModule("security");
+        site(siteId);
         return ResponseEntity.ok(ApiResponse.success("OK", book.sign(TenantContext.getTenantIdAsObject(), siteId, date,
                 TenantContext.getCurrentUserId(), r == null ? null : r.note())));
     }

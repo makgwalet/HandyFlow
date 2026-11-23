@@ -2,6 +2,7 @@
 
 package za.co.handyflow.platform.security.api;
 
+import za.co.handyflow.platform.security.application.internal.SiteScopeService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -29,6 +30,40 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class ControlRoomController {
 
+    /** Optional so a hand-built controller still works; in the application it is always there. Limits a user to the sites in their scope. */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private za.co.handyflow.platform.security.application.internal.SiteScopeService scope;
+
+    /** A site outside the user's scope answers exactly like a site that does not exist. */
+    private void site(UUID siteId) {
+        za.co.handyflow.platform.security.application.internal.SiteScopeService.check(scope, TenantContext.getTenantIdAsObject(), TenantContext.getCurrentUserId(), siteId);
+    }
+
+    /** For a list whose site is optional: a user limited to some sites must name one of them, the whole company may leave it out. */
+    private void choice(UUID siteId) {
+        za.co.handyflow.platform.security.application.internal.SiteScopeService.checkChoice(scope, TenantContext.getTenantIdAsObject(), TenantContext.getCurrentUserId(), siteId);
+    }
+
+    /** For a view that spans every site and cannot be narrowed yet: only a user with the whole company may use it. */
+    private void wholeCompany() {
+        za.co.handyflow.platform.security.application.internal.SiteScopeService.checkUnrestricted(scope, TenantContext.getTenantIdAsObject(), TenantContext.getCurrentUserId());
+    }
+
+    /** The sites the user may see, or null for the whole company. */
+    private java.util.Set<UUID> allowed() {
+        return SiteScopeService.allowedSites(scope, TenantContext.getTenantIdAsObject(), TenantContext.getCurrentUserId());
+    }
+
+    /** A record that belongs to a site: one at a site outside the user's scope answers "not found". */
+    private void child(za.co.handyflow.platform.security.application.internal.SiteScopeService.Kind kind, UUID id) {
+        za.co.handyflow.platform.security.application.internal.SiteScopeService.checkChild(scope, TenantContext.getTenantIdAsObject(), TenantContext.getCurrentUserId(), kind, id);
+    }
+
+    /** For a site that is optional in the request: leaving it out means the whole company. */
+    private void optionalSite(UUID siteId) {
+        za.co.handyflow.platform.security.application.internal.SiteScopeService.checkOptionalSite(scope, TenantContext.getTenantIdAsObject(), TenantContext.getCurrentUserId(), siteId);
+    }
+
     private final ControlRoomService controlRoomService;
 
     // ── Ingestion ──────────────────────────────────────────────────────────────
@@ -46,6 +81,7 @@ public class ControlRoomController {
             """)
     public ResponseEntity<ApiResponse<AlarmEvent>> ingest(
             @Valid @RequestBody IngestAlarmEventRequest req) {
+        optionalSite(req.siteId());
         TenantId tenantId = TenantContext.getTenantIdAsObject();
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.success(controlRoomService.ingest(tenantId, req)));
@@ -57,9 +93,10 @@ public class ControlRoomController {
     @PreAuthorize("hasAuthority('SECURITY_READ')")
     @Operation(summary = "Open triage queue — events not yet resolved or dismissed")
     public ResponseEntity<ApiResponse<Page<AlarmEvent>>> getOpenQueue(Pageable pageable) {
+        java.util.Set<UUID> allowed = allowed();
         TenantId tenantId = TenantContext.getTenantIdAsObject();
         return ResponseEntity.ok(ApiResponse.success(
-                controlRoomService.getOpenQueue(tenantId, pageable)));
+                controlRoomService.getOpenQueue(tenantId, pageable, allowed)));
     }
 
     @GetMapping("/sites/{siteId}/alarm-events")
@@ -67,6 +104,7 @@ public class ControlRoomController {
     @Operation(summary = "All alarm events for a site (full history, not just open queue)")
     public ResponseEntity<ApiResponse<Page<AlarmEvent>>> getEventsForSite(
             @PathVariable UUID siteId, Pageable pageable) {
+        site(siteId);
         TenantId tenantId = TenantContext.getTenantIdAsObject();
         return ResponseEntity.ok(ApiResponse.success(
                 controlRoomService.getEventsForSite(tenantId, siteId, pageable)));
@@ -81,6 +119,7 @@ public class ControlRoomController {
     public ResponseEntity<ApiResponse<AlarmEvent>> triage(
             @PathVariable UUID id,
             @Valid @RequestBody TriageAlarmEventRequest req) {
+        child(SiteScopeService.Kind.ALARM_EVENT, id);
         TenantId tenantId  = TenantContext.getTenantIdAsObject();
         UUID     operatorId = TenantContext.getCurrentUserId();
         return ResponseEntity.ok(ApiResponse.success(
@@ -91,6 +130,7 @@ public class ControlRoomController {
     @PreAuthorize("hasAuthority('SECURITY_MANAGE')")
     @Operation(summary = "Dismiss an alarm event as a false alarm — no dispatch needed")
     public ResponseEntity<ApiResponse<AlarmEvent>> markFalseAlarm(@PathVariable UUID id) {
+        child(SiteScopeService.Kind.ALARM_EVENT, id);
         TenantId tenantId = TenantContext.getTenantIdAsObject();
         return ResponseEntity.ok(ApiResponse.success(
                 controlRoomService.markFalseAlarm(tenantId, id)));
@@ -107,6 +147,7 @@ public class ControlRoomController {
     public ResponseEntity<ApiResponse<DispatchResponse>> dispatch(
             @PathVariable UUID id,
             @Valid @RequestBody CreateDispatchRequest req) {
+        child(SiteScopeService.Kind.ALARM_EVENT, id);
         TenantId tenantId  = TenantContext.getTenantIdAsObject();
         UUID     operatorId = TenantContext.getCurrentUserId();
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(
@@ -118,6 +159,7 @@ public class ControlRoomController {
     @Operation(summary = "Record the dispatched unit's arrival on-scene",
             description = "Drives the response-time SLA metric (dispatchedAt → arrivedAt).")
     public ResponseEntity<ApiResponse<DispatchResponse>> recordArrival(@PathVariable UUID id) {
+        child(SiteScopeService.Kind.DISPATCH, id);
         TenantId tenantId = TenantContext.getTenantIdAsObject();
         return ResponseEntity.ok(ApiResponse.success(
                 controlRoomService.recordArrival(tenantId, id)));
@@ -137,6 +179,7 @@ public class ControlRoomController {
     public ResponseEntity<ApiResponse<DispatchResponse>> resolveDispatch(
             @PathVariable UUID id,
             @Valid @RequestBody ResolveDispatchRequest req) {
+        child(SiteScopeService.Kind.DISPATCH, id);
         TenantId tenantId = TenantContext.getTenantIdAsObject();
         return ResponseEntity.ok(ApiResponse.success(
                 controlRoomService.resolveDispatch(tenantId, id, req)));
@@ -171,9 +214,10 @@ public class ControlRoomController {
     @PreAuthorize("hasAuthority('SECURITY_READ')")
     @Operation(summary = "All currently open (unresolved) dispatches — the active-response view")
     public ResponseEntity<ApiResponse<List<Dispatch>>> getOpenDispatches() {
+        java.util.Set<UUID> allowed = allowed();
         TenantId tenantId = TenantContext.getTenantIdAsObject();
         return ResponseEntity.ok(ApiResponse.success(
-                controlRoomService.getOpenDispatches(tenantId)));
+                controlRoomService.getOpenDispatches(tenantId, allowed)));
     }
 
     @GetMapping("/alarm-events/{id}/dispatches")
@@ -181,6 +225,7 @@ public class ControlRoomController {
     @Operation(summary = "All dispatches for an alarm event (history, including re-dispatches)")
     public ResponseEntity<ApiResponse<List<Dispatch>>> getDispatchesForEvent(
             @PathVariable UUID id) {
+        child(SiteScopeService.Kind.ALARM_EVENT, id);
         return ResponseEntity.ok(ApiResponse.success(
                 controlRoomService.getDispatchesForEvent(TenantContext.getTenantIdAsObject(), id)));
     }

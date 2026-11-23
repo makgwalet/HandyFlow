@@ -65,7 +65,7 @@ public class DeclinedPrincipal {
         DeclinedPrincipal d  = new DeclinedPrincipal();
         d.tenantId           = tenantId;
         d.principalId        = principalId;
-        d.declinedAt         = LocalDate.now();
+        d.declinedAt         = LocalDate.now(za.co.handyflow.platform.shared.BusinessTime.DEFAULT_ZONE);
         d.declinedBy         = declinedBy;
         d.reason             = reason;
         d.encryptedDetail    = encryptedDetail;

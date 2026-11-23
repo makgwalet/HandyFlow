@@ -9,13 +9,13 @@ import org.springframework.transaction.annotation.Transactional;
 import za.co.handyflow.platform.security.domain.model.*;
 import za.co.handyflow.platform.security.domain.repository.*;
 import za.co.handyflow.platform.security.dto.*;
+import za.co.handyflow.platform.shared.BusinessCalendar;
 import za.co.handyflow.platform.shared.ResourceNotFoundException;
 import za.co.handyflow.platform.shared.TenantId;
 
 import java.time.Duration;
 import java.time.Instant;
 import java.time.YearMonth;
-import java.time.ZoneOffset;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -85,6 +85,7 @@ public class ReportingService {
     private final PatrolRoundRepository     patrolRoundRepository;
     private final GateRegisterEntryRepository gateRegisterEntryRepository;
     private final AccessPointRepository       accessPointRepository;
+    private final BusinessCalendar            calendar; // months are decided in the company's time zone, not UTC
 
     /**
      * FIX: backlog 7.1/7.2 — the single place hours-credit is decided per
@@ -118,8 +119,9 @@ public class ReportingService {
         Site site = siteRepository.findActiveById(tenantId, siteId)
                 .orElseThrow(() -> new ResourceNotFoundException("Site", siteId.toString()));
 
-        Instant from = month.atDay(1).atStartOfDay().toInstant(ZoneOffset.UTC);
-        Instant to   = month.plusMonths(1).atDay(1).atStartOfDay().toInstant(ZoneOffset.UTC);
+        Instant[] window = calendar.monthRange(tenantId, month);
+        Instant from = window[0];
+        Instant to   = window[1];
 
         List<Shift> shifts = shiftRepository.findBySiteInRange(tenantId, siteId, from, to);
         List<Incident> incidents = incidentRepository.findBySiteInRange(tenantId, siteId, from, to);
@@ -185,8 +187,9 @@ public class ReportingService {
         Guard guard = guardRepository.findActiveById(tenantId, guardId)
                 .orElseThrow(() -> new ResourceNotFoundException("Guard", guardId.toString()));
 
-        Instant from = month.atDay(1).atStartOfDay().toInstant(ZoneOffset.UTC);
-        Instant to   = month.plusMonths(1).atDay(1).atStartOfDay().toInstant(ZoneOffset.UTC);
+        Instant[] window = calendar.monthRange(tenantId, month);
+        Instant from = window[0];
+        Instant to   = window[1];
 
         List<Shift> shifts    = shiftRepository.findByGuardInRange(tenantId, guardId, from, to);
         List<Incident> incidents = incidentRepository.findByGuardInRange(tenantId, guardId, from, to);
@@ -243,11 +246,21 @@ public class ReportingService {
 
     @Transactional(readOnly = true)
     public MonthlySummaryReport getMonthlySummaryReport(TenantId tenantId, YearMonth month) {
-        Instant from = month.atDay(1).atStartOfDay().toInstant(ZoneOffset.UTC);
-        Instant to   = month.plusMonths(1).atDay(1).atStartOfDay().toInstant(ZoneOffset.UTC);
+        return getMonthlySummaryReport(tenantId, month, null);
+    }
 
-        List<Shift>    allShifts    = shiftRepository.findByTenantInRange(tenantId, from, to);
-        List<Incident> allIncidents = incidentRepository.findByTenantInRange(tenantId, from, to);
+    /**
+     * `allowed` null = the whole company. Otherwise only the shifts and incidents at those sites are counted (an incident with no
+     * site is left out), so every total, rate, the incident breakdown, the guards who worked and the site rows are for those sites.
+     */
+    @Transactional(readOnly = true)
+    public MonthlySummaryReport getMonthlySummaryReport(TenantId tenantId, YearMonth month, java.util.Set<UUID> allowed) {
+        Instant[] window = calendar.monthRange(tenantId, month);
+        Instant from = window[0];
+        Instant to   = window[1];
+
+        List<Shift>    allShifts    = MonthlySummaryScope.keep(shiftRepository.findByTenantInRange(tenantId, from, to), Shift::getSiteId, allowed);
+        List<Incident> allIncidents = MonthlySummaryScope.keep(incidentRepository.findByTenantInRange(tenantId, from, to), Incident::getSiteId, allowed);
 
         long totalShifts     = allShifts.size();
         long completedShifts = allShifts.stream().filter(s -> s.getStatus() == ShiftStatus.COMPLETED).count();
@@ -333,8 +346,9 @@ public class ReportingService {
      */
     @Transactional(readOnly = true)
     public SiteAccessReport getSiteAccessReport(TenantId tenantId, UUID siteId, YearMonth month) {
-        Instant from = month.atDay(1).atStartOfDay(ZoneOffset.UTC).toInstant();
-        Instant to   = month.plusMonths(1).atDay(1).atStartOfDay(ZoneOffset.UTC).toInstant();
+        Instant[] window = calendar.monthRange(tenantId, month);
+        Instant from = window[0];
+        Instant to   = window[1];
 
         List<za.co.handyflow.platform.security.domain.model.GateRegisterEntry> entries =
                 gateRegisterEntryRepository.findAllBySiteAndPeriod(tenantId, siteId, from, to);

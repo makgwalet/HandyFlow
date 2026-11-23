@@ -12,15 +12,17 @@ import Chip from "../../components/ui/Chip"
 import StatTile from "../../components/ui/StatTile"
 import { clock } from "./schedule.logic"
 import { PRESETS, STATUS_FILTERS, STATUS_LABEL, STATUS_TONE, filterRounds, needsAttention, presetWindow, progress, summarise, type PatrolRound } from "./patrol.logic"
+import { getCompanyZone, useCompanyZone } from "./companyZone"
 
 const sel: React.CSSProperties = { padding: "7px 10px", border: "1px solid var(--hf-border)", borderRadius: 8, fontSize: 13, background: "var(--hf-surface)", color: "var(--hf-text-primary)" }
 const card: React.CSSProperties = { background: "var(--hf-surface)", border: "1px solid var(--hf-border)", borderRadius: 12 }
 const th: React.CSSProperties = { textAlign: "left", padding: 10, fontSize: 11, color: "var(--hf-text-muted)", fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.4 }
 const td: React.CSSProperties = { padding: 10, fontSize: 13, borderTop: "1px solid var(--hf-border)", verticalAlign: "top" }
-const fmtDay = (iso: string) => new Date(iso).toLocaleDateString("en-ZA", { weekday: "short", day: "numeric", month: "short", timeZone: "Africa/Johannesburg" })
+const fmtDay = (iso: string) => new Date(iso).toLocaleDateString("en-ZA", { weekday: "short", day: "numeric", month: "short", timeZone: getCompanyZone() })
 const unwrap = (r: any) => { const p = r.data?.data ?? r.data; return Array.isArray(p) ? p : p?.content ?? [] }
 
 export default function PatrolsTab() {
+  useCompanyZone()
   const [preset, setPreset] = useState<string>("7")
   const [siteId, setSiteId] = useState("")
   const [status, setStatus] = useState("")

@@ -25,6 +25,16 @@ public interface ShiftRepository extends JpaRepository<Shift, UUID> {
         """)
     Page<Shift> findAllActive(TenantId tenantId, Pageable pageable);
 
+    /** The same list limited to some sites (a user whose access is limited). */
+    @Query("""
+        SELECT s FROM Shift s
+        WHERE s.tenantId = :tenantId
+        AND s.siteId IN :siteIds
+        AND s.deletedAt IS NULL
+        ORDER BY s.startAt DESC
+        """)
+    Page<Shift> findAllActiveInSites(TenantId tenantId, java.util.Collection<UUID> siteIds, Pageable pageable);
+
     /** One guard's own shifts in a window, for the guard app's "my shifts" screen. */
     @Query("""
         SELECT s FROM Shift s

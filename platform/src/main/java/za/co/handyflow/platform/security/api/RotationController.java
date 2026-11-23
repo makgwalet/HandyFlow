@@ -29,6 +29,28 @@ public class RotationController {
 
     private final RotationService rotationService;
 
+
+    /** Optional so a controller built by hand still works; in the application it is always there. */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private za.co.handyflow.platform.security.application.internal.SiteScopeService scope;
+
+    private void site(UUID siteId) {
+        za.co.handyflow.platform.security.application.internal.SiteScopeService.check(scope, TenantContext.getTenantIdAsObject(), TenantContext.getCurrentUserId(), siteId);
+    }
+
+    /** Only a user with access to the whole company may use this: the records are not tied to one site. */
+    private void wholeCompany() {
+        za.co.handyflow.platform.security.application.internal.SiteScopeService.checkUnrestricted(scope, TenantContext.getTenantIdAsObject(), TenantContext.getCurrentUserId());
+    }
+
+    private void child(za.co.handyflow.platform.security.application.internal.SiteScopeService.Kind kind, UUID id) {
+        za.co.handyflow.platform.security.application.internal.SiteScopeService.checkChild(scope, TenantContext.getTenantIdAsObject(), TenantContext.getCurrentUserId(), kind, id);
+    }
+
+    private java.util.Set<UUID> allowed() {
+        return za.co.handyflow.platform.security.application.internal.SiteScopeService.allowedSites(scope, TenantContext.getTenantIdAsObject(), TenantContext.getCurrentUserId());
+    }
+
     // ── Patterns ───────────────────────────────────────────────────────────────
 
     @GetMapping
@@ -37,7 +59,7 @@ public class RotationController {
     public ResponseEntity<ApiResponse<Page<RotationPatternResponse>>> getPatterns(Pageable pageable) {
         TenantId tenantId = TenantContext.getTenantIdAsObject();
         return ResponseEntity.ok(ApiResponse.success(
-                rotationService.getPatterns(tenantId, pageable)));
+                rotationService.getPatterns(tenantId, pageable, allowed())));
     }
 
     @PostMapping
@@ -45,6 +67,7 @@ public class RotationController {
     @Operation(summary = "Create a new rotation pattern for a site")
     public ResponseEntity<ApiResponse<RotationPatternResponse>> createPattern(
             @Valid @RequestBody CreateRotationPatternRequest req) {
+        site(req.siteId());
         TenantId tenantId = TenantContext.getTenantIdAsObject();
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.success(rotationService.createPattern(tenantId, req)));
@@ -56,6 +79,7 @@ public class RotationController {
     public ResponseEntity<ApiResponse<RotationPatternResponse>> updatePattern(
             @PathVariable UUID id,
             @Valid @RequestBody UpdateRotationPatternRequest req) {
+        child(za.co.handyflow.platform.security.application.internal.SiteScopeService.Kind.ROTATION_PATTERN, id);
         TenantId tenantId = TenantContext.getTenantIdAsObject();
         return ResponseEntity.ok(ApiResponse.success(
                 rotationService.updatePattern(tenantId, id, req)));
@@ -65,6 +89,7 @@ public class RotationController {
     @PreAuthorize("hasAuthority('SECURITY_MANAGE')")
     @Operation(summary = "Deactivate a rotation pattern (does not delete generated shifts)")
     public ResponseEntity<ApiResponse<Void>> deactivatePattern(@PathVariable UUID id) {
+        child(za.co.handyflow.platform.security.application.internal.SiteScopeService.Kind.ROTATION_PATTERN, id);
         TenantId tenantId = TenantContext.getTenantIdAsObject();
         rotationService.deactivatePattern(tenantId, id);
         return ResponseEntity.ok(ApiResponse.success(null));
@@ -78,6 +103,7 @@ public class RotationController {
             description = "Automatically ends the guard's previous open-ended assignment.")
     public ResponseEntity<ApiResponse<RotationAssignmentResponse>> assignGuard(
             @Valid @RequestBody CreateRotationAssignmentRequest req) {
+        child(za.co.handyflow.platform.security.application.internal.SiteScopeService.Kind.ROTATION_PATTERN, req.patternId());
         TenantId tenantId = TenantContext.getTenantIdAsObject();
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.success(rotationService.assignGuard(tenantId, req)));
@@ -92,6 +118,7 @@ public class RotationController {
     @Operation(summary = "Active guard assignments for a rotation pattern")
     public ResponseEntity<ApiResponse<java.util.List<RotationAssignmentResponse>>> getAssignmentsForPattern(
             @PathVariable UUID patternId) {
+        child(za.co.handyflow.platform.security.application.internal.SiteScopeService.Kind.ROTATION_PATTERN, patternId);
         TenantId tenantId = TenantContext.getTenantIdAsObject();
         return ResponseEntity.ok(ApiResponse.success(
                 rotationService.getAssignmentsForPattern(tenantId, patternId)));
@@ -103,6 +130,7 @@ public class RotationController {
     public ResponseEntity<ApiResponse<Void>> endAssignment(
             @PathVariable UUID assignmentId,
             @RequestParam LocalDate endsAt) {
+        child(za.co.handyflow.platform.security.application.internal.SiteScopeService.Kind.ROTATION_ASSIGNMENT, assignmentId);
         TenantId tenantId = TenantContext.getTenantIdAsObject();
         rotationService.endAssignment(tenantId, assignmentId, endsAt);
         return ResponseEntity.ok(ApiResponse.success(null));
@@ -122,6 +150,7 @@ public class RotationController {
                """)
     public ResponseEntity<ApiResponse<GenerateScheduleResponse>> generateSchedule(
             @Valid @RequestBody GenerateScheduleRequest req) {
+        child(za.co.handyflow.platform.security.application.internal.SiteScopeService.Kind.ROTATION_PATTERN, req.patternId());
         TenantId tenantId = TenantContext.getTenantIdAsObject();
         return ResponseEntity.ok(ApiResponse.success(
                 rotationService.generateSchedule(tenantId, req)));

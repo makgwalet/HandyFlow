@@ -29,7 +29,12 @@ import CloseProtectionTab from "./CloseProtectionTab"
 import PayrollTab         from "./PayrollTab"
 import BranchesTab        from "./BranchesTab"
 import PublicApiTab       from "./PublicApiTab"
+import AccessLogTab       from "./AccessLogTab"
+import InvoiceDraftsTab    from "./InvoiceDraftsTab"
+import SlaTab              from "./SlaTab"
+import SiteAccessOverviewTab from "./SiteAccessOverviewTab"
 import { PageHeader } from "../../components/ui/PageHeader"
+import MySiteScopeBanner from "./MySiteScopeBanner"
 import {
   SECURITY_SECTIONS, SECURITY_SECTION_ALIASES, findSection,
 } from "../../navigation/moduleSections"
@@ -65,6 +70,7 @@ export function SecurityPage() {
     "checkpoints":       <CheckpointsTab />,
     "gate-dashboard":    <GateDashboardTab />,
     "incidents":         <IncidentsTab />,
+    "sla":               <SlaTab />,
     "patrol-routes":     <PatrolRoutesTab />,
     "post-orders":       <PostOrdersTab />,
     "gate-access":       <GateAccessTab />,
@@ -83,6 +89,9 @@ export function SecurityPage() {
     "close-protection":  <CloseProtectionTab />,
     "reports":           <ReportsTab />,
     "public-api":        <PublicApiTab />,
+    "access-log":        <AccessLogTab />,
+    "site-access":       <SiteAccessOverviewTab />,
+    "invoice-drafts":    <InvoiceDraftsTab />,
   }
 
   return (
@@ -96,6 +105,7 @@ export function SecurityPage() {
           { label: section.label },
         ]}
       />
+      <MySiteScopeBanner />
       {/* key: remount on section change so each section starts fresh, as it
           did when it was a conditionally rendered tab. */}
       <div key={section.id} style={{ background: "var(--hf-surface)", border: "1px solid var(--hf-border)", borderRadius: 14, padding: 24 }}>

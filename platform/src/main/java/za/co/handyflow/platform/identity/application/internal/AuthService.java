@@ -56,6 +56,10 @@ public class AuthService {
     private final DisposableEmailChecker disposableEmailChecker;
     private final TokenPermissions tokenPermissions;
 
+    /** Optional so a hand-built service still works; in the application it is always there. */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private SsoPolicyService ssoPolicy;
+
     @Transactional
     public AuthResponse register(RegisterRequest request) {
         // FIX: registration previously validated only email format, with
@@ -156,6 +160,12 @@ public class AuthService {
 
         if (!user.isActive()) {
             throw new IllegalStateException("Your account has been deactivated");
+        }
+
+        // Single sign-on: where a company enforces it, a correct password is not enough. Checked after the password so that only
+        // someone who knows it learns that SSO is required.
+        if (ssoPolicy != null) {
+            ssoPolicy.requirePasswordAllowed(tenant.getTenantId(), user.getId(), user.getEmail());
         }
 
         log.info("User logged in: userId={} tenantId={}", user.getId(), tenant.getId());

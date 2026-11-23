@@ -44,6 +44,16 @@ public interface DispatchRepository extends JpaRepository<Dispatch, UUID> {
         """)
     List<Dispatch> findOpen(TenantId tenantId);
 
+    /** Open dispatches answering alarms at some sites (a user whose access is limited). */
+    @Query("""
+        SELECT d FROM Dispatch d
+        WHERE d.tenantId = :tenantId
+        AND d.resolvedAt IS NULL
+        AND d.alarmEventId IN (SELECT e.id FROM AlarmEvent e WHERE e.tenantId = :tenantId AND e.siteId IN :siteIds)
+        ORDER BY d.dispatchedAt
+        """)
+    List<Dispatch> findOpenInSites(TenantId tenantId, java.util.Collection<UUID> siteIds);
+
     @Query("""
         SELECT d FROM Dispatch d
         WHERE d.tenantId = :tenantId

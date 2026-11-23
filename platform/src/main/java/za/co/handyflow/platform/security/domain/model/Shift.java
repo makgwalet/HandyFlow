@@ -82,6 +82,12 @@ public class Shift {
     @Column(name = "actual_start_at")
     private Instant actualStartAt;
 
+    // ── Real end (V858) ───────────────────────────────────────────────────────
+
+    /** When the guard ended the shift. Set only by the guard's own clock-out (complete()); a supervisor's force-close or pull leaves it empty, as nobody knows when the guard really left. */
+    @Column(name = "actual_end_at")
+    private Instant actualEndAt;
+
     // ── Alert dedup (V210) ────────────────────────────────────────────────────
 
     @Column(name = "late_alert_sent_at")
@@ -157,6 +163,7 @@ public class Shift {
             throw new IllegalStateException("Only ACTIVE shifts can be completed");
         }
         this.status    = ShiftStatus.COMPLETED;
+        this.actualEndAt = Instant.now();
         this.updatedAt = Instant.now();
     }
 

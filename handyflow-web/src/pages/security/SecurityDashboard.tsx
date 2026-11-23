@@ -9,7 +9,7 @@ import type { ReactNode } from "react"
 import { apiClient } from "../../api/client"
 import Chip, { toneColor, type ChipTone } from "../../components/ui/Chip"
 import {
-  LEVEL_LABEL, LEVEL_TONE, SEVERITY_TONE, greeting, headline, isLate, punctualityLabel, shiftProgress, toneForCount,
+  LEVEL_LABEL, LEVEL_TONE, SEVERITY_TONE, greeting, headline, isLate, limitedNote, punctualityLabel, shiftProgress, toneForCount,
   type SecurityDashboard as Data,
 } from "./dashboard.logic"
 
@@ -85,12 +85,14 @@ export default function SecurityDashboard({ onNavigate }: { onNavigate: (section
         )}
       </section>
 
+      {limitedNote(data) && <div role="status" style={{ fontSize: 13, color: "var(--hf-text-muted)" }}>{limitedNote(data)}</div>}
+
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))", gap: 12 }}>
         <Tile label="Guards on duty" value={shifts.onDuty} hint={shiftProgress(shifts)} tone={shifts.onDuty > 0 ? "ok" : "neutral"} icon={<Shield size={18} />} onClick={() => onNavigate("live")} />
         <Tile label="Open incidents" value={incidents.open} hint={incidents.criticalOpen > 0 ? `${incidents.criticalOpen} critical` : `${incidents.last7Days} in the last 7 days`} tone={toneForCount(incidents.criticalOpen, "bad")} icon={<AlertTriangle size={18} />} onClick={() => onNavigate("incidents")} />
         <Tile label="Control room queue" value={data.openAlarms} hint="alarms not yet resolved" tone={toneForCount(data.openAlarms, "warn")} icon={<Radio size={18} />} onClick={() => onNavigate("control-room")} />
         <Tile label="On site now" value={gate.onSite} hint={gate.overstayed > 0 ? `${gate.overstayed} overstayed` : `${gate.enteredToday} entered today`} tone={toneForCount(gate.overstayed, "warn")} icon={<DoorOpen size={18} />} onClick={() => onNavigate("gate-dashboard")} />
-        <Tile label="Open complaints" value={complaints.open} hint={complaints.urgent > 0 ? `${complaints.urgent} urgent` : undefined} tone={toneForCount(complaints.urgent, "bad")} icon={<MessageSquareWarning size={18} />} onClick={() => onNavigate("complaints")} />
+        {complaints && <Tile label="Open complaints" value={complaints.open} hint={complaints.urgent > 0 ? `${complaints.urgent} urgent` : undefined} tone={toneForCount(complaints.urgent, "bad")} icon={<MessageSquareWarning size={18} />} onClick={() => onNavigate("complaints")} />}
         <Tile label="Active sites" value={data.activeSites} tone="neutral" icon={<MapPin size={18} />} onClick={() => onNavigate("sites")} />
       </div>
 
@@ -140,7 +142,7 @@ export default function SecurityDashboard({ onNavigate }: { onNavigate: (section
           )}
         </section>
 
-        <section aria-label="Workforce" style={panel}>
+        {workforce && <section aria-label="Workforce" style={panel}>
           <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 10 }}>
             <span style={{ fontSize: 14, fontWeight: 700 }}>Workforce</span>
             <button type="button" style={linkBtn} onClick={() => onNavigate("guards")}>All guards <ArrowRight size={13} /></button>
@@ -157,7 +159,7 @@ export default function SecurityDashboard({ onNavigate }: { onNavigate: (section
               <Chip tone={r.tone}>{r.value}</Chip>
             </div>
           ))}
-        </section>
+        </section>}
 
         <section aria-label="Quick actions" style={panel}>
           <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 10 }}>Quick actions</div>

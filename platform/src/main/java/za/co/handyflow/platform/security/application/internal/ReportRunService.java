@@ -75,7 +75,15 @@ public class ReportRunService {
     }
 
     @Transactional(readOnly = true)
-    public Catalogue catalogue(TenantId tenantId) {
+    public Catalogue catalogue(TenantId tenantId) { return catalogue(tenantId, false); }
+
+    /**
+     * The list of reports. The history of who generated what, for which site or guard, is company-wide, so a user limited to some
+     * sites gets the reports with no "last run" and no recent runs.
+     */
+    @Transactional(readOnly = true)
+    public Catalogue catalogue(TenantId tenantId, boolean limited) {
+        if (limited) return new Catalogue(cards(List.of()), List.of());
         UUID tenant = tenantId.getValue();
         List<Run> latest = jdbc.query("""
                 SELECT DISTINCT ON (report_key) report_key, period, subject, format, generated_by_name, generated_at

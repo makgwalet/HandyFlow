@@ -6,6 +6,7 @@ import { useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import { todayIso } from "./guard360.logic"
+import { useCompanyZone } from "./companyZone"
 import { CATEGORIES, COMPLAINANT_TYPES, SEVERITIES, complaintFormError, type ComplaintDetail } from "./complaints.logic"
 
 const input: React.CSSProperties = { padding: "8px 10px", border: "1px solid var(--hf-border)", borderRadius: 8, fontSize: 13, background: "var(--hf-surface)", color: "var(--hf-text-primary)", width: "100%", boxSizing: "border-box" }
@@ -17,6 +18,7 @@ const list = async (url: string) => { const r = await apiClient.get(url); const 
 export default function ComplaintForm({ fixedGuardId, existing, onClose, onSaved }: {
   fixedGuardId?: string; existing?: ComplaintDetail; onClose: () => void; onSaved?: (id: string) => void
 }) {
+  useCompanyZone()
   const qc = useQueryClient()
   const e = existing
   const [f, setF] = useState({

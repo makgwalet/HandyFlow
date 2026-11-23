@@ -6,7 +6,10 @@ import { useQuery } from "@tanstack/react-query"
 import { ChevronLeft, ChevronRight, FileText, Printer } from "lucide-react"
 import { apiClient } from "../../api/client"
 import Chip from "../../components/ui/Chip"
+import { useAuthStore } from "../../store/auth.store"
 import { printSection } from "./printSection"
+import { useCompanyZone } from "./companyZone"
+import ReportRecipientsPanel from "./ReportRecipientsPanel"
 import {
   PRINT_CSS, bookText, canGoNextMonth, coverDetail, coverText, incidentText, lastMonthSast, monthTitle, patrolText, printTitle, printedAt, shiftLines, shiftMonth, visitorText,
   type Pack,
@@ -32,11 +35,15 @@ function rows(p: Pack): [string, string][] {
 }
 
 export default function MonthlyPackCard({ siteId }: { siteId: string }) {
-  const [month, setMonth] = useState(() => lastMonthSast())
+  const { ready: zoneReady } = useCompanyZone()
+  const [picked, setPicked] = useState<string | null>(null)
+  const month = picked ?? lastMonthSast()
+  const setMonth = (f: (m: string) => string) => setPicked(f(month))
   const { data, isLoading, error } = useQuery<Pack>({
-    queryKey: ["monthly-pack", siteId, month],
+    queryKey: ["monthly-pack", siteId, month], enabled: zoneReady,
     queryFn: async () => (await apiClient.get(`/api/v1/security/sites/${siteId}/monthly-pack`, { params: { month } })).data?.data,
   })
+  const canManage = useAuthStore(s => s.hasPermission("SECURITY_MANAGE"))
   const ok = !!data && !!data.cover && !!data.patrols && !!data.incidents && !!data.visitors && !!data.occurrenceBook && !!data.shifts
 
   return (
@@ -59,6 +66,8 @@ export default function MonthlyPackCard({ siteId }: { siteId: string }) {
           <table style={{ width: "100%", borderCollapse: "collapse" }}>
             <tbody>{rows(data).map(([k, v]) => <tr key={k} style={{ borderTop: "1px solid var(--hf-border-subtle)" }}><th style={th} scope="row">{k}</th><td style={td}>{v}</td></tr>)}</tbody>
           </table>
+
+          {canManage && <ReportRecipientsPanel siteId={siteId} month={month} monthTitle={monthTitle(month)} inProgress={data.inProgress} reportLoaded={ok} />}
 
           <div className="mp-print" aria-hidden="true" data-testid="mp-print">
             <style>{PRINT_CSS}</style>

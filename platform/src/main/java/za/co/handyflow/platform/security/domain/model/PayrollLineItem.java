@@ -119,5 +119,32 @@ public class PayrollLineItem {
         return li;
     }
 
-    public enum LineType { REGULAR, OVERTIME, ALLOWANCE, DEDUCTION }
+    /**
+     * Hours worked on a Sunday or a public holiday, paid at the premium rate. The hours go in hoursWorked and the premium rate in
+     * overtimeRateCents, so the pay statement and the CSV read it the same way as an overtime line.
+     */
+    public static PayrollLineItem premium(TenantId tenantId, UUID periodId, UUID guardId, UUID shiftId,
+                                          Instant shiftStart, Instant shiftEnd, LineType type,
+                                          BigDecimal hours, int baseRateCents, int premiumRateCents) {
+        if (type != LineType.SUNDAY && type != LineType.PUBLIC_HOLIDAY) {
+            throw new IllegalArgumentException("Not a premium line type: " + type);
+        }
+        PayrollLineItem li   = new PayrollLineItem();
+        li.tenantId          = tenantId;
+        li.periodId          = periodId;
+        li.guardId           = guardId;
+        li.shiftId           = shiftId;
+        li.lineType          = type;
+        li.shiftStartAt      = shiftStart;
+        li.shiftEndAt        = shiftEnd;
+        li.hoursWorked       = hours;
+        li.overtimeHours     = BigDecimal.ZERO;
+        li.hourlyRateCents   = baseRateCents;
+        li.overtimeRateCents = premiumRateCents;
+        li.grossAmountCents  = hours.multiply(BigDecimal.valueOf(premiumRateCents)).intValue();
+        li.createdAt         = Instant.now();
+        return li;
+    }
+
+    public enum LineType { REGULAR, OVERTIME, ALLOWANCE, DEDUCTION, SUNDAY, PUBLIC_HOLIDAY }
 }

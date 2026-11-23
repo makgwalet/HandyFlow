@@ -202,6 +202,10 @@ public class GuardService {
                     "Guard status set to " + req.status());
             log.info("[Security] Guard={} status={} tokensRevoked={}", id, req.status(), revoked);
         }
+        // ...and their open clock-in session must not keep a shared phone tied up for the next guard.
+        if (SessionOffboarding.mustClose(req.status())) {
+            closeOpenSessions(tenantId, id, changedBy, SessionOffboarding.reasonForStatus(req.status()));
+        }
         // Leaving for good: also pull their phone out of service and void any unused activation code.
         if ("TERMINATED".equals(req.status())) {
             offboardAppAccess(tenantId, id);
@@ -224,6 +228,7 @@ public class GuardService {
         guardRepository.save(guard);
         writeAudit(tenantId, deletedBy, id, "DELETED", null);
         tokenRepository.revokeAllForGuard(id, java.time.Instant.now(), "Guard deleted");
+        closeOpenSessions(tenantId, id, deletedBy, SessionOffboarding.REASON_DELETED);
         offboardAppAccess(tenantId, id);
         if (guard.hasFaceEmbedding()) {
             guard.clearFaceEmbedding();
@@ -519,6 +524,18 @@ public class GuardService {
      * hardware can be issued to someone else) and unused activation codes expire immediately. Sessions' tokens are
      * revoked by the caller.
      */
+    /**
+     * Ends the guard's open device session (at most one), recording who and why like a supervisor's force-close. Within the company only.
+     * The shift itself and any resources checked out are left for a supervisor, who must decide what happened to them.
+     */
+    private void closeOpenSessions(TenantId tenantId, UUID guardId, UUID by, String reason) {
+        int n = jdbc.update("""
+                UPDATE security_device_sessions SET ended_at = now(), forced_close_by = ?, forced_close_reason = ?
+                WHERE tenant_id = ? AND guard_id = ? AND ended_at IS NULL""",
+                by, reason, tenantId.getValue(), guardId);
+        if (n > 0) log.warn("[Security] Closed {} open device session(s) guard={} reason={}", n, guardId, reason);
+    }
+
     private void offboardAppAccess(TenantId tenantId, UUID guardId) {
         if (activationCodeRepository != null) {
             int voided = activationCodeRepository.voidUnusedForGuard(guardId, java.time.Instant.now());

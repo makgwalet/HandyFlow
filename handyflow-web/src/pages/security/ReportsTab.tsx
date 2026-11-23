@@ -6,6 +6,7 @@ import { getAllGuards } from "./fetchAllPages"
 import { FileBarChart, Download, Building2 } from "lucide-react"
 import { canGenerate, defaultMonth, knownCards, lastRunLine, monthLabel, reportPaths, runSummary, scopeNeeds, ago } from "./reports.logic"
 import type { Card, Catalogue, ReportKey } from "./reports.logic"
+import { LIMITED_NOTE, PDF_FAILED, isLimited, monthlyOptionLabel, pdfAvailable, reportAvailable, type MyScope } from "./reportsScopeLogic"
 
 interface Site  { id: string; name: string }
 interface Guard { id: string; fullName: string }
@@ -62,12 +63,19 @@ export default function ReportsTab() {
   const [siteId,       setSiteId]       = useState("")
   const [guardId,      setGuardId]      = useState("")
   const [triggered,    setTriggered]    = useState(false)
+  const [pdfError,     setPdfError]     = useState(false)
   const qc = useQueryClient()
 
   const { data: catalogue } = useQuery<Catalogue>({
     queryKey: ["report-catalogue"],
     queryFn: async () => { const r = await apiClient.get("/api/v1/security/reports/catalogue"); return (r.data?.data ?? r.data) as Catalogue },
   })
+  // Whether this user is limited to some sites. A failed or missing answer means "not limited": the server still decides.
+  const { data: myScope } = useQuery<MyScope | null>({
+    queryKey: ["my-site-scope"],
+    queryFn: async () => { try { const r = await apiClient.get("/api/v1/security/my-site-scope"); return (r.data?.data ?? r.data ?? null) as MyScope | null } catch { return null } },
+  })
+  const limited = isLimited(myScope)
   const cards = knownCards(catalogue?.cards ?? [])
   const recent = catalogue?.recent ?? []
 
@@ -104,14 +112,19 @@ export default function ReportsTab() {
   })
 
   async function downloadPdf() {
-    const r = await apiClient.get(paths.pdf, { responseType: "blob" })
-    const url = URL.createObjectURL(new Blob([r.data], { type: "application/pdf" }))
-    const a = document.createElement("a")
-    a.href = url
-    a.download = `handyflow-report-${reportType}-${month}.pdf`
-    a.click()
-    URL.revokeObjectURL(url)
-    qc.invalidateQueries({ queryKey: ["report-catalogue"] })
+    setPdfError(false)
+    try {
+      const r = await apiClient.get(paths.pdf, { responseType: "blob" })
+      const url = URL.createObjectURL(new Blob([r.data], { type: "application/pdf" }))
+      const a = document.createElement("a")
+      a.href = url
+      a.download = `handyflow-report-${reportType}-${month}.pdf`
+      a.click()
+      URL.revokeObjectURL(url)
+      qc.invalidateQueries({ queryKey: ["report-catalogue"] })
+    } catch {
+      setPdfError(true)
+    }
   }
 
   async function run() {
@@ -120,13 +133,14 @@ export default function ReportsTab() {
     qc.invalidateQueries({ queryKey: ["report-catalogue"] })
   }
 
-  function choose(c: Card) { setReportType(c.key); setTriggered(false) }
+  function choose(c: Card) { if (!reportAvailable(limited, c.key)) return; setReportType(c.key); setTriggered(false); setPdfError(false) }
 
   return (
     <div>
       <div style={{ marginBottom: 24 }}>
         <h2 style={{ margin: "0 0 4px", fontSize: 16, fontWeight: 700, color: "var(--hf-text)" }}>Reports</h2>
         <p style={{ margin: 0, fontSize: 12, color: "var(--hf-text-muted)" }}>Monthly security performance reports — JSON view or PDF download</p>
+        {limited && <p data-testid="limited-note" style={{ margin: "6px 0 0", fontSize: 12, color: "var(--hf-text-muted)" }}>{LIMITED_NOTE}</p>}
       </div>
 
       {/* Report cards */}
@@ -134,8 +148,8 @@ export default function ReportsTab() {
         {cards.map(c => {
           const active = c.key === reportType
           return (
-            <button key={c.key} onClick={() => choose(c)} aria-pressed={active} data-testid={`report-card-${c.key}`}
-              style={{ textAlign: "left" as const, cursor: "pointer", padding: "14px 16px", borderRadius: 12, background: "var(--hf-surface)", border: `1px solid ${active ? "var(--hf-accent)" : "var(--hf-border)"}`, boxShadow: active ? "0 0 0 1px var(--hf-accent)" : "none", display: "flex", flexDirection: "column" as const, gap: 6 }}>
+            <button key={c.key} onClick={() => choose(c)} aria-pressed={active} data-testid={`report-card-${c.key}`} disabled={!reportAvailable(limited, c.key)}
+              style={{ textAlign: "left" as const, cursor: reportAvailable(limited, c.key) ? "pointer" : "not-allowed", opacity: reportAvailable(limited, c.key) ? 1 : 0.5, padding: "14px 16px", borderRadius: 12, background: "var(--hf-surface)", border: `1px solid ${active ? "var(--hf-accent)" : "var(--hf-border)"}`, boxShadow: active ? "0 0 0 1px var(--hf-accent)" : "none", display: "flex", flexDirection: "column" as const, gap: 6 }}>
               <span style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 14, fontWeight: 700, color: "var(--hf-text)" }}>
                 <FileBarChart size={16} style={{ color: "var(--hf-accent)" }} /> {c.title}
               </span>
@@ -155,9 +169,9 @@ export default function ReportsTab() {
         <div>
           <label style={lblStyle}>Report type</label>
           <select value={reportType} onChange={e => { setReportType(e.target.value as ReportType); setTriggered(false) }} style={selStyle}>
-            <option value="monthly-summary">Monthly Summary (all sites)</option>
+            <option value="monthly-summary">{monthlyOptionLabel(limited)}</option>
             <option value="site-coverage">Site Coverage</option>
-            <option value="guard-attendance">Guard Attendance</option>
+            <option value="guard-attendance" disabled={!reportAvailable(limited, "guard-attendance")}>Guard Attendance</option>
             <option value="site-access">Site Access</option>
           </select>
         </div>
@@ -187,13 +201,15 @@ export default function ReportsTab() {
           style={{ padding: "9px 20px", borderRadius: 8, border: "none", background: canFetch ? "var(--hf-accent)" : "var(--hf-surface-strong)", color: canFetch ? "var(--hf-text-on-solid)" : "var(--hf-text-faint)", fontSize: 13, fontWeight: 600, cursor: canFetch ? "pointer" : "not-allowed", alignSelf: "flex-end" }}>
           Generate Report
         </button>
-        {report && (
+        {report && pdfAvailable(limited, reportType) && (
           <button onClick={downloadPdf}
             style={{ display: "flex", alignItems: "center", gap: 6, padding: "9px 16px", borderRadius: 8, border: "1px solid var(--hf-info)", background: "var(--hf-info-soft)", color: "var(--hf-info-text)", fontSize: 13, fontWeight: 600, cursor: "pointer", alignSelf: "flex-end" }}>
             <Download size={14} /> Download PDF
           </button>
         )}
       </div>
+
+      {pdfError && <p role="alert" style={{ color: "var(--hf-danger-text)", fontSize: 13 }}>{PDF_FAILED}</p>}
 
       {/* Results */}
       {isLoading && <p style={{ color: "var(--hf-text-faint)", fontSize: 13 }}>Generating report…</p>}

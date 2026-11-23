@@ -21,6 +21,8 @@ function route(boardRes: unknown, postsRes: unknown = posts) {
     if (url.endsWith("/coverage")) return boardRes instanceof Error ? Promise.reject(boardRes) : Promise.resolve({ data: { data: boardRes } })
     if (url.endsWith("/coverage-posts")) return Promise.resolve({ data: { data: postsRes } })
     if (url.endsWith("/weekly-hours")) return Promise.resolve({ data: { data: { weekStart: "2026-11-16", guardsRostered: 0, flagged: 0, thresholds: { warnAt: 40, limit: 45, ceiling: 55, minRestHours: 12 }, truncated: false, rows: [] } } })
+    if (url.endsWith("/working-time-policies")) return Promise.resolve({ data: { data: [] } })
+    if (url.endsWith("/company-time-zone")) return Promise.resolve({ data: { data: { timeZone: "Africa/Johannesburg", abbreviation: "SAST", now: "22 Nov 2026 19:40 SAST", today: "2026-11-22" } } })
     return Promise.reject(new Error("unexpected " + url))
   })
 }
@@ -38,6 +40,13 @@ async function pickSite() {
 describe("CoverageTab", () => {
   beforeEach(() => { api.get.mockReset(); api.post.mockReset(); api.delete.mockReset(); api.post.mockResolvedValue({ data: {} }); api.delete.mockResolvedValue({ data: {} }) })
   afterEach(() => cleanup())
+
+  it("shows the working-time policies under the weekly hours", async () => {
+    as(["SECURITY_READ"]); route(board([]))
+    show()
+    expect(await screen.findByRole("region", { name: "Working-time policies" })).toBeTruthy()
+    expect(screen.getByRole("region", { name: "Weekly hours" })).toBeTruthy()
+  })
 
   it("lists short posts with the gap and who is missing", async () => {
     as(["SECURITY_READ"]); route(board([row()]))

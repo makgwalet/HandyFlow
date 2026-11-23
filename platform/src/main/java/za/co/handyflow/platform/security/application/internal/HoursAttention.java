@@ -9,7 +9,7 @@ import java.util.List;
 /** Counts guards, once each, by the worst weekly-hours problem on this week's roster. Pure. */
 public final class HoursAttention {
 
-    /** exceeds: past the ceiling. over: past the ordinary limit but within the ceiling. rest: double-booked or short of rest (and not already counted above). */
+    /** exceeds: past the ceiling. over: past the ordinary limit but within the ceiling. rest: double-booked, short of rest or over the daily limit (and not already counted above). */
     public record Counts(int exceeds, int over, int rest) {
         public static final Counts NONE = new Counts(0, 0, 0);
         public int total() { return exceeds + over + rest; }
@@ -22,7 +22,7 @@ public final class HoursAttention {
         for (Assessment a : guards) {
             if (a.state() == State.EXCEEDS) exceeds++;
             else if (a.state() == State.OVER) over++;
-            else if (a.overlaps() || !a.restBreaches().isEmpty()) rest++;
+            else if (a.overlaps() || !a.restBreaches().isEmpty() || !a.dayBreaches().isEmpty()) rest++;
         }
         return new Counts(exceeds, over, rest);
     }

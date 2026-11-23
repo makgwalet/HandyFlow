@@ -31,6 +31,16 @@ public interface AlarmEventRepository extends JpaRepository<AlarmEvent, UUID> {
         """)
     Page<AlarmEvent> findOpenQueue(TenantId tenantId, Pageable pageable);
 
+    /** The triage queue limited to some sites (a user whose access is limited). */
+    @Query("""
+        SELECT e FROM AlarmEvent e
+        WHERE e.tenantId = :tenantId
+        AND e.siteId IN :siteIds
+        AND e.status IN ('NEW', 'TRIAGED', 'DISPATCHED')
+        ORDER BY e.createdAt DESC
+        """)
+    Page<AlarmEvent> findOpenQueueInSites(TenantId tenantId, java.util.Collection<UUID> siteIds, Pageable pageable);
+
     @Query("""
         SELECT e FROM AlarmEvent e
         WHERE e.tenantId = :tenantId

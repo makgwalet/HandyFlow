@@ -27,6 +27,34 @@ import java.util.UUID;
 @RequestMapping("/api/v1/security/payroll")
 @RequiredArgsConstructor
 public class PayrollController {
+    /** Optional so a hand-built controller still works; in the application it is always there. Limits a user to the sites in their scope. */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private za.co.handyflow.platform.security.application.internal.SiteScopeService scope;
+
+    /** A site outside the user's scope answers exactly like a site that does not exist. */
+    private void site(UUID siteId) {
+        za.co.handyflow.platform.security.application.internal.SiteScopeService.check(scope, TenantContext.getTenantIdAsObject(), TenantContext.getCurrentUserId(), siteId);
+    }
+
+    /** For a list whose site is optional: a user limited to some sites must name one of them, the whole company may leave it out. */
+    private void choice(UUID siteId) {
+        za.co.handyflow.platform.security.application.internal.SiteScopeService.checkChoice(scope, TenantContext.getTenantIdAsObject(), TenantContext.getCurrentUserId(), siteId);
+    }
+
+    /** For a view that spans every site and cannot be narrowed yet: only a user with the whole company may use it. */
+    private void wholeCompany() {
+        za.co.handyflow.platform.security.application.internal.SiteScopeService.checkUnrestricted(scope, TenantContext.getTenantIdAsObject(), TenantContext.getCurrentUserId());
+    }
+
+    /** A record that belongs to a site: one at a site outside the user's scope answers "not found". */
+    private void child(za.co.handyflow.platform.security.application.internal.SiteScopeService.Kind kind, UUID id) {
+        za.co.handyflow.platform.security.application.internal.SiteScopeService.checkChild(scope, TenantContext.getTenantIdAsObject(), TenantContext.getCurrentUserId(), kind, id);
+    }
+
+    /** For a site that is optional in the request: leaving it out means the whole company. */
+    private void optionalSite(UUID siteId) {
+        za.co.handyflow.platform.security.application.internal.SiteScopeService.checkOptionalSite(scope, TenantContext.getTenantIdAsObject(), TenantContext.getCurrentUserId(), siteId);
+    }
 
     private final SecurityPayrollService              payrollService;
     private final SecurityGuardPayStatementPdfService  payStatementPdfService;
@@ -37,6 +65,7 @@ public class PayrollController {
     @PreAuthorize("hasAuthority('SECURITY_PAYROLL_READ')")
     @Operation(summary = "List all payroll periods")
     public ResponseEntity<ApiResponse<Page<PayrollPeriodResponse>>> listPeriods(Pageable pageable) {
+        wholeCompany();
         TenantId tenantId = TenantContext.getTenantIdAsObject();
         return ResponseEntity.ok(ApiResponse.success(payrollService.listPeriods(tenantId, pageable)));
     }
@@ -45,6 +74,7 @@ public class PayrollController {
     @PreAuthorize("hasAuthority('SECURITY_PAYROLL_READ')")
     @Operation(summary = "Get a single payroll period")
     public ResponseEntity<ApiResponse<PayrollPeriodResponse>> getPeriod(@PathVariable UUID id) {
+        wholeCompany();
         TenantId tenantId = TenantContext.getTenantIdAsObject();
         return ResponseEntity.ok(ApiResponse.success(payrollService.getPeriod(tenantId, id)));
     }
@@ -56,6 +86,7 @@ public class PayrollController {
             description = "Starts as DRAFT. No line items are computed until the period is approved.")
     public ResponseEntity<ApiResponse<PayrollPeriodResponse>> createPeriod(
             @Valid @RequestBody CreatePayrollPeriodRequest req) {
+        wholeCompany();
         TenantId tenantId = TenantContext.getTenantIdAsObject();
         UUID actorId = TenantContext.getCurrentUserId();
         return ResponseEntity.status(HttpStatus.CREATED)
@@ -70,6 +101,7 @@ public class PayrollController {
                     "rate (explicit override or grade-based), computes regular + overtime line " +
                     "items, and freezes totals. Throws if any guard has no rate configured.")
     public ResponseEntity<ApiResponse<PayrollPeriodResponse>> approvePeriod(@PathVariable UUID id) {
+        wholeCompany();
         TenantId tenantId = TenantContext.getTenantIdAsObject();
         UUID actorId = TenantContext.getCurrentUserId();
         return ResponseEntity.ok(ApiResponse.success(
@@ -80,6 +112,7 @@ public class PayrollController {
     @PreAuthorize("hasAuthority('SECURITY_PAYROLL_PAY')")
     @Operation(summary = "Mark an EXPORTED period as PAID")
     public ResponseEntity<ApiResponse<PayrollPeriodResponse>> markPaid(@PathVariable UUID id) {
+        wholeCompany();
         TenantId tenantId = TenantContext.getTenantIdAsObject();
         return ResponseEntity.ok(ApiResponse.success(payrollService.markPaid(tenantId, id, TenantContext.getCurrentUserId())));
     }
@@ -90,6 +123,7 @@ public class PayrollController {
     @PreAuthorize("hasAuthority('SECURITY_PAYROLL_READ')")
     @Operation(summary = "List all line items for a period")
     public ResponseEntity<ApiResponse<List<PayrollLineItem>>> getLineItems(@PathVariable UUID id) {
+        wholeCompany();
         TenantId tenantId = TenantContext.getTenantIdAsObject();
         return ResponseEntity.ok(ApiResponse.success(payrollService.getLineItems(tenantId, id)));
     }
@@ -104,6 +138,7 @@ public class PayrollController {
             description = "One row per line item. Marks the period as EXPORTED. " +
                     "Includes guard name, grade, PSiRA number, shift date, hours, rate, and gross ZAR.")
     public ResponseEntity<byte[]> exportCsv(@PathVariable UUID id) {
+        wholeCompany();
         TenantId tenantId = TenantContext.getTenantIdAsObject();
         byte[] csv = payrollService.exportCsv(tenantId, id);
         return ResponseEntity.ok()
@@ -120,6 +155,7 @@ public class PayrollController {
             description = "Returns a structured summary grouped by guard. Same data as CSV " +
                     "but in a format suitable for machine consumption. Marks the period EXPORTED.")
     public ResponseEntity<ApiResponse<PayrollExportJsonResponse>> exportJson(@PathVariable UUID id) {
+        wholeCompany();
         TenantId tenantId = TenantContext.getTenantIdAsObject();
         return ResponseEntity.ok(ApiResponse.success(payrollService.exportJson(tenantId, id)));
     }
@@ -138,6 +174,7 @@ public class PayrollController {
                     "if not yet exported/paid.")
     public ResponseEntity<byte[]> getGuardPayStatementPdf(
             @PathVariable UUID id, @PathVariable UUID guardId) {
+        wholeCompany();
         TenantId tenantId = TenantContext.getTenantIdAsObject();
         byte[] pdf = payStatementPdfService.payStatementPdf(tenantId, id, guardId);
         return pdfResponse(pdf, "pay-statement-" + guardId.toString().substring(0, 8) + "-" + id + ".pdf");
@@ -149,6 +186,7 @@ public class PayrollController {
     @PreAuthorize("hasAuthority('SECURITY_PAYROLL_READ')")
     @Operation(summary = "List all configured grade rates for this tenant")
     public ResponseEntity<ApiResponse<List<GradeRate>>> getGradeRates() {
+        wholeCompany();
         TenantId tenantId = TenantContext.getTenantIdAsObject();
         return ResponseEntity.ok(ApiResponse.success(payrollService.getGradeRates(tenantId)));
     }
@@ -161,6 +199,7 @@ public class PayrollController {
                     "effectiveFrom: the date from which this rate applies (affects shifts on/after this date).")
     public ResponseEntity<ApiResponse<GradeRate>> setGradeRate(
             @Valid @RequestBody SetGradeRateRequest req) {
+        wholeCompany();
         TenantId tenantId = TenantContext.getTenantIdAsObject();
         UUID actorId = TenantContext.getCurrentUserId();
         return ResponseEntity.status(HttpStatus.CREATED)

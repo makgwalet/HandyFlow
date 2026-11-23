@@ -8,6 +8,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import za.co.handyflow.platform.security.application.internal.MonthlyPackService.Pack;
+import za.co.handyflow.platform.security.application.internal.ReportEmailRules.Contact;
 import za.co.handyflow.platform.security.application.internal.ReportEmailRules.Content;
 import za.co.handyflow.platform.security.application.internal.ReportEmailRules.Line;
 import za.co.handyflow.platform.shared.EmailService;
@@ -27,12 +28,40 @@ import java.util.UUID;
 public class MonthlyPackEmailService {
 
     public record Recipient(UUID id, String name, String email) {}
-    public record Sent(int queued, String month) {}
+    /** failed: messages the mail service refused at once. A message that was queued may still not arrive; nothing here can know. */
+    public record Sent(int queued, String month, int failed) {}
+
+    /** Optional so a service built by hand still works; without it South Africa's zone is used, never the server's. */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private za.co.handyflow.platform.shared.BusinessCalendar calendar;
 
     private final JdbcTemplate jdbc;
     private final MonthlyPackService packs;
     @Autowired(required = false)
     private EmailService mail;
+
+    @Transactional(readOnly = true)
+    public Contact contact(TenantId tenantId) {
+        List<Contact> c = jdbc.query("SELECT contact_name, contact_email, contact_phone FROM security_report_settings WHERE tenant_id = ?",
+                (rs, i) -> new Contact(rs.getString("contact_name"), rs.getString("contact_email"), rs.getString("contact_phone")), tenantId.getValue());
+        return c.isEmpty() ? null : c.get(0);
+    }
+
+    @Transactional
+    public Contact setContact(TenantId tenantId, UUID actor, String name, String email, String phone) {
+        UUID tenant = tenantId.getValue();
+        Contact c = new Contact(ReportEmailRules.cleanContactName(name), ReportEmailRules.cleanEmail(email), ReportEmailRules.cleanPhone(phone));
+        jdbc.update("""
+                INSERT INTO security_report_settings (tenant_id, contact_name, contact_email, contact_phone, updated_by, updated_at)
+                VALUES (?,?,?,?,?, now())
+                ON CONFLICT (tenant_id) DO UPDATE SET contact_name = EXCLUDED.contact_name, contact_email = EXCLUDED.contact_email,
+                    contact_phone = EXCLUDED.contact_phone, updated_by = EXCLUDED.updated_by, updated_at = now()""",
+                tenant, c.name(), c.email(), c.phone(), actor);
+        jdbc.update("""
+                INSERT INTO security_audit_log (id, tenant_id, actor_id, actor_type, entity_type, entity_id, action, metadata, occurred_at)
+                VALUES (gen_random_uuid(), ?, ?, 'USER', 'REPORT_SETTINGS', ?, 'CONTACT_SET', '{}'::jsonb, now())""", tenant, actor, tenant);
+        return c;
+    }
 
     @Transactional(readOnly = true)
     public List<Recipient> recipients(TenantId tenantId, UUID siteId) {
@@ -76,8 +105,10 @@ public class MonthlyPackEmailService {
         if (mail == null) throw new HandyFlowException("Email is not set up on this server", HttpStatus.CONFLICT, "EMAIL_NOT_CONFIGURED");
         List<Recipient> to = list(tenant, siteId);
         ReportEmailRules.requireRecipients(to.size());
+        Contact contact = contact(tenantId);
+        ReportEmailRules.requireContact(contact);
         Pack p = packs.pack(tenantId, siteId, monthAsked, now);
-        ReportEmailRules.requireFinished(YearMonth.parse(p.month()), now);
+        ReportEmailRules.requireFinished(YearMonth.parse(p.month()), now, za.co.handyflow.platform.shared.BusinessCalendar.zoneOf(calendar, tenantId));
         List<Timestamp> last = jdbc.query("""
                 SELECT max(occurred_at) AS t FROM security_audit_log
                 WHERE tenant_id = ? AND entity_type = 'SITE_REPORT' AND entity_id = ? AND action = 'PACK_EMAILED' AND metadata->>'month' = ?""",
@@ -86,10 +117,17 @@ public class MonthlyPackEmailService {
 
         String title = ReportEmailRules.monthTitle(YearMonth.parse(p.month()));
         Content content = new Content(p.siteName(), title, p.from() + " to " + p.to(), lines(p));
-        String subject = ReportEmailRules.subject(p.siteName(), title), html = ReportEmailRules.html(content);
+        String subject = ReportEmailRules.subject(p.siteName(), title), html = ReportEmailRules.html(content, contact);
         audit(tenant, actor, siteId, "PACK_EMAILED", "{\"month\":\"" + p.month() + "\",\"recipients\":" + to.size() + "}");
-        for (Recipient r : to) mail.send(r.email(), subject, html); // one message each: recipients never see each other
-        return new Sent(to.size(), p.month());
+        int failed = 0;
+        for (Recipient r : to) { // one message each: recipients never see each other; one refusal does not stop the others
+            try { mail.send(r.email(), subject, html); }
+            catch (RuntimeException e) {
+                failed++;
+                audit(tenant, actor, siteId, "PACK_EMAIL_FAILED", "{\"month\":\"" + p.month() + "\",\"recipientId\":\"" + r.id() + "\"}");
+            }
+        }
+        return new Sent(to.size() - failed, p.month(), failed);
     }
 
     static List<Line> lines(Pack p) {
@@ -103,7 +141,7 @@ public class MonthlyPackEmailService {
         out.add(new Line("Patrols", PackWording.patrols(pt.rounds(), pt.complete(), pt.partial(), pt.missed(), pt.checkpointsExpected(), pt.checkpointsScanned(), pt.checkpointPct())));
         out.add(new Line("Incidents", PackWording.incidents(p.incidents().total(), p.incidents().resolved(), p.incidents().bySeverity())));
         out.add(new Line("Visitors", PackWording.visitors(p.visitors().total(), p.visitors().withVehicle(), p.visitors().byType())));
-        out.add(new Line("Alarms", p.alarms() == 0 ? "No alarms." : p.alarms() + (p.alarms() == 1 ? " alarm." : " alarms.")));
+        out.add(new Line("Alarms", PackWording.alarms(p.alarms())));
         out.add(new Line("Occurrence Book", PackWording.book(p.occurrenceBook().daysSigned(), p.occurrenceBook().daysInPeriod())));
         return out;
     }

@@ -26,6 +26,15 @@ public class BranchController {
 
     private final BranchService branchService;
 
+    /** Optional so a hand-built controller still works; in the application it is always there. Limits a user to the sites in their scope. */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private za.co.handyflow.platform.security.application.internal.SiteScopeService scope;
+
+    /** Branches decide who sees what, so only a user with the whole company may change them. Reading the list stays open. */
+    private void wholeCompany() {
+        za.co.handyflow.platform.security.application.internal.SiteScopeService.checkUnrestricted(scope, TenantContext.getTenantIdAsObject(), TenantContext.getCurrentUserId());
+    }
+
     @GetMapping
     @PreAuthorize("hasAuthority('SECURITY_READ')")
     @Operation(summary = "List all active branches")
@@ -47,6 +56,7 @@ public class BranchController {
     @Operation(summary = "Create a branch")
     public ResponseEntity<ApiResponse<Branch>> createBranch(
             @Valid @RequestBody CreateBranchRequest req) {
+        wholeCompany();
         TenantId tenantId = TenantContext.getTenantIdAsObject();
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.success(branchService.createBranch(tenantId, req)));
@@ -57,6 +67,7 @@ public class BranchController {
     @Operation(summary = "Update a branch's name, region, or description")
     public ResponseEntity<ApiResponse<Branch>> updateBranch(
             @PathVariable UUID id, @Valid @RequestBody CreateBranchRequest req) {
+        wholeCompany();
         TenantId tenantId = TenantContext.getTenantIdAsObject();
         return ResponseEntity.ok(ApiResponse.success(branchService.updateBranch(tenantId, id, req)));
     }
@@ -65,6 +76,7 @@ public class BranchController {
     @PreAuthorize("hasAuthority('SECURITY_MANAGE')")
     @Operation(summary = "Deactivate a branch")
     public ResponseEntity<ApiResponse<Void>> deactivateBranch(@PathVariable UUID id) {
+        wholeCompany();
         TenantId tenantId = TenantContext.getTenantIdAsObject();
         branchService.deactivateBranch(tenantId, id);
         return ResponseEntity.ok(ApiResponse.success(null));

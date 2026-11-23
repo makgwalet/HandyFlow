@@ -10,9 +10,10 @@ export interface OpenIncidentRow { id: string; title: string; severity: string; 
 export interface SecurityDashboard {
   asOf: string; activeSites: number; openAlarms: number
   shifts: { onDuty: number; scheduledToday: number; notStarted: number; missedToday: number; completedToday: number }
-  workforce: { totalGuards: number; activeGuards: number; psiraExpired: number; psiraExpiring: number; competenciesExpired: number; competenciesExpiring: number }
+  /** null for a user limited to some sites: guard and complaint figures are not about one site, so they are left out, not shown as zero. */
+  workforce: { totalGuards: number; activeGuards: number; psiraExpired: number; psiraExpiring: number; competenciesExpired: number; competenciesExpiring: number } | null
   incidents: { open: number; unacknowledged: number; criticalOpen: number; last7Days: number }
-  complaints: { open: number; urgent: number }
+  complaints: { open: number; urgent: number } | null
   gate: { onSite: number; overstayed: number; enteredToday: number }
   attention: AttentionItem[]; activeShifts: ActiveShiftRow[]; openIncidents: OpenIncidentRow[]
 }
@@ -50,4 +51,10 @@ export function headline(items: AttentionItem[]): { tone: ChipTone; text: string
   if (items.some(i => i.level === "WARNING")) return { tone: "warn", text: `${items.filter(i => i.level === "WARNING").length} to check` }
   if (items.length > 0) return { tone: "info", text: `${items.length} coming up` }
   return { tone: "ok", text: "All clear" }
+}
+
+/** One line for a user whose dashboard leaves out the company-wide figures; null when everything is shown. */
+export function limitedNote(d: Pick<SecurityDashboard, "workforce" | "complaints">): string | null {
+  if (d.workforce && d.complaints) return null
+  return "Figures are for your sites only. Guard and complaint figures cover the whole company, so they are not shown."
 }

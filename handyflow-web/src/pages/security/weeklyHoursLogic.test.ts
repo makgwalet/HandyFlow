@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { addDays, canGoNextWeek, limitsText, mondayOf, problems, restText, stateLabel, summaryText, todaySast, weekTitle, type HoursReport, type HoursRow } from "./weeklyHoursLogic"
+import { addDays, canGoNextWeek, dayText, limitsText, mondayOf, problems, restText, rowThresholds, stateLabel, summaryText, todaySast, weekTitle, type HoursReport, type HoursRow } from "./weeklyHoursLogic"
 
 const T = { warnAt: 40, limit: 45, ceiling: 55, minRestHours: 12 }
 const row = (o: Partial<HoursRow> = {}): HoursRow => ({ guardId: "g", guardName: "Thabo", hours: 48, state: "OVER", shifts: 4, overlaps: false, restBreaches: [], ...o })
@@ -49,5 +49,22 @@ describe("weeklyHoursLogic", () => {
     const t = limitsText(T)
     expect(t).toContain("45 h ordinary limit")
     expect(t).toContain("rostered hours")
+  })
+  it("words a day over the daily limit and lists it with the other problems", () => {
+    expect(dayText({ day: "2026-11-16", hours: 13 })).toBe("13 h rostered on Mon 16 Nov, over the daily limit")
+    const r = row({ overlaps: true, dayBreaches: [{ day: "2026-11-17", hours: 14.5 }] })
+    expect(problems(r)).toHaveLength(2)
+    expect(problems(r)[1]).toContain("14.5 h rostered on Tue")
+    expect(problems(row())).toEqual([])
+  })
+  it("uses the guard's own limits when the server sends them, else the company's", () => {
+    expect(rowThresholds(row({ limit: 48, ceiling: 60 }), T)).toMatchObject({ limit: 48, ceiling: 60, warnAt: 40 })
+    expect(rowThresholds(row(), T)).toEqual(T)
+    expect(stateLabel("OVER", rowThresholds(row({ limit: 48, ceiling: 60 }), T))).toBe("Over 48 h")
+  })
+  it("mentions the daily limit and other categories in the limits line", () => {
+    expect(limitsText({ ...T, maxDaily: 12 })).toContain("12 h a day")
+    expect(limitsText(T)).not.toContain("a day")
+    expect(limitsText(T)).toContain("another category")
   })
 })

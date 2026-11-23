@@ -10,7 +10,7 @@
 // (and bundle) a module's pages just to render its navigation.
 import type { ElementType } from 'react'
 import {
-  Boxes,
+  Boxes, Eye, Timer,
   AlertTriangle, Bell, CheckCircle2, Coins, Camera, ClipboardList, Clock, Crosshair, DoorOpen, FileBarChart,
   GitBranch, Key, LayoutDashboard, Lock, MapPin, Radio, RefreshCw, Repeat, Route,
   Footprints, QrCode, Gauge, Shield, ShieldCheck, Siren, Tablet, DollarSign, Wheat, Tractor, PawPrint,
@@ -97,6 +97,7 @@ export const SECURITY_SECTIONS: ModuleSections = {
         { id: 'scheduler', label: 'Scheduler', icon: CalendarDays },
         { id: 'coverage', label: 'Coverage', icon: Users },
         { id: 'incidents', label: 'Incidents', icon: AlertTriangle },
+        { id: 'sla', label: 'Service levels', icon: Timer },
         { id: 'patrols', label: 'Patrols', icon: Footprints },
         { id: 'patrol-routes', label: 'Patrol Routes', icon: Route },
         { id: 'checkpoints', label: 'Checkpoints', icon: QrCode },
@@ -122,6 +123,8 @@ export const SECURITY_SECTIONS: ModuleSections = {
       sections: [
         { id: 'sites', label: 'Sites', icon: MapPin },
         { id: 'branches', label: 'Branches', icon: GitBranch },
+        { id: 'site-access', label: 'Site access', icon: UserCheck, permission: 'SECURITY_ADMIN' },
+        { id: 'invoice-drafts', label: 'Invoice drafts', icon: Receipt, permission: 'SECURITY_ADMIN' },
         { id: 'armoury', label: 'Armoury', icon: Crosshair },
         { id: 'cctv', label: 'CCTV', icon: Camera },
         { id: 'sessions', label: 'Devices', icon: Tablet },
@@ -138,6 +141,7 @@ export const SECURITY_SECTIONS: ModuleSections = {
       sections: [
         { id: 'reports', label: 'Reports', icon: FileBarChart },
         { id: 'public-api', label: 'Public API', icon: Key },
+        { id: 'access-log', label: 'Access log', icon: Eye, permission: 'SECURITY_ADMIN' },
       ],
     },
   ],

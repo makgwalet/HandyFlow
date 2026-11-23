@@ -50,6 +50,34 @@ import java.util.UUID;
 @RequiredArgsConstructor
 @Tag(name = "Security - Guards", description = "Guard management and status workflow")
 public class GuardController {
+    /** Optional so a hand-built controller still works; in the application it is always there. Limits a user to the sites in their scope. */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private za.co.handyflow.platform.security.application.internal.SiteScopeService scope;
+
+    /** A site outside the user's scope answers exactly like a site that does not exist. */
+    private void site(UUID siteId) {
+        za.co.handyflow.platform.security.application.internal.SiteScopeService.check(scope, TenantContext.getTenantIdAsObject(), TenantContext.getCurrentUserId(), siteId);
+    }
+
+    /** For a list whose site is optional: a user limited to some sites must name one of them, the whole company may leave it out. */
+    private void choice(UUID siteId) {
+        za.co.handyflow.platform.security.application.internal.SiteScopeService.checkChoice(scope, TenantContext.getTenantIdAsObject(), TenantContext.getCurrentUserId(), siteId);
+    }
+
+    /** For a view that spans every site and cannot be narrowed yet: only a user with the whole company may use it. */
+    private void wholeCompany() {
+        za.co.handyflow.platform.security.application.internal.SiteScopeService.checkUnrestricted(scope, TenantContext.getTenantIdAsObject(), TenantContext.getCurrentUserId());
+    }
+
+    /** A record that belongs to a site: one at a site outside the user's scope answers "not found". */
+    private void child(za.co.handyflow.platform.security.application.internal.SiteScopeService.Kind kind, UUID id) {
+        za.co.handyflow.platform.security.application.internal.SiteScopeService.checkChild(scope, TenantContext.getTenantIdAsObject(), TenantContext.getCurrentUserId(), kind, id);
+    }
+
+    /** For a site that is optional in the request: leaving it out means the whole company. */
+    private void optionalSite(UUID siteId) {
+        za.co.handyflow.platform.security.application.internal.SiteScopeService.checkOptionalSite(scope, TenantContext.getTenantIdAsObject(), TenantContext.getCurrentUserId(), siteId);
+    }
 
     private final GuardService guardService;
     private final FeatureGuard featureGuard;
@@ -104,6 +132,7 @@ public class GuardController {
     @Operation(summary = "Guard 360: guard, documents, screening history, shifts and incidents in one call")
     public ResponseEntity<ApiResponse<GuardOverviewResponse>> getOverview(@PathVariable UUID id) {
         featureGuard.requireModule("security");
+        wholeCompany();
         return ResponseEntity.ok(ApiResponse.success(
                 overviewService.overview(TenantContext.getTenantIdAsObject(), id)));
     }
@@ -114,6 +143,7 @@ public class GuardController {
     public ResponseEntity<ApiResponse<GuardResponse>> createGuard(
             @Valid @RequestBody CreateGuardRequest request) {
         featureGuard.requireModule("security");
+        wholeCompany();
         var guard = guardService.createGuard(TenantContext.getTenantIdAsObject(), request);
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.success("Guard created", guard));
@@ -126,6 +156,7 @@ public class GuardController {
             @PathVariable UUID id,
             @Valid @RequestBody CreateGuardRequest request) {
         featureGuard.requireModule("security");
+        wholeCompany();
         return ResponseEntity.ok(ApiResponse.success("Guard updated",
                 guardService.updateGuard(TenantContext.getTenantIdAsObject(), id, request)));
     }
@@ -141,6 +172,7 @@ public class GuardController {
             @PathVariable UUID id,
             @Valid @RequestBody UpdateGuardStatusRequest request) {
         featureGuard.requireModule("security");
+        wholeCompany();
         var tenantId   = TenantContext.getTenantIdAsObject();
         var changedBy  = TenantContext.getCurrentUserId();
         return ResponseEntity.ok(ApiResponse.success("Guard status updated",
@@ -152,6 +184,7 @@ public class GuardController {
     @Operation(summary = "Soft-delete a guard record (preserves shift/incident history)")
     public ResponseEntity<ApiResponse<Void>> deleteGuard(@PathVariable UUID id) {
         featureGuard.requireModule("security");
+        wholeCompany();
         var tenantId  = TenantContext.getTenantIdAsObject();
         var deletedBy = TenantContext.getCurrentUserId();
         guardService.deleteGuard(tenantId, id, deletedBy);
@@ -167,6 +200,7 @@ public class GuardController {
     public ResponseEntity<ApiResponse<GuardResponse>> updatePhoto(
             @PathVariable UUID id, @RequestBody Map<String, String> body) {
         featureGuard.requireModule("security");
+        wholeCompany();
         return ResponseEntity.ok(ApiResponse.success("Photo updated",
                 guardService.updatePhoto(TenantContext.getTenantIdAsObject(), id, body.get("photoBase64"))));
     }
@@ -178,6 +212,7 @@ public class GuardController {
     public ResponseEntity<ApiResponse<RevealPiiResponse>> reveal(
             @PathVariable UUID id, @RequestBody RevealPiiRequest req,
             org.springframework.security.core.Authentication auth) {
+        wholeCompany();
         String authority = "BANK_ACCOUNT".equalsIgnoreCase(req.field() == null ? "" : req.field().trim())
                 ? "SECURITY_GUARD_BANKING_MANAGE" : "SECURITY_MANAGE";
         boolean allowed = auth != null && auth.getAuthorities().stream()
@@ -202,6 +237,7 @@ public class GuardController {
     @PreAuthorize("hasAuthority('SECURITY_MANAGE')")
     @Operation(summary = "Delete the guard's face template (consent withdrawn). Audited.")
     public ResponseEntity<ApiResponse<FaceStatusResponse>> removeFace(@PathVariable UUID id) {
+        wholeCompany();
         return ResponseEntity.ok(ApiResponse.success("Face data removed",
                 guardService.removeFace(TenantContext.getTenantIdAsObject(), TenantContext.getCurrentUserId(), id)));
     }
@@ -214,6 +250,7 @@ public class GuardController {
     public ResponseEntity<ApiResponse<GuardResponse>> updateBankDetails(
             @PathVariable UUID id, @RequestBody za.co.handyflow.platform.security.dto.UpdateBankDetailsRequest req) {
         featureGuard.requireModule("security");
+        wholeCompany();
         return ResponseEntity.ok(ApiResponse.success("Bank details updated",
                 guardService.updateBankDetails(TenantContext.getTenantIdAsObject(), id,
                         req.bankName(), req.bankAccountNumber(), req.bankBranchCode())));

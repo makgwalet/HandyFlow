@@ -1,3 +1,4 @@
+import { dayIn, getCompanyZone } from "./companyZone"
 // src/pages/security/guard360.logic.ts
 //
 // Pure rules for the Guard 360 page: PSiRA state, the latest screening per type, the standard guard-file checklist
@@ -45,10 +46,8 @@ export function startedLabel(s: Pick<ShiftItem, "status" | "actualStartAt" | "mi
 
 export const DUE_SOON_DAYS = 30
 
-/** Today's date in South African time, as yyyy-mm-dd. */
-export function todayIso(now: Date = new Date()): string {
-  return new Intl.DateTimeFormat("en-CA", { timeZone: "Africa/Johannesburg", year: "numeric", month: "2-digit", day: "2-digit" }).format(now)
-}
+/** Today's date in the company's zone (South Africa unless the company has set another), as yyyy-mm-dd. */
+export function todayIso(now: Date = new Date()): string { return dayIn(getCompanyZone(), now) }
 
 /** Whole days from `from` to `to` (both yyyy-mm-dd). Negative when `to` is earlier. */
 export function daysBetween(from: string, to: string): number {

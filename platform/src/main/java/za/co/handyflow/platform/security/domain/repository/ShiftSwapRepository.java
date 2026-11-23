@@ -47,4 +47,24 @@ public interface ShiftSwapRepository extends JpaRepository<ShiftSwapRequest, UUI
         AND r.status IN ('PENDING', 'PROPOSED_ACCEPTED')
         """)
     List<ShiftSwapRequest> findOpenByShift(UUID shiftId);
+
+    /** The open requests for shifts at some sites (a user whose access is limited). */
+    @Query("""
+        SELECT r FROM ShiftSwapRequest r
+        WHERE r.tenantId = :tenantId
+        AND r.status IN ('PENDING', 'PROPOSED_ACCEPTED')
+        AND r.originalShiftId IN (SELECT s.id FROM Shift s WHERE s.tenantId = :tenantId AND s.siteId IN :siteIds)
+        ORDER BY r.requestedAt
+        """)
+    Page<ShiftSwapRequest> findPendingInSites(TenantId tenantId, java.util.Collection<UUID> siteIds, Pageable pageable);
+
+    /** A guard's requests for shifts at some sites. */
+    @Query("""
+        SELECT r FROM ShiftSwapRequest r
+        WHERE r.tenantId = :tenantId
+        AND (r.requestingGuardId = :guardId OR r.proposedGuardId = :guardId)
+        AND r.originalShiftId IN (SELECT s.id FROM Shift s WHERE s.tenantId = :tenantId AND s.siteId IN :siteIds)
+        ORDER BY r.requestedAt DESC
+        """)
+    Page<ShiftSwapRequest> findByGuardInSites(TenantId tenantId, UUID guardId, java.util.Collection<UUID> siteIds, Pageable pageable);
 }

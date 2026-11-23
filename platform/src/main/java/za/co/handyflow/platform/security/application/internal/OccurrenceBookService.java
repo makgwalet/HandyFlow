@@ -28,6 +28,14 @@ public class OccurrenceBookService {
 
     private final JdbcTemplate jdbc;
 
+    /** The company's calendar. Optional so a hand-built service still works, on the South African default. */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private za.co.handyflow.platform.shared.BusinessCalendar calendar;
+
+    private java.time.ZoneId zone(TenantId tenantId) {
+        return za.co.handyflow.platform.shared.BusinessCalendar.zoneOf(calendar, tenantId);
+    }
+
     /** Reading is recorded in the audit trail (once per person, site and day every 15 minutes), so this is not read-only. */
     @Transactional
     public Day day(TenantId tenantId, UUID siteId, LocalDate asked, UUID viewer) {
@@ -40,8 +48,8 @@ public class OccurrenceBookService {
     @Transactional(readOnly = true)
     Day day(TenantId tenantId, UUID siteId, LocalDate asked, Instant now) {
         String siteName = siteName(tenantId.getValue(), siteId);
-        LocalDate date = OccurrenceBookRules.dayOrToday(asked, now);
-        Instant[] w = OccurrenceBookRules.window(date);
+        LocalDate date = OccurrenceBookRules.dayOrToday(asked, now, zone(tenantId));
+        Instant[] w = OccurrenceBookRules.window(date, zone(tenantId));
         List<Line> lines = jdbc.query(OccurrenceBookRules.DAY_SQL, (rs, i) -> new Line(
                 rs.getTimestamp("at").toInstant(), Kind.valueOf(rs.getString("kind")), rs.getString("text"),
                 (UUID) rs.getObject("guard_id"), rs.getString("guard_name"), (UUID) rs.getObject("ref_id")),
@@ -64,7 +72,7 @@ public class OccurrenceBookService {
     public Signoff sign(TenantId tenantId, UUID siteId, LocalDate day, UUID signer, String note) {
         siteName(tenantId.getValue(), siteId);
         Instant now = Instant.now();
-        OccurrenceBookRules.requireSignable(day, now);
+        OccurrenceBookRules.requireSignable(day, now, zone(tenantId));
         String n = OccurrenceBookRules.cleanSignoffNote(note);
         int added = jdbc.update("""
                 INSERT INTO security_ob_signoffs (tenant_id, site_id, day, signed_by, signed_at, note) VALUES (?, ?, ?, ?, ?, ?)
@@ -102,7 +110,7 @@ public class OccurrenceBookService {
         String clean = OccurrenceBookRules.cleanText(text);
         Instant when = OfflineTimestamp.accept(recordedAt, Instant.now());
         Integer signed = jdbc.queryForObject("SELECT count(*) FROM security_ob_signoffs WHERE tenant_id = ? AND site_id = ? AND day = ?",
-                Integer.class, tenantId.getValue(), siteId, java.sql.Date.valueOf(OccurrenceBookRules.dayOf(when)));
+                Integer.class, tenantId.getValue(), siteId, java.sql.Date.valueOf(OccurrenceBookRules.dayOf(when, zone(tenantId))));
         OccurrenceBookRules.requireOpenOrCorrection(signed != null && signed > 0, k);
         jdbc.update("""
                 INSERT INTO security_ob_entries (tenant_id, site_id, guard_id, entered_by, entry_type, text, recorded_at, client_ref)

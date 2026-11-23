@@ -96,15 +96,28 @@ public class ShiftSwapService {
 
     @Transactional(readOnly = true)
     public Page<ShiftSwapResponse> getPendingSwaps(TenantId tenantId, Pageable pageable) {
-        return swapRepository.findPending(tenantId, pageable)
-                .map(this::toResponse);
+        return getPendingSwaps(tenantId, pageable, null);
+    }
+
+    /** `allowedSites` null = the whole company; otherwise only swaps of shifts at those sites (an empty set sees none). */
+    @Transactional(readOnly = true)
+    public Page<ShiftSwapResponse> getPendingSwaps(TenantId tenantId, Pageable pageable, java.util.Set<UUID> allowedSites) {
+        if (allowedSites == null) return swapRepository.findPending(tenantId, pageable).map(this::toResponse);
+        if (allowedSites.isEmpty()) return Page.empty(pageable);
+        return swapRepository.findPendingInSites(tenantId, allowedSites, pageable).map(this::toResponse);
     }
 
     @Transactional(readOnly = true)
     public Page<ShiftSwapResponse> getSwapsByGuard(TenantId tenantId, UUID guardId,
                                                    Pageable pageable) {
-        return swapRepository.findByGuard(tenantId, guardId, pageable)
-                .map(this::toResponse);
+        return getSwapsByGuard(tenantId, guardId, pageable, null);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<ShiftSwapResponse> getSwapsByGuard(TenantId tenantId, UUID guardId, Pageable pageable, java.util.Set<UUID> allowedSites) {
+        if (allowedSites == null) return swapRepository.findByGuard(tenantId, guardId, pageable).map(this::toResponse);
+        if (allowedSites.isEmpty()) return Page.empty(pageable);
+        return swapRepository.findByGuardInSites(tenantId, guardId, allowedSites, pageable).map(this::toResponse);
     }
 
     // ── Stage 1: Request ───────────────────────────────────────────────────────

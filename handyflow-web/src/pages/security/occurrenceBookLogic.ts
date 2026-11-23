@@ -1,3 +1,4 @@
+import { abbreviationIn, dateTimeIn, dayIn, getCompanyZone, timeIn } from "./companyZone"
 import { printCss } from "./printSection"
 
 // Occurrence Book: wording and small rules. The server decides what is in the book; this only words it.
@@ -24,10 +25,8 @@ export const MAX_TEXT = 2000
 
 export function kindLabel(k: string): string { return KIND_LABEL[k] ?? k }
 
-/** Today in South Africa as YYYY-MM-DD. */
-export function todaySast(now: Date = new Date()): string {
-  return new Intl.DateTimeFormat("en-CA", { timeZone: "Africa/Johannesburg", year: "numeric", month: "2-digit", day: "2-digit" }).format(now)
-}
+/** Today as YYYY-MM-DD in the company's zone (South Africa unless the company has set another). The name is kept for existing callers. */
+export function todaySast(now: Date = new Date()): string { return dayIn(getCompanyZone(), now) }
 
 /** Move a YYYY-MM-DD date by whole days, without any timezone drift. */
 export function shiftDay(date: string, days: number): string {
@@ -39,7 +38,7 @@ export function shiftDay(date: string, days: number): string {
 export function canGoNext(date: string, now: Date = new Date()): boolean { return date < todaySast(now) }
 
 export function timeText(iso: string): string {
-  return new Date(iso).toLocaleTimeString("en-ZA", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "Africa/Johannesburg" })
+  return timeIn(getCompanyZone(), iso)
 }
 
 export function dayTitle(date: string): string {
@@ -81,7 +80,7 @@ export function effectiveKind(chosen: string, signed: boolean): string {
 export function canSign(canManage: boolean, signed: boolean): boolean { return canManage && !signed }
 
 export function signedText(s: ObSignoff): string {
-  const when = new Date(s.signedAt).toLocaleString("en-ZA", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "Africa/Johannesburg" })
+  const when = dateTimeIn(getCompanyZone(), s.signedAt)
   return `Signed off by ${s.signedByName?.trim() || "a supervisor"} on ${when}.`
 }
 
@@ -105,7 +104,8 @@ export function printSignLine(signoff: ObSignoff | null | undefined): string {
 }
 
 export function printedAt(now: Date = new Date()): string {
-  return "Printed " + now.toLocaleString("en-ZA", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "Africa/Johannesburg" }) + " (SAST)"
+  const zone = getCompanyZone()
+  return "Printed " + dateTimeIn(zone, now) + " (" + abbreviationIn(zone, now) + ")"
 }
 
 /** Print rules: only this card shows on paper when its print button was used (see printSection). */

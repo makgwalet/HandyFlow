@@ -14,7 +14,7 @@ import java.util.Locale;
 /** Pure rules for the Daily Occurrence Book: the day window, the text of manual entries, and the order of lines. */
 public final class OccurrenceBookRules {
 
-    public static final ZoneId SAST = ZoneId.of("Africa/Johannesburg");
+    public static final ZoneId SAST = za.co.handyflow.platform.shared.BusinessTime.DEFAULT_ZONE;
     static final int MIN_TEXT = 3;
     static final int MAX_TEXT = 2000;
 
@@ -29,7 +29,13 @@ public final class OccurrenceBookRules {
     private OccurrenceBookRules() {}
 
     /** The South African day an instant falls in. */
-    public static LocalDate dayOf(Instant at) { return at.atZone(SAST).toLocalDate(); }
+    public static LocalDate dayOf(Instant at) { return dayOf(at, SAST); }
+
+    /** A missing zone means South Africa, never the server's own zone. */
+    private static ZoneId zoneOr(ZoneId zone) { return zone == null ? SAST : zone; }
+
+    /** The day an instant falls in, in the company's zone. */
+    public static LocalDate dayOf(Instant at, ZoneId zone) { return at.atZone(zoneOr(zone)).toLocalDate(); }
 
     /** A signed day accepts only corrections. */
     public static void requireOpenOrCorrection(boolean daySigned, Kind kind) {
@@ -40,9 +46,11 @@ public final class OccurrenceBookRules {
     }
 
     /** A day may be signed once it has started; a future day may not. */
-    public static void requireSignable(LocalDate day, Instant now) {
+    public static void requireSignable(LocalDate day, Instant now) { requireSignable(day, now, SAST); }
+
+    public static void requireSignable(LocalDate day, Instant now, ZoneId zone) {
         if (day == null) throw new HandyFlowException("Day is required.", HttpStatus.BAD_REQUEST, "OB_DAY_REQUIRED");
-        dayOrToday(day, now);
+        dayOrToday(day, now, zone);
     }
 
     public static String cleanSignoffNote(String note) {
@@ -60,14 +68,20 @@ public final class OccurrenceBookRules {
     }
 
     /** [start, end) of a South African calendar day. */
-    public static Instant[] window(LocalDate day) {
+    public static Instant[] window(LocalDate day) { return window(day, SAST); }
+
+    /** [start, end) of a calendar day in the company's zone. */
+    public static Instant[] window(LocalDate day, ZoneId zone) {
         if (day == null) throw new IllegalArgumentException("day");
-        return new Instant[]{day.atStartOfDay(SAST).toInstant(), day.plusDays(1).atStartOfDay(SAST).toInstant()};
+        ZoneId z = zoneOr(zone);
+        return new Instant[]{day.atStartOfDay(z).toInstant(), day.plusDays(1).atStartOfDay(z).toInstant()};
     }
 
     /** The day to show: the one asked for, else today in South Africa. A day in the future is refused. */
-    public static LocalDate dayOrToday(LocalDate asked, Instant now) {
-        LocalDate today = now.atZone(SAST).toLocalDate();
+    public static LocalDate dayOrToday(LocalDate asked, Instant now) { return dayOrToday(asked, now, SAST); }
+
+    public static LocalDate dayOrToday(LocalDate asked, Instant now, ZoneId zone) {
+        LocalDate today = dayOf(now, zone);
         if (asked == null) return today;
         if (asked.isAfter(today)) {
             throw new HandyFlowException("That day has not happened yet.", HttpStatus.BAD_REQUEST, "OB_FUTURE_DAY");

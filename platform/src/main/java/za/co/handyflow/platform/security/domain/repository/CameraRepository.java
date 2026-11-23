@@ -48,4 +48,14 @@ public interface CameraRepository extends JpaRepository<Camera, UUID> {
         ORDER BY c.name
         """)
     Page<Camera> findAllActive(TenantId tenantId, Pageable pageable);
+
+    /** The same list limited to some sites (a user whose access is limited). */
+    @Query("""
+        SELECT c FROM Camera c
+        WHERE c.tenantId = :tenantId
+        AND c.siteId IN :siteIds
+        AND c.status != 'DECOMMISSIONED'
+        ORDER BY c.name
+        """)
+    Page<Camera> findAllActiveInSites(TenantId tenantId, java.util.Collection<UUID> siteIds, Pageable pageable);
 }

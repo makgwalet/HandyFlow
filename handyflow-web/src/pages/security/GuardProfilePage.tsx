@@ -18,12 +18,14 @@ import GuardDevicesPanel from "./GuardDevicesPanel"
 import ComplaintsTab from "./ComplaintsTab"
 import GuardPerformancePanel from "./GuardPerformancePanel"
 import GuardHrLinkCard from "./GuardHrLinkCard"
+import GuardFaceCard from "./GuardFaceCard"
 import type { ComplaintCounts, ComplaintSummary } from "./complaints.logic"
 import {
   DOCUMENT_CATEGORIES, SEVERITY_TONE, SHIFT_TONE, categoryLabel, completionRate, expiryState,
   fileChecklist, isUpcoming, readinessState, readinessTone, screeningLabel, startedLabel, todayIso,
   type CompetencyItem, type DocumentItem, type Readiness, type ScreeningItem, type ShiftItem,
 } from "./guard360.logic"
+import { getCompanyZone, useCompanyZone } from "./companyZone"
 
 interface Overview {
   guard: {
@@ -49,8 +51,8 @@ const TABS = ["Overview", "Compliance", "Skills", "Documents", "Shifts", "Incide
 type Tab = typeof TABS[number]
 
 const STATUS_TONE: Record<string, "ok" | "warn" | "bad" | "info" | "neutral"> = { ACTIVE: "ok", ON_LEAVE: "info", SUSPENDED: "bad", UNDER_INVESTIGATION: "warn", TERMINATED: "neutral" }
-const fmtDate = (iso: string | null | undefined) => iso ? new Date(iso).toLocaleDateString("en-ZA", { day: "numeric", month: "short", year: "numeric", timeZone: "Africa/Johannesburg" }) : "-"
-const fmtDateTime = (iso: string) => new Date(iso).toLocaleString("en-ZA", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: "Africa/Johannesburg" })
+const fmtDate = (iso: string | null | undefined) => iso ? new Date(iso).toLocaleDateString("en-ZA", { day: "numeric", month: "short", year: "numeric", timeZone: getCompanyZone() }) : "-"
+const fmtDateTime = (iso: string) => new Date(iso).toLocaleString("en-ZA", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: getCompanyZone() })
 
 const card: React.CSSProperties = { background: "var(--hf-surface)", border: "1px solid var(--hf-border)", borderRadius: 12, padding: 16 }
 const th: React.CSSProperties = { textAlign: "left", padding: "8px 10px", fontSize: 11, color: "var(--hf-text-muted)", fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.4 }
@@ -66,6 +68,7 @@ function Field({ label, value }: { label: string; value: React.ReactNode }) {
 }
 
 export default function GuardProfilePage() {
+  useCompanyZone()
   const { guardId } = useParams<{ guardId: string }>()
   const navigate = useNavigate()
   const [tab, setTab] = useState<Tab>("Overview")
@@ -142,6 +145,7 @@ export default function GuardProfilePage() {
             <StatTile label="Documents on file" value={data.documents.length} icon={<FileText size={18} />} />
           </div>
           <GuardHrLinkCard guardId={guard.id} canManage={canManage} />
+          <GuardFaceCard guardId={guard.id} canManage={canManage} />
           <div style={{ ...card, display: "flex", gap: 20, alignItems: "center", flexWrap: "wrap" }}>
             <ReadinessRing readiness={readiness} />
             <div style={{ flex: "1 1 260px", minWidth: 0 }}>

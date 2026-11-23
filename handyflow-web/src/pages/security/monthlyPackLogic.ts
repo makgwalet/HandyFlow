@@ -1,3 +1,4 @@
+import { abbreviationIn, dateTimeIn, getCompanyZone, monthIn } from "./companyZone"
 // Monthly service report: wording only. The server computes every figure; this words them and handles month arithmetic.
 import { printCss } from "./printSection"
 
@@ -16,9 +17,8 @@ export const PRINT_CSS = printCss("mp-print", "mp")
 const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"]
 const pad = (n: number) => String(n).padStart(2, "0")
 
-export function currentMonthSast(now: Date = new Date()): string {
-  return new Intl.DateTimeFormat("en-CA", { timeZone: "Africa/Johannesburg", year: "numeric", month: "2-digit" }).format(now).slice(0, 7)
-}
+/** This month as YYYY-MM in the company's zone (South Africa unless the company has set another). The name is kept for existing callers. */
+export function currentMonthSast(now: Date = new Date()): string { return monthIn(getCompanyZone(), now) }
 
 export function shiftMonth(month: string, delta: number): string {
   const [y, m] = month.split("-").map(Number)
@@ -26,7 +26,7 @@ export function shiftMonth(month: string, delta: number): string {
   return `${Math.floor(t / 12)}-${pad((t % 12) + 1)}`
 }
 
-/** Last month, South African time: the month a client report is normally about. */
+/** Last month in the company's zone: the month a client report is normally about. */
 export function lastMonthSast(now: Date = new Date()): string { return shiftMonth(currentMonthSast(now), -1) }
 
 export function canGoNextMonth(month: string, now: Date = new Date()): boolean { return month < currentMonthSast(now) }
@@ -80,7 +80,8 @@ export function shiftLines(shifts: Record<string, number>): { label: string; n: 
 }
 
 export function printedAt(now: Date = new Date()): string {
-  return "Printed " + now.toLocaleString("en-ZA", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "Africa/Johannesburg" }) + " (SAST)"
+  const zone = getCompanyZone()
+  return "Printed " + dateTimeIn(zone, now) + " (" + abbreviationIn(zone, now) + ")"
 }
 
 export function printTitle(p: Pack): string { return `Monthly service report — ${p.siteName} — ${monthTitle(p.month)}` }

@@ -6,6 +6,7 @@ const api = vi.hoisted(() => ({ get: vi.fn(), post: vi.fn() }))
 vi.mock("../../api/client", () => ({ apiClient: api }))
 
 import { useAuthStore } from "../../store/auth.store"
+vi.mock("./companyZone", async orig => ({ ...(await orig<typeof import("./companyZone")>()), useCompanyZone: () => ({ zone: "Africa/Johannesburg", ready: true }) }))
 import OccurrenceBookCard from "./OccurrenceBookCard"
 
 const day = (lines: unknown[], signoff: unknown = null) => ({ data: { data: { siteId: "s1", siteName: "Mall", date: "2026-11-20", lines, truncated: false, signoff } } })

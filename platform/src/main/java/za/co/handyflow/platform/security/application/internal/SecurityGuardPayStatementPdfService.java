@@ -25,12 +25,13 @@ import za.co.handyflow.platform.security.domain.model.PayrollPeriod;
 import za.co.handyflow.platform.security.domain.repository.GuardRepository;
 import za.co.handyflow.platform.security.domain.repository.PayrollLineItemRepository;
 import za.co.handyflow.platform.security.domain.repository.PayrollPeriodRepository;
+import za.co.handyflow.platform.shared.BusinessCalendar;
 import za.co.handyflow.platform.shared.ResourceNotFoundException;
 import za.co.handyflow.platform.shared.TenantId;
 
 import java.io.ByteArrayOutputStream;
 import java.math.BigDecimal;
-import java.time.ZoneOffset;
+import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.UUID;
@@ -69,13 +70,14 @@ public class SecurityGuardPayStatementPdfService {
     private static final DeviceRgb LIGHT_GREY  = new DeviceRgb(247, 247, 247);
     private static final DeviceRgb MID_GREY    = new DeviceRgb(200, 200, 200);
 
-    private static final DateTimeFormatter DATE_FMT =
-            DateTimeFormatter.ofPattern("d MMM yyyy").withZone(ZoneOffset.UTC);
+    /** Shift dates are the company's business days, so the zone is applied where it is used. */
+    private static final DateTimeFormatter DATE_FMT = DateTimeFormatter.ofPattern("d MMM yyyy");
 
     private final SecurityPdfBrandingHelper brandingHelper;
     private final PayrollPeriodRepository   periodRepository;
     private final PayrollLineItemRepository lineItemRepository;
     private final GuardRepository           guardRepository;
+    private final BusinessCalendar          calendar;
 
     public byte[] payStatementPdf(TenantId tenantId, UUID periodId, UUID guardId) {
         PayrollPeriod period = periodRepository.findByTenantAndId(tenantId, periodId)
@@ -95,7 +97,7 @@ public class SecurityGuardPayStatementPdfService {
                     guard.getFullName(), period.getName(), tenant, BRAND_TEAL);
 
             addGuardDetails(doc, guard, period);
-            addLineItemsTable(doc, items);
+            addLineItemsTable(doc, items, calendar.zone(tenantId));
             addTotalsBox(doc, items);
             addStatutoryDisclaimer(doc);
 
@@ -121,7 +123,7 @@ public class SecurityGuardPayStatementPdfService {
         doc.add(table);
     }
 
-    private void addLineItemsTable(Document doc, List<PayrollLineItem> items) {
+    private void addLineItemsTable(Document doc, List<PayrollLineItem> items, ZoneId zone) {
         doc.add(new Paragraph("Hours & Pay")
                 .setFontSize(11).setBold()
                 .setFontColor(BRAND_TEAL)
@@ -148,13 +150,14 @@ public class SecurityGuardPayStatementPdfService {
         boolean alt = false;
         for (PayrollLineItem li : items) {
             Color bg = alt ? LIGHT_GREY : ColorConstants.WHITE;
-            BigDecimal hours = li.getLineType().name().equals("OVERTIME")
+            String lineType = li.getLineType().name();
+            BigDecimal hours = PayPremiumRules.hoursInOvertimeColumn(lineType)
                     ? li.getOvertimeHours() : li.getHoursWorked();
-            int rateCents = li.getLineType().name().equals("OVERTIME")
+            int rateCents = PayPremiumRules.paidAtLineRate(lineType)
                     ? li.getOvertimeRateCents() : li.getHourlyRateCents();
 
-            table.addCell(cell(DATE_FMT.format(li.getShiftStartAt()), bg));
-            table.addCell(cell(li.getLineType().name(), bg));
+            table.addCell(cell(DATE_FMT.withZone(zone).format(li.getShiftStartAt()), bg));
+            table.addCell(cell(PayPremiumRules.label(lineType), bg));
             table.addCell(cell(hours.toPlainString(), bg));
             table.addCell(cell(fmtCents(rateCents), bg));
             table.addCell(cell(fmtCents(li.getGrossAmountCents()), bg));

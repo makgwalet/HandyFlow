@@ -128,7 +128,10 @@ class ReportEmailRulesTest {
         assertEquals("3 logged (1 Contractor, 2 Visitor), 1 with a vehicle.", PackWording.visitors(3, 1, Map.of("VISITOR", 2, "CONTRACTOR", 1)));
         assertEquals("Occurrence Book signed off on 28 of 31 days.", PackWording.book(28, 31));
         assertEquals("20 completed, 2 missed.", PackWording.shifts(Map.of("COMPLETED", 20, "MISSED", 2, "CANCELLED", 0)));
-        assertEquals("No shifts.", PackWording.shifts(Map.of()));
+        assertEquals("No shifts in this period.", PackWording.shifts(Map.of()));
+        assertEquals("No alarm events.", PackWording.alarms(0));
+        assertEquals("1 alarm event.", PackWording.alarms(1));
+        assertEquals("4 alarm events.", PackWording.alarms(4));
     }
 
     // ---- wiring, read from the source ----
@@ -144,9 +147,9 @@ class ReportEmailRulesTest {
     @Test
     void sendingIsManagerOnlyAndEveryRouteIsFeatureGuarded() throws Exception {
         String c = src("api", "MonthlyPackEmailController.java");
-        assertEquals(4, count(c, "@PreAuthorize(\"hasAuthority('SECURITY_MANAGE')\")"));
+        assertEquals(6, count(c, "@PreAuthorize(\"hasAuthority('SECURITY_MANAGE')\")"));   // 4 report routes + the contact setting (get, put)
         assertEquals(0, count(c, "SECURITY_READ"));
-        assertEquals(4, count(c, "featureGuard.requireModule(\"security\");"));
+        assertEquals(6, count(c, "featureGuard.requireModule(\"security\");"));
     }
 
     @Test
@@ -155,11 +158,17 @@ class ReportEmailRulesTest {
         int send = s.indexOf("Sent send(TenantId tenantId, UUID siteId, UUID actor, String monthAsked, Instant now)");
         String body = s.substring(send, s.indexOf("static List<Line> lines"));
         int mailCall = body.indexOf("mail.send(");
-        for (String guard : new String[]{"mail == null", "requireRecipients(", "requireFinished(", "requireNotJustSent(", "audit(tenant, actor, siteId, \"PACK_EMAILED\""})
+        for (String guard : new String[]{"mail == null", "requireRecipients(", "requireContact(", "requireFinished(", "requireNotJustSent(", "audit(tenant, actor, siteId, \"PACK_EMAILED\""})
             assertTrue(body.indexOf(guard) > 0 && body.indexOf(guard) < mailCall, guard);
         assertFalse(body.contains("//ReportEmailRules") || body.contains("// ReportEmailRules") || body.contains("//audit") || body.contains("// audit"), "no check may be commented out");
         assertEquals(1, count(body, "mail.send("));
-        assertTrue(body.contains("for (Recipient r : to) mail.send(r.email()"));
+        assertTrue(body.contains("try { mail.send(r.email(), subject, html); }"));
+    }
+
+    @Test
+    void theEmailUsesTheSameAlarmWordingAsThePage() throws Exception {
+        String s = src("application/internal", "MonthlyPackEmailService.java");
+        assertTrue(s.contains("PackWording.alarms(p.alarms())"));
     }
 
     @Test

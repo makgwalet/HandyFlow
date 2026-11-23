@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { greeting, headline, isLate, punctualityLabel, shiftProgress, toneForCount } from './dashboard.logic'
+import { greeting, headline, isLate, limitedNote, punctualityLabel, shiftProgress, toneForCount } from './dashboard.logic'
 
 const item = (level: 'DANGER' | 'WARNING' | 'INFO') => ({ code: level, level, title: 't', detail: 'd', count: 1, section: 'guards' })
 
@@ -31,5 +31,15 @@ describe('dashboard rules', () => {
     expect(headline([item('INFO')])).toEqual({ tone: 'info', text: '1 coming up' })
     expect(headline([item('WARNING'), item('INFO')])).toEqual({ tone: 'warn', text: '1 to check' })
     expect(headline([item('DANGER'), item('DANGER'), item('WARNING')])).toEqual({ tone: 'bad', text: '2 urgent' })
+  })
+})
+
+describe('limitedNote', () => {
+  const wf = { totalGuards: 1, activeGuards: 1, psiraExpired: 0, psiraExpiring: 0, competenciesExpired: 0, competenciesExpiring: 0 }
+  it('says nothing when every figure is shown', () => expect(limitedNote({ workforce: wf, complaints: { open: 0, urgent: 0 } })).toBeNull())
+  it('explains when either company-wide figure is left out', () => {
+    expect(limitedNote({ workforce: null, complaints: null })).toMatch(/your sites only/)
+    expect(limitedNote({ workforce: wf, complaints: null })).toMatch(/your sites only/)
+    expect(limitedNote({ workforce: null, complaints: { open: 0, urgent: 0 } })).toMatch(/your sites only/)
   })
 })

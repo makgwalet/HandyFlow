@@ -173,13 +173,15 @@ interface GuardFormFieldsProps {
   capturePhoto: () => void
   stopCamera: () => void
   handleFileUpload: (e: React.ChangeEvent<HTMLInputElement>) => void
+  /** The ID number already on file when editing (shown as the hint, never sent back), or null when adding. */
+  existingIdNumber: string | null
 }
 
 function GuardFormFields({
   form, setForm, fieldErrors, setFieldErrors,
   capturedPhoto, setCapturedPhoto, photoMode,
   videoRef, canvasRef, startCamera, capturePhoto, stopCamera,
-  handleFileUpload,
+  handleFileUpload, existingIdNumber,
 }: GuardFormFieldsProps) {
   const idFeedback = validateSaId(form.idNumber)
   const inpSt = (key: string) => inputStyle(fieldErrors, key)
@@ -205,7 +207,7 @@ function GuardFormFields({
           <label style={lbl}>SA ID Number</label>
           <input value={form.idNumber}
             onChange={e => { setForm(f => ({ ...f, idNumber: e.target.value.replace(/\D/g, "").slice(0, 13) })); setFieldErrors(f => omit(f, "idNumber")) }}
-            placeholder={editing && editing.idNumber ? `${editing.idNumber} (leave blank to keep)` : "8501015026088"} inputMode="numeric" style={inpSt("idNumber")} />
+            placeholder={existingIdNumber ? `${existingIdNumber} (leave blank to keep)` : "8501015026088"} inputMode="numeric" style={inpSt("idNumber")} />
           <FieldError fieldErrors={fieldErrors} name="idNumber" />
           {form.idNumber.length === 13 && (
             idFeedback.valid ? (
@@ -751,7 +753,7 @@ export default function GuardsTab() {
             capturedPhoto={capturedPhoto} setCapturedPhoto={setCapturedPhoto}
             photoMode={photoMode} videoRef={videoRef} canvasRef={canvasRef}
             startCamera={startCamera} capturePhoto={capturePhoto} stopCamera={stopCamera}
-            handleFileUpload={handleFileUpload}
+            handleFileUpload={handleFileUpload} existingIdNumber={null}
           />
           {apiError && <ErrBanner msg={apiError} />}
           <Footer onCancel={closeAdd} onSubmit={() => handleSubmit(false)} loading={createGuard.isPending} label="Add Guard" />
@@ -765,7 +767,7 @@ export default function GuardsTab() {
             capturedPhoto={capturedPhoto} setCapturedPhoto={setCapturedPhoto}
             photoMode={photoMode} videoRef={videoRef} canvasRef={canvasRef}
             startCamera={startCamera} capturePhoto={capturePhoto} stopCamera={stopCamera}
-            handleFileUpload={handleFileUpload}
+            handleFileUpload={handleFileUpload} existingIdNumber={editing.idNumber ?? null}
           />
           {/* FIX (P0 backlog item 1.3) — see the enrollGuard mutation's own
               comment for the full context on why this exists. */}

@@ -1,4 +1,5 @@
 // Coverage board: wording and small rules. The server decides what is short; this only words and checks input.
+import { getCompanyZone } from "./companyZone"
 
 export interface CoverageGap { start: string; end: string; have: number; need: number }
 export interface CoverageRow {
@@ -16,7 +17,7 @@ export const DAY_CHOICES = [3, 7, 14]
 export function stateLabel(s: string): string { return STATE_LABEL[s] ?? s }
 
 export const hhmm = (iso: string): string =>
-  new Date(iso).toLocaleTimeString("en-ZA", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "Africa/Johannesburg" })
+  new Date(iso).toLocaleTimeString("en-ZA", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: getCompanyZone() })
 
 /** "06:00-18:00" in South African time. */
 export function rangeText(startIso: string, endIso: string): string { return `${hhmm(startIso)}–${hhmm(endIso)}` }

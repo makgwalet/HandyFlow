@@ -10,30 +10,42 @@ import java.time.ZoneId;
 /**
  * Pure payroll rules, so they can be tested without Spring or a database.
  *
- * Dates in a pay period are South African dates: a shift that starts at 01:00 on the 1st belongs to the period that contains the 1st, not to the month
+ * Dates in a pay period are dates in the company's zone (South Africa unless the company has set another): a shift that starts at 01:00 on the 1st belongs to the period that contains the 1st, not to the month
  * before (security audit 1.6; the period window used to be cut at UTC midnight, two hours early).
  */
 public final class PayrollRules {
 
-    public static final ZoneId ZONE = ZoneId.of("Africa/Johannesburg");
+    public static final ZoneId ZONE = za.co.handyflow.platform.shared.BusinessTime.DEFAULT_ZONE;
     public static final int DEFAULT_STANDARD_HOURS = 9;
 
     private PayrollRules() {}
 
     /** First instant of the period's first day, in South African time. */
-    public static Instant windowStart(LocalDate periodStart) {
-        return periodStart.atStartOfDay(ZONE).toInstant();
+    public static Instant windowStart(LocalDate periodStart) { return windowStart(periodStart, ZONE); }
+
+    /** First instant of the period's first day in the company's zone. */
+    public static Instant windowStart(LocalDate periodStart, ZoneId zone) {
+        return periodStart.atStartOfDay(zoneOr(zone)).toInstant();
     }
 
     /** First instant AFTER the period's last day, in South African time (exclusive end). */
-    public static Instant windowEnd(LocalDate periodEnd) {
-        return periodEnd.plusDays(1).atStartOfDay(ZONE).toInstant();
+    public static Instant windowEnd(LocalDate periodEnd) { return windowEnd(periodEnd, ZONE); }
+
+    /** First instant AFTER the period's last day in the company's zone (exclusive end). */
+    public static Instant windowEnd(LocalDate periodEnd, ZoneId zone) {
+        return periodEnd.plusDays(1).atStartOfDay(zoneOr(zone)).toInstant();
     }
 
     /** The South African calendar date a shift started on. */
-    public static LocalDate shiftDate(Instant startAt) {
-        return startAt.atZone(ZONE).toLocalDate();
+    public static LocalDate shiftDate(Instant startAt) { return shiftDate(startAt, ZONE); }
+
+    /** The calendar date a shift started on in the company's zone. */
+    public static LocalDate shiftDate(Instant startAt, ZoneId zone) {
+        return startAt.atZone(zoneOr(zone)).toLocalDate();
     }
+
+    /** A missing zone means South Africa, never the server's own zone. */
+    private static ZoneId zoneOr(ZoneId zone) { return zone == null ? ZONE : zone; }
 
     public record Split(BigDecimal regular, BigDecimal overtime) {}
 

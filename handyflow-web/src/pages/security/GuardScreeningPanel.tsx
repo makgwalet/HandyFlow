@@ -10,12 +10,13 @@ import { useSecurityAccess } from "./useSecurityAccess"
 import Chip from "../../components/ui/Chip"
 import EvidenceFiles from "./EvidenceFiles"
 import { SCREENING_REASONS, SCREENING_TYPES, screeningLabel, todayIso, type ScreeningItem } from "./guard360.logic"
+import { getCompanyZone, useCompanyZone } from "./companyZone"
 
 const card: React.CSSProperties = { background: "var(--hf-surface)", border: "1px solid var(--hf-border)", borderRadius: 12, padding: 16 }
 const input: React.CSSProperties = { padding: "8px 10px", border: "1px solid var(--hf-border)", borderRadius: 8, fontSize: 13, background: "var(--hf-surface)", color: "var(--hf-text-primary)", width: "100%", boxSizing: "border-box" }
 const btn: React.CSSProperties = { display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 12px", border: "1px solid var(--hf-border)", borderRadius: 9, background: "var(--hf-surface)", color: "var(--hf-text-secondary)", fontSize: 13, fontWeight: 600, cursor: "pointer" }
 const primary: React.CSSProperties = { ...btn, background: "var(--hf-accent)", color: "var(--hf-text-on-solid)", border: "none" }
-const fmt = (d: string | null) => d ? new Date(d.length === 10 ? d + "T00:00:00" : d).toLocaleDateString("en-ZA", { day: "numeric", month: "short", year: "numeric", timeZone: "Africa/Johannesburg" }) : "-"
+const fmt = (d: string | null) => d ? new Date(d.length === 10 ? d + "T00:00:00" : d).toLocaleDateString("en-ZA", { day: "numeric", month: "short", year: "numeric", timeZone: getCompanyZone() }) : "-"
 const errText = (e: any) => e?.response?.data?.message ?? "That did not work. Please try again."
 
 export function RequestScreening({ guardId, initial, onClose }: { guardId: string; initial?: { screeningType?: string; reason?: string; provider?: string | null }; onClose: () => void }) {
@@ -52,6 +53,7 @@ export function RequestScreening({ guardId, initial, onClose }: { guardId: strin
 }
 
 export default function GuardScreeningPanel({ guardId, record, canManage, onClose }: { guardId: string; record: ScreeningItem; canManage: boolean; onClose: () => void }) {
+  useCompanyZone()
   const qc = useQueryClient()
   const base = `/api/v1/security/guards/${guardId}/screening/${record.id}`
   const refresh = () => qc.invalidateQueries({ queryKey: ["guard-overview", guardId] })

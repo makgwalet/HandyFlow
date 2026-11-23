@@ -72,10 +72,17 @@ public class IncidentService {
     // ── Queries ───────────────────────────────────────────────────────────────
 
     @Transactional(readOnly = true)
+    public Page<IncidentResponse> getIncidents(TenantId tenantId, String status, String severity, Pageable pageable) {
+        return getIncidents(tenantId, status, severity, pageable, null);
+    }
+
+    /** `allowedSites` null = the whole company; otherwise only incidents at those sites (an empty set sees none). */
+    @Transactional(readOnly = true)
     public Page<IncidentResponse> getIncidents(TenantId tenantId,
                                                String status,
                                                String severity,
-                                               Pageable pageable) {
+                                               Pageable pageable,
+                                               java.util.Set<UUID> allowedSites) {
         String baseSelect = """
                 SELECT
                     i.id, i.site_id, ss.name AS site_name,
@@ -103,6 +110,9 @@ public class IncidentService {
             where.append(" AND i.severity = ?");
             params.add(severity.toUpperCase());
         }
+
+        where.append(SiteScopeRules.sqlFilter("i.site_id", allowedSites));
+        params.addAll(SiteScopeRules.sqlArgs(allowedSites));
 
         String orderBy = " ORDER BY i.created_at DESC";
         if (pageable.getSort().isSorted()) {

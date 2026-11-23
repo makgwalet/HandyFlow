@@ -47,14 +47,19 @@ public class PatrolOverviewService {
     private final PatrolRoundRepository roundRepository;
 
     @Transactional(readOnly = true)
-    public List<RoundRow> list(TenantId tenantId, Instant from, Instant to, UUID siteId, String status) {
+    public List<RoundRow> list(TenantId tenantId, Instant from, Instant to, UUID siteId, String status) { return list(tenantId, from, to, siteId, status, null); }
+
+    /** `allowed` null = the whole company; with no site chosen, a limited user sees the rounds at all their sites. */
+    @Transactional(readOnly = true)
+    public List<RoundRow> list(TenantId tenantId, Instant from, Instant to, UUID siteId, String status, Set<UUID> allowed) {
         if (from == null || to == null || !to.isAfter(from)) throw new HandyFlowException("'to' must be after 'from'", HttpStatus.BAD_REQUEST, "INVALID_RANGE");
         if (Duration.between(from, to).compareTo(MAX_RANGE) > 0) throw new HandyFlowException("Ask for at most " + MAX_RANGE.toDays() + " days at a time", HttpStatus.BAD_REQUEST, "RANGE_TOO_LONG");
         if (status != null && !status.isBlank() && !STATUSES.contains(status)) throw new HandyFlowException("Unknown status " + status, HttpStatus.BAD_REQUEST, "INVALID_STATUS");
 
         StringBuilder sql = new StringBuilder(ROW_SELECT).append(" WHERE r.tenant_id = ? AND r.expected_start_at >= ? AND r.expected_start_at < ?");
         List<Object> p = new ArrayList<>(List.of(tenantId.getValue(), Timestamp.from(from), Timestamp.from(to)));
-        if (siteId != null) { sql.append(" AND r.site_id = ?"); p.add(siteId); }
+        sql.append(SiteScopeRules.siteClause("r.site_id", siteId, allowed));
+        p.addAll(SiteScopeRules.siteArgs(siteId, allowed));
         if (status != null && !status.isBlank()) { sql.append(" AND r.status = ?"); p.add(status); }
         sql.append(" ORDER BY r.expected_start_at DESC, r.round_number LIMIT 500");
         return jdbc.query(sql.toString(), (rs, n) -> row(rs), p.toArray());

@@ -38,4 +38,14 @@ public interface RotationPatternRepository extends JpaRepository<RotationPattern
         ORDER BY p.name
         """)
     List<RotationPattern> findBySite(TenantId tenantId, UUID siteId);
+
+    /** The same list limited to some sites (a user whose access is limited). */
+    @Query("""
+        SELECT p FROM RotationPattern p
+        WHERE p.tenantId = :tenantId
+        AND p.active = true
+        AND p.siteId IN :siteIds
+        ORDER BY p.name
+        """)
+    Page<RotationPattern> findAllActiveInSites(TenantId tenantId, java.util.Collection<UUID> siteIds, Pageable pageable);
 }

@@ -1,0 +1,24 @@
+{
+  "baseUrl": "https://staging.example.com",
+  "login": { "tenantSlug": "loadtest-co", "email": "loadtest@example.com", "passwordEnv": "HF_LOAD_PASSWORD" },
+  "timeoutMs": 10000,
+  "thinkTimeMs": 200,
+  "stages": [
+    { "seconds": 30, "users": 5 },
+    { "seconds": 60, "users": 25 },
+    { "seconds": 60, "users": 50 }
+  ],
+  "scenarios": [
+    { "name": "my-site-scope", "method": "GET", "path": "/api/v1/security/my-site-scope", "weight": 5 },
+    { "name": "regions", "method": "GET", "path": "/api/v1/security/regions", "weight": 2 },
+    { "name": "sla-live", "method": "GET", "path": "/api/v1/security/sla/live", "weight": 3 },
+    { "name": "branches", "method": "GET", "path": "/api/v1/security/branches", "weight": 2 }
+  ],
+  "budgets": {
+    "overall": { "p95Ms": 800, "p99Ms": 2000, "maxErrorRate": 0.01, "minRps": 20 },
+    "scenarios": {
+      "my-site-scope": { "p95Ms": 300 },
+      "sla-live": { "p95Ms": 1000 }
+    }
+  }
+}

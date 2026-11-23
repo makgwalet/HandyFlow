@@ -1,0 +1,223 @@
+package za.co.handyflow.platform.config;
+
+import jakarta.servlet.FilterChain;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Component;
+import org.springframework.web.filter.OncePerRequestFilter;
+import za.co.handyflow.platform.shared.RateLimiter;
+
+import java.io.IOException;
+
+/**
+ * Applies RateLimiter to the specific public, unauthenticated endpoints
+ * that need it. See HandyFlow BOS Discovery doc, Section 19.3/20.1 for
+ * the fuller list of confirmed unauthenticated portals (Clinic, Projects,
+ * Desk Support, Recruiter, Creative) that should get the same treatment —
+ * adding another module's public path here is a one-line addition to
+ * LIMITS below, not a new mechanism.
+ * <p>
+ * UPDATED (Section 42/43): added the accountant client portal's own
+ * auth endpoints (/api/v1/accountant/portal/auth/register and
+ * .../login). These were found to be just as unauthenticated and
+ * brute-forceable as the main app's /api/v1/auth/** endpoints — same
+ * permitAll() exposure, same risk, just a different module's login form.
+ * Confirmed exact paths directly against AccountantPortalAuthController
+ * rather than guessed.
+ * <p>
+ * WHY THIS LIVES IN `config`, NOT `shared`: this filter needs to know
+ * about specific request paths belonging to other modules — that's
+ * exactly the kind of cross-cutting composition-root concern
+ * SecurityConfig already lives here for (see that class's own Javadoc
+ * from the SecurityConfig relocation earlier in this engagement).
+ * RateLimiter itself stays in `shared` because it's genuinely generic;
+ * only the "which paths get which limits" wiring belongs here.
+ * <p>
+ * CLIENT IP CAVEAT — IMPORTANT, READ BEFORE PUTTING THIS BEHIND A PROXY:
+ * this reads request.getRemoteAddr() directly, which is correct and safe
+ * ONLY as long as there is no reverse proxy/load balancer/WAF in front of
+ * the app (confirmed true for the current development environment as of
+ * this fix). The moment one is added, getRemoteAddr() will return the
+ * proxy's own IP for every request — collapsing every real client onto
+ * one shared rate-limit bucket (locking everyone out together) rather
+ * than limiting per real client. At that point this MUST switch to
+ * reading X-Forwarded-For (or the proxy's equivalent header), and that
+ * header must only be trusted when the request genuinely came through
+ * the known proxy — trusting X-Forwarded-For from the public internet
+ * directly lets any caller spoof their rate-limit identity. Flagging
+ * this explicitly now so it isn't forgotten when infra changes, per
+ * Q14's answer that no gateway exists yet.
+ */
+@Component
+@RequiredArgsConstructor
+public class RateLimitFilter extends OncePerRequestFilter {
+
+    private final RateLimiter rateLimiter;
+
+    /** Optional, so a hand-built filter in a test keeps working; without it the connection address is used, as before. */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private za.co.handyflow.platform.shared.ClientAddress clientAddress;
+
+    private String clientIp(HttpServletRequest request) {
+        return clientAddress != null ? clientAddress.rateKey(request) : request.getRemoteAddr();
+    }
+
+    // scope:path-prefix -> {maxRequests, windowMs}
+    private record Limit(String scope, String pathPrefix, int maxRequests, long windowMs) {}
+
+    private static final Limit[] LIMITS = {
+            // Main app registration: generous enough for a real user retrying
+            // a typo, tight enough to stop scripted mass signup against the
+            // free pilot.
+            new Limit("auth:register", "/api/v1/auth/register", 5, 60 * 60 * 1_000L),   // 5/hour
+
+            // Main app login: generous enough for a real user who mistypes a
+            // password a few times, tight enough to meaningfully slow
+            // brute-forcing.
+            new Limit("auth:login", "/api/v1/auth/login", 10, 10 * 60 * 1_000L),        // 10/10min
+
+            // Native app login and refresh (same brute-force exposure as the web login; a phone refreshes about hourly).
+            new Limit("auth:mobile-login", "/api/v1/auth/mobile/login", 10, 10 * 60 * 1_000L),
+            new Limit("auth:mobile-refresh", "/api/v1/auth/mobile/refresh", 60, 10 * 60 * 1_000L),
+
+            // Accountant client portal — invite-based registration. Tighter
+            // than main-app register() since this is invite-only (a
+            // legitimate user only ever calls this once, when accepting
+            // their invite) — no reason for repeated legitimate attempts the
+            // way a typo'd signup form might see.
+            new Limit("portal:register", "/api/v1/accountant/portal/auth/register", 5, 60 * 60 * 1_000L),
+
+            // Accountant client portal — login. Same limit as main-app login;
+            // same brute-force risk, just a different set of credentials.
+            new Limit("portal:login", "/api/v1/accountant/portal/auth/login", 10, 10 * 60 * 1_000L),
+            new Limit("payrollportal:register", "/api/v1/payroll-bureau/portal/auth/register", 5, 60 * 60 * 1_000L),
+            new Limit("payrollportal:login", "/api/v1/payroll-bureau/portal/auth/login", 10, 10 * 60 * 1_000L),
+
+            // FIX: same reasoning as the accountant/payroll-bureau
+            // portal limits above, applied to the four portals whose
+            // auth paths were just added to SecurityConfig's
+            // permitAll() — register is invite-only (5/hour is
+            // generous for a legitimate one-time accept), login gets
+            // the same brute-force-resistant ceiling as every other
+            // login endpoint in this file.
+            new Limit("whseportal:register", "/api/v1/warehousing/portal/auth/register", 5, 60 * 60 * 1_000L),
+            new Limit("whseportal:login", "/api/v1/warehousing/portal/auth/login", 10, 10 * 60 * 1_000L),
+            new Limit("supplierportal:register", "/api/v1/supplier/portal/auth/register", 5, 60 * 60 * 1_000L),
+            new Limit("supplierportal:login", "/api/v1/supplier/portal/auth/login", 10, 10 * 60 * 1_000L),
+            new Limit("fuelportal:register", "/api/v1/fuel/portal/auth/register", 5, 60 * 60 * 1_000L),
+            new Limit("fuelportal:login", "/api/v1/fuel/portal/auth/login", 10, 10 * 60 * 1_000L),
+            new Limit("trainprovportal:register", "/api/v1/training-provider/portal/auth/register", 5, 60 * 60 * 1_000L),
+            new Limit("trainprovportal:login", "/api/v1/training-provider/portal/auth/login", 10, 10 * 60 * 1_000L),
+            new Limit("fmportal:register", "/api/v1/facilitiesmanagement/portal/auth/register", 5, 60 * 60 * 1_000L),
+            new Limit("fmportal:login", "/api/v1/facilitiesmanagement/portal/auth/login", 10, 10 * 60 * 1_000L),
+            new Limit("recagencyportal:register", "/api/v1/recruitment-agency/portal/auth/register", 5, 60 * 60 * 1_000L),
+            new Limit("recagencyportal:login", "/api/v1/recruitment-agency/portal/auth/login", 10, 10 * 60 * 1_000L),
+            new Limit("propportal:register", "/api/v1/property/portal/auth/register", 5, 60 * 60 * 1_000L),
+            new Limit("propportal:login", "/api/v1/property/portal/auth/login", 10, 10 * 60 * 1_000L),
+            new Limit("pmportal:register", "/api/v1/project-client/portal/auth/register", 5, 60 * 60 * 1_000L),
+            new Limit("pmportal:login", "/api/v1/project-client/portal/auth/login", 10, 10 * 60 * 1_000L),
+            new Limit("pmportal:invite", "/api/v1/project-client/portal/auth/invite-info", 30, 10 * 60 * 1_000L),
+            new Limit("bkportal:register", "/api/v1/bookkeeping/portal/auth/register", 5, 60 * 60 * 1_000L),
+            new Limit("bkportal:login", "/api/v1/bookkeeping/portal/auth/login", 10, 10 * 60 * 1_000L),
+            new Limit("lpportal:register", "/api/v1/legal-practice/portal/auth/register-via-invite", 5, 60 * 60 * 1_000L),
+            new Limit("lpportal:login", "/api/v1/legal-practice/portal/auth/login", 10, 10 * 60 * 1_000L),
+            new Limit("hrportal:register", "/api/v1/hr/portal/auth/register", 5, 60 * 60 * 1_000L),
+            new Limit("hrportal:login", "/api/v1/hr/portal/auth/login", 10, 10 * 60 * 1_000L),
+            new Limit("auditorportal:register", "/api/v1/auditor/portal/auth/register", 5, 60 * 60 * 1_000L),
+            new Limit("auditorportal:login", "/api/v1/auditor/portal/auth/login", 10, 10 * 60 * 1_000L),
+            new Limit("collagencyportal:register", "/api/v1/collections-agency/portal/auth/register", 5, 60 * 60 * 1_000L),
+            new Limit("collagencyportal:login", "/api/v1/collections-agency/portal/auth/login", 10, 10 * 60 * 1_000L),
+            new Limit("bookingagencyportal:register", "/api/v1/booking-agency/portal/auth/register", 5, 60 * 60 * 1_000L),
+            new Limit("bookingagencyportal:login", "/api/v1/booking-agency/portal/auth/login", 10, 10 * 60 * 1_000L),
+
+            // FIX (guard device lockdown): a 6-digit code (1,000,000
+            // possibilities) is the sole scoping mechanism on this public
+            // endpoint — its 15-minute expiry is the primary defense, but
+            // rate limiting is a real secondary layer, tighter than a
+            // typical login limit since unlike a password this is a
+            // short, fixed-length numeric space genuinely worth slowing
+            // down further.
+            // Guard login: per-IP ceiling on top of the per-account PIN lockout. Generous (guards at one site share a
+            // NAT address) but stops one address cycling through many phone numbers / employee codes.
+            new Limit("guard:login", "/api/v1/auth/guard/login", 30, 10 * 60 * 1_000L),
+
+            new Limit("guard:activate-device", "/api/v1/auth/guard/activate-device", 5, 15 * 60 * 1_000L),
+
+            // NEW (identity module modernization): main-app invitation
+            // acceptance — just made reachable via SecurityConfig's
+            // permitAll() fix above. Same risk shape as
+            // "portal:register" (invite-only, a legitimate user only
+            // ever calls this once) rather than open registration, so
+            // the same 5/hour ceiling applies.
+            new Limit("identity:invitation-accept", "/api/v1/identity/invitations/accept", 5, 60 * 60 * 1_000L),
+
+            // Clinic document verification (patch 0193): public, and the code is the only secret, so guessing is slowed hard.
+            // The code has about 80 bits, so this is a second layer, not the main defence.
+            new Limit("clinic:document-verification", "/api/v1/public/clinic/document-verification", 30, 10 * 60 * 1_000L),
+
+            // Fleet telematics ingest (public, key authenticated). A provider may send often and in batches of up to 1,000 items, so this is
+            // generous; it is there to slow key guessing and runaway senders, not to meter normal traffic.
+            new Limit("fleet:telematics-ingest", "/api/v1/fleet/telematics/ingest", 300, 60 * 1_000L),
+
+            // Fuel pump/POS shift import (public, key authenticated). A site sends a few shifts a day; this slows key guessing and runaway senders.
+            new Limit("fuel:pos-import", "/api/v1/fuel/import/pos-shifts", 120, 60 * 1_000L),
+
+            // Fuel live pump transactions (public, key authenticated). Busier than shifts, since a site may send each sale; still slows key guessing.
+            new Limit("fuel:pos-transactions", "/api/v1/fuel/import/pos-transactions", 600, 60 * 1_000L),
+
+            // Fuel tank-gauge feed (public, key authenticated). A gauge system reports each tank every few minutes; this is generous enough for a depot and still slows key guessing.
+            new Limit("fuel:tank-gauge-import", "/api/v1/fuel/import/tank-gauges", 300, 60 * 1_000L),
+
+            // CRM lead capture (public, key authenticated). A busy website form is a few per minute; this slows key guessing and form-spam floods.
+            new Limit("crm:lead-capture", "/api/v1/public/crm/leads", 60, 60 * 1_000L),
+    };
+
+    // Public endpoints whose path carries an id or token, so an exact path cannot name them.
+    private record PatternLimit(String scope, java.util.regex.Pattern path, int maxRequests, long windowMs) {}
+
+    private static final PatternLimit[] PATTERN_LIMITS = {
+            // Careers page: submitting an application (a CV upload and an email to staff each time). A candidate may apply to several
+            // vacancies, and an office may share one address, so this is generous; it stops scripted floods.
+            new PatternLimit("recruiter:apply", java.util.regex.Pattern.compile("^/api/v1/recruiter/careers/[^/]+/jobs/[^/]+/apply$"), 20, 60 * 60 * 1_000L),
+            // Candidate tracking link: reading, updating the profile and CV, withdrawing.
+            new PatternLimit("recruiter:portal", java.util.regex.Pattern.compile("^/api/v1/recruiter/portal/[^/]+(/.*)?$"), 60, 10 * 60 * 1_000L),
+    };
+
+    @Override
+    protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response,
+                                    FilterChain filterChain) throws ServletException, IOException {
+        String path = request.getRequestURI();
+
+        for (Limit limit : LIMITS) {
+            if (path.equals(limit.pathPrefix())) {
+                String clientIp = clientIp(request); // see ClientAddress
+                String key = limit.scope() + ":" + clientIp;
+
+                if (!rateLimiter.tryConsume(key, limit.maxRequests(), limit.windowMs())) {
+                    response.setStatus(429); // HttpServletResponse has no TOO_MANY_REQUESTS constant pre-Servlet 6
+                    response.setContentType("application/json");
+                    response.getWriter().write(
+                            "{\"success\":false,\"message\":\"Too many requests — please try again shortly.\"}");
+                    return; // don't call filterChain.doFilter — request stops here
+                }
+                break;
+            }
+        }
+
+        for (PatternLimit limit : PATTERN_LIMITS) {
+            if (limit.path().matcher(path).matches()) {
+                if (!rateLimiter.tryConsume(limit.scope() + ":" + clientIp(request), limit.maxRequests(), limit.windowMs())) {
+                    response.setStatus(429);
+                    response.setContentType("application/json");
+                    response.getWriter().write("{\"success\":false,\"message\":\"Too many requests — please try again shortly.\"}");
+                    return;
+                }
+                break;
+            }
+        }
+
+        filterChain.doFilter(request, response);
+    }
+}

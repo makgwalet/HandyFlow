@@ -17,6 +17,7 @@ import {
   addDays, buildCells, clock, detectConflicts, fetchWindow, gridGuards, guardName, mondayOf, overHours, toInstants, weekDays, weekLabel, weeklyHours,
   CONFLICT_TONE, WEEKLY_HOURS_FLAG, type GridGuard, type GridShift,
 } from "./schedule.logic"
+import { useCompanyZone } from "./companyZone"
 
 const card: React.CSSProperties = { background: "var(--hf-surface)", border: "1px solid var(--hf-border)", borderRadius: 12 }
 const input: React.CSSProperties = { padding: "8px 10px", border: "1px solid var(--hf-border)", borderRadius: 8, fontSize: 13, background: "var(--hf-surface)", color: "var(--hf-text-primary)", width: "100%", boxSizing: "border-box" }
@@ -65,16 +66,19 @@ function AddShift({ guard, day, sites, onClose, onSaved }: { guard: GridGuard; d
 }
 
 export default function SchedulerTab() {
+  const { ready: zoneReady } = useCompanyZone()
   const qc = useQueryClient()
   const canManage = usePermission("SECURITY_MANAGE")
-  const [monday, setMonday] = useState(() => mondayOf(new Date()))
+  // The week the person picked, else this week in the company's zone (so a page that opened before the zone arrived does not keep the wrong week).
+  const [pickedMonday, setMonday] = useState<string | null>(null)
+  const monday = pickedMonday ?? mondayOf(new Date())
   const [siteId, setSiteId] = useState("")
   const [search, setSearch] = useState("")
   const [adding, setAdding] = useState<{ guard: GridGuard; day: string } | null>(null)
   const days = useMemo(() => weekDays(monday), [monday])
 
   const { data: shifts = [], isLoading, error } = useQuery<GridShift[]>({
-    queryKey: ["scheduler-shifts", monday],
+    queryKey: ["scheduler-shifts", monday], enabled: zoneReady,
     queryFn: async () => { const w = fetchWindow(monday); return unwrap(await apiClient.get(`/api/v1/security/shifts/range?from=${encodeURIComponent(w.from.toISOString())}&to=${encodeURIComponent(w.to.toISOString())}`)) },
   })
   const { data: guards = [] } = useQuery<GridGuard[]>({ queryKey: ["scheduler-guards"], queryFn: async () => unwrap(await getAllGuards()) })

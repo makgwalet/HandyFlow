@@ -2,6 +2,7 @@
 
 package za.co.handyflow.platform.security.api;
 
+import za.co.handyflow.platform.security.application.internal.SiteScopeService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -33,6 +34,39 @@ import java.util.UUID;
 @RequiredArgsConstructor
 @Tag(name = "Security - Shifts", description = "Shift scheduling and lifecycle management")
 public class ShiftController {
+    /** Optional so a hand-built controller still works; in the application it is always there. Limits a user to the sites in their scope. */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private za.co.handyflow.platform.security.application.internal.SiteScopeService scope;
+
+    /** A site outside the user's scope answers exactly like a site that does not exist. */
+    private void site(UUID siteId) {
+        za.co.handyflow.platform.security.application.internal.SiteScopeService.check(scope, TenantContext.getTenantIdAsObject(), TenantContext.getCurrentUserId(), siteId);
+    }
+
+    /** For a list whose site is optional: a user limited to some sites must name one of them, the whole company may leave it out. */
+    private void choice(UUID siteId) {
+        za.co.handyflow.platform.security.application.internal.SiteScopeService.checkChoice(scope, TenantContext.getTenantIdAsObject(), TenantContext.getCurrentUserId(), siteId);
+    }
+
+    /** For a view that spans every site and cannot be narrowed yet: only a user with the whole company may use it. */
+    private void wholeCompany() {
+        za.co.handyflow.platform.security.application.internal.SiteScopeService.checkUnrestricted(scope, TenantContext.getTenantIdAsObject(), TenantContext.getCurrentUserId());
+    }
+
+    /** The sites the user may see, or null for the whole company. */
+    private java.util.Set<UUID> allowed() {
+        return SiteScopeService.allowedSites(scope, TenantContext.getTenantIdAsObject(), TenantContext.getCurrentUserId());
+    }
+
+    /** A record that belongs to a site: one at a site outside the user's scope answers "not found". */
+    private void child(za.co.handyflow.platform.security.application.internal.SiteScopeService.Kind kind, UUID id) {
+        za.co.handyflow.platform.security.application.internal.SiteScopeService.checkChild(scope, TenantContext.getTenantIdAsObject(), TenantContext.getCurrentUserId(), kind, id);
+    }
+
+    /** For a site that is optional in the request: leaving it out means the whole company. */
+    private void optionalSite(UUID siteId) {
+        za.co.handyflow.platform.security.application.internal.SiteScopeService.checkOptionalSite(scope, TenantContext.getTenantIdAsObject(), TenantContext.getCurrentUserId(), siteId);
+    }
 
     private final ShiftService shiftService;
     private final FeatureGuard featureGuard;
@@ -43,8 +77,9 @@ public class ShiftController {
     public ResponseEntity<ApiResponse<Page<ShiftResponse>>> getShifts(
             @PageableDefault(size = 20) Pageable pageable) {
         featureGuard.requireModule("security");
+        java.util.Set<UUID> allowed = allowed();
         return ResponseEntity.ok(ApiResponse.success(
-                shiftService.getShifts(TenantContext.getTenantIdAsObject(), pageable)));
+                shiftService.getShifts(TenantContext.getTenantIdAsObject(), pageable, allowed)));
     }
 
     @GetMapping("/range")
@@ -53,8 +88,9 @@ public class ShiftController {
     public ResponseEntity<ApiResponse<java.util.List<ShiftResponse>>> getRange(
             @RequestParam java.time.Instant from, @RequestParam java.time.Instant to) {
         featureGuard.requireModule("security");
+        java.util.Set<UUID> allowed = allowed();
         return ResponseEntity.ok(ApiResponse.success(
-                shiftService.getRange(TenantContext.getTenantIdAsObject(), from, to)));
+                shiftService.getRange(TenantContext.getTenantIdAsObject(), from, to, allowed)));
     }
 
     @PostMapping
@@ -67,6 +103,7 @@ public class ShiftController {
     public ResponseEntity<ApiResponse<ShiftResponse>> createShift(
             @Valid @RequestBody CreateShiftRequest request) {
         featureGuard.requireModule("security");
+        site(request.siteId());
         var shift = shiftService.createShift(TenantContext.getTenantIdAsObject(), request);
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.success("Shift scheduled", shift));
@@ -91,6 +128,7 @@ public class ShiftController {
             @PathVariable UUID id,
             @RequestBody UpdateShiftRequest request) {
         featureGuard.requireModule("security");
+        child(SiteScopeService.Kind.SHIFT, id);
         return ResponseEntity.ok(ApiResponse.success("Shift updated",
                 shiftService.updateShift(TenantContext.getTenantIdAsObject(), id, request)));
     }
@@ -100,6 +138,7 @@ public class ShiftController {
     @Operation(summary = "Guard starts shift — SCHEDULED → ACTIVE")
     public ResponseEntity<ApiResponse<ShiftResponse>> startShift(@PathVariable UUID id) {
         featureGuard.requireModule("security");
+        child(SiteScopeService.Kind.SHIFT, id);
         return ResponseEntity.ok(ApiResponse.success("Shift started",
                 shiftService.startShift(TenantContext.getTenantIdAsObject(), id)));
     }
@@ -113,6 +152,7 @@ public class ShiftController {
     )
     public ResponseEntity<ApiResponse<ShiftResponse>> completeShift(@PathVariable UUID id) {
         featureGuard.requireModule("security");
+        child(SiteScopeService.Kind.SHIFT, id);
         return ResponseEntity.ok(ApiResponse.success("Shift completed",
                 shiftService.completeShift(TenantContext.getTenantIdAsObject(), id)));
     }
@@ -130,6 +170,7 @@ public class ShiftController {
             @PathVariable UUID id,
             @Valid @RequestBody ShiftSupervisorActionRequest request) {
         featureGuard.requireModule("security");
+        child(SiteScopeService.Kind.SHIFT, id);
         UUID supervisorId = TenantContext.getCurrentUserId();
         return ResponseEntity.ok(ApiResponse.success("Shift cancelled",
                 shiftService.cancelShift(TenantContext.getTenantIdAsObject(), id, supervisorId, request)));
@@ -146,6 +187,7 @@ public class ShiftController {
             @PathVariable UUID id,
             @Valid @RequestBody ShiftSupervisorActionRequest request) {
         featureGuard.requireModule("security");
+        child(SiteScopeService.Kind.SHIFT, id);
         UUID supervisorId = TenantContext.getCurrentUserId();
         return ResponseEntity.ok(ApiResponse.success("No-show dismissed",
                 shiftService.dismissNoShow(TenantContext.getTenantIdAsObject(), id, supervisorId, request)));
@@ -162,6 +204,7 @@ public class ShiftController {
             @PathVariable UUID id,
             @Valid @RequestBody ShiftSupervisorActionRequest request) {
         featureGuard.requireModule("security");
+        child(SiteScopeService.Kind.SHIFT, id);
         UUID supervisorId = TenantContext.getCurrentUserId();
         return ResponseEntity.ok(ApiResponse.success("Overtime shift closed",
                 shiftService.forceCloseOvertime(TenantContext.getTenantIdAsObject(), id, supervisorId, request)));
@@ -178,6 +221,7 @@ public class ShiftController {
             @PathVariable UUID id,
             @Valid @RequestBody ShiftSupervisorActionRequest request) {
         featureGuard.requireModule("security");
+        child(SiteScopeService.Kind.SHIFT, id);
         UUID supervisorId = TenantContext.getCurrentUserId();
         return ResponseEntity.ok(ApiResponse.success("Guard pulled from site",
                 shiftService.pullFromSite(TenantContext.getTenantIdAsObject(), id, supervisorId, request)));

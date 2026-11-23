@@ -78,6 +78,10 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class ArmouryService {
 
+    /** Optional so a service built by hand (tests) still works; without it the South African default zone is used, never the server's. */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private za.co.handyflow.platform.shared.BusinessCalendar calendar;
+
     private final ArmouryRepository    armouryRepository;
     private final ArmouryLogRepository logRepository;
     private final GuardRepository      guardRepository;
@@ -266,7 +270,7 @@ public class ArmouryService {
         }
         checkCompetency(tenantId, receivingGuard, firearm);
 
-        String psiraProblem = IssueChecks.psira(java.time.LocalDate.now(),
+        String psiraProblem = IssueChecks.psira(za.co.handyflow.platform.shared.BusinessCalendar.todayOf(calendar, tenantId),
                 receivingGuard.getPsiraNumber(), receivingGuard.getPsiraExpiryDate());
         if (psiraProblem != null) {
             throw new HandyFlowException(
@@ -418,7 +422,7 @@ public class ArmouryService {
                         .toList();
         String category = CompetencyChecks.categoryOf(firearm.getFirearmType());
         String problem = CompetencyChecks.check(category, certs, guard.hasFirearmCompetency(), strictCompetency,
-                java.time.LocalDate.now());
+                za.co.handyflow.platform.shared.BusinessCalendar.todayOf(calendar, tenantId));
         if (problem == null) return;
         String what = category == null ? "firearm" : category.toLowerCase();
         throw new HandyFlowException(problem.equals("NO_COMPETENCY_FOR_CATEGORY")

@@ -2,9 +2,11 @@ import { afterEach, beforeEach, describe, it, expect, vi } from "vitest"
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react"
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 
-const api = vi.hoisted(() => ({ get: vi.fn() }))
+const api = vi.hoisted(() => ({ get: vi.fn(), put: vi.fn() }))
 vi.mock("../../api/client", () => ({ apiClient: api }))
 
+import { useAuthStore } from "../../store/auth.store"
+vi.mock("./companyZone", async orig => ({ ...(await orig<typeof import("./companyZone")>()), useCompanyZone: () => ({ zone: "Africa/Johannesburg", ready: true }) }))
 import WeeklyHoursPanel from "./WeeklyHoursPanel"
 
 const T = { warnAt: 40, limit: 45, ceiling: 55, minRestHours: 12 }
@@ -16,7 +18,7 @@ function show() {
 }
 
 describe("WeeklyHoursPanel", () => {
-  beforeEach(() => { api.get.mockReset() })
+  beforeEach(() => { api.get.mockReset(); api.put.mockReset(); useAuthStore.setState({ user: { permissions: [] } } as never) })
   afterEach(() => cleanup())
 
   it("lists flagged guards with hours, status and problems", async () => {
@@ -84,5 +86,55 @@ describe("WeeklyHoursPanel", () => {
     api.get.mockResolvedValue(report([row({ guardName: null })]))
     show()
     expect(await screen.findByText("Unknown guard")).toBeTruthy()
+  })
+
+  const serveManager = (rows: unknown[], policies: unknown[] = [{ category: "DEFAULT", effectiveFrom: "2020-01-01", ordinaryWeekly: 45, maxOvertimeWeekly: 10, maxDaily: 12, minRestHours: 12 }, { category: "NIGHT", effectiveFrom: "2020-01-01", ordinaryWeekly: 48, maxOvertimeWeekly: 12, maxDaily: 12, minRestHours: 12 }]) => {
+    useAuthStore.setState({ user: { permissions: ["SECURITY_MANAGE"] } } as never)
+    api.get.mockImplementation((url: string) => url.includes("working-time-policies") ? Promise.resolve({ data: { data: policies } }) : Promise.resolve(report(rows)))
+  }
+
+  it("shows each guard's category and judges them by their own limit", async () => {
+    api.get.mockResolvedValue(report([row({ category: "NIGHT", limit: 48, ceiling: 60, hours: 50 })]))
+    show()
+    expect(await screen.findByText("Over 48 h")).toBeTruthy()
+    expect(screen.getByText("NIGHT")).toBeTruthy()
+  })
+
+  it("lists a day over the daily limit as a problem", async () => {
+    api.get.mockResolvedValue(report([row({ state: "OK", hours: 30, dayBreaches: [{ day: "2026-11-17", hours: 14 }] })]))
+    show()
+    expect(await screen.findByText(/14 h rostered on Tue/)).toBeTruthy()
+  })
+
+  it("lets a manager change a guard's category and refreshes the list", async () => {
+    serveManager([row({ category: "DEFAULT" })])
+    api.put.mockResolvedValue({ data: {} })
+    show()
+    const sel = await screen.findByLabelText("Category for Thabo Mokoena") as HTMLSelectElement
+    expect(sel.value).toBe("DEFAULT")
+    await waitFor(() => expect(Array.from(sel.options).map(o => o.value)).toEqual(["DEFAULT", "NIGHT"]))
+    fireEvent.change(sel, { target: { value: "NIGHT" } })
+    await waitFor(() => expect(api.put).toHaveBeenCalledTimes(1))
+    expect(api.put.mock.calls[0][0]).toBe("/api/v1/security/guards/g1/working-time-category")
+    expect(api.put.mock.calls[0][1]).toEqual({ category: "NIGHT" })
+    await waitFor(() => expect(api.get.mock.calls.filter(c => String(c[0]).includes("weekly-hours")).length).toBeGreaterThan(1))
+  })
+
+  it("shows the server's reason when the category is refused", async () => {
+    serveManager([row()])
+    api.put.mockImplementation(() => Promise.reject({ response: { data: { message: "No policy exists for that category yet. Add one first" } } }))
+    show()
+    const sel = await screen.findByLabelText("Category for Thabo Mokoena") as HTMLSelectElement
+    await waitFor(() => expect(sel.options.length).toBe(2))
+    fireEvent.change(sel, { target: { value: "NIGHT" } })
+    await waitFor(() => expect(screen.getByRole("alert").textContent).toContain("Add one first"))
+  })
+
+  it("gives people without manage permission no way to change a category", async () => {
+    api.get.mockResolvedValue(report([row()]))
+    show()
+    await screen.findByText("Thabo Mokoena")
+    expect(screen.queryByLabelText(/Category for/)).toBeNull()
+    expect(api.get.mock.calls.some(c => String(c[0]).includes("working-time-policies"))).toBe(false)
   })
 })

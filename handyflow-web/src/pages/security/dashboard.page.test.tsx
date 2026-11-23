@@ -70,6 +70,25 @@ describe('SecurityDashboard', () => {
     expect(screen.getByText('No open incidents.')).toBeTruthy()
   })
 
+  it('for a user limited to some sites, leaves out the guard and complaint figures instead of showing zeros', async () => {
+    api.get.mockResolvedValue({ data: { data: data({ workforce: null, complaints: null }) } })
+    renderDash()
+    expect((await screen.findAllByText('Open incidents')).length).toBeGreaterThan(0)
+    expect(screen.queryByText('Open complaints')).toBeNull()
+    expect(screen.queryByLabelText('Workforce')).toBeNull()
+    expect(screen.queryByText('PSiRA expired')).toBeNull()
+    expect(screen.getByRole('status').textContent).toMatch(/Figures are for your sites only/)
+    expect(screen.getByText('Guards on duty')).toBeTruthy()
+  })
+
+  it('shows the complaint tile and workforce panel, and no limited note, for the whole company', async () => {
+    api.get.mockResolvedValue({ data: { data: data() } })
+    renderDash()
+    expect(await screen.findByText('Open complaints')).toBeTruthy()
+    expect(screen.getByLabelText('Workforce')).toBeTruthy()
+    expect(screen.queryByText(/Figures are for your sites only/)).toBeNull()
+  })
+
   it('shows an error with a retry when the dashboard cannot load', async () => {
     api.get.mockRejectedValue(new Error('boom'))
     renderDash()

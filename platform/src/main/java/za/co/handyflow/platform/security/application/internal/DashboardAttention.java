@@ -36,9 +36,10 @@ public final class DashboardAttention {
                 "Not yet resolved. Open the incident to act on it.", incidents.criticalOpen(), "incidents");
         add(out, "ALARMS", newAlarms > 0 ? "DANGER" : "WARNING", plural(openAlarms, "alarm") + " in the control room queue",
                 newAlarms > 0 ? newAlarms + " not yet triaged." : "Triaged or dispatched, not yet resolved.", openAlarms, "control-room");
-        add(out, "PSIRA_EXPIRED", "DANGER", plural(workforce.psiraExpired(), "guard") + " with an expired PSiRA registration",
+        // Workforce and complaints are not about one site: they are null for a user limited to some sites and are left out, not shown as zero.
+        if (workforce != null) add(out, "PSIRA_EXPIRED", "DANGER", plural(workforce.psiraExpired(), "guard") + " with an expired PSiRA registration",
                 "An expired registration means the guard may not work.", workforce.psiraExpired(), "guards");
-        add(out, "URGENT_COMPLAINTS", "DANGER", plural(complaints.urgent(), "urgent complaint") + " open",
+        if (complaints != null) add(out, "URGENT_COMPLAINTS", "DANGER", plural(complaints.urgent(), "urgent complaint") + " open",
                 "Critical, or in an urgent category such as theft or excessive force.", complaints.urgent(), "complaints");
         add(out, "COVERAGE_NONE", "DANGER", plural(postsUncovered, "post") + " with no one rostered today",
                 "A post that must be staffed has no guard on the roster. Open Coverage to see which.", postsUncovered, "coverage");
@@ -57,12 +58,14 @@ public final class DashboardAttention {
                 "Reported, and nobody has taken it on.", incidents.unacknowledged(), "incidents");
         add(out, "OVERSTAYED", "WARNING", plural(gate.overstayed(), "visitor") + " overstayed on site",
                 "Past the expected departure time.", gate.overstayed(), "gate-dashboard");
-        add(out, "PSIRA_EXPIRING", "WARNING", plural(workforce.psiraExpiring(), "PSiRA registration") + " expiring within 30 days",
-                "Renew before they lapse.", workforce.psiraExpiring(), "guards");
-        add(out, "COMPETENCIES_EXPIRED", "WARNING", plural(workforce.competenciesExpired(), "required competency", "required competencies") + " expired",
-                "Firearm competency, first aid and similar certificates marked as required.", workforce.competenciesExpired(), "guards");
-        add(out, "COMPETENCIES_EXPIRING", "INFO", plural(workforce.competenciesExpiring(), "required competency", "required competencies") + " expiring within 30 days",
-                "Book the renewals.", workforce.competenciesExpiring(), "guards");
+        if (workforce != null) {
+            add(out, "PSIRA_EXPIRING", "WARNING", plural(workforce.psiraExpiring(), "PSiRA registration") + " expiring within 30 days",
+                    "Renew before they lapse.", workforce.psiraExpiring(), "guards");
+            add(out, "COMPETENCIES_EXPIRED", "WARNING", plural(workforce.competenciesExpired(), "required competency", "required competencies") + " expired",
+                    "Firearm competency, first aid and similar certificates marked as required.", workforce.competenciesExpired(), "guards");
+            add(out, "COMPETENCIES_EXPIRING", "INFO", plural(workforce.competenciesExpiring(), "required competency", "required competencies") + " expiring within 30 days",
+                    "Book the renewals.", workforce.competenciesExpiring(), "guards");
+        }
         // Stable: the order above is the tie-break within a level and count.
         out.sort(Comparator.comparingInt((AttentionItem i) -> rank(i.level())).thenComparing(Comparator.comparingInt(AttentionItem::count).reversed()));
         return List.copyOf(out);

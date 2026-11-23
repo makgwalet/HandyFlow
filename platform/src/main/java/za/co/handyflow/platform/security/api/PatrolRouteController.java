@@ -2,6 +2,7 @@
 
 package za.co.handyflow.platform.security.api;
 
+import za.co.handyflow.platform.security.application.internal.SiteScopeService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -47,6 +48,35 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class PatrolRouteController {
 
+    /** Optional so a hand-built controller still works; in the application it is always there. Limits a user to the sites in their scope. */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private za.co.handyflow.platform.security.application.internal.SiteScopeService scope;
+
+    /** A site outside the user's scope answers exactly like a site that does not exist. */
+    private void site(UUID siteId) {
+        za.co.handyflow.platform.security.application.internal.SiteScopeService.check(scope, TenantContext.getTenantIdAsObject(), TenantContext.getCurrentUserId(), siteId);
+    }
+
+    /** For a list whose site is optional: a user limited to some sites must name one of them, the whole company may leave it out. */
+    private void choice(UUID siteId) {
+        za.co.handyflow.platform.security.application.internal.SiteScopeService.checkChoice(scope, TenantContext.getTenantIdAsObject(), TenantContext.getCurrentUserId(), siteId);
+    }
+
+    /** For a view that spans every site and cannot be narrowed yet: only a user with the whole company may use it. */
+    private void wholeCompany() {
+        za.co.handyflow.platform.security.application.internal.SiteScopeService.checkUnrestricted(scope, TenantContext.getTenantIdAsObject(), TenantContext.getCurrentUserId());
+    }
+
+    /** A record that belongs to a site: one at a site outside the user's scope answers "not found". */
+    private void child(za.co.handyflow.platform.security.application.internal.SiteScopeService.Kind kind, UUID id) {
+        za.co.handyflow.platform.security.application.internal.SiteScopeService.checkChild(scope, TenantContext.getTenantIdAsObject(), TenantContext.getCurrentUserId(), kind, id);
+    }
+
+    /** For a site that is optional in the request: leaving it out means the whole company. */
+    private void optionalSite(UUID siteId) {
+        za.co.handyflow.platform.security.application.internal.SiteScopeService.checkOptionalSite(scope, TenantContext.getTenantIdAsObject(), TenantContext.getCurrentUserId(), siteId);
+    }
+
     private final PatrolRoundService patrolRoundService;
 
     // ── Route CRUD ─────────────────────────────────────────────────────────────
@@ -56,6 +86,7 @@ public class PatrolRouteController {
     @Operation(summary = "List active patrol routes for a site")
     public ResponseEntity<ApiResponse<List<PatrolRoute>>> getRoutesForSite(
             @RequestParam UUID siteId) {
+        site(siteId);
         TenantId tenantId = TenantContext.getTenantIdAsObject();
         return ResponseEntity.ok(ApiResponse.success(
                 patrolRoundService.getRoutesForSite(tenantId, siteId)));
@@ -74,6 +105,7 @@ public class PatrolRouteController {
             """)
     public ResponseEntity<ApiResponse<PatrolRoute>> createRoute(
             @Valid @RequestBody CreatePatrolRouteRequest req) {
+        site(req.siteId());
         TenantId tenantId = TenantContext.getTenantIdAsObject();
         PatrolRoute route = patrolRoundService.createRoute(
                 tenantId, req.siteId(), req.name(),
@@ -90,6 +122,7 @@ public class PatrolRouteController {
     public ResponseEntity<ApiResponse<Void>> addCheckpointToRoute(
             @PathVariable UUID routeId,
             @Valid @RequestBody AddRouteCheckpointRequest req) {
+        child(SiteScopeService.Kind.PATROL_ROUTE, routeId);
         patrolRoundService.addCheckpointToRoute(routeId, req.checkpointId(), req.sequence());
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(null));
     }
@@ -109,6 +142,7 @@ public class PatrolRouteController {
             """)
     public ResponseEntity<ApiResponse<List<PatrolRound>>> getRoundsForShift(
             @RequestParam UUID shiftId) {
+        child(SiteScopeService.Kind.SHIFT, shiftId);
         return ResponseEntity.ok(ApiResponse.success(
                 patrolRoundService.getRoundsForShift(TenantContext.getTenantIdAsObject(), shiftId)));
     }

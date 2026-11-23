@@ -42,12 +42,26 @@ public class ArmouryController {
     private final ArmouryService    armouryService;
     private final ArmouryPdfService armouryPdfService;
 
+
+    /** Optional so a controller built by hand still works; in the application it is always there. */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private za.co.handyflow.platform.security.application.internal.SiteScopeService scope;
+
+
+    /** Only a user with access to the whole company may use this: the records are not tied to one site. */
+    private void wholeCompany() {
+        za.co.handyflow.platform.security.application.internal.SiteScopeService.checkUnrestricted(scope, TenantContext.getTenantIdAsObject(), TenantContext.getCurrentUserId());
+    }
+
+
+
     // ── Register CRUD ──────────────────────────────────────────────────────────
 
     @GetMapping
     @PreAuthorize("hasAuthority('SECURITY_READ')")
     @Operation(summary = "List all active (non-decommissioned) firearms")
     public ResponseEntity<ApiResponse<Page<ArmouryResponse>>> getAll(Pageable pageable) {
+        wholeCompany();
         TenantId tenantId = TenantContext.getTenantIdAsObject();
         return ResponseEntity.ok(ApiResponse.success(armouryService.getAll(tenantId, pageable)));
     }
@@ -56,6 +70,7 @@ public class ArmouryController {
     @PreAuthorize("hasAuthority('SECURITY_READ')")
     @Operation(summary = "Get a single firearm's current record")
     public ResponseEntity<ApiResponse<ArmouryResponse>> getById(@PathVariable UUID id) {
+        wholeCompany();
         TenantId tenantId = TenantContext.getTenantIdAsObject();
         return ResponseEntity.ok(ApiResponse.success(armouryService.getById(tenantId, id)));
     }
@@ -68,6 +83,7 @@ public class ArmouryController {
                     "mandatory — issue() hard-blocks once it passes.")
     public ResponseEntity<ApiResponse<ArmouryResponse>> register(
             @Valid @RequestBody RegisterFirearmRequest req) {
+        wholeCompany();
         TenantId tenantId = TenantContext.getTenantIdAsObject();
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.success(armouryService.register(tenantId, req)));
@@ -79,6 +95,7 @@ public class ArmouryController {
     public ResponseEntity<ApiResponse<ArmouryResponse>> updateLicense(
             @PathVariable UUID id,
             @Valid @RequestBody UpdateFirearmLicenseRequest req) {
+        wholeCompany();
         TenantId tenantId = TenantContext.getTenantIdAsObject();
         return ResponseEntity.ok(ApiResponse.success(
                 armouryService.updateLicense(tenantId, id, req)));
@@ -90,6 +107,7 @@ public class ArmouryController {
     public ResponseEntity<ApiResponse<ArmouryResponse>> recordService(
             @PathVariable UUID id,
             @Valid @RequestBody ServiceFirearmRequest req) {
+        wholeCompany();
         TenantId tenantId = TenantContext.getTenantIdAsObject();
         return ResponseEntity.ok(ApiResponse.success(
                 armouryService.recordService(tenantId, id, req)));
@@ -101,6 +119,7 @@ public class ArmouryController {
     public ResponseEntity<ApiResponse<ArmouryResponse>> recordSapsCase(
             @PathVariable UUID id,
             @Valid @RequestBody RecordSapsCaseRequest req) {
+        wholeCompany();
         TenantId tenantId = TenantContext.getTenantIdAsObject();
         return ResponseEntity.ok(ApiResponse.success(
                 armouryService.recordSapsCase(tenantId, id, req, TenantContext.getCurrentUserId())));
@@ -115,6 +134,7 @@ public class ArmouryController {
     public ResponseEntity<ApiResponse<ArmouryResponse>> reportLost(
             @PathVariable UUID id,
             @Valid @RequestBody ReportLostFirearmRequest req) {
+        wholeCompany();
         TenantId tenantId = TenantContext.getTenantIdAsObject();
         return ResponseEntity.ok(ApiResponse.success(
                 armouryService.reportLost(tenantId, id, req, TenantContext.getCurrentUserId())));
@@ -128,6 +148,7 @@ public class ArmouryController {
     public ResponseEntity<ApiResponse<ArmouryResponse>> decommission(
             @PathVariable UUID id,
             @Valid @RequestBody DecommissionFirearmRequest req) {
+        wholeCompany();
         TenantId tenantId = TenantContext.getTenantIdAsObject();
         return ResponseEntity.ok(ApiResponse.success(
                 armouryService.decommission(tenantId, id, req)));
@@ -151,6 +172,7 @@ public class ArmouryController {
     public ResponseEntity<ApiResponse<ArmouryResponse>> issue(
             @PathVariable UUID id,
             @Valid @RequestBody IssueFirearmRequest req) {
+        wholeCompany();
         TenantId tenantId = TenantContext.getTenantIdAsObject();
         return ResponseEntity.ok(ApiResponse.success(
                 armouryService.issue(tenantId, id, req, TenantContext.getCurrentUserId())));
@@ -162,6 +184,7 @@ public class ArmouryController {
     public ResponseEntity<ApiResponse<ArmouryResponse>> returnFirearm(
             @PathVariable UUID id,
             @Valid @RequestBody ReturnFirearmRequest req) {
+        wholeCompany();
         TenantId tenantId = TenantContext.getTenantIdAsObject();
         return ResponseEntity.ok(ApiResponse.success(
                 armouryService.returnFirearm(tenantId, id, req, TenantContext.getCurrentUserId())));
@@ -175,6 +198,7 @@ public class ArmouryController {
             description = "Immutable audit trail — every event, witness, and timestamp " +
                     "since the firearm was registered.")
     public ResponseEntity<ApiResponse<List<ArmouryLog>>> getHistory(@PathVariable UUID id) {
+        wholeCompany();
         TenantId tenantId = TenantContext.getTenantIdAsObject();
         return ResponseEntity.ok(ApiResponse.success(
                 armouryService.getHistory(tenantId, id)));
@@ -188,6 +212,7 @@ public class ArmouryController {
                     "branded with the tenant's logo/company name — the kind of document a " +
                     "SAPS Firearms Control Act audit would ask for.")
     public ResponseEntity<byte[]> getHistoryPdf(@PathVariable UUID id) {
+        wholeCompany();
         TenantId tenantId = TenantContext.getTenantIdAsObject();
         ArmouryResponse firearm = armouryService.getById(tenantId, id);
         List<ArmouryLog> history = armouryService.getHistory(tenantId, id);
@@ -201,6 +226,7 @@ public class ArmouryController {
     @Operation(summary = "Firearms currently issued to a specific guard")
     public ResponseEntity<ApiResponse<List<ArmouryResponse>>> getIssuedToGuard(
             @PathVariable UUID guardId) {
+        wholeCompany();
         TenantId tenantId = TenantContext.getTenantIdAsObject();
         return ResponseEntity.ok(ApiResponse.success(
                 armouryService.getIssuedToGuard(tenantId, guardId)));
@@ -217,6 +243,7 @@ public class ArmouryController {
     public ResponseEntity<ApiResponse<Void>> setGuardCompetency(
             @PathVariable UUID guardId,
             @Valid @RequestBody SetFirearmCompetencyRequest req) {
+        wholeCompany();
         TenantId tenantId = TenantContext.getTenantIdAsObject();
         armouryService.setGuardCompetency(tenantId, guardId, req);
         return ResponseEntity.ok(ApiResponse.success(null));

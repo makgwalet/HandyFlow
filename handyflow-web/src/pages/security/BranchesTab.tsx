@@ -3,6 +3,10 @@ import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import { GitBranch, Plus, Pencil, Trash2, AlertTriangle, MapPin } from "lucide-react"
+import RegionsPanel from "./RegionsPanel"
+import type { RegionInfo } from "./regionAccessLogic"
+import { moveWarning, regionOfBranch } from "./regionsLogic"
+import { accessErrorText } from "./siteScopeLogic"
 
 interface Branch {
   id: string; tenantId: string; name: string
@@ -14,14 +18,12 @@ const inp = { width:"100%", padding:"8px 12px", borderRadius:8, border:"1px soli
 const btn = (bg: string, color="var(--hf-text-on-solid)") => ({ padding:"8px 16px", borderRadius:8, border:"none", background:bg, color, fontSize:13, cursor:"pointer", fontWeight:600 as const })
 const sbtn = { padding:"8px 16px", borderRadius:8, border:"1px solid var(--hf-border)", background:"var(--hf-surface)", fontSize:13, cursor:"pointer", color:"var(--hf-text-secondary)" as const }
 
-const ZA_REGIONS = ["Gauteng","Western Cape","KwaZulu-Natal","Eastern Cape","Limpopo","Mpumalanga","North West","Free State","Northern Cape"]
-
 export default function BranchesTab() {
   const qc = useQueryClient()
   const [view, setView] = useState<"list"|"create"|"edit">("list")
   const [editing, setEditing] = useState<Branch | null>(null)
   const [err, setErr] = useState("")
-  const [form, setForm] = useState({ name:"", region:"", description:"" })
+  const [form, setForm] = useState({ name:"", regionId:"", description:"" })
 
   const { data: branches = [], isLoading } = useQuery<Branch[]>({
     queryKey: ["branches"],
@@ -31,38 +33,54 @@ export default function BranchesTab() {
     },
   })
 
+  const { data: regions = [] } = useQuery<RegionInfo[]>({
+    queryKey: ["security-regions"],
+    queryFn: async () => {
+      const r = await apiClient.get("/api/v1/security/regions")
+      const p = r.data?.data ?? r.data
+      return Array.isArray(p) ? p as RegionInfo[] : []
+    },
+  })
+
+  const refresh = () => { qc.invalidateQueries({queryKey:["branches"]}); qc.invalidateQueries({queryKey:["security-branches"]}); qc.invalidateQueries({queryKey:["security-regions"]}); qc.invalidateQueries({queryKey:["site-access-overview"]}); qc.invalidateQueries({queryKey:["my-site-scope"]}) }
+  const regionName = (id: string) => regions.find(r => r.id === id)?.name ?? ""
+
+  // The branch is saved first, then put in (or taken out of) its region. The branch's text label follows its region on the server.
   const createMut = useMutation({
-    mutationFn: (b: object) => apiClient.post("/api/v1/security/branches", b),
-    onSuccess: () => { qc.invalidateQueries({queryKey:["branches"]}); setView("list"); setErr("") },
-    onError: (e: any) => setErr(e.response?.data?.message ?? "Failed to create branch"),
+    mutationFn: async (f: typeof form) => {
+      const r = await apiClient.post("/api/v1/security/branches", { name: f.name, region: regionName(f.regionId), description: f.description })
+      const id = (r.data?.data ?? r.data)?.id as string | undefined
+      if (f.regionId && id) await apiClient.put(`/api/v1/security/branches/${id}/region`, { regionId: f.regionId })
+      return r
+    },
+    onSuccess: () => { refresh(); setView("list"); setErr("") },
+    onError: (e: unknown) => { refresh(); setErr(accessErrorText(e, "Failed to create branch")) },
   })
   const updateMut = useMutation({
-    mutationFn: ({id, ...b}: any) => apiClient.put(`/api/v1/security/branches/${id}`, b),
-    onSuccess: () => { qc.invalidateQueries({queryKey:["branches"]}); setView("list"); setErr("") },
-    onError: (e: any) => setErr(e.response?.data?.message ?? "Failed to update branch"),
+    mutationFn: async (v: { id: string; form: typeof form; before: string }) => {
+      await apiClient.put(`/api/v1/security/branches/${v.id}`, { name: v.form.name, region: regionName(v.form.regionId), description: v.form.description })
+      if (v.form.regionId !== v.before) await apiClient.put(`/api/v1/security/branches/${v.id}/region`, { regionId: v.form.regionId || null })
+    },
+    onSuccess: () => { refresh(); setView("list"); setErr("") },
+    onError: (e: unknown) => { refresh(); setErr(accessErrorText(e, "Failed to update branch")) },
   })
   const deleteMut = useMutation({
     mutationFn: (id: string) => apiClient.delete(`/api/v1/security/branches/${id}`),
-    onSuccess: () => { qc.invalidateQueries({queryKey:["branches"]}); setErr("") },
-    onError: (e: any) => setErr(e.response?.data?.message ?? "Failed to deactivate branch"),
+    onSuccess: () => { refresh(); setErr("") },
+    onError: (e: unknown) => setErr(accessErrorText(e, "Failed to deactivate branch")),
   })
 
-  function openCreate() { setForm({name:"",region:"",description:""}); setView("create"); setErr("") }
-  function openEdit(b: Branch) { setEditing(b); setForm({name:b.name,region:b.region??"",description:b.description??""}); setView("edit"); setErr("") }
+  function openCreate() { setEditing(null); setForm({name:"",regionId:"",description:""}); setView("create"); setErr("") }
+  function openEdit(b: Branch) { setEditing(b); setForm({name:b.name,regionId:regionOfBranch(regions,b.id),description:b.description??""}); setView("edit"); setErr("") }
   function submit() {
-    if (view==="edit" && editing) updateMut.mutate({id:editing.id,...form})
+    if (view==="edit" && editing) updateMut.mutate({id:editing.id,form,before:regionOfBranch(regions,editing.id)})
     else createMut.mutate(form)
   }
+  const moving = moveWarning(regions, editing?.id ?? "", form.regionId)
 
   const th = (l: string) => (
     <th key={l} style={{textAlign:"left",padding:"9px 14px",fontSize:11,fontWeight:700,color:"var(--hf-text-faint)",textTransform:"uppercase" as const,letterSpacing:"0.5px"}}>{l}</th>
   )
-
-  const REGION_COLORS: Record<string,string> = {
-    "Gauteng":"var(--hf-info-text)","Western Cape":"var(--hf-success-text-strong)","KwaZulu-Natal":"var(--hf-violet-text)",
-    "Eastern Cape":"var(--hf-warning-text-deep)","Limpopo":"var(--hf-success-text-strong)","Mpumalanga":"var(--hf-warning-text-strong)",
-    "North West":"var(--hf-text)","Free State":"var(--hf-text-secondary)","Northern Cape":"var(--hf-text-muted)",
-  }
 
   return (
     <div style={{fontFamily:"'Inter',system-ui,sans-serif"}}>
@@ -85,6 +103,8 @@ export default function BranchesTab() {
         </div>
       )}
 
+      <RegionsPanel />
+
       {/* FORM */}
       {(view==="create"||view==="edit") && (
         <div style={{background:"var(--hf-surface)",border:"1px solid var(--hf-border)",borderRadius:12,padding:24,marginBottom:20}}>
@@ -96,10 +116,12 @@ export default function BranchesTab() {
             </div>
             <div>
               <label style={{display:"block",fontSize:12,fontWeight:600,color:"var(--hf-text-secondary)",marginBottom:5}}>Region</label>
-              <select value={form.region} onChange={e=>setForm(p=>({...p,region:e.target.value}))} style={{...inp,background:"var(--hf-surface)"}}>
-                <option value="">— Select region —</option>
-                {ZA_REGIONS.map(r=><option key={r} value={r}>{r}</option>)}
+              <select aria-label="Region" value={form.regionId} onChange={e=>setForm(p=>({...p,regionId:e.target.value}))} style={{...inp,background:"var(--hf-surface)"}}>
+                <option value="">— No region —</option>
+                {regions.map(r=><option key={r.id} value={r.id}>{r.name}</option>)}
               </select>
+              {regions.length===0 && <div style={{fontSize:11,color:"var(--hf-text-muted)",marginTop:4}}>No regions yet. Add one in the Regions box above.</div>}
+              {moving && <div role="status" style={{fontSize:11,color:"var(--hf-warning-text)",marginTop:4}}>{moving}</div>}
             </div>
             <div style={{gridColumn:"1/-1"}}>
               <label style={{display:"block",fontSize:12,fontWeight:600,color:"var(--hf-text-secondary)",marginBottom:5}}>Description</label>
@@ -141,7 +163,7 @@ export default function BranchesTab() {
                     </td>
                     <td style={{padding:"11px 14px"}}>
                       {b.region
-                        ? <span style={{display:"flex",alignItems:"center",gap:4,fontSize:12,color:REGION_COLORS[b.region]??"var(--hf-text-secondary)",fontWeight:600}}>
+                        ? <span style={{display:"flex",alignItems:"center",gap:4,fontSize:12,color:"var(--hf-text-secondary)",fontWeight:600}}>
                             <MapPin size={11}/> {b.region}
                           </span>
                         : <span style={{color:"var(--hf-text-disabled)",fontSize:12}}>—</span>
@@ -177,7 +199,7 @@ export default function BranchesTab() {
 
       <div style={{marginTop:20,padding:"14px 16px",background:"var(--hf-surface-muted)",border:"1px solid var(--hf-border)",borderRadius:10,fontSize:12,color:"var(--hf-text-muted)"}}>
         <strong style={{color:"var(--hf-text-secondary)"}}>Note:</strong> Assigning sites and guards to branches is done via their respective edit forms (Sites tab → edit site → Branch, Guards tab → edit guard → Primary Branch).
-        Branch-level query scoping for regional managers is a follow-on enforcement step — all current views return tenant-wide data regardless of branch.
+        Who sees which branches and regions is set per user under Settings → Team → Site access.
       </div>
     </div>
   )

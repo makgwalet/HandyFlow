@@ -49,6 +49,15 @@ public class SiteController {
     private final CheckpointQrPdfService checkpointQrPdfService;
     private final FeatureGuard          featureGuard;
 
+    /** Optional so a hand-built controller still works; in the application it is always there. Limits a user to the sites in their scope. */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private za.co.handyflow.platform.security.application.internal.SiteScopeService scope;
+
+    private void site(UUID siteId) {
+        za.co.handyflow.platform.security.application.internal.SiteScopeService.check(scope, TenantContext.getTenantIdAsObject(), TenantContext.getCurrentUserId(), siteId);
+    }
+
+
     @GetMapping
     @PreAuthorize("hasAuthority('SECURITY_READ')")
     @Operation(summary = "List all active sites, or filter to one branch — checkpoints not included in list view")
@@ -56,10 +65,12 @@ public class SiteController {
             @RequestParam(required = false) UUID branchId,
             @PageableDefault(size = 20) Pageable pageable) {
         featureGuard.requireModule("security");
+        // A user limited to some sites sees only those; no scope means the whole company.
+        java.util.Set<UUID> allowed = za.co.handyflow.platform.security.application.internal.SiteScopeService.allowedSites(scope, TenantContext.getTenantIdAsObject(), TenantContext.getCurrentUserId());
         return ResponseEntity.ok(ApiResponse.success(
                 branchId != null
-                        ? siteService.getSitesByBranch(TenantContext.getTenantIdAsObject(), branchId, pageable)
-                        : siteService.getSites(TenantContext.getTenantIdAsObject(), pageable)));
+                        ? siteService.getSitesByBranch(TenantContext.getTenantIdAsObject(), branchId, pageable, allowed)
+                        : siteService.getSites(TenantContext.getTenantIdAsObject(), pageable, allowed)));
     }
 
     @GetMapping("/{id}")
@@ -67,6 +78,7 @@ public class SiteController {
     @Operation(summary = "Get site detail with all checkpoints and their QR/NFC/BLE identifiers")
     public ResponseEntity<ApiResponse<SiteResponse>> getSite(@PathVariable UUID id) {
         featureGuard.requireModule("security");
+        site(id);
         return ResponseEntity.ok(ApiResponse.success(
                 siteService.getSite(TenantContext.getTenantIdAsObject(), id)));
     }
@@ -77,6 +89,8 @@ public class SiteController {
     public ResponseEntity<ApiResponse<SiteResponse>> createSite(
             @Valid @RequestBody CreateSiteRequest request) {
         featureGuard.requireModule("security");
+        // A new site is outside any limited scope, so only someone with access to the whole company may register one.
+        za.co.handyflow.platform.security.application.internal.SiteScopeService.checkUnrestricted(scope, TenantContext.getTenantIdAsObject(), TenantContext.getCurrentUserId());
         var site = siteService.createSite(TenantContext.getTenantIdAsObject(), request);
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.success("Site created", site));
@@ -89,6 +103,7 @@ public class SiteController {
             @PathVariable UUID id,
             @Valid @RequestBody CreateCheckpointRequest request) {
         featureGuard.requireModule("security");
+        site(id);
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.success("Checkpoint added",
                         siteService.addCheckpoint(TenantContext.getTenantIdAsObject(), id, request)));
@@ -99,6 +114,7 @@ public class SiteController {
     @Operation(summary = "Soft-delete a site (preserves shift/incident/scan history)")
     public ResponseEntity<ApiResponse<Void>> deleteSite(@PathVariable UUID id) {
         featureGuard.requireModule("security");
+        site(id);
         UUID deletedBy = TenantContext.getCurrentUserId();
         siteService.deleteSite(TenantContext.getTenantIdAsObject(), id, deletedBy);
         return ResponseEntity.ok(ApiResponse.success("Site deleted", null));
@@ -114,6 +130,7 @@ public class SiteController {
             @PathVariable UUID id,
             @RequestBody Map<String, String> body) {
         featureGuard.requireModule("security");
+        site(id);
         UUID terminatedBy = TenantContext.getCurrentUserId();
         return ResponseEntity.ok(ApiResponse.success("Contract terminated",
                 siteService.terminateSite(TenantContext.getTenantIdAsObject(), id,
@@ -136,6 +153,7 @@ public class SiteController {
     public ResponseEntity<ApiResponse<QrPayloadResponse>> getCheckpointQrPayload(
             @PathVariable UUID siteId, @PathVariable UUID checkpointId) {
         featureGuard.requireModule("security");
+        site(siteId);
         return ResponseEntity.ok(ApiResponse.success(
                 siteService.getCheckpointQrPayload(
                         TenantContext.getTenantIdAsObject(), siteId, checkpointId)));
@@ -157,6 +175,7 @@ public class SiteController {
     public ResponseEntity<ApiResponse<Void>> assignBranch(
             @PathVariable UUID id, @RequestBody AssignSiteBranchRequest req) {
         featureGuard.requireModule("security");
+        site(id);
         siteService.assignBranch(TenantContext.getTenantIdAsObject(), id, req.branchId());
         return ResponseEntity.ok(ApiResponse.success(null));
     }
@@ -174,6 +193,7 @@ public class SiteController {
     public ResponseEntity<ApiResponse<Void>> setQrEnforcement(
             @PathVariable UUID id, @Valid @RequestBody SetQrEnforcementRequest req) {
         featureGuard.requireModule("security");
+        site(id);
         siteService.setQrEnforcement(TenantContext.getTenantIdAsObject(), id, req.requireSignedQr());
         return ResponseEntity.ok(ApiResponse.success(null));
     }
@@ -189,6 +209,7 @@ public class SiteController {
     public ResponseEntity<ApiResponse<Void>> setClockInWindow(
             @PathVariable UUID id, @Valid @RequestBody SetClockInWindowRequest req) {
         featureGuard.requireModule("security");
+        site(id);
         siteService.setClockInWindow(TenantContext.getTenantIdAsObject(), id, req.minutes());
         return ResponseEntity.ok(ApiResponse.success(null));
     }
@@ -211,6 +232,7 @@ public class SiteController {
     public ResponseEntity<ApiResponse<QrPayloadResponse>> regenerateCheckpointQr(
             @PathVariable UUID siteId, @PathVariable UUID checkpointId) {
         featureGuard.requireModule("security");
+        site(siteId);
         return ResponseEntity.ok(ApiResponse.success(
                 siteService.regenerateCheckpointQr(
                         TenantContext.getTenantIdAsObject(), siteId, checkpointId)));
@@ -226,6 +248,7 @@ public class SiteController {
     public ResponseEntity<byte[]> getCheckpointQrImage(
             @PathVariable UUID siteId, @PathVariable UUID checkpointId) {
         featureGuard.requireModule("security");
+        site(siteId);
         TenantId tenantId = TenantContext.getTenantIdAsObject();
         Site site = siteService.getSiteWithCheckpointsForPrinting(tenantId, siteId);
         Checkpoint checkpoint = site.getCheckpoints().stream()
@@ -248,6 +271,7 @@ public class SiteController {
     public ResponseEntity<byte[]> getCheckpointQrPdf(
             @PathVariable UUID siteId, @PathVariable UUID checkpointId) {
         featureGuard.requireModule("security");
+        site(siteId);
         TenantId tenantId = TenantContext.getTenantIdAsObject();
         Site site = siteService.getSiteWithCheckpointsForPrinting(tenantId, siteId);
         Checkpoint checkpoint = site.getCheckpoints().stream()
@@ -266,6 +290,7 @@ public class SiteController {
                     "workflow: print once, cut out each QR, mount at its checkpoint.")
     public ResponseEntity<byte[]> getSiteQrSheet(@PathVariable UUID siteId) {
         featureGuard.requireModule("security");
+        site(siteId);
         TenantId tenantId = TenantContext.getTenantIdAsObject();
         Site site = siteService.getSiteWithCheckpointsForPrinting(tenantId, siteId);
         byte[] pdf = checkpointQrPdfService.siteQrSheetPdf(site, tenantId);

@@ -7,11 +7,14 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import Chip from "../../components/ui/Chip"
 import WeeklyHoursPanel from "./WeeklyHoursPanel"
+import WorkingTimePolicyPanel from "./WorkingTimePolicyPanel"
+import CompanyZonePanel from "./CompanyZonePanel"
 import { useAuthStore } from "../../store/auth.store"
 import {
   DAY_CHOICES, STATE_TONE, WEEKDAYS, dayLabel, gapText, postBody, postProblem, rangeText, runsPastMidnight, stateLabel, summaryText, timeOnly, toggleDay, weekdaysText,
   type CoverageBoard, type SitePost,
 } from "./coverageLogic"
+import { useCompanyZone } from "./companyZone"
 
 const sel: React.CSSProperties = { padding: "7px 10px", border: "1px solid var(--hf-border)", borderRadius: 8, fontSize: 13, background: "var(--hf-surface)", color: "var(--hf-text-primary)" }
 const card: React.CSSProperties = { background: "var(--hf-surface)", border: "1px solid var(--hf-border)", borderRadius: 12, padding: 16, marginBottom: 16 }
@@ -26,6 +29,7 @@ const unwrap = (r: { data?: { data?: unknown } & Record<string, unknown> }) => {
 const msg = (e: unknown, fallback: string) => (e as { response?: { data?: { message?: string } } })?.response?.data?.message ?? fallback
 
 export default function CoverageTab() {
+  useCompanyZone()
   const [siteId, setSiteId] = useState("")
   const [days, setDays] = useState(7)
   const canManage = useAuthStore(s => s.hasPermission("SECURITY_MANAGE"))
@@ -74,6 +78,10 @@ export default function CoverageTab() {
       )}
 
       <WeeklyHoursPanel />
+
+      <WorkingTimePolicyPanel />
+
+      <CompanyZonePanel />
 
       <PostsEditor sites={sites} siteId={siteId} canManage={canManage} />
     </div>

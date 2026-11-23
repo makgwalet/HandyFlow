@@ -18,7 +18,7 @@ import java.util.UUID;
 /** Pure rules for the coverage board: when a post must be staffed, and where the roster falls short. */
 public final class CoverageRules {
 
-    public static final ZoneId SAST = ZoneId.of("Africa/Johannesburg");
+    public static final ZoneId SAST = za.co.handyflow.platform.shared.BusinessTime.DEFAULT_ZONE;
     public static final int MAX_DAYS = 14;
 
     public record Post(UUID id, UUID siteId, String name, Set<Integer> weekdays, LocalTime start, LocalTime end, int minGuards) {}
@@ -38,14 +38,17 @@ public final class CoverageRules {
     }
 
     /** Every occurrence of the post on the days [from, from + days). */
-    public static List<Window> windows(Post post, LocalDate from, int days) {
+    public static List<Window> windows(Post post, LocalDate from, int days) { return windows(post, from, days, SAST); }
+
+    /** The same, with the post's clock times read in the company's zone. */
+    public static List<Window> windows(Post post, LocalDate from, int days, ZoneId zone) {
         List<Window> out = new ArrayList<>();
         for (int i = 0; i < days; i++) {
             LocalDate d = from.plusDays(i);
             if (!post.weekdays().contains(d.getDayOfWeek().getValue())) continue;
-            Instant s = d.atTime(post.start()).atZone(SAST).toInstant();
+            Instant s = d.atTime(post.start()).atZone(zone).toInstant();
             LocalDate endDay = post.end().isAfter(post.start()) ? d : d.plusDays(1);
-            Instant e = endDay.atTime(post.end()).atZone(SAST).toInstant();
+            Instant e = endDay.atTime(post.end()).atZone(zone).toInstant();
             out.add(new Window(post, d, s, e));
         }
         return out;
@@ -81,9 +84,11 @@ public final class CoverageRules {
         return new Result(w, s, gaps);
     }
 
-    public static List<Result> evaluateAll(List<Post> posts, LocalDate from, int days, List<Cover> covers) {
+    public static List<Result> evaluateAll(List<Post> posts, LocalDate from, int days, List<Cover> covers) { return evaluateAll(posts, from, days, covers, SAST); }
+
+    public static List<Result> evaluateAll(List<Post> posts, LocalDate from, int days, List<Cover> covers, ZoneId zone) {
         return posts.stream()
-                .flatMap(p -> windows(p, from, days).stream())
+                .flatMap(p -> windows(p, from, days, zone).stream())
                 .sorted(Comparator.comparing(Window::start).thenComparing(w -> w.post().name()))
                 .map(w -> evaluate(w, covers))
                 .toList();

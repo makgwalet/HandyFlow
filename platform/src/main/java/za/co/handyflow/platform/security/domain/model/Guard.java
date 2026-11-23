@@ -244,12 +244,12 @@ public class Guard {
 
     public boolean hasFirearmCompetency() {
         return firearmCompetencyExpiry != null
-                && !firearmCompetencyExpiry.isBefore(LocalDate.now());
+                && !firearmCompetencyExpiry.isBefore(LocalDate.now(za.co.handyflow.platform.shared.BusinessTime.DEFAULT_ZONE));
     }
 
     public boolean meetsVettingTierFor(String principalThreatLevel) {
         if (principalThreatLevel == null) return true;
-        if (cpVettingExpiresAt != null && cpVettingExpiresAt.isBefore(LocalDate.now())) return false;
+        if (cpVettingExpiresAt != null && cpVettingExpiresAt.isBefore(LocalDate.now(za.co.handyflow.platform.shared.BusinessTime.DEFAULT_ZONE))) return false;
         return tierRank(cpVettingTier) >= tierRank(principalThreatLevel);
     }
 

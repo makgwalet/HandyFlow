@@ -69,6 +69,17 @@ describe("Guard app access (bulk)", () => {
 describe("Guard app access (single)", () => {
   const open = async () => { show(); await screen.findByText("Ayanda Zulu"); fireEvent.click(screen.getAllByTitle("Edit")[0]) }
 
+  it("the edit form hints at the ID number on file; the add form shows an example", async () => {
+    await open()
+    const edit = await screen.findByPlaceholderText("900*** (leave blank to keep)")
+    expect((edit as HTMLInputElement).value).toBe("")
+    cleanup()
+    show()
+    await screen.findByText("Ayanda Zulu")
+    fireEvent.click(screen.getByText("Add Guard"))
+    expect(await screen.findByPlaceholderText("8501015026088")).toBeTruthy()
+  })
+
   it("blank PIN: asks the server to generate one and shows it once", async () => {
     post.mockResolvedValue({ data: { data: { guardId: "g1", fullName: "Ayanda Zulu", temporaryPin: "739104" } } })
     await open()

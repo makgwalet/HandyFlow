@@ -30,6 +30,25 @@ import java.util.UUID;
 @Tag(name = "Security - Live operations")
 public class LiveOperationsController {
 
+    /** Optional so a hand-built controller still works; in the application it is always there. Limits a user to the sites in their scope. */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private za.co.handyflow.platform.security.application.internal.SiteScopeService scope;
+
+    /** A site outside the user's scope answers exactly like a site that does not exist. */
+    private void site(UUID siteId) {
+        za.co.handyflow.platform.security.application.internal.SiteScopeService.check(scope, TenantContext.getTenantIdAsObject(), TenantContext.getCurrentUserId(), siteId);
+    }
+
+    /** The sites the user may see: null means the whole company. */
+    private java.util.Set<UUID> allowed() {
+        return za.co.handyflow.platform.security.application.internal.SiteScopeService.allowedSites(scope, TenantContext.getTenantIdAsObject(), TenantContext.getCurrentUserId());
+    }
+
+    /** For a view that spans every site and cannot be narrowed yet: only a user with the whole company may use it. */
+    private void wholeCompany() {
+        za.co.handyflow.platform.security.application.internal.SiteScopeService.checkUnrestricted(scope, TenantContext.getTenantIdAsObject(), TenantContext.getCurrentUserId());
+    }
+
     private final LiveOperationsService liveService;
     private final GuardLocationService guardLocationService;
     private final FeatureGuard featureGuard;
@@ -39,7 +58,8 @@ public class LiveOperationsController {
     @Operation(summary = "Every guard on an active shift with last position and last scan; optional siteId")
     public ResponseEntity<ApiResponse<List<LiveGuardResponse>>> liveGuards(@RequestParam(required = false) UUID siteId) {
         featureGuard.requireModule("security");
-        return ResponseEntity.ok(ApiResponse.success(liveService.liveGuards(TenantContext.getTenantIdAsObject(), siteId)));
+        if (siteId != null) site(siteId);
+        return ResponseEntity.ok(ApiResponse.success(liveService.liveGuards(TenantContext.getTenantIdAsObject(), siteId, allowed())));
     }
 
     @GetMapping("/sites/{siteId}/guards/locations")
@@ -47,6 +67,7 @@ public class LiveOperationsController {
     @Operation(summary = "Current positions of guards at a site, each with a stale flag")
     public ResponseEntity<ApiResponse<List<CurrentLocationResponse>>> locations(@PathVariable UUID siteId) {
         featureGuard.requireModule("security");
+        site(siteId);
         return ResponseEntity.ok(ApiResponse.success(guardLocationService.getCurrentLocationsForSite(TenantContext.getTenantIdAsObject(), siteId)));
     }
 }

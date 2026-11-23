@@ -30,7 +30,8 @@ public class WeeklyHoursController {
     @Operation(summary = "Guards near or over their weekly hours on the roster, with double bookings and short rests",
             description = "The week runs Monday to Sunday in South African time; pass any date in it (default this week). " +
                     "Counts rostered (scheduled, active, completed) hours, merged so a double booking is not counted twice. " +
-                    "Thresholds are configurable: handyflow.security.hours.warn-at / limit / ceiling / min-rest. flaggedOnly defaults to true.")
+                    "Limits come from the working-time policy in force for each guard's category (see /api/v1/security/working-time-policies); " +
+                    "where none is set, handyflow.security.hours.* apply. Also flags days over the daily limit. flaggedOnly defaults to true.")
     public ResponseEntity<ApiResponse<WeeklyHoursService.Report>> weekly(
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate week,
             @RequestParam(required = false, defaultValue = "true") boolean flaggedOnly) {

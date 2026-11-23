@@ -39,6 +39,10 @@ public class MonthlyPackService {
                        Cover_ cover, Map<String, Integer> shifts, Patrols patrols, Incidents incidents, Visitors visitors,
                        int alarms, Book occurrenceBook) {}
 
+    /** Optional so a service built by hand still works; without it South Africa's zone is used, never the server's. */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private za.co.handyflow.platform.shared.BusinessCalendar calendar;
+
     private final JdbcTemplate jdbc;
 
     @Transactional(readOnly = true)
@@ -49,8 +53,9 @@ public class MonthlyPackService {
         UUID tenant = tenantId.getValue();
         List<Map<String, Object>> site = jdbc.queryForList("SELECT name, contract_status FROM security_sites WHERE id = ? AND tenant_id = ? AND deleted_at IS NULL", siteId, tenant);
         if (site.isEmpty()) throw new HandyFlowException("Site not found", HttpStatus.NOT_FOUND, "SITE_NOT_FOUND");
-        YearMonth m = MonthlyPackRules.month(monthAsked, now);
-        Instant[] w = MonthlyPackRules.window(m);
+        java.time.ZoneId zone = za.co.handyflow.platform.shared.BusinessCalendar.zoneOf(calendar, tenantId);
+        YearMonth m = MonthlyPackRules.month(monthAsked, now, zone);
+        Instant[] w = MonthlyPackRules.window(m, zone);
         Instant until = w[1].isAfter(now) ? now : w[1];
         Timestamp from = Timestamp.from(w[0]), to = Timestamp.from(w[1]);          // columns with a time zone
         Timestamp fromU = utc(w[0]), toU = utc(w[1]);                              // columns without one (read as UTC)
@@ -72,7 +77,7 @@ public class MonthlyPackService {
                 (rs, i) -> new Cover(rs.getObject("start_at", LocalDateTime.class).toInstant(ZoneOffset.UTC),
                         rs.getObject("end_at", LocalDateTime.class).toInstant(ZoneOffset.UTC)),
                 tenant, siteId, toU, fromU);
-        MonthlyPackRules.CoverFigures cf = MonthlyPackRules.cover(posts, m, until, covers);
+        MonthlyPackRules.CoverFigures cf = MonthlyPackRules.cover(posts, m, until, covers, zone);
         Cover_ cover = new Cover_(posts.size(), !posts.isEmpty(), cf.windows(), cf.requiredHours(), cf.coveredHours(),
                 MonthlyPackRules.pct(cf.coveredHours(), cf.requiredHours()), cf.windowsShort(), cf.windowsUncovered());
 
@@ -114,10 +119,10 @@ public class MonthlyPackService {
         Integer signed = jdbc.queryForObject("SELECT count(*) FROM security_ob_signoffs WHERE tenant_id = ? AND site_id = ? AND day >= ? AND day < ?", Integer.class,
                 tenant, siteId, java.sql.Date.valueOf(m.atDay(1)), java.sql.Date.valueOf(m.plusMonths(1).atDay(1)));
 
-        return new Pack(siteId, (String) site.get(0).get("name"), m.toString(), m.atDay(1), m.atEndOfMonth(), MonthlyPackRules.inProgress(m, now),
+        return new Pack(siteId, (String) site.get(0).get("name"), m.toString(), m.atDay(1), m.atEndOfMonth(), MonthlyPackRules.inProgress(m, now, zone),
                 (String) site.get(0).get("contract_status"), cover, shifts, patrols,
                 new Incidents(inc[0], inc[1], sev), new Visitors(vis[0], vis[1], types), alarms == null ? 0 : alarms,
-                new Book(MonthlyPackRules.daysInPeriod(m, now), signed == null ? 0 : signed));
+                new Book(MonthlyPackRules.daysInPeriod(m, now, zone), signed == null ? 0 : signed));
     }
 
     private static Timestamp utc(Instant i) { return Timestamp.valueOf(LocalDateTime.ofInstant(i, ZoneOffset.UTC)); }

@@ -13,11 +13,12 @@ import Chip from "../../components/ui/Chip"
 import StatTile from "../../components/ui/StatTile"
 import { checkpointState } from "./site.logic"
 import { deactivateWarning, filterCheckpoints, groupBySite, methods, summarise, type CheckpointRow } from "./checkpoint.logic"
+import { getCompanyZone, useCompanyZone } from "./companyZone"
 
 const card: React.CSSProperties = { background: "var(--hf-surface)", border: "1px solid var(--hf-border)", borderRadius: 12, marginBottom: 14, overflow: "hidden" }
 const input: React.CSSProperties = { padding: "8px 10px", border: "1px solid var(--hf-border)", borderRadius: 8, fontSize: 13, background: "var(--hf-surface)", color: "var(--hf-text-primary)", width: "100%", boxSizing: "border-box" }
 const btn: React.CSSProperties = { display: "inline-flex", alignItems: "center", gap: 5, padding: "5px 9px", border: "1px solid var(--hf-border)", borderRadius: 8, background: "var(--hf-surface)", color: "var(--hf-text-secondary)", fontSize: 12, fontWeight: 600, cursor: "pointer" }
-const fmtT = (d: string) => new Date(d).toLocaleString("en-ZA", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: "Africa/Johannesburg" })
+const fmtT = (d: string) => new Date(d).toLocaleString("en-ZA", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: getCompanyZone() })
 const unwrap = (r: any) => { const p = r.data?.data ?? r.data; return Array.isArray(p) ? p : p?.content ?? [] }
 const errText = (e: any) => e?.response?.data?.message ?? "That did not work. Please try again."
 const base = (c: CheckpointRow) => `/api/v1/security/sites/${c.siteId}/checkpoints/${c.id}`
@@ -80,6 +81,7 @@ function EditDialog({ c, onClose, onSaved }: { c: CheckpointRow; onClose: () => 
 }
 
 export default function CheckpointsTab() {
+  useCompanyZone()
   const qc = useQueryClient()
   const canManage = usePermission("SECURITY_MANAGE")
   const [siteId, setSiteId] = useState("")

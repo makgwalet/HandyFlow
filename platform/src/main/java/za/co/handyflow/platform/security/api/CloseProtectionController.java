@@ -50,12 +50,26 @@ public class CloseProtectionController {
     private final CloseProtectionService  cpService;
     private final CpCompliancePdfService  cpCompliancePdfService;
 
+
+    /** Optional so a controller built by hand still works; in the application it is always there. */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private za.co.handyflow.platform.security.application.internal.SiteScopeService scope;
+
+
+    /** Only a user with access to the whole company may use this: the records are not tied to one site. */
+    private void wholeCompany() {
+        za.co.handyflow.platform.security.application.internal.SiteScopeService.checkUnrestricted(scope, TenantContext.getTenantIdAsObject(), TenantContext.getCurrentUserId());
+    }
+
+
+
     // ── Principals ─────────────────────────────────────────────────────────────
 
     @GetMapping("/principals")
     @Operation(summary = "List all active principals")
     public ResponseEntity<ApiResponse<Page<PrincipalResponse>>> getAllPrincipals(
             Pageable pageable) {
+        wholeCompany();
         TenantId tenantId = TenantContext.getTenantIdAsObject();
         UUID     actorId  = TenantContext.getCurrentUserId();
         return ResponseEntity.ok(ApiResponse.success(
@@ -65,6 +79,7 @@ public class CloseProtectionController {
     @GetMapping("/principals/{id}")
     @Operation(summary = "Get a principal's full record (real name, medical notes, threats)")
     public ResponseEntity<ApiResponse<PrincipalResponse>> getPrincipal(@PathVariable UUID id) {
+        wholeCompany();
         TenantId tenantId = TenantContext.getTenantIdAsObject();
         UUID     actorId  = TenantContext.getCurrentUserId();
         return ResponseEntity.ok(ApiResponse.success(
@@ -78,6 +93,7 @@ public class CloseProtectionController {
                     "instead of the real name in team comms, dashboards, and notifications.")
     public ResponseEntity<ApiResponse<PrincipalResponse>> createPrincipal(
             @Valid @RequestBody CreatePrincipalRequest req) {
+        wholeCompany();
         TenantId tenantId = TenantContext.getTenantIdAsObject();
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.success(cpService.createPrincipal(tenantId, req)));
@@ -87,6 +103,7 @@ public class CloseProtectionController {
     @Operation(summary = "Update a principal's record")
     public ResponseEntity<ApiResponse<PrincipalResponse>> updatePrincipal(
             @PathVariable UUID id, @Valid @RequestBody UpdatePrincipalRequest req) {
+        wholeCompany();
         TenantId tenantId = TenantContext.getTenantIdAsObject();
         return ResponseEntity.ok(ApiResponse.success(
                 cpService.updatePrincipal(tenantId, id, req)));
@@ -95,6 +112,7 @@ public class CloseProtectionController {
     @DeleteMapping("/principals/{id}")
     @Operation(summary = "Deactivate a principal (does not delete historical engagement records)")
     public ResponseEntity<ApiResponse<Void>> deactivatePrincipal(@PathVariable UUID id) {
+        wholeCompany();
         TenantId tenantId = TenantContext.getTenantIdAsObject();
         cpService.deactivatePrincipal(tenantId, id);
         return ResponseEntity.ok(ApiResponse.success(null));
@@ -110,6 +128,7 @@ public class CloseProtectionController {
                     "this record and when.'")
     public ResponseEntity<ApiResponse<org.springframework.data.domain.Page<AuditEvent>>> getPrincipalAudit(
             @PathVariable UUID id, Pageable pageable) {
+        wholeCompany();
         TenantId tenantId = TenantContext.getTenantIdAsObject();
         return ResponseEntity.ok(ApiResponse.success(
                 cpService.getPrincipalAudit(tenantId, id, pageable)));
@@ -122,6 +141,7 @@ public class CloseProtectionController {
                     "at this person's medical notes and threat intel.'")
     public ResponseEntity<ApiResponse<org.springframework.data.domain.Page<AuditEvent>>> getPrincipalViewHistory(
             @PathVariable UUID id, Pageable pageable) {
+        wholeCompany();
         TenantId tenantId = TenantContext.getTenantIdAsObject();
         return ResponseEntity.ok(ApiResponse.success(
                 cpService.getPrincipalViewHistory(tenantId, id, pageable)));
@@ -138,6 +158,7 @@ public class CloseProtectionController {
                     "threats, and any declined-engagement sensitive detail -- see " +
                     "CpCompliancePdfService for why.")
     public ResponseEntity<byte[]> getVettingCompliancePdf(@PathVariable UUID id) {
+        wholeCompany();
         TenantId tenantId = TenantContext.getTenantIdAsObject();
         byte[] pdf = cpCompliancePdfService.vettingCompliancePdf(tenantId, id);
         return pdfResponse(pdf, "vetting-compliance-" + id.toString().substring(0, 8) + ".pdf");
@@ -149,6 +170,7 @@ public class CloseProtectionController {
     @Operation(summary = "List active or planned protection details across all principals")
     public ResponseEntity<ApiResponse<Page<ProtectionDetailResponse>>> getActiveOrPlanned(
             Pageable pageable) {
+        wholeCompany();
         TenantId tenantId = TenantContext.getTenantIdAsObject();
         return ResponseEntity.ok(ApiResponse.success(
                 cpService.getActiveOrPlannedDetails(tenantId, pageable)));
@@ -158,6 +180,7 @@ public class CloseProtectionController {
     @Operation(summary = "Get a single protection detail")
     public ResponseEntity<ApiResponse<ProtectionDetailResponse>> getDetail(
             @PathVariable UUID id) {
+        wholeCompany();
         TenantId tenantId = TenantContext.getTenantIdAsObject();
         return ResponseEntity.ok(ApiResponse.success(cpService.getDetail(tenantId, id)));
     }
@@ -166,6 +189,7 @@ public class CloseProtectionController {
     @Operation(summary = "All engagements for a principal — full history")
     public ResponseEntity<ApiResponse<List<ProtectionDetailResponse>>> getDetailsForPrincipal(
             @PathVariable UUID principalId) {
+        wholeCompany();
         TenantId tenantId = TenantContext.getTenantIdAsObject();
         return ResponseEntity.ok(ApiResponse.success(
                 cpService.getDetailsForPrincipal(tenantId, principalId)));
@@ -177,6 +201,7 @@ public class CloseProtectionController {
             description = "detailType: STATIC | MOBILE | EVENT | TRAVEL. Starts in PLANNED status.")
     public ResponseEntity<ApiResponse<ProtectionDetailResponse>> createDetail(
             @Valid @RequestBody CreateProtectionDetailRequest req) {
+        wholeCompany();
         TenantId tenantId = TenantContext.getTenantIdAsObject();
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.success(cpService.createDetail(tenantId, req)));
@@ -186,6 +211,7 @@ public class CloseProtectionController {
     @Operation(summary = "Activate a PLANNED detail")
     public ResponseEntity<ApiResponse<ProtectionDetailResponse>> activateDetail(
             @PathVariable UUID id) {
+        wholeCompany();
         TenantId tenantId = TenantContext.getTenantIdAsObject();
         return ResponseEntity.ok(ApiResponse.success(cpService.activateDetail(tenantId, id)));
     }
@@ -194,6 +220,7 @@ public class CloseProtectionController {
     @Operation(summary = "Mark an ACTIVE detail as completed")
     public ResponseEntity<ApiResponse<ProtectionDetailResponse>> completeDetail(
             @PathVariable UUID id) {
+        wholeCompany();
         TenantId tenantId = TenantContext.getTenantIdAsObject();
         return ResponseEntity.ok(ApiResponse.success(cpService.completeDetail(tenantId, id)));
     }
@@ -202,6 +229,7 @@ public class CloseProtectionController {
     @Operation(summary = "Cancel a detail before completion")
     public ResponseEntity<ApiResponse<ProtectionDetailResponse>> cancelDetail(
             @PathVariable UUID id, @Valid @RequestBody CancelDetailRequest req) {
+        wholeCompany();
         TenantId tenantId = TenantContext.getTenantIdAsObject();
         return ResponseEntity.ok(ApiResponse.success(
                 cpService.cancelDetail(tenantId, id, req)));
@@ -226,6 +254,7 @@ public class CloseProtectionController {
             """)
     public ResponseEntity<ApiResponse<CloneDetailResult>> cloneDetail(
             @PathVariable UUID id, @Valid @RequestBody CloneDetailRequest req) {
+        wholeCompany();
         TenantId tenantId = TenantContext.getTenantIdAsObject();
         UUID     actorId  = TenantContext.getCurrentUserId();
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(
@@ -238,6 +267,7 @@ public class CloseProtectionController {
     @Operation(summary = "Get the current team roster for a detail")
     public ResponseEntity<ApiResponse<List<DetailAssignmentResponse>>> getTeamRoster(
             @PathVariable UUID id) {
+        wholeCompany();
         TenantId tenantId = TenantContext.getTenantIdAsObject();
         return ResponseEntity.ok(ApiResponse.success(cpService.getTeamRoster(tenantId, id)));
     }
@@ -249,6 +279,7 @@ public class CloseProtectionController {
                     "A guard cannot hold two open-ended roles on the same detail.")
     public ResponseEntity<ApiResponse<DetailAssignmentResponse>> assignToDetail(
             @PathVariable UUID id, @Valid @RequestBody AssignToDetailRequest req) {
+        wholeCompany();
         TenantId tenantId = TenantContext.getTenantIdAsObject();
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(
                 cpService.assignToDetail(tenantId, id, req)));
@@ -257,6 +288,7 @@ public class CloseProtectionController {
     @DeleteMapping("/team/{assignmentId}")
     @Operation(summary = "End a guard's role on a detail")
     public ResponseEntity<ApiResponse<Void>> endAssignment(@PathVariable UUID assignmentId) {
+        wholeCompany();
         TenantId tenantId = TenantContext.getTenantIdAsObject();
         cpService.endAssignment(tenantId, assignmentId);
         return ResponseEntity.ok(ApiResponse.success(null));
@@ -281,6 +313,7 @@ public class CloseProtectionController {
     public ResponseEntity<ApiResponse<ArmouryResponse>> issueFirearmForDetail(
             @PathVariable UUID id, @PathVariable UUID assignmentId, @PathVariable UUID armouryId,
             @Valid @RequestBody IssueFirearmRequest req) {
+        wholeCompany();
         TenantId tenantId = TenantContext.getTenantIdAsObject();
         return ResponseEntity.ok(ApiResponse.success(
                 cpService.issueFirearmForDetail(tenantId, id, assignmentId, armouryId, req, TenantContext.getCurrentUserId())));
@@ -293,6 +326,7 @@ public class CloseProtectionController {
                     "above -- \"which firearms are or were out on this engagement.\"")
     public ResponseEntity<ApiResponse<List<ArmouryLog>>> getArmouryForDetail(
             @PathVariable UUID id) {
+        wholeCompany();
         TenantId tenantId = TenantContext.getTenantIdAsObject();
         return ResponseEntity.ok(ApiResponse.success(cpService.getArmouryForDetail(tenantId, id)));
     }
@@ -303,6 +337,7 @@ public class CloseProtectionController {
     @Operation(summary = "Full itinerary for a detail, in sequence order")
     public ResponseEntity<ApiResponse<List<ItineraryStopResponse>>> getItinerary(
             @PathVariable UUID id) {
+        wholeCompany();
         TenantId tenantId = TenantContext.getTenantIdAsObject();
         return ResponseEntity.ok(ApiResponse.success(cpService.getItinerary(tenantId, id)));
     }
@@ -313,6 +348,7 @@ public class CloseProtectionController {
                     "Returns null if all stops are completed or none exist yet.")
     public ResponseEntity<ApiResponse<ItineraryStopResponse>> getCurrentStop(
             @PathVariable UUID id) {
+        wholeCompany();
         TenantId tenantId = TenantContext.getTenantIdAsObject();
         return ResponseEntity.ok(ApiResponse.success(cpService.getCurrentStop(tenantId, id)));
     }
@@ -322,6 +358,7 @@ public class CloseProtectionController {
             description = "Sequence is assigned automatically (appended to the end).")
     public ResponseEntity<ApiResponse<ItineraryStopResponse>> addStop(
             @PathVariable UUID id, @Valid @RequestBody AddItineraryStopRequest req) {
+        wholeCompany();
         TenantId tenantId = TenantContext.getTenantIdAsObject();
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.success(cpService.addStop(tenantId, id, req)));
@@ -331,6 +368,7 @@ public class CloseProtectionController {
     @Operation(summary = "Record arrival at an itinerary stop")
     public ResponseEntity<ApiResponse<ItineraryStopResponse>> recordArrival(
             @PathVariable UUID stopId) {
+        wholeCompany();
         TenantId tenantId = TenantContext.getTenantIdAsObject();
         return ResponseEntity.ok(ApiResponse.success(
                 cpService.recordStopArrival(tenantId, stopId)));
@@ -340,6 +378,7 @@ public class CloseProtectionController {
     @Operation(summary = "Record departure from an itinerary stop")
     public ResponseEntity<ApiResponse<ItineraryStopResponse>> recordDeparture(
             @PathVariable UUID stopId) {
+        wholeCompany();
         TenantId tenantId = TenantContext.getTenantIdAsObject();
         return ResponseEntity.ok(ApiResponse.success(
                 cpService.recordStopDeparture(tenantId, stopId)));
@@ -351,6 +390,7 @@ public class CloseProtectionController {
     @Operation(summary = "All advance surveys conducted for an itinerary stop")
     public ResponseEntity<ApiResponse<List<AdvanceSurveyResponse>>> getSurveysForStop(
             @PathVariable UUID stopId) {
+        wholeCompany();
         TenantId tenantId = TenantContext.getTenantIdAsObject();
         return ResponseEntity.ok(ApiResponse.success(
                 cpService.getSurveysForStop(tenantId, stopId)));
@@ -367,6 +407,7 @@ public class CloseProtectionController {
             """)
     public ResponseEntity<ApiResponse<AdvanceSurveyResponse>> conductSurvey(
             @PathVariable UUID stopId, @Valid @RequestBody ConductSurveyRequest req) {
+        wholeCompany();
         TenantId tenantId  = TenantContext.getTenantIdAsObject();
         UUID     guardId   = TenantContext.getCurrentUserId();
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(
@@ -376,6 +417,7 @@ public class CloseProtectionController {
     @GetMapping("/itinerary/{stopId}/cleared")
     @Operation(summary = "Whether at least one ALL_CLEAR survey exists for this stop")
     public ResponseEntity<ApiResponse<Boolean>> isStopCleared(@PathVariable UUID stopId) {
+        wholeCompany();
         return ResponseEntity.ok(ApiResponse.success(cpService.isStopCleared(stopId)));
     }
 
@@ -384,6 +426,7 @@ public class CloseProtectionController {
     @GetMapping("/vehicles")
     @Operation(summary = "List all active (non-decommissioned) protection vehicles")
     public ResponseEntity<ApiResponse<Page<VehicleResponse>>> getAllVehicles(Pageable pageable) {
+        wholeCompany();
         TenantId tenantId = TenantContext.getTenantIdAsObject();
         return ResponseEntity.ok(ApiResponse.success(cpService.getAllVehicles(tenantId, pageable)));
     }
@@ -393,6 +436,7 @@ public class CloseProtectionController {
             description = "vehicleType: PRINCIPAL_CAR | LEAD_CAR | FOLLOW_CAR")
     public ResponseEntity<ApiResponse<VehicleResponse>> registerVehicle(
             @Valid @RequestBody RegisterVehicleRequest req) {
+        wholeCompany();
         TenantId tenantId = TenantContext.getTenantIdAsObject();
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.success(cpService.registerVehicle(tenantId, req)));
@@ -402,6 +446,7 @@ public class CloseProtectionController {
     @Operation(summary = "Assign a driver to a vehicle")
     public ResponseEntity<ApiResponse<VehicleResponse>> assignDriver(
             @PathVariable UUID id, @Valid @RequestBody AssignDriverRequest req) {
+        wholeCompany();
         TenantId tenantId = TenantContext.getTenantIdAsObject();
         return ResponseEntity.ok(ApiResponse.success(
                 cpService.assignDriver(tenantId, id, req)));
@@ -410,6 +455,7 @@ public class CloseProtectionController {
     @DeleteMapping("/vehicles/{id}/driver")
     @Operation(summary = "Release a vehicle's driver (returns vehicle to AVAILABLE)")
     public ResponseEntity<ApiResponse<VehicleResponse>> releaseDriver(@PathVariable UUID id) {
+        wholeCompany();
         TenantId tenantId = TenantContext.getTenantIdAsObject();
         return ResponseEntity.ok(ApiResponse.success(cpService.releaseDriver(tenantId, id)));
     }
@@ -418,6 +464,7 @@ public class CloseProtectionController {
     @Operation(summary = "Send a vehicle for maintenance")
     public ResponseEntity<ApiResponse<VehicleResponse>> sendForService(
             @PathVariable UUID id, @Valid @RequestBody ServiceVehicleRequest req) {
+        wholeCompany();
         TenantId tenantId = TenantContext.getTenantIdAsObject();
         return ResponseEntity.ok(ApiResponse.success(
                 cpService.sendForService(tenantId, id, req)));
@@ -427,6 +474,7 @@ public class CloseProtectionController {
     @Operation(summary = "Return a vehicle from maintenance to AVAILABLE")
     public ResponseEntity<ApiResponse<VehicleResponse>> returnFromService(
             @PathVariable UUID id) {
+        wholeCompany();
         TenantId tenantId = TenantContext.getTenantIdAsObject();
         return ResponseEntity.ok(ApiResponse.success(
                 cpService.returnFromService(tenantId, id)));
@@ -436,6 +484,7 @@ public class CloseProtectionController {
     @Operation(summary = "Permanently retire a vehicle")
     public ResponseEntity<ApiResponse<VehicleResponse>> decommissionVehicle(
             @PathVariable UUID id) {
+        wholeCompany();
         TenantId tenantId = TenantContext.getTenantIdAsObject();
         return ResponseEntity.ok(ApiResponse.success(
                 cpService.decommissionVehicle(tenantId, id)));
@@ -448,6 +497,7 @@ public class CloseProtectionController {
             description = "category: ID_DOCUMENT | ENGAGEMENT_LETTER | THREAT_INTEL | MEDICAL | OTHER")
     public ResponseEntity<ApiResponse<EvidenceResponse>> uploadPrincipalEvidence(
             @PathVariable UUID id, @Valid @RequestBody UploadEvidenceRequest req) {
+        wholeCompany();
         TenantId tenantId = TenantContext.getTenantIdAsObject();
         UUID     actorId  = TenantContext.getCurrentUserId();
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(
@@ -458,6 +508,7 @@ public class CloseProtectionController {
     @Operation(summary = "List active evidence for a principal")
     public ResponseEntity<ApiResponse<List<EvidenceResponse>>> getPrincipalEvidence(
             @PathVariable UUID id) {
+        wholeCompany();
         TenantId tenantId = TenantContext.getTenantIdAsObject();
         return ResponseEntity.ok(ApiResponse.success(
                 cpService.getEvidenceFor(tenantId, CpEvidence.EntityType.PRINCIPAL, id)));
@@ -468,6 +519,7 @@ public class CloseProtectionController {
             description = "category: ID_DOCUMENT | ENGAGEMENT_LETTER | THREAT_INTEL | MEDICAL | OTHER")
     public ResponseEntity<ApiResponse<EvidenceResponse>> uploadDetailEvidence(
             @PathVariable UUID id, @Valid @RequestBody UploadEvidenceRequest req) {
+        wholeCompany();
         TenantId tenantId = TenantContext.getTenantIdAsObject();
         UUID     actorId  = TenantContext.getCurrentUserId();
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(
@@ -478,6 +530,7 @@ public class CloseProtectionController {
     @Operation(summary = "List active evidence for a protection detail")
     public ResponseEntity<ApiResponse<List<EvidenceResponse>>> getDetailEvidence(
             @PathVariable UUID id) {
+        wholeCompany();
         TenantId tenantId = TenantContext.getTenantIdAsObject();
         return ResponseEntity.ok(ApiResponse.success(
                 cpService.getEvidenceFor(tenantId, CpEvidence.EntityType.PROTECTION_DETAIL, id)));
@@ -489,6 +542,7 @@ public class CloseProtectionController {
                     "same posture as other compliance-sensitive records in this module.")
     public ResponseEntity<ApiResponse<Void>> deleteEvidence(
             @PathVariable UUID evidenceId, @Valid @RequestBody DeleteEvidenceRequest req) {
+        wholeCompany();
         TenantId tenantId = TenantContext.getTenantIdAsObject();
         UUID     actorId  = TenantContext.getCurrentUserId();
         cpService.deleteEvidence(tenantId, evidenceId, actorId, req);

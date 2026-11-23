@@ -19,3 +19,25 @@ describe("Security navigation: Close Protection", () => {
     for (const id of ["coverage", "reports"]) expect(seen).toContain(id)
   })
 })
+
+describe("Security navigation: Invoice drafts", () => {
+  it("is offered only to administrators, because the list endpoint requires SECURITY_ADMIN", () => {
+    expect(ids(["SECURITY_READ", "SECURITY_MANAGE"])).not.toContain("invoice-drafts")
+    expect(ids(["SECURITY_READ", "SECURITY_ADMIN"])).toContain("invoice-drafts")
+  })
+  it("sends a deep link back to the default section for everyone else", () => {
+    expect(findSection(SECURITY_SECTIONS, "invoice-drafts", ["SECURITY_READ"])?.section.id).not.toBe("invoice-drafts")
+    expect(findSection(SECURITY_SECTIONS, "invoice-drafts", ["SECURITY_ADMIN"])?.section.id).toBe("invoice-drafts")
+  })
+})
+
+describe("Security navigation: Site access", () => {
+  it("is offered only to administrators, because the list endpoint requires SECURITY_ADMIN", () => {
+    expect(ids(["SECURITY_READ", "SECURITY_MANAGE"])).not.toContain("site-access")
+    expect(ids(["SECURITY_READ", "SECURITY_ADMIN"])).toContain("site-access")
+  })
+  it("sends a deep link back to the default section for everyone else", () => {
+    expect(findSection(SECURITY_SECTIONS, "site-access", ["SECURITY_READ"])?.section.id).not.toBe("site-access")
+    expect(findSection(SECURITY_SECTIONS, "site-access", ["SECURITY_ADMIN"])?.section.id).toBe("site-access")
+  })
+})

@@ -135,7 +135,15 @@ public class ControlRoomService {
 
     @Transactional(readOnly = true)
     public Page<AlarmEvent> getOpenQueue(TenantId tenantId, Pageable pageable) {
-        return eventRepository.findOpenQueue(tenantId, pageable);
+        return getOpenQueue(tenantId, pageable, null);
+    }
+
+    /** `allowedSites` null = the whole company; otherwise only alarms at those sites. An alarm with no site is outside every limited scope. */
+    @Transactional(readOnly = true)
+    public Page<AlarmEvent> getOpenQueue(TenantId tenantId, Pageable pageable, java.util.Set<UUID> allowedSites) {
+        if (allowedSites == null) return eventRepository.findOpenQueue(tenantId, pageable);
+        if (allowedSites.isEmpty()) return Page.empty(pageable);
+        return eventRepository.findOpenQueueInSites(tenantId, allowedSites, pageable);
     }
 
     @Transactional(readOnly = true)
@@ -363,7 +371,15 @@ public class ControlRoomService {
 
     @Transactional(readOnly = true)
     public List<Dispatch> getOpenDispatches(TenantId tenantId) {
-        return dispatchRepository.findOpen(tenantId);
+        return getOpenDispatches(tenantId, null);
+    }
+
+    /** `allowedSites` null = the whole company; otherwise only dispatches answering alarms at those sites. */
+    @Transactional(readOnly = true)
+    public List<Dispatch> getOpenDispatches(TenantId tenantId, java.util.Set<UUID> allowedSites) {
+        if (allowedSites == null) return dispatchRepository.findOpen(tenantId);
+        if (allowedSites.isEmpty()) return List.of();
+        return dispatchRepository.findOpenInSites(tenantId, allowedSites);
     }
 
     @Transactional(readOnly = true)

@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import { useSecurityAccess } from "./useSecurityAccess"
 import { DollarSign, Plus, CheckCircle, Download, AlertTriangle, List } from "lucide-react"
+import PayPremiumPanel from "./PayPremiumPanel"
 
 interface PayrollPeriod {
   id: string; name: string; periodType: string
@@ -14,7 +15,7 @@ interface PayrollPeriod {
   exportedAt: string | null; exportFormat: string | null; createdAt: string
 }
 interface LineItem {
-  id: string; guardId: string; lineType: "REGULAR" | "OVERTIME" | "ALLOWANCE" | "DEDUCTION"
+  id: string; guardId: string; lineType: "REGULAR" | "OVERTIME" | "ALLOWANCE" | "DEDUCTION" | "SUNDAY" | "PUBLIC_HOLIDAY"
   shiftStartAt: string; shiftEndAt: string
   hoursWorked: number; overtimeHours: number
   hourlyRateCents: number; overtimeRateCents: number; grossAmountCents: number
@@ -39,6 +40,8 @@ const TYPE_CFG = {
   OVERTIME:  { label: "Overtime",  color: "var(--hf-warning-text-deep)", bg: "var(--hf-warning-soft-strong)" },
   ALLOWANCE: { label: "Allowance", color: "var(--hf-success-text-strong)", bg: "var(--hf-success-soft-strong)" },
   DEDUCTION: { label: "Deduction", color: "var(--hf-danger-text-strong)", bg: "var(--hf-danger-soft)" },
+  SUNDAY:         { label: "Sunday",         color: "var(--hf-warning-text-deep)", bg: "var(--hf-warning-soft-strong)" },
+  PUBLIC_HOLIDAY: { label: "Public holiday", color: "var(--hf-warning-text-deep)", bg: "var(--hf-warning-soft-strong)" },
 }
 
 const inp = { width:"100%", padding:"8px 12px", borderRadius:8, border:"1px solid var(--hf-border)", fontSize:13, outline:"none", boxSizing:"border-box" as const }
@@ -48,7 +51,7 @@ const sbtn = { padding:"8px 16px", borderRadius:8, border:"1px solid var(--hf-bo
 export default function PayrollTab() {
   const qc = useQueryClient()
   const acc = useSecurityAccess()
-  const [view, setView] = useState<"periods"|"create"|"lines"|"grades"|"add-grade">("periods")
+  const [view, setView] = useState<"periods"|"create"|"lines"|"grades"|"add-grade"|"premiums">("periods")
   const [selected, setSelected] = useState<PayrollPeriod | null>(null)
   const [err, setErr] = useState("")
   const [form, setForm] = useState({ name:"", periodType:"MONTHLY", periodStart:"", periodEnd:"" })
@@ -130,6 +133,7 @@ export default function PayrollTab() {
         </div>
         <div style={{display:"flex",gap:8}}>
           <button style={sbtn} onClick={()=>{setView("grades");setErr("")}}>Grade Rates</button>
+          <button style={sbtn} onClick={()=>{setView("premiums");setErr("")}}>Sunday &amp; holiday pay</button>
           {acc.payrollManage && (
             <button style={{...btn("var(--hf-primary)"),display:"flex",alignItems:"center",gap:6}} onClick={()=>{setView("create");setErr("")}}>
               <Plus size={14}/> New Period
@@ -344,6 +348,13 @@ export default function PayrollTab() {
                   })}</tbody>
                 </table>
               </div>
+      )}
+
+      {view === "premiums" && (
+        <div>
+          <button style={{...sbtn,marginBottom:14}} onClick={()=>setView("periods")}>← Back to periods</button>
+          <PayPremiumPanel canManage={acc.payrollManage} />
+        </div>
       )}
     </div>
   )

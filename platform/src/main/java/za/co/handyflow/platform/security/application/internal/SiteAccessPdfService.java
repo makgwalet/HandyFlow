@@ -53,9 +53,14 @@ public class SiteAccessPdfService {
     private static final DeviceRgb LIGHT_GREY = new DeviceRgb(247, 247, 247);
     private static final DeviceRgb MID_GREY   = new DeviceRgb(200, 200, 200);
 
+    /** Optional so a service built by hand (tests) still works; without it the South African default zone is used, never the server's. */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private za.co.handyflow.platform.shared.BusinessCalendar calendar;
+
     private final SecurityPdfBrandingHelper brandingHelper;
 
     public byte[] siteAccessPdf(SiteAccessReport report, TenantId tenantId) {
+        java.time.ZoneId zone = za.co.handyflow.platform.shared.BusinessCalendar.zoneOf(calendar, tenantId);
         TenantDetails tenant = brandingHelper.resolveTenant(tenantId);
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
 
@@ -109,14 +114,14 @@ public class SiteAccessPdfService {
                     addRowCell(detail, line.company() != null ? line.company() : "—", alt);
                     addRowCell(detail, line.vehicleRegistration() != null ? line.vehicleRegistration() : "—", alt);
                     addRowCell(detail, line.accessPointName() != null ? line.accessPointName() : "—", alt);
-                    addRowCell(detail, formatInstant(line.loggedInAt()), alt);
+                    addRowCell(detail, formatInstant(line.loggedInAt(), zone), alt);
                     addRowCell(detail, line.status(), alt);
                     alt = !alt;
                 }
                 doc.add(detail);
             }
 
-            doc.add(new Paragraph("Generated " + java.time.LocalDate.now())
+            doc.add(new Paragraph("Generated " + za.co.handyflow.platform.shared.BusinessCalendar.todayOf(calendar, tenantId))
                     .setFontSize(8).setMarginTop(24).setTextAlignment(TextAlignment.RIGHT));
 
         } catch (Exception e) {
@@ -126,10 +131,10 @@ public class SiteAccessPdfService {
         return baos.toByteArray();
     }
 
-    private String formatInstant(java.time.Instant instant) {
+    private String formatInstant(java.time.Instant instant, java.time.ZoneId zone) {
         if (instant == null) return "—";
         return DateTimeFormatter.ofLocalizedDateTime(FormatStyle.SHORT)
-                .withLocale(Locale.ENGLISH).withZone(java.time.ZoneId.of("Africa/Johannesburg"))
+                .withLocale(Locale.ENGLISH).withZone(zone)
                 .format(instant);
     }
 

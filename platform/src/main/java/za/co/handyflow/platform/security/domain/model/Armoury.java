@@ -198,7 +198,7 @@ public class Armoury {
     public boolean isAvailableForIssue() { return status == ArmouryStatus.IN_ARMOURY; }
 
     public boolean isLicenseExpired() {
-        return licenseExpiry.isBefore(LocalDate.now());
+        return licenseExpiry.isBefore(LocalDate.now(za.co.handyflow.platform.shared.BusinessTime.DEFAULT_ZONE));
     }
 
     private static String appendNote(String existing, String addition) {

@@ -66,6 +66,10 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class ClientPortalService {
 
+    /** Optional so a service built by hand (tests) still works; without it the South African default zone is used, never the server's. */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private za.co.handyflow.platform.shared.BusinessCalendar calendar;
+
     private final SiteRepository siteRepository;
     private final JdbcTemplate   jdbc;
     private final EmailService emailService;
@@ -97,7 +101,7 @@ public class ClientPortalService {
         }
 
         UUID siteId = site.getId();
-        LocalDate today = LocalDate.now();
+        LocalDate today = za.co.handyflow.platform.shared.BusinessCalendar.todayOf(calendar, site.getTenantId());
 
         List<Map<String, Object>> shifts = jdbc.queryForList("""
                 SELECT

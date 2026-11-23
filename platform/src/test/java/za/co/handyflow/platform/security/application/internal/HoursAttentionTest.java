@@ -103,7 +103,10 @@ class HoursAttentionTest {
         int a = s.indexOf("public HoursAttention.Counts attentionCounts");
         String body = s.substring(a, s.indexOf("private record Computed"));
         assertFalse(body.contains("MAX_ROWS"));
-        assertTrue(body.contains("now.atZone(WeeklyHoursRules.SAST)"));
+        // the company's own zone (chunk 72), never a fixed one
+        assertTrue(body.contains("BusinessCalendar.zoneOf(calendar, tenantId)"));
+        assertTrue(body.contains("now.atZone(zone)"));
+        assertFalse(body.contains("WeeklyHoursRules.SAST"));
     }
 
     @Test

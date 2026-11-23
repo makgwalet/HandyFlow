@@ -28,10 +28,17 @@ public class LiveOperationsService {
     private final JdbcTemplate jdbc;
 
     @Transactional(readOnly = true)
-    public List<LiveGuardResponse> liveGuards(TenantId tenantId, UUID siteId) { return liveGuards(tenantId, siteId, Instant.now()); }
+    public List<LiveGuardResponse> liveGuards(TenantId tenantId, UUID siteId) { return liveGuards(tenantId, siteId, Instant.now(), null); }
+
+    /** `allowed` null = the whole company; with no site chosen, a limited user sees the guards at all their sites. */
+    @Transactional(readOnly = true)
+    public List<LiveGuardResponse> liveGuards(TenantId tenantId, UUID siteId, java.util.Set<UUID> allowed) { return liveGuards(tenantId, siteId, Instant.now(), allowed); }
 
     @Transactional(readOnly = true)
-    List<LiveGuardResponse> liveGuards(TenantId tenantId, UUID siteId, Instant now) {
+    List<LiveGuardResponse> liveGuards(TenantId tenantId, UUID siteId, Instant now) { return liveGuards(tenantId, siteId, now, null); }
+
+    @Transactional(readOnly = true)
+    List<LiveGuardResponse> liveGuards(TenantId tenantId, UUID siteId, Instant now, java.util.Set<UUID> allowed) {
         StringBuilder sql = new StringBuilder("""
                 SELECT s.id AS shift_id, s.site_id, ss.name AS site_name, s.guard_id,
                        g.first_name, g.last_name, g.grade, s.start_at, s.end_at,
@@ -52,7 +59,8 @@ public class LiveOperationsService {
                 """);
         List<Object> params = new ArrayList<>();
         params.add(tenantId.getValue());
-        if (siteId != null) { sql.append(" AND s.site_id = ?"); params.add(siteId); }
+        sql.append(SiteScopeRules.siteClause("s.site_id", siteId, allowed));
+        params.addAll(SiteScopeRules.siteArgs(siteId, allowed));
         sql.append(" ORDER BY s.start_at, g.last_name, g.first_name");
         return jdbc.query(sql.toString(), (rs, n) -> map(rs, now), params.toArray());
     }

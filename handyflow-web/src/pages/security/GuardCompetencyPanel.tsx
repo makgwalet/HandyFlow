@@ -10,6 +10,7 @@ import { apiClient } from "../../api/client"
 import Chip from "../../components/ui/Chip"
 import EvidenceFiles from "./EvidenceFiles"
 import { COMPETENCY_TYPES, FIREARM_CATEGORIES, competencyFormError, firearmCategoryLabel, readinessState, todayIso, type CompetencyItem } from "./guard360.logic"
+import { getCompanyZone, useCompanyZone } from "./companyZone"
 
 const card: React.CSSProperties = { background: "var(--hf-surface)", border: "1px solid var(--hf-border)", borderRadius: 12, padding: 16 }
 const input: React.CSSProperties = { padding: "8px 10px", border: "1px solid var(--hf-border)", borderRadius: 8, fontSize: 13, background: "var(--hf-surface)", color: "var(--hf-text-primary)", width: "100%", boxSizing: "border-box" }
@@ -18,7 +19,7 @@ const primary: React.CSSProperties = { ...btn, background: "var(--hf-accent)", c
 const th: React.CSSProperties = { textAlign: "left", padding: "8px 10px", fontSize: 11, color: "var(--hf-text-muted)", fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.4 }
 const td: React.CSSProperties = { padding: "9px 10px", fontSize: 13, borderTop: "1px solid var(--hf-border-subtle)" }
 const lab: React.CSSProperties = { fontSize: 11, color: "var(--hf-text-muted)", fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.4, marginBottom: 3 }
-const fmt = (d: string | null) => d ? new Date(d.length === 10 ? d + "T00:00:00" : d).toLocaleDateString("en-ZA", { day: "numeric", month: "short", year: "numeric", timeZone: "Africa/Johannesburg" }) : "-"
+const fmt = (d: string | null) => d ? new Date(d.length === 10 ? d + "T00:00:00" : d).toLocaleDateString("en-ZA", { day: "numeric", month: "short", year: "numeric", timeZone: getCompanyZone() }) : "-"
 const errText = (e: any) => e?.response?.data?.message ?? "That did not work. Please try again."
 const name = (c: CompetencyItem) => c.title || c.label
 
@@ -144,6 +145,7 @@ function CompetencyDetail({ guardId, c, canManage, onClose }: { guardId: string;
 }
 
 export default function SkillsTab({ guardId, competencies, canManage, initialOpenId }: { guardId: string; competencies: CompetencyItem[]; canManage: boolean; initialOpenId?: string | null }) {
+  useCompanyZone()
   const [openId, setOpenId] = useState<string | null>(initialOpenId ?? null)
   const [adding, setAdding] = useState(false)
   const open = competencies.find(c => c.id === openId) ?? null

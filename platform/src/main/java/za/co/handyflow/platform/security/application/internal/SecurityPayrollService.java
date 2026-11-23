@@ -66,6 +66,18 @@ public class SecurityPayrollService {
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     private za.co.handyflow.platform.shared.SeparationOfDutiesChecker separationOfDuties;
     private final SiteRepository            siteRepository;
+
+    /** The company's calendar. Optional so a hand-built service still works, on the South African default. */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private za.co.handyflow.platform.shared.BusinessCalendar calendar;
+
+    /** Sunday and public-holiday pay. Optional, so a hand-built service pays the ordinary way; the company must also have switched it on. */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private PayPremiumService premiums;
+
+    private java.time.ZoneId zone(TenantId tenantId) {
+        return za.co.handyflow.platform.shared.BusinessCalendar.zoneOf(calendar, tenantId);
+    }
     // FIX: closes the confirmed AuditEvent coverage gap for Payroll —
     // approving a period is a major financial event that previously
     // had no generic audit trail entry at all.
@@ -162,9 +174,10 @@ public class SecurityPayrollService {
     // ── Line item computation ──────────────────────────────────────────────────
 
     private List<PayrollLineItem> computeLineItems(TenantId tenantId, PayrollPeriod period) {
-        // South African days, not UTC days (audit 1.6).
-        Instant from = PayrollRules.windowStart(period.getPeriodStart());
-        Instant to   = PayrollRules.windowEnd(period.getPeriodEnd());
+        // The company's days, not UTC days (audit 1.6).
+        java.time.ZoneId zone = zone(tenantId);
+        Instant from = PayrollRules.windowStart(period.getPeriodStart(), zone);
+        Instant to   = PayrollRules.windowEnd(period.getPeriodEnd(), zone);
 
         List<Shift> shifts = shiftRepository.findByTenantInRange(tenantId, from, to);
         if (period.getBranchId() != null) {
@@ -186,6 +199,7 @@ public class SecurityPayrollService {
                 .toList());
 
         List<PayrollLineItem> items = new ArrayList<>();
+        PayPremiumService.Context premium = premiums == null ? null : premiums.context(tenantId);
 
         for (Shift shift : completedShifts) {
             // Deleted guards are included: pay already earned is still owed (audit 1.6: they used to be skipped and vanish from payroll).
@@ -195,6 +209,14 @@ public class SecurityPayrollService {
 
             int rateCents = resolveRate(tenantId, guard, period.getPeriodEnd());
             int standardHours = resolveStandardHours(tenantId, guard, period.getPeriodEnd());
+
+            // A shift with Sunday or public-holiday hours is paid in parts; every other shift, and every shift while the premium is off, is paid as before.
+            List<PayPremiumRules.Line> parts = premium == null ? null
+                    : PayPremiumRules.lines(shift.getStartAt(), shift.getEndAt(), zone, standardHours, rateCents, premium.settings(), premium.holidays());
+            if (parts != null) {
+                addPremiumLines(items, tenantId, period, guard, shift, rateCents, parts);
+                continue;
+            }
 
             PayrollRules.Split split = PayrollRules.split(shift.getStartAt(), shift.getEndAt(), standardHours);
             BigDecimal regularHours  = split.regular();
@@ -217,6 +239,20 @@ public class SecurityPayrollService {
         }
 
         return items;
+    }
+
+    private static void addPremiumLines(List<PayrollLineItem> items, TenantId tenantId, PayrollPeriod period, Guard guard, Shift shift,
+                                        int rateCents, List<PayPremiumRules.Line> parts) {
+        for (PayPremiumRules.Line l : parts) {
+            switch (l.type()) {
+                case "REGULAR" -> items.add(PayrollLineItem.regular(tenantId, period.getId(), guard.getId(),
+                        shift.getId(), shift.getStartAt(), shift.getEndAt(), l.hours(), rateCents));
+                case "OVERTIME" -> items.add(PayrollLineItem.overtime(tenantId, period.getId(), guard.getId(),
+                        shift.getId(), shift.getStartAt(), shift.getEndAt(), l.hours(), rateCents));
+                default -> items.add(PayrollLineItem.premium(tenantId, period.getId(), guard.getId(), shift.getId(), shift.getStartAt(), shift.getEndAt(),
+                        PayrollLineItem.LineType.valueOf(l.type()), l.hours(), rateCents, l.payRateCents()));
+            }
+        }
     }
 
     /** Drops shifts that already have pay in any period, so a shift can never be paid twice (audit 1.6). Queried in batches to keep the IN list small. */
@@ -277,13 +313,14 @@ public class SecurityPayrollService {
         csv.append("LineType,ShiftDate,HoursWorked,OvertimeHours,RateCents,OvertimeRateCents,GrossCents,GrossZAR\n");
 
         DateTimeFormatter dateFmt = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+        java.time.ZoneId csvZone = zone(tenantId);
 
         for (PayrollLineItem li : items) {
             // Every line is written, also for a guard record that has since been deleted (audit 1.6: such rows used to vanish from the file).
             Guard guard = guardCache.computeIfAbsent(li.getGuardId(),
                     gid -> guardRepository.findAnyById(tenantId, gid).orElse(null));
 
-            String shiftDate = PayrollRules.shiftDate(li.getShiftStartAt()).format(dateFmt);
+            String shiftDate = PayrollRules.shiftDate(li.getShiftStartAt(), csvZone).format(dateFmt);
 
             // Point decimals whatever the server locale; text quoted and defused against spreadsheet formulas.
             csv.append(String.join(",",

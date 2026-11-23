@@ -40,6 +40,27 @@ public class SiteService {
         return siteRepository.findAllActive(tenantId, pageable).map(this::toResponse);
     }
 
+    /** The sites a limited user may see, paged. `allowed` null means the whole company. */
+    @Transactional(readOnly = true)
+    public Page<SiteResponse> getSites(TenantId tenantId, Pageable pageable, java.util.Set<UUID> allowed) {
+        if (allowed == null) return getSites(tenantId, pageable);
+        return page(siteRepository.findAllActive(tenantId, Pageable.unpaged()).map(this::toResponse).getContent(), pageable, allowed);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<SiteResponse> getSitesByBranch(TenantId tenantId, UUID branchId, Pageable pageable, java.util.Set<UUID> allowed) {
+        if (allowed == null) return getSitesByBranch(tenantId, branchId, pageable);
+        return page(siteRepository.findAllActiveByBranch(tenantId, branchId, Pageable.unpaged()).map(this::toResponse).getContent(), pageable, allowed);
+    }
+
+    private static Page<SiteResponse> page(java.util.List<SiteResponse> all, Pageable pageable, java.util.Set<UUID> allowed) {
+        java.util.List<SiteResponse> kept = SiteScopeRules.keep(allowed, all, SiteResponse::id);
+        if (pageable == null || pageable.isUnpaged()) return new org.springframework.data.domain.PageImpl<>(kept);
+        int from = (int) Math.min(pageable.getOffset(), kept.size());
+        int to = Math.min(from + pageable.getPageSize(), kept.size());
+        return new org.springframework.data.domain.PageImpl<>(kept.subList(from, to), pageable, kept.size());
+    }
+
     // FIX: closes part of the confirmed "branch-level query scoping"
     // gap. Uses SiteRepository.findAllActiveByBranch() — already
     // existed, fully working, never called from anywhere until now.
