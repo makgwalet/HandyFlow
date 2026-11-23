@@ -7,7 +7,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
-import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -295,6 +294,7 @@ public class AgCropCycleController {
             @RequestParam String evidenceType) {
         featureGuard.requireModule(SOURCE_MODULE);
         TenantId tenantId = TenantContext.getTenantIdAsObject();
+        cropCycleService.requireExists(tenantId, id);
         UUID uploadedBy = TenantContext.getCurrentUserId();
         String uploadedByName = TenantContext.getCurrentUserName();
         return ResponseEntity.ok(ApiResponse.success(evidenceFacade.attach(
@@ -313,18 +313,15 @@ public class AgCropCycleController {
     @PreAuthorize("hasAuthority('AGRICULTURE_READ')")
     public ResponseEntity<byte[]> downloadEvidence(@PathVariable UUID evidenceId) {
         featureGuard.requireModule(SOURCE_MODULE);
-        EvidenceFacade.DownloadedEvidence file = evidenceFacade.download(TenantContext.getTenantIdAsObject(), evidenceId);
-        return ResponseEntity.ok()
-                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + file.fileName() + "\"")
-                .contentType(MediaType.parseMediaType(file.contentType()))
-                .body(file.content());
+        return AgEvidenceResponses.download(evidenceFacade.downloadScoped(
+                TenantContext.getTenantIdAsObject(), SOURCE_MODULE, ENTITY_TYPE, evidenceId));
     }
 
     @PostMapping("/crop-cycles/evidence/{evidenceId}/detach")
     @PreAuthorize("hasAuthority('AGRICULTURE_MANAGE')")
     public ResponseEntity<ApiResponse<Void>> detachEvidence(@PathVariable UUID evidenceId) {
         featureGuard.requireModule(SOURCE_MODULE);
-        evidenceFacade.detach(TenantContext.getTenantIdAsObject(), evidenceId);
+        evidenceFacade.detachScoped(TenantContext.getTenantIdAsObject(), SOURCE_MODULE, ENTITY_TYPE, evidenceId);
         return ResponseEntity.ok(ApiResponse.success("Evidence detached", null));
     }
 }

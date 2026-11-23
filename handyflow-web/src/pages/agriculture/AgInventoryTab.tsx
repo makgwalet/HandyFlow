@@ -15,10 +15,16 @@
 // every other Increment-1 controller.
 import type React from "react"
 import { useState } from "react"
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
+import { useQuery, useQueryClient } from "@tanstack/react-query"
+import { useAgToastMutation } from "./agMutation"
 import { Package, Plus, Pencil, ArrowDownToLine, ArrowUpFromLine, Scale, Ban, RotateCcw, Trash2, TriangleAlert } from "lucide-react"
 import { apiClient } from "../../api/client"
-import { AG_ACCENT, AG_ACCENT_TEXT, fmtMoney, statusBadge } from "./constants"
+import { AG_ACCENT_TEXT, fmtMoney, statusBadge, inp, btnPrimary, btnGhost } from "./constants"
+import { agConfirm } from "./agConfirm"
+import { Field, QueryError } from "./agUi"
+import AgManage from "./AgManage"
+import { STOCK_UNITS } from "./agLookups"
+import { adjustError, adjustmentText, averageCostAfterReceipt, receiveError } from "./agStock.logic"
 
 export interface InventoryItemResponse {
   id: string
@@ -48,18 +54,20 @@ export default function AgInventoryTab({ farmId }: { farmId: string }) {
   const [acting, setActing] = useState<{ item: InventoryItemResponse; kind: ActionKind } | null>(null)
   const [qty, setQty] = useState("")
   const [notes, setNotes] = useState("")
+  const [deliveryCost, setDeliveryCost] = useState("")
+  const [actionError, setActionError] = useState("")
 
   const [itemName, setItemName] = useState(""); const [category, setCategory] = useState("FEED")
   const [uom, setUom] = useState("kg"); const [reorderLevel, setReorderLevel] = useState("")
   const [unitCost, setUnitCost] = useState(""); const [supplier, setSupplier] = useState("")
 
-  const { data, isLoading } = useQuery<Page<InventoryItemResponse>>({
+  const { data, isLoading, isError, refetch } = useQuery<Page<InventoryItemResponse>>({
     queryKey: ["ag-inventory", farmId],
     queryFn: async () => (await apiClient.get(`/api/v1/agriculture/farms/${farmId}/inventory-items`, { params: { size: 200 } })).data,
   })
   const invalidate = () => qc.invalidateQueries({ queryKey: ["ag-inventory", farmId] })
 
-  const createMut = useMutation({
+  const createMut = useAgToastMutation({
     mutationFn: () => apiClient.post(`/api/v1/agriculture/farms/${farmId}/inventory-items`, {
       farmId, itemName, category, unitOfMeasure: uom,
       reorderLevel: reorderLevel ? Number(reorderLevel) : null,
@@ -70,7 +78,7 @@ export default function AgInventoryTab({ farmId }: { farmId: string }) {
       setItemName(""); setCategory("FEED"); setUom("kg"); setReorderLevel(""); setUnitCost(""); setSupplier("")
     },
   })
-  const updateMut = useMutation({
+  const updateMut = useAgToastMutation({
     mutationFn: (v: { itemName: string; reorderLevel: string; unitCost: string; supplier: string; notes: string }) =>
       apiClient.put(`/api/v1/agriculture/inventory-items/${editing!.id}`, {
         itemName: v.itemName, reorderLevel: v.reorderLevel ? Number(v.reorderLevel) : null,
@@ -78,22 +86,31 @@ export default function AgInventoryTab({ farmId }: { farmId: string }) {
       }),
     onSuccess: () => { invalidate(); setEditing(null) },
   })
-  const deactivateMut = useMutation({ mutationFn: (id: string) => apiClient.patch(`/api/v1/agriculture/inventory-items/${id}/deactivate`), onSuccess: invalidate })
-  const reactivateMut = useMutation({ mutationFn: (id: string) => apiClient.patch(`/api/v1/agriculture/inventory-items/${id}/reactivate`), onSuccess: invalidate })
-  const deleteMut = useMutation({ mutationFn: (id: string) => apiClient.delete(`/api/v1/agriculture/inventory-items/${id}`), onSuccess: invalidate })
+  const deactivateMut = useAgToastMutation({ mutationFn: (id: string) => apiClient.patch(`/api/v1/agriculture/inventory-items/${id}/deactivate`), onSuccess: invalidate })
+  const reactivateMut = useAgToastMutation({ mutationFn: (id: string) => apiClient.patch(`/api/v1/agriculture/inventory-items/${id}/reactivate`), onSuccess: invalidate })
+  const deleteMut = useAgToastMutation({ mutationFn: (id: string) => apiClient.delete(`/api/v1/agriculture/inventory-items/${id}`), onSuccess: invalidate })
 
-  const actionMut = useMutation({
+  const actionMut = useAgToastMutation({
     mutationFn: async () => {
       if (!acting) return
       const { item, kind } = acting
-      if (kind === "receive") return apiClient.post(`/api/v1/agriculture/inventory-items/${item.id}/receive`, { quantity: Number(qty), newUnitCost: null, notes: notes || null })
+      if (kind === "receive") return apiClient.post(`/api/v1/agriculture/inventory-items/${item.id}/receive`, { quantity: Number(qty), newUnitCost: deliveryCost ? Number(deliveryCost) : null, notes: notes || null })
       if (kind === "issue") return apiClient.post(`/api/v1/agriculture/inventory-items/${item.id}/issue`, { quantity: Number(qty), referenceType: null, referenceId: null, notes: notes || null })
       if (kind === "adjust") return apiClient.post(`/api/v1/agriculture/inventory-items/${item.id}/adjust`, { newQuantity: Number(qty), notes: notes || null })
     },
-    onSuccess: () => { invalidate(); setActing(null); setQty(""); setNotes("") },
+    onSuccess: () => { invalidate(); setActing(null); setQty(""); setNotes(""); setDeliveryCost(""); setActionError("") },
   })
 
   const items = data?.content ?? []
+  const submitAction = () => {
+    if (!acting) return
+    const problem = acting.kind === "adjust" ? adjustError(qty, notes, acting.item.currentQuantity)
+      : acting.kind === "receive" ? receiveError(qty, deliveryCost)
+      : Number(qty) > 0 ? null : "Enter a quantity greater than 0."
+    if (problem) { setActionError(problem); return }
+    setActionError(""); actionMut.mutate()
+  }
+  const closeAction = () => { setActing(null); setQty(""); setNotes(""); setDeliveryCost(""); setActionError("") }
   const lowStock = items.filter(i => i.belowReorderLevel)
 
   return (
@@ -107,20 +124,20 @@ export default function AgInventoryTab({ farmId }: { farmId: string }) {
 
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
         <p style={{ fontSize: 13, color: "var(--hf-text-muted)", margin: 0 }}>{items.length} stock item{items.length === 1 ? "" : "s"}.</p>
-        {!showCreate && <button onClick={() => setShowCreate(true)} style={btnPrimary}><Plus size={14} style={{ marginRight: 5, verticalAlign: -2 }} />Add item</button>}
+        {!showCreate && <AgManage><button onClick={() => setShowCreate(true)} style={btnPrimary}><Plus size={14} style={{ marginRight: 5, verticalAlign: -2 }} />Add item</button></AgManage>}
       </div>
 
       {showCreate && (
         <div style={{ background: "var(--hf-surface-muted)", border: "1px solid var(--hf-border)", borderRadius: 12, padding: 16, marginBottom: 16 }}>
-          <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr", gap: 10, marginBottom: 10 }}>
-            <div><label style={lbl}>Item name</label><input value={itemName} onChange={e => setItemName(e.target.value)} style={inp} /></div>
-            <div><label style={lbl}>Category</label><select value={category} onChange={e => setCategory(e.target.value)} style={inp}>{CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}</select></div>
-            <div><label style={lbl}>Unit of measure</label><input value={uom} onChange={e => setUom(e.target.value)} style={inp} /></div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))", gap: 10, marginBottom: 10 }}>
+            <Field label="Item name"><input value={itemName} onChange={e => setItemName(e.target.value)} style={inp} /></Field>
+            <Field label="Category"><select value={category} onChange={e => setCategory(e.target.value)} style={inp}>{CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}</select></Field>
+            <Field label="Unit of measure"><select value={uom} onChange={e => setUom(e.target.value)} style={inp}>{STOCK_UNITS.map(u => <option key={u} value={u}>{u}</option>)}</select></Field>
           </div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, marginBottom: 12 }}>
-            <div><label style={lbl}>Reorder level</label><input type="number" min={0} value={reorderLevel} onChange={e => setReorderLevel(e.target.value)} style={inp} /></div>
-            <div><label style={lbl}>Unit cost (R)</label><input type="number" min={0} step="0.01" value={unitCost} onChange={e => setUnitCost(e.target.value)} style={inp} /></div>
-            <div><label style={lbl}>Supplier</label><input value={supplier} onChange={e => setSupplier(e.target.value)} style={inp} /></div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))", gap: 10, marginBottom: 12 }}>
+            <Field label="Reorder level"><input type="number" min={0} value={reorderLevel} onChange={e => setReorderLevel(e.target.value)} style={inp} /></Field>
+            <Field label="Unit cost (R)"><input type="number" min={0} step="0.01" value={unitCost} onChange={e => setUnitCost(e.target.value)} style={inp} /></Field>
+            <Field label="Supplier"><input value={supplier} onChange={e => setSupplier(e.target.value)} style={inp} /></Field>
           </div>
           <div style={{ display: "flex", gap: 8 }}>
             <button disabled={createMut.isPending || !itemName.trim()} onClick={() => createMut.mutate()}
@@ -130,7 +147,7 @@ export default function AgInventoryTab({ farmId }: { farmId: string }) {
         </div>
       )}
 
-      {isLoading ? <p style={{ color: "var(--hf-text-faint)", fontSize: 13 }}>Loading…</p> :
+      {isLoading ? <p style={{ color: "var(--hf-text-faint)", fontSize: 13 }}>Loading…</p> : isError ? <QueryError onRetry={() => void refetch()} /> :
         items.length === 0 ? <p style={{ color: "var(--hf-text-faint)", fontSize: 13 }}>No stock items yet.</p> : (
         <div style={{ border: "1px solid var(--hf-border)", borderRadius: 12, overflow: "hidden" }}>
           {items.map((it, i) => (
@@ -148,6 +165,7 @@ export default function AgInventoryTab({ farmId }: { farmId: string }) {
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                   <span style={statusBadge(it.status)}>{it.status}</span>
+                  <AgManage>
                   <button onClick={() => setActing({ item: it, kind: "receive" })} title="Receive stock" style={iconBtn}><ArrowDownToLine size={13} /></button>
                   <button onClick={() => setActing({ item: it, kind: "issue" })} title="Issue stock" style={iconBtn}><ArrowUpFromLine size={13} /></button>
                   <button onClick={() => setActing({ item: it, kind: "adjust" })} title="Adjust quantity" style={iconBtn}><Scale size={13} /></button>
@@ -157,7 +175,8 @@ export default function AgInventoryTab({ farmId }: { farmId: string }) {
                   ) : (
                     <button onClick={() => reactivateMut.mutate(it.id)} title="Reactivate" style={iconBtn}><RotateCcw size={13} /></button>
                   )}
-                  <button onClick={() => { if (confirm(`Delete "${it.itemName}"?`)) deleteMut.mutate(it.id) }} title="Delete" style={{ ...iconBtn, color: "var(--hf-danger-text)" }}><Trash2 size={13} /></button>
+                  <button onClick={async () => { if (await agConfirm({ title: `Delete "${it.itemName}"?`, confirmLabel: "Delete", danger: true })) deleteMut.mutate(it.id) }} title="Delete" style={{ ...iconBtn, color: "var(--hf-danger-text)" }}><Trash2 size={13} /></button>
+                  </AgManage>
                 </div>
               </div>
 
@@ -168,20 +187,33 @@ export default function AgInventoryTab({ farmId }: { farmId: string }) {
               )}
 
               {acting?.item.id === it.id && (
-                <div style={{ padding: "0 16px 16px", display: "flex", gap: 8, alignItems: "flex-end" }}>
-                  <div>
-                    <label style={lbl}>{acting.kind === "adjust" ? "New quantity" : "Quantity"}</label>
-                    <input type="number" min={0} step="0.01" value={qty} onChange={e => setQty(e.target.value)} style={{ ...inp, width: 130 }} />
+                <div style={{ padding: "0 16px 16px" }}>
+                  <div style={{ display: "flex", gap: 8, alignItems: "flex-end" }}>
+                    <Field label={`${acting.kind === "adjust" ? "Counted quantity" : "Quantity"} (${it.unitOfMeasure})`}><input type="number" min={0} step="0.01" value={qty} onChange={e => setQty(e.target.value)} style={{ ...inp, width: 130 }} /></Field>
+                    {acting.kind === "receive" && (
+                      <Field label={`Cost per ${it.unitOfMeasure} this delivery (R)`}><input type="number" min={0} step="0.01" value={deliveryCost} onChange={e => setDeliveryCost(e.target.value)} style={{ ...inp, width: 150 }} /></Field>
+                    )}
+                    <div style={{ flex: 1 }}>
+                      <Field label={acting.kind === "adjust" ? "Reason (required)" : "Notes"}>
+                        <input value={notes} onChange={e => setNotes(e.target.value)} placeholder={acting.kind === "adjust" ? "e.g. Stock count, spilled, found" : ""} style={inp} />
+                      </Field>
+                    </div>
+                    <button disabled={actionMut.isPending} onClick={submitAction}
+                      style={{ ...btnPrimary, opacity: actionMut.isPending ? 0.6 : 1, textTransform: "capitalize" }}>
+                      {actionMut.isPending ? "Saving…" : acting.kind}
+                    </button>
+                    <button onClick={closeAction} style={btnGhost}>Cancel</button>
                   </div>
-                  <div style={{ flex: 1 }}>
-                    <label style={lbl}>Notes</label>
-                    <input value={notes} onChange={e => setNotes(e.target.value)} style={inp} />
-                  </div>
-                  <button disabled={actionMut.isPending || !qty} onClick={() => actionMut.mutate()}
-                    style={{ ...btnPrimary, opacity: actionMut.isPending || !qty ? 0.6 : 1, textTransform: "capitalize" }}>
-                    {actionMut.isPending ? "Saving…" : acting.kind}
-                  </button>
-                  <button onClick={() => { setActing(null); setQty(""); setNotes("") }} style={btnGhost}>Cancel</button>
+                  {acting.kind === "adjust" && qty.trim() !== "" && Number(qty) >= 0 && (
+                    <p style={{ fontSize: 12, color: "var(--hf-text-muted)", margin: "8px 0 0" }}>{adjustmentText(it.currentQuantity, Number(qty), it.unitOfMeasure)}</p>
+                  )}
+                  {acting.kind === "receive" && deliveryCost !== "" && Number(qty) > 0 && Number(deliveryCost) >= 0 && (
+                    <p style={{ fontSize: 12, color: "var(--hf-text-muted)", margin: "8px 0 0" }}>
+                      Average cost becomes R{averageCostAfterReceipt(it.currentQuantity, it.unitCost, Number(qty), Number(deliveryCost))?.toFixed(2)} per {it.unitOfMeasure}.
+                    </p>
+                  )}
+                  {acting.kind === "receive" && deliveryCost === "" && <p style={{ fontSize: 12, color: "var(--hf-text-faint)", margin: "8px 0 0" }}>Leave the cost empty to keep the item's current cost.</p>}
+                  {actionError && <p role="alert" style={{ fontSize: 12.5, color: "var(--hf-danger-text)", margin: "8px 0 0" }}>{actionError}</p>}
                 </div>
               )}
             </div>
@@ -203,13 +235,13 @@ function EditItemForm({ item, saving, onCancel, onSave }: {
   const [notes, setNotes] = useState(item.notes ?? "")
   return (
     <div style={{ background: "var(--hf-surface-muted)", border: "1px solid var(--hf-border)", borderRadius: 12, padding: 16 }}>
-      <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr 1fr", gap: 10, marginBottom: 12 }}>
-        <div><label style={lbl}>Item name</label><input value={itemName} onChange={e => setItemName(e.target.value)} style={inp} /></div>
-        <div><label style={lbl}>Reorder level</label><input type="number" min={0} value={reorderLevel} onChange={e => setReorderLevel(e.target.value)} style={inp} /></div>
-        <div><label style={lbl}>Unit cost (R)</label><input type="number" min={0} step="0.01" value={unitCost} onChange={e => setUnitCost(e.target.value)} style={inp} /></div>
-        <div><label style={lbl}>Supplier</label><input value={supplier} onChange={e => setSupplier(e.target.value)} style={inp} /></div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))", gap: 10, marginBottom: 12 }}>
+        <Field label="Item name"><input value={itemName} onChange={e => setItemName(e.target.value)} style={inp} /></Field>
+        <Field label="Reorder level"><input type="number" min={0} value={reorderLevel} onChange={e => setReorderLevel(e.target.value)} style={inp} /></Field>
+        <Field label="Unit cost (R)"><input type="number" min={0} step="0.01" value={unitCost} onChange={e => setUnitCost(e.target.value)} style={inp} /></Field>
+        <Field label="Supplier"><input value={supplier} onChange={e => setSupplier(e.target.value)} style={inp} /></Field>
       </div>
-      <div style={{ marginBottom: 12 }}><label style={lbl}>Notes</label><input value={notes} onChange={e => setNotes(e.target.value)} style={inp} /></div>
+      <div style={{ marginBottom: 12 }}><Field label="Notes"><input value={notes} onChange={e => setNotes(e.target.value)} style={inp} /></Field></div>
       <div style={{ display: "flex", gap: 8 }}>
         <button disabled={saving || !itemName.trim()} onClick={() => onSave({ itemName, reorderLevel, unitCost, supplier, notes })}
           style={{ ...btnPrimary, opacity: saving || !itemName.trim() ? 0.6 : 1 }}>{saving ? "Saving…" : "Save"}</button>
@@ -219,8 +251,4 @@ function EditItemForm({ item, saving, onCancel, onSave }: {
   )
 }
 
-const lbl: React.CSSProperties = { fontSize: 11, fontWeight: 600, color: "var(--hf-text-secondary)", marginBottom: 4, display: "block" }
-const inp: React.CSSProperties = { width: "100%", padding: "8px 10px", border: "1px solid var(--hf-border)", borderRadius: 7, fontSize: 12.5, boxSizing: "border-box" }
-const btnPrimary: React.CSSProperties = { display: "inline-flex", alignItems: "center", padding: "8px 14px", borderRadius: 8, border: "none", background: AG_ACCENT, color: "var(--hf-text-on-solid)", fontSize: 12.5, fontWeight: 700, cursor: "pointer" }
-const btnGhost: React.CSSProperties = { padding: "8px 14px", borderRadius: 8, border: "1px solid var(--hf-border)", background: "var(--hf-surface)", color: "var(--hf-text-muted)", fontSize: 12.5, fontWeight: 600, cursor: "pointer" }
 const iconBtn: React.CSSProperties = { display: "flex", alignItems: "center", justifyContent: "center", width: 28, height: 28, borderRadius: 7, border: "1px solid var(--hf-border)", background: "var(--hf-surface)", color: "var(--hf-text-muted)", cursor: "pointer" }

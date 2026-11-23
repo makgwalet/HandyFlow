@@ -7,6 +7,7 @@ import { apiClient } from "../../api/client"
 import { api, useAgMutation } from "./agCrops.api"
 import type { AnimalResponse } from "./AgAnimalsTab"
 import type { GroupResponse } from "./AgGroupsTab"
+import { fetchAllPages } from "./agPaging.logic"
 
 export type TargetType = "CROP_CYCLE" | "GROUP" | "ANIMAL" | "ENTERPRISE"
 
@@ -26,19 +27,24 @@ export interface CreateCostBody {
 }
 
 const BASE = "/api/v1/agriculture"
+export interface DateRange { from?: string; to?: string }
 const LEDGER = ["ag", "ledger"] as const
 
-export function useCostEntries(farmId: string, target: TargetFilter | null, enabled = true) {
+/** Ledger rows, optionally only those dated from..to (both included, either may be empty). */
+export function useCostEntries(farmId: string, target: TargetFilter | null, enabled = true, range: DateRange = {}) {
   return useQuery<{ content: CostEntry[]; totalElements: number }>({
-    queryKey: [...LEDGER, "entries", farmId, target?.type ?? "all", target?.id ?? ""], enabled: enabled && !!farmId,
-    queryFn: async () => (await apiClient.get(`${BASE}/farms/${farmId}/cost-entries`, { params: { targetType: target?.type, targetId: target?.id, size: 200 } })).data,
+    queryKey: [...LEDGER, "entries", farmId, target?.type ?? "all", target?.id ?? "", range.from ?? "", range.to ?? ""], enabled: enabled && !!farmId,
+    queryFn: async () => {
+      const r = await fetchAllPages<CostEntry>(async (page, size) => (await apiClient.get(`${BASE}/farms/${farmId}/cost-entries`, { params: { targetType: target?.type, targetId: target?.id, ...range, page, size } })).data)
+      return { content: r.items, totalElements: r.total }
+    },
   })
 }
 
-export function useCostTotals(farmId: string, target: TargetFilter | null, enabled = true) {
+export function useCostTotals(farmId: string, target: TargetFilter | null, enabled = true, range: DateRange = {}) {
   return useQuery<CostTotals>({
-    queryKey: [...LEDGER, "totals", farmId, target?.type ?? "all", target?.id ?? ""], enabled: enabled && !!farmId,
-    queryFn: async () => (await apiClient.get(`${BASE}/farms/${farmId}/cost-entries/totals`, { params: { targetType: target?.type, targetId: target?.id } })).data,
+    queryKey: [...LEDGER, "totals", farmId, target?.type ?? "all", target?.id ?? "", range.from ?? "", range.to ?? ""], enabled: enabled && !!farmId,
+    queryFn: async () => (await apiClient.get(`${BASE}/farms/${farmId}/cost-entries/totals`, { params: { targetType: target?.type, targetId: target?.id, ...range } })).data,
   })
 }
 
@@ -52,12 +58,12 @@ export function useReverseCost() {
     { invalidate: [[...LEDGER]], success: "Cost reversed", failure: "Couldn't reverse the cost." })
 }
 
-// the lists a cost can be allocated to (the farm's groups and animals have no shared hook yet)
+// the lists a cost can be allocated to: every page, up to 2,000 rows (the server sends at most 200 at a time)
 export function useFarmGroups(farmId: string) {
   return useQuery<GroupResponse[]>({ queryKey: ["ag", "groups-for-ledger", farmId], enabled: !!farmId,
-    queryFn: async () => (await apiClient.get(`${BASE}/farms/${farmId}/groups`, { params: { size: 200 } })).data.content ?? [] })
+    queryFn: async () => (await fetchAllPages<GroupResponse>(async (page, size) => (await apiClient.get(`${BASE}/farms/${farmId}/groups`, { params: { page, size } })).data)).items })
 }
 export function useFarmAnimals(farmId: string) {
   return useQuery<AnimalResponse[]>({ queryKey: ["ag", "animals-for-ledger", farmId], enabled: !!farmId,
-    queryFn: async () => (await apiClient.get(`${BASE}/farms/${farmId}/animals`, { params: { size: 200 } })).data.content ?? [] })
+    queryFn: async () => (await fetchAllPages<AnimalResponse>(async (page, size) => (await apiClient.get(`${BASE}/farms/${farmId}/animals`, { params: { page, size } })).data)).items })
 }

@@ -8,8 +8,12 @@ import EmployeePicker, { type EmployeeOption } from "../training/EmployeePicker"
 import { agKeys, api, useAgMutation, useCropTypes, useHarvests } from "./agCrops.api"
 import { canLog, harvestUnitProblem, todayISO } from "./agCrops.logic"
 import { sumHarvests } from "./agUnits"
+import AgWithdrawalNotice from "./AgWithdrawalNotice"
+import { useWithdrawal } from "./agCompliance.api"
+import { overrideNote, overrideProblem, overrideReasonToSend } from "./agCompliance.logic"
 import type { CropCycle } from "./agCrops.types"
 import { Empty, Field, Th, Warn } from "./agCropsUi"
+import { QueryError } from "./agUi"
 import { btnGhost, btnPrimary, fmtDate, grid, inp, panel, td, theadStyle } from "./constants"
 
 const GRADES = ["A", "B", "C", "Reject"]
@@ -18,13 +22,18 @@ function HarvestForm({ cycle, defaultUnit, onDone }: { cycle: CropCycle; default
   const existing = useHarvests(cycle.id).data ?? []
   const [f, setF] = useState({ date: todayISO(), qty: "", unit: defaultUnit ?? existing[0]?.unitOfMeasure ?? "kg", grade: "", moisture: "", storage: "", hours: "", notes: "" })
   const [by, setBy] = useState<EmployeeOption | null>(null)
+  // a spray whose pre-harvest interval has not passed holds the harvest, unless someone says why it is safe
+  const [overrideReason, setOverrideReason] = useState("")
+  const hold = useWithdrawal("crop", cycle.id, f.date, !!f.date)
+  const held = !!hold.data?.held
   const problem = harvestUnitProblem(f.unit, defaultUnit, existing)    // the server rejects this too
-  const valid = !!f.date && Number(f.qty) > 0 && !!f.unit.trim() && !problem
+  const valid = !!f.date && Number(f.qty) > 0 && !!f.unit.trim() && !problem && !overrideProblem(held, overrideReason)
   const create = useAgMutation(
     () => api.post(`/crop-cycles/${cycle.id}/harvest-records`, {
       harvestDate: f.date, quantityHarvested: Number(f.qty), unitOfMeasure: f.unit.trim(), qualityGrade: f.grade.trim() || undefined,
       moistureContent: f.moisture ? Number(f.moisture) : undefined, storageLocation: f.storage.trim() || undefined,
       harvestedBy: by?.id, laborHours: f.hours ? Number(f.hours) : undefined, notes: f.notes.trim() || undefined,
+      preHarvestOverrideReason: overrideReasonToSend(held, overrideReason) ?? undefined,
     }),
     { invalidate: [agKeys.harvests(cycle.id), agKeys.cycleCost(cycle.id), ["ag", "costs", "crops", cycle.farmId]], success: "Harvest recorded", failure: "Couldn't record the harvest." })
   return (
@@ -40,7 +49,9 @@ function HarvestForm({ cycle, defaultUnit, onDone }: { cycle: CropCycle; default
         <Field label="Harvested by"><EmployeePicker value={by} onChange={setBy} /></Field>
         <Field label="Notes" htmlFor="hv-notes"><input id="hv-notes" style={inp} value={f.notes} onChange={e => setF({ ...f, notes: e.target.value })} /></Field>
       </div>
+      <AgWithdrawalNotice status={hold.data} kind="pre-harvest interval" reason={overrideReason} onReason={setOverrideReason} />
       {problem && <Warn tone="danger">{problem}</Warn>}
+      {held && overrideProblem(held, overrideReason) && <Warn tone="danger">{overrideProblem(held, overrideReason)}</Warn>}
       <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
         <button type="button" style={{ ...btnPrimary, opacity: valid && !create.isPending ? 1 : 0.5 }} disabled={!valid || create.isPending} onClick={() => create.mutate(undefined, { onSuccess: onDone })}>Record harvest</button>
         <button type="button" style={btnGhost} onClick={onDone}>Cancel</button>
@@ -52,7 +63,7 @@ function HarvestForm({ cycle, defaultUnit, onDone }: { cycle: CropCycle; default
 export default function AgCropHarvestsTab({ cycle }: { cycle: CropCycle }) {
   const canManage = usePermission("AGRICULTURE_MANAGE")
   const [adding, setAdding] = useState(false)
-  const { data: records = [], isLoading } = useHarvests(cycle.id)
+  const { data: records = [], isLoading, isError, refetch } = useHarvests(cycle.id)
   const defaultUnit = (useCropTypes().data ?? []).find(t => t.id === cycle.cropTypeId)?.defaultUnitOfMeasure ?? null
   // yield is shown in the crop's own unit, converting kg and t exactly as the server does
   const yieldUnit = defaultUnit ?? records[0]?.unitOfMeasure ?? null
@@ -61,14 +72,14 @@ export default function AgCropHarvestsTab({ cycle }: { cycle: CropCycle }) {
     <div>
       {canManage && canLog("harvest", cycle.status) && !adding && <div style={{ marginBottom: 12 }}><button type="button" style={btnPrimary} onClick={() => setAdding(true)}><Plus size={14} />Record harvest</button></div>}
       {adding && <HarvestForm cycle={cycle} defaultUnit={defaultUnit} onDone={() => setAdding(false)} />}
-      {isLoading ? <Empty>Loading harvests…</Empty> : records.length === 0 ? <Empty>{cycle.status === "PLANNED" ? "Harvests can be recorded once the crop is planted." : "No harvest recorded for this cycle yet."}</Empty> : (
+      {isLoading ? <Empty>Loading harvests…</Empty> : isError ? <QueryError onRetry={() => void refetch()} what="the harvests" /> : records.length === 0 ? <Empty>{cycle.status === "PLANNED" ? "Harvests can be recorded once the crop is planted." : "No harvest recorded for this cycle yet."}</Empty> : (
         <div style={{ overflowX: "auto" }}>
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12.5 }}>
             <thead><tr style={theadStyle}>{["Date", "Quantity", "Grade", "Moisture", "Storage", "Harvested by", "Labour h"].map(h => <Th key={h}>{h}</Th>)}</tr></thead>
             <tbody>
               {records.map(r => (
                 <tr key={r.id} style={{ borderTop: "1px solid var(--hf-border-subtle)" }}>
-                  <td style={td}>{fmtDate(r.harvestDate)}</td><td style={td}>{r.quantityHarvested} {r.unitOfMeasure}</td><td style={td}>{r.qualityGrade ?? "—"}</td>
+                  <td style={td}>{fmtDate(r.harvestDate)}</td><td style={td}>{r.quantityHarvested} {r.unitOfMeasure}{overrideNote(r.withdrawalOverrideReason, r.withdrawalHeldUntil, "pre-harvest interval") && <span style={{ display: "block", fontSize: 11, color: "var(--hf-warning-text)" }}>{overrideNote(r.withdrawalOverrideReason, r.withdrawalHeldUntil, "pre-harvest interval")}</span>}</td><td style={td}>{r.qualityGrade ?? "—"}</td>
                   <td style={td}>{r.moistureContent != null ? `${r.moistureContent}%` : "—"}</td><td style={td}>{r.storageLocation ?? "—"}</td>
                   <td style={td}>{r.harvestedByName ?? "—"}</td><td style={td}>{r.laborHours ?? "—"}</td>
                 </tr>

@@ -19,8 +19,26 @@ public interface AgInputApplicationRepository extends JpaRepository<AgInputAppli
     @Query("SELECT a FROM AgInputApplication a WHERE a.tenantId = :tenantId AND a.id = :id")
     Optional<AgInputApplication> findByTenantAndId(TenantId tenantId, UUID id);
 
-    @Query("SELECT a FROM AgInputApplication a WHERE a.tenantId = :tenantId AND a.cropCycleId = :cropCycleId ORDER BY a.applicationDate DESC")
+    @Query("SELECT a FROM AgInputApplication a WHERE a.tenantId = :tenantId AND a.cropCycleId = :cropCycleId ORDER BY a.applicationDate DESC, a.id DESC")
     Page<AgInputApplication> findByCropCycle(TenantId tenantId, UUID cropCycleId, Pageable pageable);
+
+    // Applications with a pre-harvest interval, on or before asOf; AgWithdrawalRules decides which still hold the harvest.
+    @Query("""
+        SELECT a FROM AgInputApplication a
+        WHERE a.tenantId = :tenantId AND a.cropCycleId = :cropCycleId
+        AND a.preHarvestIntervalDays IS NOT NULL AND a.preHarvestIntervalDays > 0
+        AND a.applicationDate >= :since AND a.applicationDate <= :asOf
+        """)
+    List<AgInputApplication> findWithPreHarvestInterval(TenantId tenantId, UUID cropCycleId, LocalDate since, LocalDate asOf);
+
+    // The spray and input register: every application on the farm's crop cycles in the period, oldest first.
+    @Query("""
+        SELECT a FROM AgInputApplication a
+        WHERE a.tenantId = :tenantId AND a.applicationDate >= :from AND a.applicationDate <= :to
+        AND a.cropCycleId IN (SELECT c.id FROM AgCropCycle c WHERE c.tenantId = :tenantId AND c.farmId = :farmId)
+        ORDER BY a.applicationDate ASC, a.createdAt ASC
+        """)
+    List<AgInputApplication> findForFarmBetween(TenantId tenantId, UUID farmId, LocalDate from, LocalDate to, Pageable pageable);
 
     // Backs AgCostReportingService — COALESCE so a cycle with zero
     // applications returns 0, not null, mirroring

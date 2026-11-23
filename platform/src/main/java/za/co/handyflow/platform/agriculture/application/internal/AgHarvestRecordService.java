@@ -14,6 +14,7 @@ import za.co.handyflow.platform.agriculture.domain.repository.AgCropTypeReposito
 import za.co.handyflow.platform.agriculture.domain.repository.AgHarvestRecordRepository;
 import za.co.handyflow.platform.agriculture.domain.rules.AgCropLifecycle;
 import za.co.handyflow.platform.agriculture.domain.rules.AgUnits;
+import za.co.handyflow.platform.agriculture.domain.rules.AgWithdrawalRules;
 import za.co.handyflow.platform.agriculture.dto.CreateHarvestRecordRequest;
 import za.co.handyflow.platform.agriculture.dto.HarvestRecordResponse;
 import za.co.handyflow.platform.hr.application.HrFacade;
@@ -41,6 +42,7 @@ public class AgHarvestRecordService {
     private final AgCropCycleRepository cropCycleRepository;
     private final AgCropTypeRepository cropTypeRepository;
     private final HrFacade hrFacade;
+    private final AgWithdrawalService withdrawal;
 
     @Transactional(readOnly = true)
     public Page<HarvestRecordResponse> getHistoryForCropCycle(TenantId tenantId, UUID cropCycleId, Pageable pageable) {
@@ -57,10 +59,13 @@ public class AgHarvestRecordService {
         cropTypeRepository.findActiveById(tenantId, cycle.getCropTypeId())
                 .map(AgCropType::getDefaultUnitOfMeasure)
                 .ifPresent(cropUnit -> AgUnits.requireConvertible(req.unitOfMeasure(), cropUnit));
+        // A crop sprayed less than the product's pre-harvest interval ago cannot be harvested without a written reason
+        AgWithdrawalRules.Override override = withdrawal.requireCropClearOrOverride(tenantId, cropCycleId, req.harvestDate(), req.preHarvestOverrideReason()).orElse(null);
         String harvestedByName = resolveEmployeeName(tenantId, req.harvestedBy());
         AgHarvestRecord record = AgHarvestRecord.create(tenantId, cropCycleId, req.harvestDate(),
                 req.quantityHarvested(), req.unitOfMeasure(), req.qualityGrade(), req.moistureContent(),
                 req.storageLocation(), req.harvestedBy(), harvestedByName, req.laborHours(), req.notes());
+        record.recordWithdrawalOverride(override);
         harvestRecordRepository.save(record);
         log.info("Harvest recorded id={} cropCycle={} quantity={} tenant={}",
                 record.getId(), cropCycleId, req.quantityHarvested(), tenantId.getValue());
@@ -80,7 +85,8 @@ public class AgHarvestRecordService {
         return new HarvestRecordResponse(
                 h.getId(), h.getCropCycleId(), h.getHarvestDate(), h.getQuantityHarvested(), h.getUnitOfMeasure(),
                 h.getQualityGrade(), h.getMoistureContent(), h.getStorageLocation(), h.getHarvestedBy(),
-                h.getHarvestedByName(), h.getLaborHours(), h.getNotes(), h.getCreatedAt()
+                h.getHarvestedByName(), h.getLaborHours(), h.getNotes(), h.getCreatedAt(),
+                h.getWithdrawalOverrideReason(), h.getWithdrawalHeldUntil()
         );
     }
 }

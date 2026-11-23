@@ -23,6 +23,7 @@ import java.util.UUID;
 public class AgProductionAreaService {
 
     private final AgProductionAreaRepository areaRepository;
+    private final AgReferenceChecker references;
 
     @Transactional(readOnly = true)
     public Page<ProductionAreaResponse> getAreasForFarm(TenantId tenantId, UUID farmId, String status, Pageable pageable) {
@@ -39,6 +40,7 @@ public class AgProductionAreaService {
 
     @Transactional
     public ProductionAreaResponse createArea(TenantId tenantId, CreateProductionAreaRequest req) {
+        references.requireActiveFarm(tenantId, req.farmId());
         AgProductionArea area = AgProductionArea.create(tenantId, req.farmId(), req.name(), req.areaType(),
                 req.sizeHectares(), req.capacity(), req.soilType());
         areaRepository.save(area);

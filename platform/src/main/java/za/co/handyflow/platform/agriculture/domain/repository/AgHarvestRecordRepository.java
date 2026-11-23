@@ -19,7 +19,7 @@ public interface AgHarvestRecordRepository extends JpaRepository<AgHarvestRecord
     @Query("SELECT h FROM AgHarvestRecord h WHERE h.tenantId = :tenantId AND h.id = :id")
     Optional<AgHarvestRecord> findByTenantAndId(TenantId tenantId, UUID id);
 
-    @Query("SELECT h FROM AgHarvestRecord h WHERE h.tenantId = :tenantId AND h.cropCycleId = :cropCycleId ORDER BY h.harvestDate DESC")
+    @Query("SELECT h FROM AgHarvestRecord h WHERE h.tenantId = :tenantId AND h.cropCycleId = :cropCycleId ORDER BY h.harvestDate DESC, h.id DESC")
     Page<AgHarvestRecord> findByCropCycle(TenantId tenantId, UUID cropCycleId, Pageable pageable);
 
     // Backs AgCostReportingService's yield-per-hectare figure. Summed as

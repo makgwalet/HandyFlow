@@ -13,6 +13,7 @@ import { useCostLabour, useUncostedLabour, useUpdateFinanceSettings, type Financ
 import { baseRateFor, costFor, hoursText, rowKey, settingsProblem, validateCosting } from "./agLabour.logic"
 import { Empty, Field, Warn } from "./agCropsUi"
 import { btnGhost, btnPrimary, card, fmtDate, fmtMoney, inp, kpiLabel, kpiValue, panel } from "./constants"
+import { QueryError } from "./agUi"
 
 function SettingsPanel({ settings }: { settings: FinanceSettings }) {
   const [editing, setEditing] = useState(false)
@@ -60,7 +61,7 @@ function LabourBody({ farmId }: { farmId: string }) {
 
   if (overview.isLoading) return <Empty>Loading labour…</Empty>
   if (overview.isError || !overview.data) {
-    return <p role="alert" style={{ fontSize: 13, color: "var(--hf-danger-text)" }}>We couldn't load labour. <button type="button" onClick={() => overview.refetch()} style={{ background: "none", border: "none", textDecoration: "underline", cursor: "pointer", color: "inherit", fontWeight: 700 }}>Try again</button></p>
+    return <QueryError onRetry={() => void overview.refetch()} what="labour" />
   }
   const { settings, hrRatesAvailable, candidates } = overview.data
   const cycleName = (id: string) => { const c = cycles.find(x => x.id === id); return c ? cycleLabel(c, cropTypes) : "Crop cycle" }

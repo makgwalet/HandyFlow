@@ -12,6 +12,7 @@ import { STATUS_LABEL, cropName, cycleKpis, cycleLabel, isHarvestOverdue, status
 import type { CropCycle, CycleStatus } from "./agCrops.types"
 import AgCropCycleDetail from "./AgCropCycleDetail"
 import { AG_ACCENT_TEXT, btnGhost, btnPrimary, card, fmtDate, inp, kpiLabel, kpiValue, lbl, panel, statusBadge } from "./constants"
+import { QueryError } from "./agUi"
 
 const STATUS_FILL: Record<CycleStatus, string> = {
   PLANNED: "var(--hf-text-faint)", PLANTED: "var(--hf-info)", GROWING: "var(--hf-success)", HARVESTING: "var(--hf-warning)",
@@ -169,7 +170,7 @@ export default function AgCropCyclesTab({ farmId }: { farmId: string }) {
       {showForm && canManage && <CycleForm farmId={farmId} onDone={() => setShowForm(false)} />}
 
       {isLoading ? <p style={{ fontSize: 13, color: "var(--hf-text-faint)" }}>Loading crop cycles…</p>
-        : isError ? <p role="alert" style={{ fontSize: 13, color: "var(--hf-danger-text)" }}>We couldn't load crop cycles. <button type="button" onClick={() => refetch()} style={{ background: "none", border: "none", textDecoration: "underline", cursor: "pointer", color: "inherit", fontWeight: 700 }}>Try again</button></p>
+        : isError ? <QueryError onRetry={() => void refetch()} what="crop cycles" />
         : rows.length === 0 ? (
           <div style={{ textAlign: "center", padding: "32px 12px", color: "var(--hf-text-muted)", fontSize: 13 }}>
             <Sprout size={26} style={{ color: "var(--hf-text-disabled)", marginBottom: 6 }} />

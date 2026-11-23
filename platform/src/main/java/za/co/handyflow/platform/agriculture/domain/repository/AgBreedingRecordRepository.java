@@ -17,10 +17,10 @@ public interface AgBreedingRecordRepository extends JpaRepository<AgBreedingReco
     @Query("SELECT b FROM AgBreedingRecord b WHERE b.tenantId = :tenantId AND b.id = :id")
     Optional<AgBreedingRecord> findByTenantAndId(TenantId tenantId, UUID id);
 
-    @Query("SELECT b FROM AgBreedingRecord b WHERE b.tenantId = :tenantId AND b.animalId = :animalId ORDER BY b.matingDate DESC")
+    @Query("SELECT b FROM AgBreedingRecord b WHERE b.tenantId = :tenantId AND b.animalId = :animalId ORDER BY b.matingDate DESC, b.id DESC")
     Page<AgBreedingRecord> findByAnimal(TenantId tenantId, UUID animalId, Pageable pageable);
 
-    @Query("SELECT b FROM AgBreedingRecord b WHERE b.tenantId = :tenantId AND b.groupId = :groupId ORDER BY b.matingDate DESC")
+    @Query("SELECT b FROM AgBreedingRecord b WHERE b.tenantId = :tenantId AND b.groupId = :groupId ORDER BY b.matingDate DESC, b.id DESC")
     Page<AgBreedingRecord> findByGroup(TenantId tenantId, UUID groupId, Pageable pageable);
 
     // Trends: births that have been recorded: [actualBirthDate, offspringCount, animalId, groupId].

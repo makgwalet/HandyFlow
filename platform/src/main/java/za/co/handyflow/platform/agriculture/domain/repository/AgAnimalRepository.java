@@ -17,8 +17,18 @@ public interface AgAnimalRepository extends JpaRepository<AgAnimal, UUID> {
     @Query("SELECT a FROM AgAnimal a WHERE a.tenantId = :tenantId AND a.id = :id AND a.deletedAt IS NULL")
     Optional<AgAnimal> findActiveById(TenantId tenantId, UUID id);
 
-    @Query("SELECT a FROM AgAnimal a WHERE a.tenantId = :tenantId AND a.farmId = :farmId AND a.deletedAt IS NULL ORDER BY a.tagNumber")
+    @Query("SELECT a FROM AgAnimal a WHERE a.tenantId = :tenantId AND a.farmId = :farmId AND a.deletedAt IS NULL ORDER BY a.tagNumber, a.id")
     Page<AgAnimal> findAllActiveForFarm(TenantId tenantId, UUID farmId, Pageable pageable);
+
+    /**
+     * One farm's animals, filtered by status ("" = any) and a lower-case LIKE pattern (see AgListRules.likePattern) on tag number, name and breed.
+     * Always non-null parameters: a null bind in "x IS NULL" breaks type inference on PostgreSQL.
+     */
+    @Query("SELECT a FROM AgAnimal a WHERE a.tenantId = :tenantId AND a.farmId = :farmId AND a.deletedAt IS NULL "
+            + "AND (:status = '' OR a.status = :status) "
+            + "AND (LOWER(a.tagNumber) LIKE :pattern ESCAPE '!' OR LOWER(COALESCE(a.name, '')) LIKE :pattern ESCAPE '!' "
+            + "OR LOWER(COALESCE(a.breed, '')) LIKE :pattern ESCAPE '!') ORDER BY a.tagNumber, a.id")
+    Page<AgAnimal> searchForFarm(TenantId tenantId, UUID farmId, String status, String pattern, Pageable pageable);
 
     // FIX (Agriculture GAP 4 — mobile gap report, "Home/Today" summary):
     // backs the animal-count tile — avoids pulling a full page just to
@@ -26,10 +36,10 @@ public interface AgAnimalRepository extends JpaRepository<AgAnimal, UUID> {
     @Query("SELECT COUNT(a) FROM AgAnimal a WHERE a.tenantId = :tenantId AND a.farmId = :farmId AND a.deletedAt IS NULL AND a.status = 'ACTIVE'")
     long countActiveForFarm(TenantId tenantId, UUID farmId);
 
-    @Query("SELECT a FROM AgAnimal a WHERE a.tenantId = :tenantId AND a.farmId = :farmId AND a.status = :status AND a.deletedAt IS NULL ORDER BY a.tagNumber")
+    @Query("SELECT a FROM AgAnimal a WHERE a.tenantId = :tenantId AND a.farmId = :farmId AND a.status = :status AND a.deletedAt IS NULL ORDER BY a.tagNumber, a.id")
     Page<AgAnimal> findByStatusForFarm(TenantId tenantId, UUID farmId, String status, Pageable pageable);
 
-    @Query("SELECT a FROM AgAnimal a WHERE a.tenantId = :tenantId AND a.productionAreaId = :productionAreaId AND a.deletedAt IS NULL ORDER BY a.tagNumber")
+    @Query("SELECT a FROM AgAnimal a WHERE a.tenantId = :tenantId AND a.productionAreaId = :productionAreaId AND a.deletedAt IS NULL ORDER BY a.tagNumber, a.id")
     Page<AgAnimal> findAllActiveForProductionArea(TenantId tenantId, UUID productionAreaId, Pageable pageable);
 
     // Backs the pre-insert uniqueness check in AgAnimalService.createAnimal() —

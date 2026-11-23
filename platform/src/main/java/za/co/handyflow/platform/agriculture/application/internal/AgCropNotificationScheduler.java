@@ -4,95 +4,90 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 import za.co.handyflow.platform.agriculture.domain.model.AgScoutingRecord;
 import za.co.handyflow.platform.agriculture.domain.repository.AgScoutingRecordRepository;
+import za.co.handyflow.platform.agriculture.domain.rules.AgActionUrls;
+import za.co.handyflow.platform.agriculture.domain.rules.AgDates;
+import za.co.handyflow.platform.agriculture.domain.rules.AgReminderRules;
 import za.co.handyflow.platform.notifications.application.NotificationRequest;
 import za.co.handyflow.platform.notifications.application.Recipient;
-import za.co.handyflow.platform.notifications.application.TenantAdminRecipients;
 import za.co.handyflow.platform.notifications.application.internal.NotificationService;
 import za.co.handyflow.platform.notifications.domain.model.NotificationType;
+import za.co.handyflow.platform.shared.SchedulerLease;
 import za.co.handyflow.platform.shared.TenantId;
 
+import java.time.Duration;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
- * Daily sweep — 09:45, the next free 15-minute slot after this module's own
- * {@code AgNotificationScheduler} (Increment 1, 09:30), per this
- * engagement's running notification-scheduler registry. A SEPARATE
- * scheduler class from {@code AgNotificationScheduler} rather than merged
- * into it — Crops and Livestock are independent sub-domains within this
- * module (see package-info.java / this class's own entities' Javadoc for
- * why), and keeping each sub-domain's sweep in its own scheduler class
- * mirrors the "one scheduler per bounded concern" shape used elsewhere in
- * this engagement.
- * <p>
- * One sweep: scouting follow-ups due — every {@link AgScoutingRecord}
- * whose {@code followUpDate} has arrived and hasn't yet been acknowledged,
- * regardless of tenant. Same isolate-per-record pattern and same
- * "notify then acknowledge" shape as {@code AgNotificationScheduler}'s own
- * health-event sweep — see that class's Javadoc for the precedent.
- * <p>
- * Requires {@code NotificationType.AG_SCOUTING_FOLLOWUP_DUE} to exist —
- * see {@code Agriculture-Crops-NotificationType-patch-instructions.md} at
- * the sandbox root for the exact enum constant to add.
- * <p>
- * ASSUMES {@code @EnableScheduling} IS ALREADY ON somewhere in this app —
- * not re-verified here, same standing assumption {@code AgNotificationScheduler}
- * and every prior scheduler in this engagement has made.
+ * Daily sweep at 09:45 SAST: scouting follow-ups whose date has arrived. Same rules as {@link AgNotificationScheduler}: telling is not
+ * acknowledging ({@code followUpNotifiedOn} is the sweep's, {@code followUpAcknowledged} is a person's), repeated weekly while open, only for
+ * crop cycles still running on a live farm, sent to the farm manager (else the tenant admins), one lease and one transaction per record.
  */
 @Slf4j
 @Component
 @RequiredArgsConstructor
 public class AgCropNotificationScheduler {
 
+    static final String LOCK = "agriculture-crop-sweep";
+
     private final AgScoutingRecordRepository scoutingRecordRepository;
     private final NotificationService notificationService;
-    private final TenantAdminRecipients tenantAdminRecipients;
+    private final AgReminderSupport support;
+    private final SchedulerLease lease;
+    private final PlatformTransactionManager transactionManager;
 
     @Scheduled(cron = "0 45 9 * * *", zone = "Africa/Johannesburg")
-    @Transactional
     public void runDailySweep() {
-        sweepScoutingFollowUpsDue();
+        lease.runExclusively(LOCK, Duration.ofMinutes(30), () -> sweepScoutingFollowUpsDue(AgDates.today()));
     }
 
-    private void sweepScoutingFollowUpsDue() {
-        LocalDate today = LocalDate.now();
-        List<AgScoutingRecord> due = scoutingRecordRepository.findFollowUpDueAcrossTenants(today);
-        int sent = 0;
+    private void sweepScoutingFollowUpsDue(LocalDate today) {
+        List<AgScoutingRecord> due = scoutingRecordRepository.findFollowUpDueAcrossTenants(today, AgReminderRules.repeatBefore(today));
+        TransactionTemplate tx = new TransactionTemplate(transactionManager);
+        AtomicInteger sent = new AtomicInteger();
         for (AgScoutingRecord record : due) {
             try {
-                notifyScoutingFollowUpDue(record);
-                record.acknowledgeFollowUp();
-                scoutingRecordRepository.save(record);
-                sent++;
+                tx.executeWithoutResult(status -> {
+                    if (!AgReminderRules.shouldNotifyDue(record.getFollowUpDate(), record.isFollowUpAcknowledged(), record.getFollowUpNotifiedOn(), today)) return;
+                    if (notifyScoutingFollowUpDue(record, today)) {
+                        record.markFollowUpNotified(today);
+                        scoutingRecordRepository.save(record);
+                        sent.incrementAndGet();
+                    }
+                });
             } catch (Exception e) {
-                log.error("Failed to send scouting-follow-up-due reminder for record={}: {}",
-                        record.getId(), e.getMessage(), e);
+                log.error("Failed to send scouting-follow-up-due reminder for record={}: {}", record.getId(), e.getMessage(), e);
             }
         }
-        if (sent > 0) {
-            log.info("Sent {} agriculture scouting-follow-up-due reminder(s)", sent);
-        }
+        if (sent.get() > 0) log.info("Sent {} agriculture scouting-follow-up-due reminder(s)", sent.get());
     }
 
-    private void notifyScoutingFollowUpDue(AgScoutingRecord record) {
+    /** @return true if a message was sent; false when the crop cycle or farm is gone or nobody could be told (tried again tomorrow). */
+    private boolean notifyScoutingFollowUpDue(AgScoutingRecord record, LocalDate today) {
         TenantId tenantId = record.getTenantId();
-        List<Recipient> recipients = tenantAdminRecipients.resolveTenantAdmins(tenantId);
-        if (recipients.isEmpty()) return;
+        Optional<AgReminderSupport.Target> target = support.forCropCycle(tenantId, record.getCropCycleId());
+        if (target.isEmpty()) return false;
+        List<Recipient> recipients = support.recipientsFor(tenantId, target.get().farmId());
+        if (recipients.isEmpty()) return false;
 
         notificationService.send(NotificationRequest.builder()
                 .tenantId(tenantId)
                 .type(NotificationType.AG_SCOUTING_FOLLOWUP_DUE)
                 .title("Scouting follow-up due: " + record.getObservationType())
-                .message(record.getObservationType() + " follow-up is due (" + record.getFollowUpDate()
-                        + ") for crop cycle " + record.getCropCycleId()
+                .message(record.getObservationType() + " follow-up for " + target.get().label() + " on " + target.get().farmName() + " is "
+                        + AgReminderRules.dueWording(record.getFollowUpDate(), today) + " (" + record.getFollowUpDate() + ")"
                         + (record.getDescription() != null ? " — " + record.getDescription() : "") + ".")
-                .actionUrl("/agriculture/scouting-records/" + record.getId())
+                .actionUrl(AgActionUrls.cropCycles(target.get().farmId()))
                 .sourceModule("agriculture")
                 .sourceEntityId(record.getId().toString())
                 .recipients(recipients)
                 .build());
+        return true;
     }
 }

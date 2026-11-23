@@ -127,6 +127,14 @@ public class AgGroup {
         this.productionAreaId = productionAreaId;
     }
 
+    /** A whole-group transfer to another farm; paddock and enterprise belonged to the old farm and are cleared unless a paddock on the new farm is given. */
+    public void moveToFarm(UUID farmId, UUID productionAreaId) {
+        if (farmId == null) throw new IllegalArgumentException("farmId is required");
+        this.farmId = farmId;
+        this.productionAreaId = productionAreaId;
+        this.enterpriseId = null;
+    }
+
     public void reduceCount(int by) {
         if (by <= 0) throw new IllegalArgumentException("reduction must be positive");
         if (by > currentCount) throw new IllegalStateException("cannot reduce group " + batchNumber + " by " + by + " — only " + currentCount + " remain");

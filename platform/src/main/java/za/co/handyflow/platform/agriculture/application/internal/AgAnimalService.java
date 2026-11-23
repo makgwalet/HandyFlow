@@ -3,6 +3,7 @@ package za.co.handyflow.platform.agriculture.application.internal;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -10,10 +11,16 @@ import za.co.handyflow.platform.agriculture.domain.model.AgAnimal;
 import za.co.handyflow.platform.agriculture.domain.model.AgWeightRecord;
 import za.co.handyflow.platform.agriculture.domain.repository.AgAnimalRepository;
 import za.co.handyflow.platform.agriculture.domain.repository.AgWeightRecordRepository;
+import za.co.handyflow.platform.agriculture.domain.model.AgProductionArea;
+import za.co.handyflow.platform.agriculture.domain.repository.AgProductionAreaRepository;
+import za.co.handyflow.platform.agriculture.domain.rules.AgListRules;
+import za.co.handyflow.platform.agriculture.domain.rules.AgMovementRules;
 import za.co.handyflow.platform.agriculture.dto.*;
 import za.co.handyflow.platform.hr.application.HrFacade;
 import za.co.handyflow.platform.hr.EmployeeSummary;
 import za.co.handyflow.platform.shared.ResourceNotFoundException;
+import za.co.handyflow.platform.agriculture.domain.rules.AgDates;
+import za.co.handyflow.platform.agriculture.domain.rules.AgWithdrawalRules;
 import za.co.handyflow.platform.shared.TenantId;
 
 import java.util.Optional;
@@ -33,13 +40,21 @@ public class AgAnimalService {
     private final AgAnimalRepository animalRepository;
     private final AgWeightRecordRepository weightRecordRepository;
     private final HrFacade hrFacade;
+    private final AgProductionAreaRepository areaRepository;
+    private final AgReferenceChecker references;
+    private final AgWithdrawalService withdrawal;
 
     @Transactional(readOnly = true)
     public Page<AnimalResponse> getAnimalsForFarm(TenantId tenantId, UUID farmId, String status, Pageable pageable) {
-        Page<AgAnimal> page = (status != null && !status.isBlank())
-                ? animalRepository.findByStatusForFarm(tenantId, farmId, status, pageable)
-                : animalRepository.findAllActiveForFarm(tenantId, farmId, pageable);
-        return page.map(this::toResponse);
+        return getAnimalsForFarm(tenantId, farmId, status, null, pageable);
+    }
+
+    /** Filtered by status and a search on tag number, name and breed. The page is clamped to 1-200 rows and ordered by tag number. */
+    @Transactional(readOnly = true)
+    public Page<AnimalResponse> getAnimalsForFarm(TenantId tenantId, UUID farmId, String status, String q, Pageable pageable) {
+        Pageable page = PageRequest.of(AgListRules.pageIndex(pageable.getPageNumber()), AgListRules.pageSize(pageable.getPageSize()));
+        return animalRepository.searchForFarm(tenantId, farmId, AgListRules.status(status), AgListRules.likePattern(q), page)
+                .map(this::toResponse);
     }
 
     @Transactional(readOnly = true)
@@ -53,6 +68,11 @@ public class AgAnimalService {
             throw new IllegalArgumentException(
                     "An animal with tag number '" + req.tagNumber() + "' already exists on this farm");
         }
+        references.requireActiveFarm(tenantId, req.farmId());
+        references.requireSpecies(tenantId, req.speciesId());
+        references.checkPlacement(tenantId, req.farmId(), req.productionAreaId(), req.enterpriseId());
+        UUID newId = null;   // a new animal cannot be its own parent
+        references.checkParents(tenantId, newId, req.sireId(), req.damId(), req.speciesId(), req.dateOfBirth());
         AgAnimal animal = AgAnimal.create(tenantId, req.farmId(), req.productionAreaId(), req.enterpriseId(),
                 req.speciesId(), req.tagNumber(), req.name(), req.breed(), req.sex(), req.dateOfBirth(),
                 req.estimatedAge(), req.sireId(), req.damId(), req.acquisitionType(), req.acquisitionDate(),
@@ -65,8 +85,27 @@ public class AgAnimalService {
     @Transactional
     public AnimalResponse updateAnimal(TenantId tenantId, UUID id, UpdateAnimalRequest req) {
         AgAnimal animal = findActive(tenantId, id);
-        animal.update(req.productionAreaId(), req.enterpriseId(), req.name(), req.breed(), req.dateOfBirth(),
-                req.estimatedAge(), req.sireId(), req.damId(), req.notes());
+        java.util.Set<String> clear = AgPatchRules.clearSet(req.clear(), AgPatchRules.ANIMAL_CLEARABLE);
+        UUID newArea = AgPatchRules.apply("productionAreaId", animal.getProductionAreaId(), req.productionAreaId(), clear);
+        UUID newEnterprise = AgPatchRules.apply("enterpriseId", animal.getEnterpriseId(), req.enterpriseId(), clear);
+        java.time.LocalDate newDob = AgPatchRules.apply("dateOfBirth", animal.getDateOfBirth(), req.dateOfBirth(), clear);
+        UUID newSire = AgPatchRules.apply("sireId", animal.getSireId(), req.sireId(), clear);
+        UUID newDam = AgPatchRules.apply("damId", animal.getDamId(), req.damId(), clear);
+        // only what changed is checked, so an old record can still be edited after its area or enterprise has since been retired
+        references.checkPlacement(tenantId, animal.getFarmId(),
+                java.util.Objects.equals(newArea, animal.getProductionAreaId()) ? null : newArea,
+                java.util.Objects.equals(newEnterprise, animal.getEnterpriseId()) ? null : newEnterprise);
+        if (!java.util.Objects.equals(newSire, animal.getSireId()) || !java.util.Objects.equals(newDam, animal.getDamId())
+                || !java.util.Objects.equals(newDob, animal.getDateOfBirth())) {
+            references.checkParents(tenantId, animal.getId(), newSire, newDam, animal.getSpeciesId(), newDob);
+        }
+        animal.update(newArea, newEnterprise,
+                AgPatchRules.apply("name", animal.getName(), req.name(), clear),
+                AgPatchRules.apply("breed", animal.getBreed(), req.breed(), clear),
+                newDob,
+                req.estimatedAge() != null ? req.estimatedAge() : animal.isEstimatedAge(),
+                newSire, newDam,
+                AgPatchRules.apply("notes", animal.getNotes(), req.notes(), clear));
         return toResponse(animal);
     }
 
@@ -91,6 +130,11 @@ public class AgAnimalService {
     @Transactional
     public AnimalResponse moveAnimal(TenantId tenantId, UUID id, MoveAnimalRequest req) {
         AgAnimal animal = findActive(tenantId, id);
+        if (req.productionAreaId() != null) {
+            AgProductionArea area = areaRepository.findActiveById(tenantId, req.productionAreaId())
+                    .orElseThrow(() -> new ResourceNotFoundException("ProductionArea", req.productionAreaId().toString()));
+            AgMovementRules.requireUsableArea(area.getFarmId(), area.getStatus(), animal.getFarmId());
+        }
         animal.moveTo(req.productionAreaId());
         return toResponse(animal);
     }
@@ -98,6 +142,10 @@ public class AgAnimalService {
     @Transactional
     public AnimalResponse changeStatus(TenantId tenantId, UUID id, ChangeAnimalStatusRequest req) {
         AgAnimal animal = findActive(tenantId, id);
+        // An animal in its withdrawal period cannot go for sale or slaughter without a written reason, which stays on the animal
+        if (AgWithdrawalRules.LEAVES_FOR_MARKET.contains(req.status())) {
+            animal.recordWithdrawalOverride(withdrawal.requireAnimalOrGroupClearOrOverride(tenantId, animal, null, AgDates.today(), req.withdrawalOverrideReason()).orElse(null));
+        }
         animal.changeStatus(req.status());
         return toResponse(animal);
     }
@@ -118,6 +166,9 @@ public class AgAnimalService {
         log.info("Animal deleted id={} tenant={}", id, tenantId.getValue());
     }
 
+    /** Throws "not found" unless this animal exists, is not deleted, and belongs to the tenant. */
+    public void requireExists(TenantId tenantId, UUID id) { findActive(tenantId, id); }
+
     AgAnimal findActive(TenantId tenantId, UUID id) {
         return animalRepository.findActiveById(tenantId, id)
                 .orElseThrow(() -> new ResourceNotFoundException("Animal", id.toString()));
@@ -137,7 +188,8 @@ public class AgAnimalService {
                 a.getId(), a.getFarmId(), a.getProductionAreaId(), a.getEnterpriseId(), a.getSpeciesId(),
                 a.getTagNumber(), a.getName(), a.getBreed(), a.getSex(), a.getDateOfBirth(), a.isEstimatedAge(),
                 a.getSireId(), a.getDamId(), a.getAcquisitionType(), a.getAcquisitionDate(), a.getAcquisitionCost(),
-                a.getCurrentWeightKg(), a.getStatus(), a.getNotes(), a.getCreatedAt(), a.getUpdatedAt(), a.isBreedingStock()
+                a.getCurrentWeightKg(), a.getStatus(), a.getNotes(), a.getCreatedAt(), a.getUpdatedAt(), a.isBreedingStock(),
+                a.getWithdrawalOverrideReason(), a.getWithdrawalHeldUntil()
         );
     }
 

@@ -4,6 +4,8 @@ import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import za.co.handyflow.platform.agriculture.domain.rules.AgPartyRules;
+import za.co.handyflow.platform.agriculture.domain.rules.AgWithdrawalRules;
 import za.co.handyflow.platform.shared.TenantId;
 
 import java.time.Instant;
@@ -71,12 +73,44 @@ public class AgMovementRecord {
     @Column(columnDefinition = "TEXT")
     private String notes;
 
+    /** Who a sale or transfer out went to, where, and in what vehicle: the details a document of identification needs. */
+    @Column(name = "buyer_name")
+    private String buyerName;
+
+    @Column(name = "buyer_id_number")
+    private String buyerIdNumber;
+
+    @Column(name = "buyer_address")
+    private String buyerAddress;
+
+    private String destination;
+
+    @Column(name = "vehicle_registration")
+    private String vehicleRegistration;
+
+    /** Why the sale or transfer went ahead during a withdrawal period; null when nothing was held. */
+    @Column(name = "withdrawal_override_reason", columnDefinition = "TEXT")
+    private String withdrawalOverrideReason;
+
+    /** The day that withdrawal period would have run to. */
+    @Column(name = "withdrawal_held_until")
+    private LocalDate withdrawalHeldUntil;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
     public static AgMovementRecord create(TenantId tenantId, UUID animalId, UUID groupId, LocalDate movementDate,
                                            String movementType, UUID fromProductionAreaId, UUID toProductionAreaId,
                                            UUID fromFarmId, UUID toFarmId, Integer countMoved, String reason, String notes) {
+        return create(tenantId, animalId, groupId, movementDate, movementType, fromProductionAreaId, toProductionAreaId,
+                fromFarmId, toFarmId, countMoved, reason, notes, null, null, null, null, null);
+    }
+
+    public static AgMovementRecord create(TenantId tenantId, UUID animalId, UUID groupId, LocalDate movementDate,
+                                           String movementType, UUID fromProductionAreaId, UUID toProductionAreaId,
+                                           UUID fromFarmId, UUID toFarmId, Integer countMoved, String reason, String notes,
+                                           String buyerName, String buyerIdNumber, String buyerAddress, String destination,
+                                           String vehicleRegistration) {
         if (tenantId == null) throw new IllegalArgumentException("tenantId is required");
         AgTrackingTarget.requireExactlyOne(animalId, groupId);
         if (movementDate == null) throw new IllegalArgumentException("movementDate is required");
@@ -95,8 +129,20 @@ public class AgMovementRecord {
         m.countMoved = countMoved;
         m.reason = reason;
         m.notes = notes;
+        m.buyerName = AgPartyRules.clean(buyerName, "Buyer name", AgPartyRules.NAME);
+        m.buyerIdNumber = AgPartyRules.clean(buyerIdNumber, "Buyer ID number", AgPartyRules.ID_NUMBER);
+        m.buyerAddress = AgPartyRules.clean(buyerAddress, "Buyer address", AgPartyRules.ADDRESS);
+        m.destination = AgPartyRules.clean(destination, "Destination", AgPartyRules.ADDRESS);
+        m.vehicleRegistration = AgPartyRules.vehicle(vehicleRegistration);
         m.createdAt = Instant.now();
         return m;
+    }
+
+    /** Keeps the reason for going ahead during a withdrawal period, on the record the sale made. */
+    public void recordWithdrawalOverride(AgWithdrawalRules.Override override) {
+        if (override == null) return;
+        this.withdrawalOverrideReason = override.reason();
+        this.withdrawalHeldUntil = override.heldUntil();
     }
 
     public boolean isForAnimal() { return animalId != null; }

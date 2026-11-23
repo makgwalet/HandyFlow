@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import za.co.handyflow.platform.agriculture.domain.rules.AgWithdrawalRules;
 import za.co.handyflow.platform.shared.TenantId;
 
 import java.math.BigDecimal;
@@ -71,8 +72,23 @@ public class AgHarvestRecord {
     @Column(columnDefinition = "TEXT")
     private String notes;
 
+    /** Why the harvest went ahead inside a pre-harvest interval; null when nothing was held. */
+    @Column(name = "withdrawal_override_reason", columnDefinition = "TEXT")
+    private String withdrawalOverrideReason;
+
+    /** The day that pre-harvest interval would have run to. */
+    @Column(name = "withdrawal_held_until")
+    private LocalDate withdrawalHeldUntil;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
+
+    /** Keeps the reason for harvesting inside a pre-harvest interval, on the harvest record. */
+    public void recordWithdrawalOverride(AgWithdrawalRules.Override override) {
+        if (override == null) return;
+        this.withdrawalOverrideReason = override.reason();
+        this.withdrawalHeldUntil = override.heldUntil();
+    }
 
     public static AgHarvestRecord create(TenantId tenantId, UUID cropCycleId, LocalDate harvestDate,
                                           BigDecimal quantityHarvested, String unitOfMeasure, String qualityGrade,

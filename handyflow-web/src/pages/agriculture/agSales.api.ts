@@ -5,6 +5,7 @@
 import { useQuery } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import { api, useAgMutation } from "./agCrops.api"
+import { fetchAllPages } from "./agPaging.logic"
 import type { TargetFilter, TargetType } from "./agLedger.api"
 
 export interface SaleLine {
@@ -44,7 +45,10 @@ export function useSaleLines(farmId: string, query: SaleLineQuery, enabled: bool
 export function useSalesAllocations(farmId: string, target: TargetFilter | null, enabled = true) {
   return useQuery<{ content: SalesAllocation[]; totalElements: number }>({
     queryKey: [...SALES, "allocations", farmId, target?.type ?? "all", target?.id ?? ""], enabled: enabled && !!farmId,
-    queryFn: async () => (await apiClient.get(`${BASE}/farms/${farmId}/sales-allocations`, { params: { targetType: target?.type, targetId: target?.id, size: 200 } })).data,
+    queryFn: async () => {
+      const r = await fetchAllPages<SalesAllocation>(async (page, size) => (await apiClient.get(`${BASE}/farms/${farmId}/sales-allocations`, { params: { targetType: target?.type, targetId: target?.id, page, size } })).data)
+      return { content: r.items, totalElements: r.total }
+    },
   })
 }
 

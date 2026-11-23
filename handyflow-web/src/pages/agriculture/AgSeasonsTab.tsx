@@ -7,6 +7,7 @@ import { usePermission } from "../../hooks/usePermission"
 import { agKeys, api, useAgMutation, useCropCycles, useSeasons } from "./agCrops.api"
 import type { Season } from "./agCrops.types"
 import { Empty, Field, Warn } from "./agCropsUi"
+import { QueryError } from "./agUi"
 import { btnDanger, btnGhost, btnPrimary, card, fmtDate, grid, inp, panel, statusBadge } from "./constants"
 
 function SeasonForm({ farmId, initial, onDone }: { farmId: string; initial?: Season; onDone: () => void }) {
@@ -42,7 +43,7 @@ export default function AgSeasonsTab({ farmId }: { farmId: string }) {
   const [adding, setAdding] = useState(false)
   const [editing, setEditing] = useState<Season | null>(null)
   const [confirm, setConfirm] = useState<{ kind: "activate" | "delete"; season: Season } | null>(null)
-  const { data: seasons = [], isLoading } = useSeasons(farmId)
+  const { data: seasons = [], isLoading, isError, refetch } = useSeasons(farmId)
   const cycles = useCropCycles(farmId).data ?? []
   const keys = [agKeys.seasons(farmId)]
   const activate = useAgMutation((id: string) => api.patch(`/seasons/${id}/activate`), { invalidate: keys, success: "Season activated", failure: "Couldn't activate the season." })
@@ -76,7 +77,7 @@ export default function AgSeasonsTab({ farmId }: { farmId: string }) {
           </div>
         </div>
       )}
-      {isLoading ? <Empty>Loading seasons…</Empty> : sorted.length === 0 ? <Empty>No seasons yet. A season groups crop cycles, for example "2026/27 summer".</Empty> : (
+      {isLoading ? <Empty>Loading seasons…</Empty> : isError ? <QueryError onRetry={() => void refetch()} what="the seasons" /> : sorted.length === 0 ? <Empty>No seasons yet. A season groups crop cycles, for example "2026/27 summer".</Empty> : (
         <div style={{ display: "grid", gap: 10 }}>
           {sorted.map(s => (
             <div key={s.id} style={{ ...card, display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>

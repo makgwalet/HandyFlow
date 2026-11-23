@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import za.co.handyflow.platform.agriculture.domain.rules.AgStockRules;
 import za.co.handyflow.platform.shared.TenantId;
 
 import java.math.BigDecimal;
@@ -69,6 +70,10 @@ public class AgInventoryItem {
     @Column(columnDefinition = "TEXT")
     private String notes;
 
+    /** The day the sweep last sent a low-stock message about this item; null if it has not, or since it was restocked. */
+    @Column(name = "low_stock_notified_on")
+    private java.time.LocalDate lowStockNotifiedOn;
+
     /** The item's usual Supply Chain supplier (a reference by id). A receipt with no supplier of its own takes this one. Null until set. The typed {@code supplier} text is kept for history. */
     @Column(name = "supplier_id")
     private UUID supplierId;
@@ -110,6 +115,7 @@ public class AgInventoryItem {
 
     public void update(String itemName, BigDecimal reorderLevel, BigDecimal unitCost, String supplier, String notes) {
         if (itemName != null && !itemName.isBlank()) this.itemName = itemName;
+        if (!java.util.Objects.equals(this.reorderLevel, reorderLevel)) this.lowStockNotifiedOn = null;
         this.reorderLevel = reorderLevel;
         this.unitCost = unitCost;
         this.supplier = supplier;
@@ -118,12 +124,16 @@ public class AgInventoryItem {
 
     public void receive(BigDecimal quantity, BigDecimal newUnitCost) {
         if (quantity == null || quantity.signum() <= 0) throw new IllegalArgumentException("quantity must be positive");
+        AgStockRules.requireUsable(status, itemName);
+        // the cost becomes the average of what was on hand and what arrived, not whatever the last delivery cost
+        this.unitCost = AgStockRules.weightedAverageCost(this.currentQuantity, this.unitCost, quantity, newUnitCost);
         this.currentQuantity = this.currentQuantity.add(quantity);
-        if (newUnitCost != null) this.unitCost = newUnitCost;
+        clearLowStockNoticeIfRestocked();
     }
 
     public void issue(BigDecimal quantity) {
         if (quantity == null || quantity.signum() <= 0) throw new IllegalArgumentException("quantity must be positive");
+        AgStockRules.requireUsable(status, itemName);
         if (quantity.compareTo(this.currentQuantity) > 0) {
             throw new IllegalStateException("cannot issue " + quantity + " " + unitOfMeasure + " of " + itemName + " — only " + currentQuantity + " on hand");
         }
@@ -133,6 +143,14 @@ public class AgInventoryItem {
     public void adjust(BigDecimal newQuantity) {
         if (newQuantity == null || newQuantity.signum() < 0) throw new IllegalArgumentException("newQuantity must be >= 0");
         this.currentQuantity = newQuantity;
+        clearLowStockNoticeIfRestocked();
+    }
+
+    public void markLowStockNotified(java.time.LocalDate day) { this.lowStockNotifiedOn = day; }
+
+    /** Once the item is back above its reorder level the next shortage is a new one and gets a fresh message. */
+    private void clearLowStockNoticeIfRestocked() {
+        if (!isBelowReorderLevel()) this.lowStockNotifiedOn = null;
     }
 
     public boolean isBelowReorderLevel() {

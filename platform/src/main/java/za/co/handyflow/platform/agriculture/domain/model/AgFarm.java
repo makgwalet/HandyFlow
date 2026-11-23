@@ -4,6 +4,8 @@ import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import za.co.handyflow.platform.agriculture.domain.rules.AgMarkRules;
+import za.co.handyflow.platform.agriculture.domain.rules.AgPartyRules;
 import za.co.handyflow.platform.shared.TenantId;
 
 import java.math.BigDecimal;
@@ -44,6 +46,23 @@ public class AgFarm {
 
     @Column(name = "registration_number")
     private String registrationNumber;
+
+    /** Registered brand mark, ear mark and the registration number of the mark; printed on sale documents. All optional. */
+    @Column(name = "brand_mark")
+    private String brandMark;
+
+    @Column(name = "ear_mark")
+    private String earMark;
+
+    @Column(name = "mark_registration_number")
+    private String markRegistrationNumber;
+
+    /** Who owns the farm and where it is, as printed on sale documents. Optional. */
+    @Column(name = "owner_name")
+    private String ownerName;
+
+    @Column(name = "physical_address")
+    private String physicalAddress;
 
     private String province;
 
@@ -113,6 +132,21 @@ public class AgFarm {
         this.gpsLongitude = gpsLongitude;
         this.totalHectares = totalHectares;
         this.notes = notes;
+    }
+
+    /** Sets the marks as given (blank clears one). A separate method, so update() and everything calling it are unchanged. */
+    public void setMarks(String brandMark, String earMark, String markRegistrationNumber) {
+        this.brandMark = AgMarkRules.normalise(brandMark, "Brand mark");
+        this.earMark = AgMarkRules.normalise(earMark, "Ear mark");
+        this.markRegistrationNumber = AgMarkRules.normalise(markRegistrationNumber, "Mark registration number");
+        this.updatedAt = Instant.now();
+    }
+
+    /** Owner and physical address for sale documents (blank clears one). */
+    public void setOwnerDetails(String ownerName, String physicalAddress) {
+        this.ownerName = AgPartyRules.clean(ownerName, "Owner name", AgPartyRules.NAME);
+        this.physicalAddress = AgPartyRules.clean(physicalAddress, "Physical address", AgPartyRules.ADDRESS);
+        this.updatedAt = Instant.now();
     }
 
     public void assignManager(UUID managerId, String managerName) {

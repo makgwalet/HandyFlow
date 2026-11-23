@@ -1,5 +1,6 @@
 package za.co.handyflow.platform.agriculture.application.internal;
 
+import za.co.handyflow.platform.agriculture.domain.rules.AgDates;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -9,6 +10,7 @@ import org.springframework.transaction.annotation.Transactional;
 import za.co.handyflow.platform.agriculture.domain.model.AgInventoryItem;
 import za.co.handyflow.platform.agriculture.domain.model.AgStockMovement;
 import za.co.handyflow.platform.agriculture.domain.repository.AgInventoryItemRepository;
+import za.co.handyflow.platform.agriculture.domain.rules.AgStockRules;
 import za.co.handyflow.platform.agriculture.domain.repository.AgStockMovementRepository;
 import za.co.handyflow.platform.agriculture.dto.*;
 import za.co.handyflow.platform.hr.application.HrFacade;
@@ -18,7 +20,6 @@ import za.co.handyflow.platform.shared.TenantId;
 import za.co.handyflow.platform.supplychain.application.SupplierFacade;
 import za.co.handyflow.platform.supplychain.application.SupplierFacade.SupplierSummary;
 
-import java.time.LocalDate;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
@@ -44,6 +45,7 @@ public class AgInventoryItemService {
     private final AgStockMovementRepository stockMovementRepository;
     private final HrFacade hrFacade;
     private final SupplierFacade supplierFacade;
+    private final AgReferenceChecker references;
 
     @Transactional(readOnly = true)
     public Page<InventoryItemResponse> getItemsForFarm(TenantId tenantId, UUID farmId, Pageable pageable) {
@@ -59,6 +61,7 @@ public class AgInventoryItemService {
 
     @Transactional
     public InventoryItemResponse createItem(TenantId tenantId, CreateInventoryItemRequest req) {
+        references.requireActiveFarm(tenantId, req.farmId());
         AgInventoryItem item = AgInventoryItem.create(tenantId, req.farmId(), req.itemName(), req.category(),
                 req.unitOfMeasure(), req.reorderLevel(), req.unitCost(), req.supplier());
         inventoryItemRepository.save(item);
@@ -91,7 +94,7 @@ public class AgInventoryItemService {
         UUID supplierId = req.supplierId() != null ? req.supplierId() : item.getSupplierId();
         if (supplierId != null) requireUsableSupplier(tenantId, supplierId, req.supplierId() == null);
         item.receive(req.quantity(), req.newUnitCost());
-        AgStockMovement movement = AgStockMovement.create(tenantId, id, "RECEIPT", LocalDate.now(), req.quantity(),
+        AgStockMovement movement = AgStockMovement.create(tenantId, id, "RECEIPT", AgDates.today(), req.quantity(),
                 req.newUnitCost() != null ? req.newUnitCost() : item.getUnitCost(), null, null,
                 req.performedBy(), performedByName, req.notes(), supplierId);
         stockMovementRepository.save(movement);
@@ -103,7 +106,7 @@ public class AgInventoryItemService {
         AgInventoryItem item = findActive(tenantId, id);
         String performedByName = resolveEmployeeName(tenantId, req.performedBy());
         item.issue(req.quantity());
-        AgStockMovement movement = AgStockMovement.create(tenantId, id, "ISSUE", LocalDate.now(), req.quantity(),
+        AgStockMovement movement = AgStockMovement.create(tenantId, id, "ISSUE", AgDates.today(), req.quantity(),
                 item.getUnitCost(), req.referenceType(), req.referenceId(), req.performedBy(), performedByName, req.notes());
         stockMovementRepository.save(movement);
         return toResponse(tenantId, item);
@@ -113,10 +116,14 @@ public class AgInventoryItemService {
     public InventoryItemResponse adjust(TenantId tenantId, UUID id, AdjustInventoryRequest req) {
         AgInventoryItem item = findActive(tenantId, id);
         String performedByName = resolveEmployeeName(tenantId, req.performedBy());
-        java.math.BigDecimal delta = req.newQuantity().subtract(item.getCurrentQuantity());
+        String reason = AgStockRules.requireReason(req.notes());
+        java.math.BigDecimal before = item.getCurrentQuantity();
+        // the ledger keeps the direction: ADJUSTMENT_UP or ADJUSTMENT_DOWN, with the size of the correction as a positive quantity
+        String type = AgStockRules.adjustmentType(before, req.newQuantity());
+        java.math.BigDecimal size = AgStockRules.adjustmentQuantity(before, req.newQuantity());
         item.adjust(req.newQuantity());
-        AgStockMovement movement = AgStockMovement.create(tenantId, id, "ADJUSTMENT", LocalDate.now(),
-                delta.abs(), item.getUnitCost(), null, null, req.performedBy(), performedByName, req.notes());
+        AgStockMovement movement = AgStockMovement.create(tenantId, id, type, AgDates.today(),
+                size, item.getUnitCost(), null, null, req.performedBy(), performedByName, reason);
         stockMovementRepository.save(movement);
         return toResponse(tenantId, item);
     }

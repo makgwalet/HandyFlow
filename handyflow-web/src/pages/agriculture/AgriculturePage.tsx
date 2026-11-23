@@ -25,7 +25,11 @@ import AgSalesTab from "./AgSalesTab"
 import AgLabourTab from "./AgLabourTab"
 import AgEquipmentFuelTab from "./AgEquipmentFuelTab"
 import AgProfitabilityTab from "./AgProfitabilityTab"
+import AgLinkedFarm from "./AgLinkedFarm"
+import AgConfirmHost from "./AgConfirmHost"
+import { parseFarmLink } from "./agDeepLink.logic"
 import { PageHeader } from "../../components/ui/PageHeader"
+import "../../styles/agriculture.css"
 import { AGRICULTURE_SECTIONS, findSection } from "../../navigation/moduleSections"
 
 /**
@@ -44,6 +48,8 @@ export default function AgriculturePage() {
   if (!found) return <Navigate replace to={`${base}/${AGRICULTURE_SECTIONS.defaultSection}`} />
   const { section } = found
 
+  // a notification opens /agriculture/farms?farm=<id>[&animal=…] straight on that farm
+  const farmLink = rawSection === "farms" ? parseFarmLink(location.search) : null
   const selectedFarm = openFarm && openFarm.locationKey === location.key ? openFarm.farm : null
   const crumbs = [
     { label: AGRICULTURE_SECTIONS.title, to: `${base}/${AGRICULTURE_SECTIONS.defaultSection}` },
@@ -52,9 +58,12 @@ export default function AgriculturePage() {
   ]
 
   return (
-    <div>
+    <div className="hf-ag">
+      <AgConfirmHost />
       <PageHeader title={selectedFarm ? selectedFarm.name : section.label} icon={section.icon} breadcrumbs={crumbs} />
-      {selectedFarm ? (
+      {farmLink && !selectedFarm ? (
+        <AgLinkedFarm key={location.key} link={farmLink} />
+      ) : selectedFarm ? (
         <AgFarmDetail farm={selectedFarm} onBack={() => setOpenFarm(null)} />
       ) : (
         <>

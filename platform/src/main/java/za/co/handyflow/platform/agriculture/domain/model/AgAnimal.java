@@ -4,6 +4,8 @@ import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import za.co.handyflow.platform.agriculture.domain.rules.AgLifecycleRules;
+import za.co.handyflow.platform.agriculture.domain.rules.AgWithdrawalRules;
 import za.co.handyflow.platform.shared.TenantId;
 
 import java.math.BigDecimal;
@@ -91,6 +93,14 @@ public class AgAnimal {
     @Column(columnDefinition = "TEXT")
     private String notes;
 
+    /** Why the animal was sold, culled or transferred out during a withdrawal period; null when nothing was held. The latest such change. */
+    @Column(name = "withdrawal_override_reason", columnDefinition = "TEXT")
+    private String withdrawalOverrideReason;
+
+    /** The day that withdrawal period would have run to. */
+    @Column(name = "withdrawal_held_until")
+    private LocalDate withdrawalHeldUntil;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
@@ -172,9 +182,32 @@ public class AgAnimal {
         this.updatedAt = Instant.now();
     }
 
+    /** Adds a line to the notes, keeping what is there (used to keep the reason for a withdrawal override). */
+    public void addNote(String line) {
+        if (line == null || line.isBlank()) return;
+        this.notes = this.notes == null || this.notes.isBlank() ? line : this.notes.trim() + "\n" + line;
+        this.updatedAt = Instant.now();
+    }
+
+    /** Keeps the reason for going ahead during a withdrawal period. Null clears it, so a later change with nothing held leaves no stale reason. */
+    public void recordWithdrawalOverride(AgWithdrawalRules.Override override) {
+        this.withdrawalOverrideReason = override == null ? null : override.reason();
+        this.withdrawalHeldUntil = override == null ? null : override.heldUntil();
+        this.updatedAt = Instant.now();
+    }
+
+    /** Checked against AgLifecycleRules: a deceased animal stays deceased, and one that has left can only be put back to ACTIVE. */
     public void changeStatus(String status) {
-        if (status == null || status.isBlank()) throw new IllegalArgumentException("status is required");
+        AgLifecycleRules.requireAnimalStatusChange(this.status, status);
         this.status = status;
+    }
+
+    /** A transfer to another farm. Its paddock and enterprise belonged to the old farm, so they are cleared unless a paddock on the new farm is given. */
+    public void moveToFarm(UUID farmId, UUID productionAreaId) {
+        if (farmId == null) throw new IllegalArgumentException("farmId is required");
+        this.farmId = farmId;
+        this.productionAreaId = productionAreaId;
+        this.enterpriseId = null;
     }
 
     public void softDelete() { this.deletedAt = Instant.now(); }

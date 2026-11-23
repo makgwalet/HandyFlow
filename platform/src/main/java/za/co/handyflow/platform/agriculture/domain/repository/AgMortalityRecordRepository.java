@@ -17,10 +17,10 @@ public interface AgMortalityRecordRepository extends JpaRepository<AgMortalityRe
     @Query("SELECT m FROM AgMortalityRecord m WHERE m.tenantId = :tenantId AND m.id = :id")
     Optional<AgMortalityRecord> findByTenantAndId(TenantId tenantId, UUID id);
 
-    @Query("SELECT m FROM AgMortalityRecord m WHERE m.tenantId = :tenantId AND m.animalId = :animalId ORDER BY m.mortalityDate DESC")
+    @Query("SELECT m FROM AgMortalityRecord m WHERE m.tenantId = :tenantId AND m.animalId = :animalId ORDER BY m.mortalityDate DESC, m.id DESC")
     Page<AgMortalityRecord> findByAnimal(TenantId tenantId, UUID animalId, Pageable pageable);
 
-    @Query("SELECT m FROM AgMortalityRecord m WHERE m.tenantId = :tenantId AND m.groupId = :groupId ORDER BY m.mortalityDate DESC")
+    @Query("SELECT m FROM AgMortalityRecord m WHERE m.tenantId = :tenantId AND m.groupId = :groupId ORDER BY m.mortalityDate DESC, m.id DESC")
     Page<AgMortalityRecord> findByGroup(TenantId tenantId, UUID groupId, Pageable pageable);
 
     // Trends: [mortalityDate, countLost, estimatedValueLoss, animalId, groupId].

@@ -16,5 +16,14 @@ public record CreateHarvestRecordRequest(
         String storageLocation,
         UUID harvestedBy,
         BigDecimal laborHours,
-        String notes
-) {}
+        String notes,
+        /** Only needed to harvest while a spray's pre-harvest interval has not passed. */
+        String preHarvestOverrideReason
+) {
+    public CreateHarvestRecordRequest(LocalDate harvestDate, BigDecimal quantityHarvested, String unitOfMeasure,
+                                      String qualityGrade, BigDecimal moistureContent, String storageLocation,
+                                      UUID harvestedBy, BigDecimal laborHours, String notes) {
+        this(harvestDate, quantityHarvested, unitOfMeasure, qualityGrade, moistureContent, storageLocation, harvestedBy,
+                laborHours, notes, null);
+    }
+}

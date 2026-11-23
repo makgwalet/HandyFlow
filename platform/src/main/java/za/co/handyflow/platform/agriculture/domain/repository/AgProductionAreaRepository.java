@@ -15,9 +15,9 @@ public interface AgProductionAreaRepository extends JpaRepository<AgProductionAr
     @Query("SELECT a FROM AgProductionArea a WHERE a.tenantId = :tenantId AND a.id = :id AND a.deletedAt IS NULL")
     Optional<AgProductionArea> findActiveById(TenantId tenantId, UUID id);
 
-    @Query("SELECT a FROM AgProductionArea a WHERE a.tenantId = :tenantId AND a.farmId = :farmId AND a.deletedAt IS NULL ORDER BY a.name")
+    @Query("SELECT a FROM AgProductionArea a WHERE a.tenantId = :tenantId AND a.farmId = :farmId AND a.deletedAt IS NULL ORDER BY a.name, a.id")
     Page<AgProductionArea> findAllActiveForFarm(TenantId tenantId, UUID farmId, Pageable pageable);
 
-    @Query("SELECT a FROM AgProductionArea a WHERE a.tenantId = :tenantId AND a.farmId = :farmId AND a.status = :status AND a.deletedAt IS NULL ORDER BY a.name")
+    @Query("SELECT a FROM AgProductionArea a WHERE a.tenantId = :tenantId AND a.farmId = :farmId AND a.status = :status AND a.deletedAt IS NULL ORDER BY a.name, a.id")
     Page<AgProductionArea> findByStatusForFarm(TenantId tenantId, UUID farmId, String status, Pageable pageable);
 }

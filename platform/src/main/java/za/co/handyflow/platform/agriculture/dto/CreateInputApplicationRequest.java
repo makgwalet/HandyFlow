@@ -19,5 +19,7 @@ public record CreateInputApplicationRequest(
         BigDecimal laborHours,
         BigDecimal cost,
         String weatherConditions,
-        String notes
+        String notes,
+        /** Days after this application before harvest is allowed (from the product label). Optional. */
+        Integer preHarvestIntervalDays
 ) {}

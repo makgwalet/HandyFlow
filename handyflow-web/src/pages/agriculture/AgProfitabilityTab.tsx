@@ -13,6 +13,7 @@ import { openPrintWindow, profitabilityPrintHtml } from "./agProfitability.print
 import { TYPE_LABEL, costParts, filterUnits, percentText, profitabilityCsvRows, profitabilityFileName, stateLabel, toneOf, typesPresent, type StateFilter, type TypeFilter } from "./agProfitability.logic"
 import { Empty, Th } from "./agCropsUi"
 import { btnGhost, card, fmtMoney, inp } from "./constants"
+import { QueryError } from "./agUi"
 
 const TONE_COLOR = { gain: "var(--hf-success-text-strong)", loss: "var(--hf-danger-text)", even: "var(--hf-text-secondary)" } as const
 
@@ -103,7 +104,7 @@ export default function AgProfitabilityTab({ farmId, farmName = "Farm" }: { farm
     )
   }
   if (isLoading) return <Empty>Loading profitability…</Empty>
-  if (isError || !data) return <p role="alert" style={{ fontSize: 13, color: "var(--hf-danger-text)" }}>We couldn't load profitability. <button type="button" onClick={() => refetch()} style={{ background: "none", border: "none", textDecoration: "underline", cursor: "pointer", color: "inherit", fontWeight: 700 }}>Try again</button></p>
+  if (isError || !data) return <QueryError onRetry={() => void refetch()} what="profitability" />
 
   const t = data.totals
   const shown = filterUnits(data.units, type, state)

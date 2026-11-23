@@ -16,9 +16,9 @@ public interface AgSeasonRepository extends JpaRepository<AgSeason, UUID> {
     @Query("SELECT s FROM AgSeason s WHERE s.tenantId = :tenantId AND s.id = :id AND s.deletedAt IS NULL")
     Optional<AgSeason> findActiveById(TenantId tenantId, UUID id);
 
-    @Query("SELECT s FROM AgSeason s WHERE s.tenantId = :tenantId AND s.farmId = :farmId AND s.deletedAt IS NULL ORDER BY s.startDate DESC")
+    @Query("SELECT s FROM AgSeason s WHERE s.tenantId = :tenantId AND s.farmId = :farmId AND s.deletedAt IS NULL ORDER BY s.startDate DESC, s.id DESC")
     Page<AgSeason> findAllActiveForFarm(TenantId tenantId, UUID farmId, Pageable pageable);
 
-    @Query("SELECT s FROM AgSeason s WHERE s.tenantId = :tenantId AND s.farmId = :farmId AND s.status = :status AND s.deletedAt IS NULL ORDER BY s.startDate DESC")
+    @Query("SELECT s FROM AgSeason s WHERE s.tenantId = :tenantId AND s.farmId = :farmId AND s.status = :status AND s.deletedAt IS NULL ORDER BY s.startDate DESC, s.id DESC")
     Page<AgSeason> findByStatusForFarm(TenantId tenantId, UUID farmId, String status, Pageable pageable);
 }

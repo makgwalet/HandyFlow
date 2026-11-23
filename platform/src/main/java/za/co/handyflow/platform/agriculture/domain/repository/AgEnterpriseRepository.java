@@ -15,6 +15,6 @@ public interface AgEnterpriseRepository extends JpaRepository<AgEnterprise, UUID
     @Query("SELECT e FROM AgEnterprise e WHERE e.tenantId = :tenantId AND e.id = :id AND e.deletedAt IS NULL")
     Optional<AgEnterprise> findActiveById(TenantId tenantId, UUID id);
 
-    @Query("SELECT e FROM AgEnterprise e WHERE e.tenantId = :tenantId AND e.farmId = :farmId AND e.deletedAt IS NULL ORDER BY e.name")
+    @Query("SELECT e FROM AgEnterprise e WHERE e.tenantId = :tenantId AND e.farmId = :farmId AND e.deletedAt IS NULL ORDER BY e.name, e.id")
     Page<AgEnterprise> findAllActiveForFarm(TenantId tenantId, UUID farmId, Pageable pageable);
 }

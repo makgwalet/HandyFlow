@@ -10,6 +10,7 @@ import za.co.handyflow.platform.agriculture.domain.model.AgCostEntry;
 import za.co.handyflow.platform.agriculture.domain.repository.AgCostEntryRepository;
 import za.co.handyflow.platform.agriculture.domain.repository.AgFarmRepository;
 import za.co.handyflow.platform.agriculture.domain.rules.AgCostAllocation;
+import za.co.handyflow.platform.agriculture.domain.rules.AgDateRangeRules;
 import za.co.handyflow.platform.agriculture.dto.CostEntryDtos.AllocationShare;
 import za.co.handyflow.platform.agriculture.dto.CostEntryDtos.CategoryTotal;
 import za.co.handyflow.platform.agriculture.dto.CostEntryDtos.CostEntryResponse;
@@ -101,23 +102,45 @@ public class AgCostEntryService {
 
     @Transactional(readOnly = true)
     public Page<CostEntryResponse> list(TenantId tenantId, UUID farmId, String targetType, UUID targetId, Pageable pageable) {
+        return list(tenantId, farmId, targetType, targetId, null, null, pageable);
+    }
+
+    /** The ledger rows, optionally only those with an entry date from {@code from} to {@code to} (both included; either may be null). */
+    @Transactional(readOnly = true)
+    public Page<CostEntryResponse> list(TenantId tenantId, UUID farmId, String targetType, UUID targetId, LocalDate from, LocalDate to, Pageable pageable) {
         requireFarm(tenantId, farmId);
+        AgDateRangeRules.require(from, to);
+        boolean unbounded = AgDateRangeRules.isUnbounded(from, to);
         if (targetType != null) {
             requireValidTarget(targetType, targetId);
-            return costEntryRepository.findForTarget(tenantId, targetType, targetId, pageable).map(this::toResponse);
+            return (unbounded ? costEntryRepository.findForTarget(tenantId, targetType, targetId, pageable)
+                    : costEntryRepository.findForTargetBetween(tenantId, targetType, targetId, AgDateRangeRules.from(from), AgDateRangeRules.to(to), pageable))
+                    .map(this::toResponse);
         }
-        return costEntryRepository.findForFarm(tenantId, farmId, pageable).map(this::toResponse);
+        return (unbounded ? costEntryRepository.findForFarm(tenantId, farmId, pageable)
+                : costEntryRepository.findForFarmBetween(tenantId, farmId, AgDateRangeRules.from(from), AgDateRangeRules.to(to), pageable))
+                .map(this::toResponse);
     }
 
     @Transactional(readOnly = true)
     public CostTotalsResponse totals(TenantId tenantId, UUID farmId, String targetType, UUID targetId) {
+        return totals(tenantId, farmId, targetType, targetId, null, null);
+    }
+
+    /** Net cost by category, optionally only for entries dated from {@code from} to {@code to} (both included; either may be null). */
+    @Transactional(readOnly = true)
+    public CostTotalsResponse totals(TenantId tenantId, UUID farmId, String targetType, UUID targetId, LocalDate from, LocalDate to) {
         requireFarm(tenantId, farmId);
+        AgDateRangeRules.require(from, to);
+        boolean unbounded = AgDateRangeRules.isUnbounded(from, to);
         List<Object[]> rows;
         if (targetType != null) {
             requireValidTarget(targetType, targetId);
-            rows = costEntryRepository.sumByCategoryForTarget(tenantId, targetType, targetId);
+            rows = unbounded ? costEntryRepository.sumByCategoryForTarget(tenantId, targetType, targetId)
+                    : costEntryRepository.sumByCategoryForTargetBetween(tenantId, targetType, targetId, AgDateRangeRules.from(from), AgDateRangeRules.to(to));
         } else {
-            rows = costEntryRepository.sumByCategoryForFarm(tenantId, farmId);
+            rows = unbounded ? costEntryRepository.sumByCategoryForFarm(tenantId, farmId)
+                    : costEntryRepository.sumByCategoryForFarmBetween(tenantId, farmId, AgDateRangeRules.from(from), AgDateRangeRules.to(to));
         }
         Map<String, BigDecimal> byCategory = new HashMap<>();
         for (Object[] r : rows) byCategory.put((String) r[0], r[1] instanceof BigDecimal bd ? bd : new BigDecimal(String.valueOf(r[1])));

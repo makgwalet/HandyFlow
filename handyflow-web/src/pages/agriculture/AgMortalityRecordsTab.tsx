@@ -6,12 +6,17 @@
 // (and auto-closes the group at zero) — both confirmed via
 // AgMortalityRecordService, so no separate frontend action is needed for
 // that side-effect.
-import type React from "react"
 import { useState } from "react"
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
+import { useQuery, useQueryClient } from "@tanstack/react-query"
+import { useAgToastMutation } from "./agMutation"
 import { Plus, Skull } from "lucide-react"
+import AgPager from "./AgPager"
+import { PAGE_SIZE, rangeLabel } from "./agPaging.logic"
 import { apiClient } from "../../api/client"
-import { AG_ACCENT, fmtMoney, type AgTargetType, targetBasePath } from "./constants"
+import { fmtMoney, type AgTargetType, targetBasePath, inp, btnPrimary, btnGhost } from "./constants"
+import { agConfirm } from "./agConfirm"
+import { Field, QueryError } from "./agUi"
+import AgManage from "./AgManage"
 
 interface MortalityRecordResponse {
   id: string; animalId: string | null; groupId: string | null
@@ -34,12 +39,16 @@ export default function AgMortalityRecordsTab({ targetType, targetId }: { target
   const [estimatedValueLoss, setEstimatedValueLoss] = useState("")
 
   const queryKey = ["ag-mortality-records", targetType, targetId]
-  const { data, isLoading } = useQuery<Page<MortalityRecordResponse>>({
-    queryKey,
-    queryFn: async () => (await apiClient.get(`${base}/mortality-records`, { params: { size: 100 } })).data,
+  // 50 a page, newest first; the server never sends more than 200 at a time
+  const [page, setPage] = useState(0)
+  const { data, isLoading, isError, refetch } = useQuery<Page<MortalityRecordResponse>>({
+    queryKey: [...queryKey, page],
+    placeholderData: prev => prev,
+    queryFn: async () => (await apiClient.get(`${base}/mortality-records`, { params: { page, size: PAGE_SIZE } })).data,
   })
+  const total = data?.totalElements ?? 0
 
-  const createMut = useMutation({
+  const createMut = useAgToastMutation({
     mutationFn: () => apiClient.post(`${base}/mortality-records`, {
       [targetType === "animal" ? "animalId" : "groupId"]: targetId,
       mortalityDate, countLost: Number(countLost), causeCategory, causeDetail: causeDetail || null,
@@ -60,27 +69,27 @@ export default function AgMortalityRecordsTab({ targetType, targetId }: { target
         <p style={{ fontSize: 12.5, color: "var(--hf-text-muted)", margin: 0 }}>
           {targetType === "animal" ? "Recording a death sets this animal's status to DECEASED." : "Recording a death reduces this group's current count."}
         </p>
-        {!showCreate && <button onClick={() => setShowCreate(true)} style={btnPrimary}><Plus size={13} style={{ marginRight: 4, verticalAlign: -2 }} />Record death</button>}
+        {!showCreate && <AgManage><button onClick={() => setShowCreate(true)} style={btnPrimary}><Plus size={13} style={{ marginRight: 4, verticalAlign: -2 }} />Record death</button></AgManage>}
       </div>
 
       {showCreate && (
         <div style={{ background: "var(--hf-surface-muted)", border: "1px solid var(--hf-border)", borderRadius: 10, padding: 14, marginBottom: 14 }}>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 8, marginBottom: 8 }}>
-            <div><label style={lbl}>Date</label><input type="date" value={mortalityDate} onChange={e => setMortalityDate(e.target.value)} style={inp} /></div>
-            {targetType === "group" && <div><label style={lbl}>Count lost</label><input type="number" min={1} value={countLost} onChange={e => setCountLost(e.target.value)} style={inp} /></div>}
-            <div><label style={lbl}>Cause category</label><select value={causeCategory} onChange={e => setCauseCategory(e.target.value)} style={inp}>{CAUSE_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}</select></div>
-            <div><label style={lbl}>Estimated value loss (R)</label><input type="number" min={0} step="0.01" value={estimatedValueLoss} onChange={e => setEstimatedValueLoss(e.target.value)} style={inp} /></div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))", gap: 8, marginBottom: 8 }}>
+            <Field label="Date"><input type="date" value={mortalityDate} onChange={e => setMortalityDate(e.target.value)} style={inp} /></Field>
+            {targetType === "group" && <Field label="Count lost"><input type="number" min={1} value={countLost} onChange={e => setCountLost(e.target.value)} style={inp} /></Field>}
+            <Field label="Cause category"><select value={causeCategory} onChange={e => setCauseCategory(e.target.value)} style={inp}>{CAUSE_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}</select></Field>
+            <Field label="Estimated value loss (R)"><input type="number" min={0} step="0.01" value={estimatedValueLoss} onChange={e => setEstimatedValueLoss(e.target.value)} style={inp} /></Field>
           </div>
-          <div style={{ marginBottom: 10 }}><label style={lbl}>Cause detail</label><input value={causeDetail} onChange={e => setCauseDetail(e.target.value)} style={inp} /></div>
+          <div style={{ marginBottom: 10 }}><Field label="Cause detail"><input value={causeDetail} onChange={e => setCauseDetail(e.target.value)} style={inp} /></Field></div>
           <div style={{ display: "flex", gap: 8 }}>
-            <button disabled={createMut.isPending} onClick={() => { if (confirm("Record this death? This cannot be undone from the UI.")) createMut.mutate() }}
+            <button disabled={createMut.isPending} onClick={async () => { if (await agConfirm({ title: "Record this death?", message: "This cannot be undone from the screen.", confirmLabel: "Record death", danger: true })) createMut.mutate() }}
               style={{ ...btnPrimary, opacity: createMut.isPending ? 0.6 : 1 }}>{createMut.isPending ? "Saving…" : "Save"}</button>
             <button onClick={() => setShowCreate(false)} style={btnGhost}>Cancel</button>
           </div>
         </div>
       )}
 
-      {isLoading ? <p style={{ color: "var(--hf-text-faint)", fontSize: 12.5 }}>Loading…</p> :
+      {isLoading ? <p style={{ color: "var(--hf-text-faint)", fontSize: 12.5 }}>Loading…</p> : isError ? <QueryError onRetry={() => void refetch()} /> :
         records.length === 0 ? <p style={{ color: "var(--hf-text-faint)", fontSize: 12.5 }}>No mortalities recorded.</p> : (
         <div style={{ border: "1px solid var(--hf-border)", borderRadius: 10, overflow: "hidden" }}>
           {records.map((r, i) => (
@@ -96,11 +105,9 @@ export default function AgMortalityRecordsTab({ targetType, targetId }: { target
           ))}
         </div>
       )}
+      {total > PAGE_SIZE && <p style={{ fontSize: 12, color: "var(--hf-text-muted)", margin: "10px 0 0" }}>{rangeLabel(page, total, "mortality record")}</p>}
+      <AgPager page={page} total={total} size={PAGE_SIZE} onPage={setPage} />
     </div>
   )
 }
 
-const lbl: React.CSSProperties = { fontSize: 10.5, fontWeight: 600, color: "var(--hf-text-secondary)", marginBottom: 3, display: "block" }
-const inp: React.CSSProperties = { width: "100%", padding: "7px 9px", border: "1px solid var(--hf-border)", borderRadius: 6, fontSize: 12, boxSizing: "border-box" }
-const btnPrimary: React.CSSProperties = { display: "inline-flex", alignItems: "center", padding: "7px 12px", borderRadius: 7, border: "none", background: AG_ACCENT, color: "var(--hf-text-on-solid)", fontSize: 12, fontWeight: 700, cursor: "pointer" }
-const btnGhost: React.CSSProperties = { padding: "7px 12px", borderRadius: 7, border: "1px solid var(--hf-border)", background: "var(--hf-surface)", color: "var(--hf-text-muted)", fontSize: 12, fontWeight: 600, cursor: "pointer" }

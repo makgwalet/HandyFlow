@@ -87,3 +87,14 @@ export function groupEntries(entries: CostEntry[]): CostGroup[] {
   }
   return groups.sort((a, b) => b.date.localeCompare(a.date) || b.rows[0].createdAt.localeCompare(a.rows[0].createdAt))
 }
+
+/** A from/to pair typed into the ledger filter: either may be empty. Returns the message to show, or "" when the pair is usable. */
+export function dateRangeProblem(from: string, to: string): string {
+  return from && to && from > to ? "The 'from' date must not be after the 'to' date." : ""
+}
+
+/** The query parameters for a from/to pair: only the ends that are set, and nothing at all while the pair is out of order. */
+export function dateRangeParams(from: string, to: string): { from?: string; to?: string } {
+  if (dateRangeProblem(from, to)) return {}
+  return { ...(from ? { from } : {}), ...(to ? { to } : {}) }
+}

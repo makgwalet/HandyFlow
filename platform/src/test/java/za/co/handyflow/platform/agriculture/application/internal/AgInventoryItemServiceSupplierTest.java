@@ -47,7 +47,7 @@ class AgInventoryItemServiceSupplierTest {
     final UUID farmId = UUID.randomUUID(), agri = UUID.randomUUID(), other = UUID.randomUUID();
     final AgStockMovement[] saved = new AgStockMovement[1];
 
-    private AgInventoryItemService service() { return new AgInventoryItemService(itemRepository, movementRepository, hrFacade, supplierFacade); }
+    private AgInventoryItemService service() { return new AgInventoryItemService(itemRepository, movementRepository, hrFacade, supplierFacade, mock(AgReferenceChecker.class)); }
     private static BigDecimal bd(String s) { return new BigDecimal(s); }
 
     private AgInventoryItem item() {

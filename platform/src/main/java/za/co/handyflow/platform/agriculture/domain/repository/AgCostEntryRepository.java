@@ -7,6 +7,7 @@ import org.springframework.data.jpa.repository.Query;
 import za.co.handyflow.platform.agriculture.domain.model.AgCostEntry;
 import za.co.handyflow.platform.shared.TenantId;
 
+import java.time.LocalDate;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -14,11 +15,18 @@ import java.util.UUID;
 
 public interface AgCostEntryRepository extends JpaRepository<AgCostEntry, UUID> {
 
-    @Query("SELECT e FROM AgCostEntry e WHERE e.tenantId = :tenantId AND e.farmId = :farmId ORDER BY e.entryDate DESC, e.createdAt DESC")
+    @Query("SELECT e FROM AgCostEntry e WHERE e.tenantId = :tenantId AND e.farmId = :farmId ORDER BY e.entryDate DESC, e.createdAt DESC, e.id DESC")
     Page<AgCostEntry> findForFarm(TenantId tenantId, UUID farmId, Pageable pageable);
 
-    @Query("SELECT e FROM AgCostEntry e WHERE e.tenantId = :tenantId AND e.targetType = :targetType AND e.targetId = :targetId ORDER BY e.entryDate DESC, e.createdAt DESC")
+    @Query("SELECT e FROM AgCostEntry e WHERE e.tenantId = :tenantId AND e.targetType = :targetType AND e.targetId = :targetId ORDER BY e.entryDate DESC, e.createdAt DESC, e.id DESC")
     Page<AgCostEntry> findForTarget(TenantId tenantId, String targetType, UUID targetId, Pageable pageable);
+
+    // The same two lists limited to an entry date range (both ends included). The ends are never null: see AgDateRangeRules.
+    @Query("SELECT e FROM AgCostEntry e WHERE e.tenantId = :tenantId AND e.farmId = :farmId AND e.entryDate >= :from AND e.entryDate <= :to ORDER BY e.entryDate DESC, e.createdAt DESC, e.id DESC")
+    Page<AgCostEntry> findForFarmBetween(TenantId tenantId, UUID farmId, LocalDate from, LocalDate to, Pageable pageable);
+
+    @Query("SELECT e FROM AgCostEntry e WHERE e.tenantId = :tenantId AND e.targetType = :targetType AND e.targetId = :targetId AND e.entryDate >= :from AND e.entryDate <= :to ORDER BY e.entryDate DESC, e.createdAt DESC, e.id DESC")
+    Page<AgCostEntry> findForTargetBetween(TenantId tenantId, String targetType, UUID targetId, LocalDate from, LocalDate to, Pageable pageable);
 
     @Query("SELECT e FROM AgCostEntry e WHERE e.tenantId = :tenantId AND e.allocationGroupId = :allocationGroupId ORDER BY e.createdAt ASC")
     List<AgCostEntry> findByAllocationGroup(TenantId tenantId, UUID allocationGroupId);
@@ -32,6 +40,12 @@ public interface AgCostEntryRepository extends JpaRepository<AgCostEntry, UUID> 
 
     @Query("SELECT e.category, SUM(e.amount) FROM AgCostEntry e WHERE e.tenantId = :tenantId AND e.targetType = :targetType AND e.targetId = :targetId GROUP BY e.category")
     List<Object[]> sumByCategoryForTarget(TenantId tenantId, String targetType, UUID targetId);
+
+    @Query("SELECT e.category, SUM(e.amount) FROM AgCostEntry e WHERE e.tenantId = :tenantId AND e.farmId = :farmId AND e.entryDate >= :from AND e.entryDate <= :to GROUP BY e.category")
+    List<Object[]> sumByCategoryForFarmBetween(TenantId tenantId, UUID farmId, LocalDate from, LocalDate to);
+
+    @Query("SELECT e.category, SUM(e.amount) FROM AgCostEntry e WHERE e.tenantId = :tenantId AND e.targetType = :targetType AND e.targetId = :targetId AND e.entryDate >= :from AND e.entryDate <= :to GROUP BY e.category")
+    List<Object[]> sumByCategoryForTargetBetween(TenantId tenantId, String targetType, UUID targetId, LocalDate from, LocalDate to);
 
     // How many ACTIVE ledger entries of this source already point at this record (labour: at most one; the V308 unique index enforces it).
     @Query("SELECT COUNT(e) FROM AgCostEntry e WHERE e.tenantId = :tenantId AND e.sourceType = :sourceType AND e.sourceRef = :sourceRef AND e.status = 'ACTIVE'")

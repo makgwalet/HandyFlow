@@ -4,140 +4,150 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 import za.co.handyflow.platform.agriculture.domain.model.AgHealthEvent;
 import za.co.handyflow.platform.agriculture.domain.model.AgInventoryItem;
 import za.co.handyflow.platform.agriculture.domain.repository.AgHealthEventRepository;
 import za.co.handyflow.platform.agriculture.domain.repository.AgInventoryItemRepository;
+import za.co.handyflow.platform.agriculture.domain.rules.AgActionUrls;
+import za.co.handyflow.platform.agriculture.domain.rules.AgDates;
+import za.co.handyflow.platform.agriculture.domain.rules.AgReminderRules;
 import za.co.handyflow.platform.notifications.application.NotificationRequest;
 import za.co.handyflow.platform.notifications.application.Recipient;
-import za.co.handyflow.platform.notifications.application.TenantAdminRecipients;
 import za.co.handyflow.platform.notifications.application.internal.NotificationService;
 import za.co.handyflow.platform.notifications.domain.model.NotificationType;
+import za.co.handyflow.platform.shared.SchedulerLease;
 import za.co.handyflow.platform.shared.TenantId;
 
+import java.time.Duration;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
- * Daily sweep — 09:30, the next free 15-minute slot after Bookkeeping's own
- * 09:15 (per this engagement's running notification-scheduler registry).
- * <p>
- * Two sweeps, each isolated per-record so one bad row never stops the rest
- * of the batch — same isolation principle {@code ApBillDueSoonScheduler}
- * uses:
- * <ol>
- *   <li>Health events whose {@code nextDueDate} has arrived and are not yet
- *       acknowledged — notify tenant admins, then call
- *       {@code AgHealthEvent.acknowledgeReminder()} so the alert fires once
- *       per due date, not indefinitely (see {@code AgHealthEvent}'s own
- *       Javadoc for why this is a deliberate Increment 1 simplification).</li>
- *   <li>Inventory items that have dropped below their reorder level —
- *       notify tenant admins. No acknowledgement flag: crossing back above
- *       the level self-corrects the condition, so a once-per-day digest is
- *       acceptable without extra state to track.</li>
- * </ol>
- * <p>
- * Requires {@code NotificationType.AG_HEALTH_EVENT_DUE} and
- * {@code NotificationType.AG_INVENTORY_LOW_STOCK} to exist — see
- * {@code Agriculture-NotificationType-patch-instructions.md} at the sandbox
- * root for the exact enum constants to add.
- * <p>
- * {@code NotificationService}/{@code TenantAdminRecipients} confirmed as
- * injected beans (not static calls), matching {@code FmWorkOrderService}/
- * {@code FacilityNotificationScheduler}'s real source.
- * <p>
- * ASSUMES {@code @EnableScheduling} IS ALREADY ON somewhere in this app —
- * not re-verified here, same standing assumption every prior scheduler in
- * this engagement has made.
+ * Daily sweep at 09:30 SAST: health events whose next-due date has arrived, and stock below its reorder level.
+ * <ul>
+ *   <li><b>Telling is not acknowledging.</b> The sweep records the day it sent a message ({@code reminderNotifiedOn},
+ *       {@code lowStockNotifiedOn}) and never touches {@code reminderAcknowledged}, which only a person sets. The farm dashboard's
+ *       attention list shows everything not yet acknowledged, so a due vaccination stays on it after the morning message.</li>
+ *   <li><b>No daily nagging.</b> A message is sent the first time, then again every {@value AgReminderRules#REPEAT_DAYS} days
+ *       while it is still open. A low-stock notice is forgotten once the item is back above its reorder level.</li>
+ *   <li><b>Only for what is still there.</b> Sold, dead or deleted animals and groups, and inactive or deleted farms, are skipped.</li>
+ *   <li><b>The right person.</b> The farm's manager if they are a platform user, otherwise the tenant admins. Messages name the tag or
+ *       batch number and the farm, not a database id.</li>
+ *   <li><b>One instance, one transaction per record.</b> The sweep holds a database lease so two instances do not both send, and each
+ *       record is its own transaction, so one failure cannot undo the others' "notified" marks and make everything re-send.</li>
+ * </ul>
+ * Today is the South African date (see {@link AgDates}), not the server's.
  */
 @Slf4j
 @Component
 @RequiredArgsConstructor
 public class AgNotificationScheduler {
 
+    static final String LOCK = "agriculture-daily-sweep";
+
     private final AgHealthEventRepository healthEventRepository;
     private final AgInventoryItemRepository inventoryItemRepository;
     private final NotificationService notificationService;
-    private final TenantAdminRecipients tenantAdminRecipients;
+    private final AgReminderSupport support;
+    private final SchedulerLease lease;
+    private final PlatformTransactionManager transactionManager;
 
     @Scheduled(cron = "0 30 9 * * *", zone = "Africa/Johannesburg")
-    @Transactional
     public void runDailySweep() {
-        sweepHealthEventsDue();
-        sweepLowStockInventory();
+        lease.runExclusively(LOCK, Duration.ofMinutes(30), () -> {
+            LocalDate today = AgDates.today();
+            sweepHealthEventsDue(today);
+            sweepLowStockInventory(today);
+        });
     }
 
-    private void sweepHealthEventsDue() {
-        LocalDate today = LocalDate.now();
-        List<AgHealthEvent> due = healthEventRepository.findDueAcrossTenants(today);
-        int sent = 0;
+    private void sweepHealthEventsDue(LocalDate today) {
+        List<AgHealthEvent> due = healthEventRepository.findDueAcrossTenants(today, AgReminderRules.repeatBefore(today));
+        TransactionTemplate tx = new TransactionTemplate(transactionManager);
+        AtomicInteger sent = new AtomicInteger();
         for (AgHealthEvent event : due) {
             try {
-                notifyHealthEventDue(event);
-                event.acknowledgeReminder();
-                healthEventRepository.save(event);
-                sent++;
+                tx.executeWithoutResult(status -> {
+                    if (!AgReminderRules.shouldNotifyDue(event.getNextDueDate(), event.isReminderAcknowledged(), event.getReminderNotifiedOn(), today)) return;
+                    if (notifyHealthEventDue(event, today)) {
+                        event.markReminderNotified(today);
+                        healthEventRepository.save(event);
+                        sent.incrementAndGet();
+                    }
+                });
             } catch (Exception e) {
-                log.error("Failed to send health-event-due reminder for event={}: {}",
-                        event.getId(), e.getMessage(), e);
+                log.error("Failed to send health-event-due reminder for event={}: {}", event.getId(), e.getMessage(), e);
             }
         }
-        if (sent > 0) {
-            log.info("Sent {} agriculture health-event-due reminder(s)", sent);
-        }
+        if (sent.get() > 0) log.info("Sent {} agriculture health-event-due reminder(s)", sent.get());
     }
 
-    private void sweepLowStockInventory() {
-        List<AgInventoryItem> lowStock = inventoryItemRepository.findBelowReorderLevelAcrossTenants();
-        int sent = 0;
+    private void sweepLowStockInventory(LocalDate today) {
+        List<AgInventoryItem> lowStock = inventoryItemRepository.findBelowReorderLevelAcrossTenants(AgReminderRules.repeatBefore(today));
+        TransactionTemplate tx = new TransactionTemplate(transactionManager);
+        AtomicInteger sent = new AtomicInteger();
         for (AgInventoryItem item : lowStock) {
             try {
-                notifyLowStock(item);
-                sent++;
+                tx.executeWithoutResult(status -> {
+                    if (!AgReminderRules.isNoticeDue(item.getLowStockNotifiedOn(), today)) return;
+                    if (notifyLowStock(item)) {
+                        item.markLowStockNotified(today);
+                        inventoryItemRepository.save(item);
+                        sent.incrementAndGet();
+                    }
+                });
             } catch (Exception e) {
                 log.error("Failed to send low-stock alert for item={}: {}", item.getId(), e.getMessage(), e);
             }
         }
-        if (sent > 0) {
-            log.info("Sent {} agriculture low-stock alert(s)", sent);
-        }
+        if (sent.get() > 0) log.info("Sent {} agriculture low-stock alert(s)", sent.get());
     }
 
-    private void notifyHealthEventDue(AgHealthEvent event) {
+    /** @return true if a message was sent; false when the target is gone or nobody could be told (it is tried again tomorrow). */
+    private boolean notifyHealthEventDue(AgHealthEvent event, LocalDate today) {
         TenantId tenantId = event.getTenantId();
-        List<Recipient> recipients = tenantAdminRecipients.resolveTenantAdmins(tenantId);
-        if (recipients.isEmpty()) return;
+        Optional<AgReminderSupport.Target> target = support.forAnimalOrGroup(tenantId, event.getAnimalId(), event.getGroupId());
+        if (target.isEmpty()) return false;
+        List<Recipient> recipients = support.recipientsFor(tenantId, target.get().farmId());
+        if (recipients.isEmpty()) return false;
 
-        String subject = event.isForAnimal() ? "animal " + event.getAnimalId() : "group " + event.getGroupId();
         notificationService.send(NotificationRequest.builder()
                 .tenantId(tenantId)
                 .type(NotificationType.AG_HEALTH_EVENT_DUE)
                 .title("Health event due: " + event.getEventType())
-                .message(event.getEventType() + " is due (" + event.getNextDueDate() + ") for " + subject
+                .message(event.getEventType() + " for " + target.get().label() + " on " + target.get().farmName() + " is "
+                        + AgReminderRules.dueWording(event.getNextDueDate(), today) + " (" + event.getNextDueDate() + ")"
                         + (event.getDescription() != null ? " — " + event.getDescription() : "") + ".")
-                .actionUrl("/agriculture/health-events/" + event.getId())
+                .actionUrl(AgActionUrls.animalOrGroup(target.get().farmId(), event.getAnimalId(), event.getGroupId()))
                 .sourceModule("agriculture")
                 .sourceEntityId(event.getId().toString())
                 .recipients(recipients)
                 .build());
+        return true;
     }
 
-    private void notifyLowStock(AgInventoryItem item) {
+    private boolean notifyLowStock(AgInventoryItem item) {
         TenantId tenantId = item.getTenantId();
-        List<Recipient> recipients = tenantAdminRecipients.resolveTenantAdmins(tenantId);
-        if (recipients.isEmpty()) return;
+        Optional<AgReminderSupport.Target> target = support.forFarm(tenantId, item.getFarmId(), item.getItemName());
+        if (target.isEmpty()) return false;
+        List<Recipient> recipients = support.recipientsFor(tenantId, target.get().farmId());
+        if (recipients.isEmpty()) return false;
 
         notificationService.send(NotificationRequest.builder()
                 .tenantId(tenantId)
                 .type(NotificationType.AG_INVENTORY_LOW_STOCK)
                 .title("Low stock: " + item.getItemName())
-                .message(item.getItemName() + " is at " + item.getCurrentQuantity() + " " + item.getUnitOfMeasure()
+                .message(item.getItemName() + " on " + target.get().farmName() + " is at " + item.getCurrentQuantity() + " " + item.getUnitOfMeasure()
                         + " — below its reorder level of " + item.getReorderLevel() + " " + item.getUnitOfMeasure() + ".")
-                .actionUrl("/agriculture/inventory/" + item.getId())
+                .actionUrl(AgActionUrls.inventory(item.getFarmId()))
                 .sourceModule("agriculture")
                 .sourceEntityId(item.getId().toString())
                 .recipients(recipients)
                 .build());
+        return true;
     }
 }

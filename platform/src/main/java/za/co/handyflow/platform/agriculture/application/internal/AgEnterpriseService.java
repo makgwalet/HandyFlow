@@ -22,6 +22,7 @@ import java.util.UUID;
 public class AgEnterpriseService {
 
     private final AgEnterpriseRepository enterpriseRepository;
+    private final AgReferenceChecker references;
 
     @Transactional(readOnly = true)
     public Page<EnterpriseResponse> getEnterprisesForFarm(TenantId tenantId, UUID farmId, Pageable pageable) {
@@ -35,6 +36,7 @@ public class AgEnterpriseService {
 
     @Transactional
     public EnterpriseResponse createEnterprise(TenantId tenantId, CreateEnterpriseRequest req) {
+        references.requireActiveFarm(tenantId, req.farmId());
         AgEnterprise enterprise = AgEnterprise.create(tenantId, req.farmId(), req.name(), req.enterpriseType(),
                 req.speciesFocus(), req.startDate());
         enterpriseRepository.save(enterprise);

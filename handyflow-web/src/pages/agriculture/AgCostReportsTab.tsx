@@ -11,6 +11,7 @@ import { round, sumBy, toCsv } from "./agCrops.logic"
 import type { AnimalCost, CropCycleCost, GroupCost } from "./agCrops.types"
 import { Empty, Th } from "./agCropsUi"
 import { AG_ACCENT_TEXT, btnGhost, card, fmtMoney, kpiLabel, kpiValue, td, theadStyle } from "./constants"
+import { QueryError } from "./agUi"
 
 type Kind = "crops" | "animals" | "groups"
 const KINDS: { key: Kind; label: string }[] = [{ key: "crops", label: "Crops" }, { key: "animals", label: "Animals" }, { key: "groups", label: "Groups" }]
@@ -139,7 +140,7 @@ export default function AgCostReportsTab({ farmId }: { farmId: string }) {
         <button type="button" style={{ ...btnGhost, opacity: exportRows.length ? 1 : 0.5 }} disabled={!exportRows.length} onClick={() => downloadCsv(`${kind}-costs.csv`, toCsv(exportRows))}><Download size={14} />Export CSV</button>
       </div>
       {q.isLoading ? <Empty>Loading cost report…</Empty> : q.isError ? (
-        <p role="alert" style={{ fontSize: 13, color: "var(--hf-danger-text)" }}>We couldn't load this report. <button type="button" onClick={() => q.refetch()} style={{ background: "none", border: "none", textDecoration: "underline", cursor: "pointer", color: "inherit", fontWeight: 700 }}>Try again</button></p>
+        <QueryError onRetry={() => void q.refetch()} what="this report" />
       ) : body}
     </div>
   )

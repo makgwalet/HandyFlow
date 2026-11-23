@@ -4,17 +4,18 @@
 // Needs AGRICULTURE_FINANCE (ledger rows carry rates derived from salaries). Costs are never edited: a mistake is reversed, which writes
 // a negating row dated like the original, so history stays complete. The existing direct costs (feed, health, inputs, seed, animal
 // purchases) are NOT here; they stay where they are recorded, so nothing is counted twice. Cost reports will combine both in a later step.
+import { truncationNote } from "./agPaging.logic"
 import { useState } from "react"
 import { Plus, Lock } from "lucide-react"
 import { usePermission } from "../../hooks/usePermission"
 import { useCostEntries, useCostTotals, useReverseCost, type TargetFilter, type TargetType } from "./agLedger.api"
 import { useTargetOptions } from "./agTargets"
-import { CATEGORY_LABEL, TARGET_LABEL, TARGET_TYPES, groupEntries, type CostGroup } from "./agLedger.logic"
+import { CATEGORY_LABEL, TARGET_LABEL, TARGET_TYPES, dateRangeParams, dateRangeProblem, groupEntries, type CostGroup } from "./agLedger.logic"
 import AgCostEntryForm from "./AgCostEntryForm"
 import { Empty, Field } from "./agCropsUi"
 import { btnDanger, btnGhost, btnPrimary, card, fmtDate, fmtMoney, inp, kpiLabel, kpiValue, panel, statusBadge } from "./constants"
+import { QueryError } from "./agUi"
 
-const MAX_ROWS = 200
 
 function LedgerBody({ farmId }: { farmId: string }) {
   const [type, setType] = useState<TargetType | "">("")
@@ -24,8 +25,12 @@ function LedgerBody({ farmId }: { farmId: string }) {
   const [reason, setReason] = useState("")
   const options = useTargetOptions(farmId)
   const filter: TargetFilter | null = type && targetId ? { type, id: targetId } : null
-  const entries = useCostEntries(farmId, filter)
-  const totals = useCostTotals(farmId, filter)
+  const [from, setFrom] = useState("")
+  const [to, setTo] = useState("")
+  const rangeProblem = dateRangeProblem(from, to)
+  const range = dateRangeParams(from, to)
+  const entries = useCostEntries(farmId, filter, true, range)
+  const totals = useCostTotals(farmId, filter, true, range)
   const reverse = useReverseCost()
   const costs = groupEntries(entries.data?.content ?? [])
   const labelOf = (t: string, id: string) => options.find(o => o.type === t && o.id === id)?.label ?? `${TARGET_LABEL[t as TargetType] ?? t}`
@@ -50,9 +55,15 @@ function LedgerBody({ farmId }: { farmId: string }) {
             </select>
           </Field>
         )}
+        <Field label="From" htmlFor="cl-from"><input id="cl-from" type="date" style={{ ...inp, width: "auto" }} value={from} max={to || undefined} onChange={e => setFrom(e.target.value)} /></Field>
+        <Field label="To" htmlFor="cl-to"><input id="cl-to" type="date" style={{ ...inp, width: "auto" }} value={to} min={from || undefined} onChange={e => setTo(e.target.value)} /></Field>
+        {(from || to) && <button type="button" style={btnGhost} onClick={() => { setFrom(""); setTo("") }}>Clear dates</button>}
         <div style={{ flex: 1 }} />
         {!adding && <button type="button" style={btnPrimary} onClick={() => setAdding(true)}><Plus size={14} />Record a cost</button>}
       </div>
+
+      {rangeProblem && <p role="alert" style={{ fontSize: 12.5, color: "var(--hf-danger-text)", margin: "0 0 10px" }}>{rangeProblem} Showing every date until it is fixed.</p>}
+      {(from || to) && !rangeProblem && <p style={{ fontSize: 12, color: "var(--hf-text-faint)", margin: "0 0 10px" }}>Showing costs dated {from ? `from ${fmtDate(from)}` : "up to"}{from && to ? " " : ""}{to ? `${from ? "to" : ""} ${fmtDate(to)}` : ""}. The totals above use the same dates.</p>}
 
       {adding && <AgCostEntryForm farmId={farmId} options={options} initialTarget={filter} onDone={() => setAdding(false)} />}
 
@@ -68,7 +79,7 @@ function LedgerBody({ farmId }: { farmId: string }) {
       )}
 
       {entries.isLoading ? <Empty>Loading the cost ledger…</Empty> : entries.isError ? (
-        <p role="alert" style={{ fontSize: 13, color: "var(--hf-danger-text)" }}>We couldn't load the cost ledger. <button type="button" onClick={() => entries.refetch()} style={{ background: "none", border: "none", textDecoration: "underline", cursor: "pointer", color: "inherit", fontWeight: 700 }}>Try again</button></p>
+        <QueryError onRetry={() => void entries.refetch()} what="the cost ledger" />
       ) : costs.length === 0 ? <Empty>{filter ? "No costs recorded for this yet." : "No direct costs recorded yet. Use Record a cost for things like a hired contractor."}</Empty> : (
         <div style={{ display: "grid", gap: 10 }}>
           {costs.map(c => (
@@ -87,7 +98,7 @@ function LedgerBody({ farmId }: { farmId: string }) {
               {c.status === "REVERSED" && <p style={{ fontSize: 11.5, color: "var(--hf-text-faint)", margin: "8px 0 0" }}>Reversed{c.reversedNote ? `: ${c.reversedNote}` : ""}</p>}
             </div>
           ))}
-          {(entries.data?.totalElements ?? 0) > MAX_ROWS && <p style={{ fontSize: 11.5, color: "var(--hf-text-faint)" }}>Showing the newest {MAX_ROWS} ledger rows.</p>}
+          {truncationNote(entries.data?.content.length ?? 0, entries.data?.totalElements ?? 0, "ledger rows") && <p style={{ fontSize: 11.5, color: "var(--hf-text-faint)" }}>{truncationNote(entries.data?.content.length ?? 0, entries.data?.totalElements ?? 0, "ledger rows")}</p>}
         </div>
       )}
     </div>

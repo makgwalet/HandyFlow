@@ -66,8 +66,13 @@ public class AgScoutingRecord {
     @Column(name = "follow_up_date")
     private LocalDate followUpDate;
 
+    /** A person has dealt with this follow-up. Written only by {@link #acknowledgeFollowUp()}, never by the daily sweep. */
     @Column(name = "follow_up_acknowledged", nullable = false)
     private boolean followUpAcknowledged = false;
+
+    /** The day the sweep last sent a message about this follow-up; null if it has not. Written only by the sweep. */
+    @Column(name = "follow_up_notified_on")
+    private LocalDate followUpNotifiedOn;
 
     @Column(nullable = false)
     private String status = "OPEN"; // OPEN | RESOLVED
@@ -115,8 +120,12 @@ public class AgScoutingRecord {
         if (severity != null && !severity.isBlank()) this.severity = severity;
         if (description != null && !description.isBlank()) this.description = description;
         this.recommendedAction = recommendedAction;
+        // a new follow-up date is a new reminder; editing the notes of an old one must not bring it back
+        if (!java.util.Objects.equals(this.followUpDate, followUpDate)) {
+            this.followUpAcknowledged = false;
+            this.followUpNotifiedOn = null;
+        }
         this.followUpDate = followUpDate;
-        this.followUpAcknowledged = false;
         this.notes = notes;
     }
 
@@ -125,6 +134,8 @@ public class AgScoutingRecord {
     public void reopen() { this.status = "OPEN"; }
 
     public void acknowledgeFollowUp() { this.followUpAcknowledged = true; }
+
+    public void markFollowUpNotified(LocalDate day) { this.followUpNotifiedOn = day; }
 
     @PreUpdate
     void onUpdate() { this.updatedAt = Instant.now(); }

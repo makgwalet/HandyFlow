@@ -7,10 +7,16 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import za.co.handyflow.platform.agriculture.domain.model.AgFarm;
+import za.co.handyflow.platform.agriculture.domain.repository.AgAnimalRepository;
+import za.co.handyflow.platform.agriculture.domain.repository.AgCropCycleRepository;
 import za.co.handyflow.platform.agriculture.domain.repository.AgFarmRepository;
+import za.co.handyflow.platform.agriculture.domain.repository.AgGroupRepository;
+import za.co.handyflow.platform.agriculture.domain.repository.AgInventoryItemRepository;
+import za.co.handyflow.platform.agriculture.domain.rules.AgReferenceRules;
 import za.co.handyflow.platform.agriculture.dto.AssignManagerRequest;
 import za.co.handyflow.platform.agriculture.dto.CreateFarmRequest;
 import za.co.handyflow.platform.agriculture.dto.FarmResponse;
+import za.co.handyflow.platform.agriculture.dto.UpdateFarmMarksRequest;
 import za.co.handyflow.platform.agriculture.dto.UpdateFarmRequest;
 import za.co.handyflow.platform.hr.application.HrFacade;
 import za.co.handyflow.platform.hr.EmployeeSummary;
@@ -33,6 +39,10 @@ public class AgFarmService {
 
     private final AgFarmRepository farmRepository;
     private final HrFacade hrFacade;
+    private final AgAnimalRepository animalRepository;
+    private final AgGroupRepository groupRepository;
+    private final AgCropCycleRepository cropCycleRepository;
+    private final AgInventoryItemRepository inventoryItemRepository;
 
     @Transactional(readOnly = true)
     public Page<FarmResponse> getFarms(TenantId tenantId, String status, Pageable pageable) {
@@ -64,6 +74,18 @@ public class AgFarmService {
         return toResponse(farm);
     }
 
+    /** Sets the farm's registered brand mark, ear mark and mark registration number (blank clears one). */
+    @Transactional
+    public FarmResponse updateMarks(TenantId tenantId, UUID id, UpdateFarmMarksRequest req) {
+        AgFarm farm = findActive(tenantId, id);
+        farm.setMarks(req.brandMark(), req.earMark(), req.markRegistrationNumber());
+        // owner and address are only changed when sent (an empty string clears them)
+        farm.setOwnerDetails(req.ownerName() != null ? req.ownerName() : farm.getOwnerName(),
+                req.physicalAddress() != null ? req.physicalAddress() : farm.getPhysicalAddress());
+        log.info("Farm marks updated id={} tenant={}", id, tenantId.getValue());
+        return toResponse(farm);
+    }
+
     @Transactional
     public FarmResponse assignManager(TenantId tenantId, UUID id, AssignManagerRequest req) {
         AgFarm farm = findActive(tenantId, id);
@@ -80,6 +102,7 @@ public class AgFarmService {
     @Transactional
     public FarmResponse deactivateFarm(TenantId tenantId, UUID id) {
         AgFarm farm = findActive(tenantId, id);
+        requireNothingLive(tenantId, farm, "deactivated");
         farm.deactivate();
         return toResponse(farm);
     }
@@ -94,8 +117,18 @@ public class AgFarmService {
     @Transactional
     public void deleteFarm(TenantId tenantId, UUID id) {
         AgFarm farm = findActive(tenantId, id);
+        requireNothingLive(tenantId, farm, "deleted");
         farm.softDelete();
         log.info("Farm deleted id={} tenant={}", id, tenantId.getValue());
+    }
+
+    /** A farm that still has animals, groups, crops or stock cannot be switched off: they would keep sending reminders and showing in reports. */
+    private void requireNothingLive(TenantId tenantId, AgFarm farm, String action) {
+        AgReferenceRules.requireNoHoldings(farm.getName(), action,
+                animalRepository.countActiveForFarm(tenantId, farm.getId()),
+                groupRepository.countActiveForFarm(tenantId, farm.getId()),
+                cropCycleRepository.countActiveForFarm(tenantId, farm.getId()),
+                inventoryItemRepository.countWithStockForFarm(tenantId, farm.getId()));
     }
 
     private AgFarm findActive(TenantId tenantId, UUID id) {
@@ -108,7 +141,9 @@ public class AgFarmService {
                 f.getId(), f.getName(), f.getFarmType(), f.getRegistrationNumber(),
                 f.getProvince(), f.getRegion(), f.getGpsLatitude(), f.getGpsLongitude(),
                 f.getTotalHectares(), f.getManagerId(), f.getManagerName(),
-                f.getStatus(), f.getNotes(), f.getCreatedAt(), f.getUpdatedAt()
+                f.getStatus(), f.getNotes(), f.getCreatedAt(), f.getUpdatedAt(),
+                f.getBrandMark(), f.getEarMark(), f.getMarkRegistrationNumber(),
+                f.getOwnerName(), f.getPhysicalAddress()
         );
     }
 }

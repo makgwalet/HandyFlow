@@ -108,20 +108,23 @@ class AgCostEntryControllerTest {
     @WithMockUser(authorities = "AGRICULTURE_FINANCE")
     @DisplayName("GET /cost-entries lists a farm's rows, and passes a target filter through")
     void listPassesTheFilter() throws Exception {
-        when(costEntryService.list(any(), eq(farmId), any(), any(), any())).thenReturn(new PageImpl<CostEntryResponse>(List.of(row("10"))));
+        when(costEntryService.list(any(), eq(farmId), any(), any(), any(), any(), any())).thenReturn(new PageImpl<CostEntryResponse>(List.of(row("10"))));
 
         TenantRequests.asTenant(mvc, get(BASE + "/farms/" + farmId + "/cost-entries")).andExpect(status().isOk()).andExpect(jsonPath("$.data.content[0].description").value("Hired sprayer"));
-        verify(costEntryService).list(any(), eq(farmId), isNull(), isNull(), any());
+        verify(costEntryService).list(any(), eq(farmId), isNull(), isNull(), isNull(), isNull(), any());
 
         TenantRequests.asTenant(mvc, get(BASE + "/farms/" + farmId + "/cost-entries").param("targetType", "GROUP").param("targetId", targetId.toString())).andExpect(status().isOk());
-        verify(costEntryService).list(any(), eq(farmId), eq("GROUP"), eq(targetId), any());
+        verify(costEntryService).list(any(), eq(farmId), eq("GROUP"), eq(targetId), isNull(), isNull(), any());
+
+        TenantRequests.asTenant(mvc, get(BASE + "/farms/" + farmId + "/cost-entries").param("from", "2026-07-01").param("to", "2026-09-30")).andExpect(status().isOk());
+        verify(costEntryService).list(any(), eq(farmId), isNull(), isNull(), eq(java.time.LocalDate.of(2026, 7, 1)), eq(java.time.LocalDate.of(2026, 9, 30)), any());
     }
 
     @Test
     @WithMockUser(authorities = "AGRICULTURE_FINANCE")
     @DisplayName("GET /cost-entries/totals returns the net cost by category")
     void totals() throws Exception {
-        when(costEntryService.totals(any(), eq(farmId), any(), any()))
+        when(costEntryService.totals(any(), eq(farmId), any(), any(), any(), any()))
                 .thenReturn(new CostTotalsResponse(List.of(new CategoryTotal("LABOUR", new BigDecimal("250.50")), new CategoryTotal("OTHER_DIRECT", new BigDecimal("100"))), new BigDecimal("350.50")));
 
         TenantRequests.asTenant(mvc, get(BASE + "/farms/" + farmId + "/cost-entries/totals"))

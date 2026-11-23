@@ -14,6 +14,7 @@ import AgCropHarvestsTab from "./AgCropHarvestsTab"
 import AgEvidenceTab from "./AgEvidenceTab"
 import { Field, Warn } from "./agCropsUi"
 import { AG_ACCENT, AG_ACCENT_TEXT, btnDanger, btnGhost, btnPrimary, card, fmtDate, fmtMoney, grid, inp, kpiLabel, panel, statusBadge } from "./constants"
+import { QueryError } from "./agUi"
 
 type Tab = "overview" | "inputs" | "scouting" | "harvests" | "evidence"
 const TABS: { key: Tab; label: string }[] = [
@@ -44,7 +45,7 @@ function Stepper({ cycle }: { cycle: CropCycle }) {
 export default function AgCropCycleDetail({ farmId, cycleId, onBack }: { farmId: string; cycleId: string; onBack: () => void }) {
   const canManage = usePermission("AGRICULTURE_MANAGE")
   const canDelete = usePermission("AGRICULTURE_ADMIN")
-  const { data: cycle, isLoading, isError } = useCropCycle(cycleId)
+  const { data: cycle, isLoading, isError, refetch } = useCropCycle(cycleId)
   const types = useCropTypes().data ?? []
   const areas = useAreas(farmId).data ?? []
   const seasons = useSeasons(farmId).data ?? []
@@ -73,7 +74,7 @@ export default function AgCropCycleDetail({ farmId, cycleId, onBack }: { farmId:
   const remove = useAgMutation(() => api.del(`/crop-cycles/${cycleId}`), { invalidate: [agKeys.cyclesOfFarm(farmId), ["ag", "costs", "crops", farmId]], success: "Crop cycle deleted", failure: "Couldn't delete it." })
 
   if (isLoading) return <p style={{ fontSize: 13, color: "var(--hf-text-faint)" }}>Loading crop cycle…</p>
-  if (isError || !cycle) return <p role="alert" style={{ fontSize: 13, color: "var(--hf-danger-text)" }}>We couldn't load this crop cycle. <button type="button" onClick={onBack} style={btnGhost}>Back</button></p>
+  if (isError || !cycle) return <QueryError onRetry={() => void refetch()} what="this crop cycle" onBack={onBack} />
 
   const a = allowedActions(cycle.status)
   const seedItem = seeds.find(i => i.id === f.seedItem)

@@ -15,9 +15,9 @@ public interface AgFarmRepository extends JpaRepository<AgFarm, UUID> {
     @Query("SELECT f FROM AgFarm f WHERE f.tenantId = :tenantId AND f.id = :id AND f.deletedAt IS NULL")
     Optional<AgFarm> findActiveById(TenantId tenantId, UUID id);
 
-    @Query("SELECT f FROM AgFarm f WHERE f.tenantId = :tenantId AND f.deletedAt IS NULL ORDER BY f.name")
+    @Query("SELECT f FROM AgFarm f WHERE f.tenantId = :tenantId AND f.deletedAt IS NULL ORDER BY f.name, f.id")
     Page<AgFarm> findAllActive(TenantId tenantId, Pageable pageable);
 
-    @Query("SELECT f FROM AgFarm f WHERE f.tenantId = :tenantId AND f.status = :status AND f.deletedAt IS NULL ORDER BY f.name")
+    @Query("SELECT f FROM AgFarm f WHERE f.tenantId = :tenantId AND f.status = :status AND f.deletedAt IS NULL ORDER BY f.name, f.id")
     Page<AgFarm> findByStatus(TenantId tenantId, String status, Pageable pageable);
 }

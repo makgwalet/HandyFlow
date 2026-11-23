@@ -44,7 +44,7 @@ class AgHarvestRecordServiceTest {
     final UUID cycleId = UUID.randomUUID();
 
     private AgHarvestRecordService service() {
-        return new AgHarvestRecordService(harvestRecordRepository, cropCycleRepository, cropTypeRepository, hrFacade);
+        return new AgHarvestRecordService(harvestRecordRepository, cropCycleRepository, cropTypeRepository, hrFacade, mock(AgWithdrawalService.class));
     }
 
     private void cycle(LocalDate plantingDate) {

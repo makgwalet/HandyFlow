@@ -21,5 +21,7 @@ public record InputApplicationResponse(
         BigDecimal cost,
         String weatherConditions,
         String notes,
-        Instant createdAt
+        Instant createdAt,
+        Integer preHarvestIntervalDays,
+        LocalDate harvestClearOn
 ) {}

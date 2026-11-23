@@ -23,6 +23,10 @@ public class AgSpeciesService {
 
     private final AgSpeciesRepository speciesRepository;
 
+    private java.util.List<String> existingNames(TenantId tenantId) {
+        return speciesRepository.findAllActive(tenantId, org.springframework.data.domain.Pageable.unpaged()).stream().map(AgSpecies::getName).toList();
+    }
+
     @Transactional(readOnly = true)
     public Page<SpeciesResponse> getSpecies(TenantId tenantId, String category, Pageable pageable) {
         Page<AgSpecies> page = (category != null && !category.isBlank())
@@ -38,6 +42,7 @@ public class AgSpeciesService {
 
     @Transactional
     public SpeciesResponse createSpecies(TenantId tenantId, CreateSpeciesRequest req) {
+        za.co.handyflow.platform.agriculture.domain.rules.AgLookupDefaults.requireNewName(existingNames(tenantId), req.name(), "species");
         AgSpecies species = AgSpecies.create(tenantId, req.name(), req.category(), req.defaultUnitOfMeasure(),
                 req.trackingMode(), req.gestationDays(), req.maturityWeightKg());
         speciesRepository.save(species);
@@ -45,9 +50,24 @@ public class AgSpeciesService {
         return toResponse(species);
     }
 
+    /** Adds the standard species the tenant does not have yet (matched by name, ignoring case); anything it already has is left alone. */
+    @Transactional
+    public za.co.handyflow.platform.agriculture.dto.SeedDefaultsResponse addStandardSpecies(TenantId tenantId) {
+        java.util.List<String> have = existingNames(tenantId);
+        var missing = za.co.handyflow.platform.agriculture.domain.rules.AgLookupDefaults.missingSpecies(have);
+        for (var d : missing) {
+            speciesRepository.save(AgSpecies.create(tenantId, d.name(), d.category(), d.unit(), d.trackingMode(), d.gestationDays(), d.maturityWeightKg()));
+        }
+        log.info("Standard species added count={} tenant={}", missing.size(), tenantId.getValue());
+        return new za.co.handyflow.platform.agriculture.dto.SeedDefaultsResponse(missing.size(), za.co.handyflow.platform.agriculture.domain.rules.AgLookupDefaults.SPECIES.size() - missing.size());
+    }
+
     @Transactional
     public SpeciesResponse updateSpecies(TenantId tenantId, UUID id, UpdateSpeciesRequest req) {
         AgSpecies species = findActive(tenantId, id);
+        if (req.name() != null && !za.co.handyflow.platform.agriculture.domain.rules.AgLookupDefaults.normalise(req.name()).equals(za.co.handyflow.platform.agriculture.domain.rules.AgLookupDefaults.normalise(species.getName()))) {
+            za.co.handyflow.platform.agriculture.domain.rules.AgLookupDefaults.requireNewName(existingNames(tenantId), req.name(), "species");
+        }
         species.update(req.name(), req.defaultUnitOfMeasure(), req.trackingMode(), req.gestationDays(), req.maturityWeightKg());
         return toResponse(species);
     }

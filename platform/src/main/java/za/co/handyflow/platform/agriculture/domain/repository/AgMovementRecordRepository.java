@@ -15,9 +15,9 @@ public interface AgMovementRecordRepository extends JpaRepository<AgMovementReco
     @Query("SELECT m FROM AgMovementRecord m WHERE m.tenantId = :tenantId AND m.id = :id")
     Optional<AgMovementRecord> findByTenantAndId(TenantId tenantId, UUID id);
 
-    @Query("SELECT m FROM AgMovementRecord m WHERE m.tenantId = :tenantId AND m.animalId = :animalId ORDER BY m.movementDate DESC")
+    @Query("SELECT m FROM AgMovementRecord m WHERE m.tenantId = :tenantId AND m.animalId = :animalId ORDER BY m.movementDate DESC, m.id DESC")
     Page<AgMovementRecord> findByAnimal(TenantId tenantId, UUID animalId, Pageable pageable);
 
-    @Query("SELECT m FROM AgMovementRecord m WHERE m.tenantId = :tenantId AND m.groupId = :groupId ORDER BY m.movementDate DESC")
+    @Query("SELECT m FROM AgMovementRecord m WHERE m.tenantId = :tenantId AND m.groupId = :groupId ORDER BY m.movementDate DESC, m.id DESC")
     Page<AgMovementRecord> findByGroup(TenantId tenantId, UUID groupId, Pageable pageable);
 }

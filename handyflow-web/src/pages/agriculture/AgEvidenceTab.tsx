@@ -7,10 +7,14 @@
 // TrainingSessionController's own evidence endpoints).
 import type React from "react"
 import { useState } from "react"
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
+import { useQuery, useQueryClient } from "@tanstack/react-query"
+import { useAgToastMutation } from "./agMutation"
 import { Upload, Download, Trash2, FileImage } from "lucide-react"
 import { apiClient } from "../../api/client"
-import { AG_ACCENT, AG_ACCENT_TEXT, fmtDateTime, type AgEvidenceTarget } from "./constants"
+import { AG_ACCENT_TEXT, fmtDateTime, type AgEvidenceTarget, inp, btnPrimary } from "./constants"
+import { agConfirm } from "./agConfirm"
+import { Field, QueryError } from "./agUi"
+import { usePermission } from "../../hooks/usePermission"
 
 interface EvidenceResponse {
   id: string; fileName: string; evidenceType: string; contentType: string
@@ -20,18 +24,19 @@ interface EvidenceResponse {
 const EVIDENCE_TYPES = ["PHOTO", "DOCUMENT", "OTHER"]
 
 export default function AgEvidenceTab({ targetType, targetId }: { targetType: AgEvidenceTarget; targetId: string }) {
+  const canManage = usePermission("AGRICULTURE_MANAGE")
   const qc = useQueryClient()
   const segment = targetType === "animal" ? "animals" : targetType === "group" ? "groups" : "crop-cycles"
   const [evidenceType, setEvidenceType] = useState("PHOTO")
   const [file, setFile] = useState<File | null>(null)
 
   const queryKey = ["ag-evidence", targetType, targetId]
-  const { data, isLoading } = useQuery<EvidenceResponse[]>({
+  const { data, isLoading, isError, refetch } = useQuery<EvidenceResponse[]>({
     queryKey,
     queryFn: async () => (await apiClient.get(`/api/v1/agriculture/${segment}/${targetId}/evidence`)).data,
   })
 
-  const uploadMut = useMutation({
+  const uploadMut = useAgToastMutation({
     mutationFn: () => {
       const form = new FormData()
       form.append("file", file!)
@@ -41,7 +46,7 @@ export default function AgEvidenceTab({ targetType, targetId }: { targetType: Ag
     },
     onSuccess: () => { qc.invalidateQueries({ queryKey }); setFile(null) },
   })
-  const detachMut = useMutation({
+  const detachMut = useAgToastMutation({
     mutationFn: (evidenceId: string) => apiClient.post(`/api/v1/agriculture/${segment}/evidence/${evidenceId}/detach`),
     onSuccess: () => qc.invalidateQueries({ queryKey }),
   })
@@ -57,22 +62,18 @@ export default function AgEvidenceTab({ targetType, targetId }: { targetType: Ag
 
   return (
     <div>
-      <div style={{ display: "flex", alignItems: "flex-end", gap: 8, marginBottom: 14, background: "var(--hf-surface-muted)", border: "1px solid var(--hf-border)", borderRadius: 10, padding: 14 }}>
-        <div>
-          <label style={lbl}>Type</label>
-          <select value={evidenceType} onChange={e => setEvidenceType(e.target.value)} style={inp}>{EVIDENCE_TYPES.map(t => <option key={t} value={t}>{t}</option>)}</select>
-        </div>
+      {canManage && <div style={{ display: "flex", alignItems: "flex-end", gap: 8, marginBottom: 14, background: "var(--hf-surface-muted)", border: "1px solid var(--hf-border)", borderRadius: 10, padding: 14 }}>
+        <Field label="Type"><select value={evidenceType} onChange={e => setEvidenceType(e.target.value)} style={inp}>{EVIDENCE_TYPES.map(t => <option key={t} value={t}>{t}</option>)}</select></Field>
         <div style={{ flex: 1 }}>
-          <label style={lbl}>File</label>
-          <input type="file" onChange={e => setFile(e.target.files?.[0] ?? null)} style={{ fontSize: 12 }} />
+          <Field label="File"><input type="file" onChange={e => setFile(e.target.files?.[0] ?? null)} style={{ fontSize: 12 }} /></Field>
         </div>
         <button disabled={!file || uploadMut.isPending} onClick={() => uploadMut.mutate()}
           style={{ ...btnPrimary, opacity: !file || uploadMut.isPending ? 0.6 : 1 }}>
           <Upload size={13} style={{ marginRight: 4, verticalAlign: -2 }} />{uploadMut.isPending ? "Uploading…" : "Upload"}
         </button>
-      </div>
+      </div>}
 
-      {isLoading ? <p style={{ color: "var(--hf-text-faint)", fontSize: 12.5 }}>Loading…</p> :
+      {isLoading ? <p style={{ color: "var(--hf-text-faint)", fontSize: 12.5 }}>Loading…</p> : isError ? <QueryError onRetry={() => void refetch()} /> :
         evidence.length === 0 ? <p style={{ color: "var(--hf-text-faint)", fontSize: 12.5 }}>No evidence attached yet.</p> : (
         <div style={{ border: "1px solid var(--hf-border)", borderRadius: 10, overflow: "hidden" }}>
           {evidence.map((e, i) => (
@@ -86,7 +87,7 @@ export default function AgEvidenceTab({ targetType, targetId }: { targetType: Ag
               </div>
               <div style={{ display: "flex", gap: 6 }}>
                 <button onClick={() => download(e.id, e.fileName)} title="Download" style={iconBtn}><Download size={12} /></button>
-                <button onClick={() => { if (confirm("Detach this evidence?")) detachMut.mutate(e.id) }} title="Detach" style={{ ...iconBtn, color: "var(--hf-danger-text)" }}><Trash2 size={12} /></button>
+                {canManage && <button onClick={async () => { if (await agConfirm({ title: "Detach this evidence?", confirmLabel: "Detach", danger: true })) detachMut.mutate(e.id) }} title="Detach" style={{ ...iconBtn, color: "var(--hf-danger-text)" }}><Trash2 size={12} /></button>}
               </div>
             </div>
           ))}
@@ -96,7 +97,4 @@ export default function AgEvidenceTab({ targetType, targetId }: { targetType: Ag
   )
 }
 
-const lbl: React.CSSProperties = { fontSize: 10.5, fontWeight: 600, color: "var(--hf-text-secondary)", marginBottom: 3, display: "block" }
-const inp: React.CSSProperties = { padding: "7px 9px", border: "1px solid var(--hf-border)", borderRadius: 6, fontSize: 12, boxSizing: "border-box" }
-const btnPrimary: React.CSSProperties = { display: "inline-flex", alignItems: "center", padding: "8px 14px", borderRadius: 7, border: "none", background: AG_ACCENT, color: "var(--hf-text-on-solid)", fontSize: 12, fontWeight: 700, cursor: "pointer" }
 const iconBtn: React.CSSProperties = { display: "flex", alignItems: "center", justifyContent: "center", width: 24, height: 24, borderRadius: 6, border: "1px solid var(--hf-border)", background: "var(--hf-surface)", color: "var(--hf-text-muted)", cursor: "pointer" }

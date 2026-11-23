@@ -14,10 +14,10 @@ import java.util.UUID;
 
 public interface AgSalesAllocationRepository extends JpaRepository<AgSalesAllocation, UUID> {
 
-    @Query("SELECT a FROM AgSalesAllocation a WHERE a.tenantId = :tenantId AND a.farmId = :farmId AND a.status = 'ACTIVE' ORDER BY a.soldOn DESC, a.createdAt DESC")
+    @Query("SELECT a FROM AgSalesAllocation a WHERE a.tenantId = :tenantId AND a.farmId = :farmId AND a.status = 'ACTIVE' ORDER BY a.soldOn DESC, a.createdAt DESC, a.id DESC")
     Page<AgSalesAllocation> findActiveForFarm(TenantId tenantId, UUID farmId, Pageable pageable);
 
-    @Query("SELECT a FROM AgSalesAllocation a WHERE a.tenantId = :tenantId AND a.targetType = :targetType AND a.targetId = :targetId AND a.status = 'ACTIVE' ORDER BY a.soldOn DESC, a.createdAt DESC")
+    @Query("SELECT a FROM AgSalesAllocation a WHERE a.tenantId = :tenantId AND a.targetType = :targetType AND a.targetId = :targetId AND a.status = 'ACTIVE' ORDER BY a.soldOn DESC, a.createdAt DESC, a.id DESC")
     Page<AgSalesAllocation> findActiveForTarget(TenantId tenantId, String targetType, UUID targetId, Pageable pageable);
 
     @Query("SELECT a FROM AgSalesAllocation a WHERE a.tenantId = :tenantId AND a.id = :id")

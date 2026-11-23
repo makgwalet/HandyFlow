@@ -13,6 +13,7 @@ import { todayISO, toCsv } from "./agCrops.logic"
 import { overviewCsvRows, overviewFileName } from "./agProfitability.logic"
 import { Th } from "./agCropsUi"
 import { AG_ACCENT_TEXT, btnGhost, card, fmtMoney } from "./constants"
+import { QueryError } from "./agUi"
 
 const hasActivity = (f: FarmMargin) => f.revenue !== 0 || f.directCost !== 0
 
@@ -35,7 +36,7 @@ export default function AgMarginOverview() {
   if (isError || !data) {
     return (
       <section style={{ ...card, marginBottom: 16 }} aria-label="Gross margin, all farms">
-        <p role="alert" style={{ fontSize: 13, color: "var(--hf-danger-text)", margin: 0 }}>We couldn't load gross margin. <button type="button" onClick={() => refetch()} style={{ background: "none", border: "none", textDecoration: "underline", cursor: "pointer", color: "inherit", fontWeight: 700 }}>Try again</button></p>
+        <QueryError onRetry={() => void refetch()} what="gross margin" />
       </section>
     )
   }

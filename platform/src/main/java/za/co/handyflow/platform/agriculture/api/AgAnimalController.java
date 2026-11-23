@@ -20,6 +20,7 @@ import za.co.handyflow.platform.agriculture.application.internal.AgFeedRecordSer
 import za.co.handyflow.platform.agriculture.application.internal.AgHealthEventService;
 import za.co.handyflow.platform.agriculture.application.internal.AgMortalityRecordService;
 import za.co.handyflow.platform.agriculture.application.internal.AgMovementRecordService;
+import za.co.handyflow.platform.agriculture.domain.rules.AgPathRules;
 import za.co.handyflow.platform.agriculture.dto.*;
 import za.co.handyflow.platform.billing.FeatureGuard;
 import za.co.handyflow.platform.evidence.application.EvidenceFacade;
@@ -70,10 +71,11 @@ public class AgAnimalController {
     public ResponseEntity<ApiResponse<Page<AnimalResponse>>> getAnimalsForFarm(
             @PathVariable UUID farmId,
             @RequestParam(required = false) String status,
+            @RequestParam(required = false) String q,
             @PageableDefault(size = 50) Pageable pageable) {
         featureGuard.requireModule(SOURCE_MODULE);
         return ResponseEntity.ok(ApiResponse.success(
-                animalService.getAnimalsForFarm(TenantContext.getTenantIdAsObject(), farmId, status, pageable)));
+                animalService.getAnimalsForFarm(TenantContext.getTenantIdAsObject(), farmId, status, q, pageable)));
     }
 
     @PostMapping("/farms/{farmId}/animals")
@@ -177,6 +179,7 @@ public class AgAnimalController {
     @PreAuthorize("hasAuthority('AGRICULTURE_MANAGE')")
     public ResponseEntity<ApiResponse<HealthEventResponse>> createHealthEventForAnimal(
             @PathVariable UUID id, @Valid @RequestBody CreateHealthEventRequest request) {
+        AgPathRules.requireAnimal(id, request.animalId(), request.groupId());
         featureGuard.requireModule(SOURCE_MODULE);
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success("Health event recorded",
                 healthEventService.createHealthEvent(TenantContext.getTenantIdAsObject(), request)));
@@ -231,6 +234,7 @@ public class AgAnimalController {
     @PreAuthorize("hasAuthority('AGRICULTURE_MANAGE')")
     public ResponseEntity<ApiResponse<BreedingRecordResponse>> createBreedingRecordForAnimal(
             @PathVariable UUID id, @Valid @RequestBody CreateBreedingRecordRequest request) {
+        AgPathRules.requireAnimal(id, request.animalId(), request.groupId());
         featureGuard.requireModule(SOURCE_MODULE);
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success("Breeding record created",
                 breedingRecordService.createBreedingRecord(TenantContext.getTenantIdAsObject(), request)));
@@ -301,6 +305,7 @@ public class AgAnimalController {
     @PreAuthorize("hasAuthority('AGRICULTURE_MANAGE')")
     public ResponseEntity<ApiResponse<MovementRecordResponse>> createMovementRecordForAnimal(
             @PathVariable UUID id, @Valid @RequestBody CreateMovementRecordRequest request) {
+        AgPathRules.requireAnimal(id, request.animalId(), request.groupId());
         featureGuard.requireModule(SOURCE_MODULE);
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success("Movement recorded",
                 movementRecordService.createMovementRecord(TenantContext.getTenantIdAsObject(), request)));
@@ -322,6 +327,7 @@ public class AgAnimalController {
     @Operation(summary = "Record a death — also sets the animal's status to DECEASED")
     public ResponseEntity<ApiResponse<MortalityRecordResponse>> createMortalityRecordForAnimal(
             @PathVariable UUID id, @Valid @RequestBody CreateMortalityRecordRequest request) {
+        AgPathRules.requireAnimal(id, request.animalId(), request.groupId());
         featureGuard.requireModule(SOURCE_MODULE);
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success("Mortality recorded",
                 mortalityRecordService.createMortalityRecord(TenantContext.getTenantIdAsObject(), request)));
@@ -342,6 +348,7 @@ public class AgAnimalController {
     @PreAuthorize("hasAuthority('AGRICULTURE_MANAGE')")
     public ResponseEntity<ApiResponse<FeedRecordResponse>> createFeedRecordForAnimal(
             @PathVariable UUID id, @Valid @RequestBody CreateFeedRecordRequest request) {
+        AgPathRules.requireAnimal(id, request.animalId(), request.groupId());
         featureGuard.requireModule(SOURCE_MODULE);
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success("Feed recorded",
                 feedRecordService.createFeedRecord(TenantContext.getTenantIdAsObject(), request)));
@@ -359,6 +366,7 @@ public class AgAnimalController {
             @RequestParam String evidenceType) {
         featureGuard.requireModule(SOURCE_MODULE);
         TenantId tenantId = TenantContext.getTenantIdAsObject();
+        animalService.requireExists(tenantId, id);
         UUID uploadedBy = TenantContext.getCurrentUserId();
         String uploadedByName = TenantContext.getCurrentUserName();
         return ResponseEntity.ok(ApiResponse.success(evidenceFacade.attach(
@@ -377,18 +385,15 @@ public class AgAnimalController {
     @PreAuthorize("hasAuthority('AGRICULTURE_READ')")
     public ResponseEntity<byte[]> downloadEvidence(@PathVariable UUID evidenceId) {
         featureGuard.requireModule(SOURCE_MODULE);
-        EvidenceFacade.DownloadedEvidence file = evidenceFacade.download(TenantContext.getTenantIdAsObject(), evidenceId);
-        return ResponseEntity.ok()
-                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + file.fileName() + "\"")
-                .contentType(MediaType.parseMediaType(file.contentType()))
-                .body(file.content());
+        return AgEvidenceResponses.download(evidenceFacade.downloadScoped(
+                TenantContext.getTenantIdAsObject(), SOURCE_MODULE, ENTITY_TYPE, evidenceId));
     }
 
     @PostMapping("/animals/evidence/{evidenceId}/detach")
     @PreAuthorize("hasAuthority('AGRICULTURE_MANAGE')")
     public ResponseEntity<ApiResponse<Void>> detachEvidence(@PathVariable UUID evidenceId) {
         featureGuard.requireModule(SOURCE_MODULE);
-        evidenceFacade.detach(TenantContext.getTenantIdAsObject(), evidenceId);
+        evidenceFacade.detachScoped(TenantContext.getTenantIdAsObject(), SOURCE_MODULE, ENTITY_TYPE, evidenceId);
         return ResponseEntity.ok(ApiResponse.success("Evidence detached", null));
     }
 }

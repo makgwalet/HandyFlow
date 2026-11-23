@@ -7,12 +7,16 @@
 // populated server-side (enforced via AgTrackingTarget.requireExactlyOne).
 // Confirmed via AgAnimalController/AgGroupController: POST also updates
 // the animal's currentWeightKg / group's averageWeightKg server-side.
-import type React from "react"
 import { useState } from "react"
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
+import { useQuery, useQueryClient } from "@tanstack/react-query"
+import { useAgToastMutation } from "./agMutation"
 import { Plus, Scale } from "lucide-react"
+import AgPager from "./AgPager"
+import { PAGE_SIZE, rangeLabel } from "./agPaging.logic"
 import { apiClient } from "../../api/client"
-import { AG_ACCENT, AG_ACCENT_TEXT, type AgTargetType, targetBasePath } from "./constants"
+import { AG_ACCENT_TEXT, type AgTargetType, targetBasePath, inp, btnPrimary, btnGhost } from "./constants"
+import { Field, QueryError } from "./agUi"
+import AgManage from "./AgManage"
 
 interface WeightRecordResponse {
   id: string; animalId: string | null; groupId: string | null
@@ -31,12 +35,16 @@ export default function AgWeightHistoryTab({ targetType, targetId }: { targetTyp
   const [notes, setNotes] = useState("")
 
   const queryKey = ["ag-weight-records", targetType, targetId]
-  const { data, isLoading } = useQuery<Page<WeightRecordResponse>>({
-    queryKey,
-    queryFn: async () => (await apiClient.get(`${base}/weight-records`, { params: { size: 100 } })).data,
+  // 50 a page, newest first; the server never sends more than 200 at a time
+  const [page, setPage] = useState(0)
+  const { data, isLoading, isError, refetch } = useQuery<Page<WeightRecordResponse>>({
+    queryKey: [...queryKey, page],
+    placeholderData: prev => prev,
+    queryFn: async () => (await apiClient.get(`${base}/weight-records`, { params: { page, size: PAGE_SIZE } })).data,
   })
+  const total = data?.totalElements ?? 0
 
-  const createMut = useMutation({
+  const createMut = useAgToastMutation({
     mutationFn: () => apiClient.post(`${base}/weight-records`, {
       recordedDate, weightKg: Number(weightKg), sampleSize: sampleSize ? Number(sampleSize) : null,
       recordedBy: null, notes: notes || null,
@@ -55,16 +63,16 @@ export default function AgWeightHistoryTab({ targetType, targetId }: { targetTyp
         <p style={{ fontSize: 12.5, color: "var(--hf-text-muted)", margin: 0 }}>
           {targetType === "group" ? "Average/sampled weight readings for this group." : "Individual weight history for this animal."}
         </p>
-        {!showCreate && <button onClick={() => setShowCreate(true)} style={btnPrimary}><Plus size={13} style={{ marginRight: 4, verticalAlign: -2 }} />Record weight</button>}
+        {!showCreate && <AgManage><button onClick={() => setShowCreate(true)} style={btnPrimary}><Plus size={13} style={{ marginRight: 4, verticalAlign: -2 }} />Record weight</button></AgManage>}
       </div>
 
       {showCreate && (
         <div style={{ background: "var(--hf-surface-muted)", border: "1px solid var(--hf-border)", borderRadius: 10, padding: 14, marginBottom: 14 }}>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 2fr", gap: 8, marginBottom: 10 }}>
-            <div><label style={lbl}>Date</label><input type="date" value={recordedDate} onChange={e => setRecordedDate(e.target.value)} style={inp} /></div>
-            <div><label style={lbl}>Weight (kg)</label><input type="number" min={0} step="0.1" value={weightKg} onChange={e => setWeightKg(e.target.value)} style={inp} /></div>
-            {targetType === "group" && <div><label style={lbl}>Sample size</label><input type="number" min={1} value={sampleSize} onChange={e => setSampleSize(e.target.value)} style={inp} /></div>}
-            <div><label style={lbl}>Notes</label><input value={notes} onChange={e => setNotes(e.target.value)} style={inp} /></div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))", gap: 8, marginBottom: 10 }}>
+            <Field label="Date"><input type="date" value={recordedDate} onChange={e => setRecordedDate(e.target.value)} style={inp} /></Field>
+            <Field label="Weight (kg)"><input type="number" min={0} step="0.1" value={weightKg} onChange={e => setWeightKg(e.target.value)} style={inp} /></Field>
+            {targetType === "group" && <Field label="Sample size"><input type="number" min={1} value={sampleSize} onChange={e => setSampleSize(e.target.value)} style={inp} /></Field>}
+            <Field label="Notes"><input value={notes} onChange={e => setNotes(e.target.value)} style={inp} /></Field>
           </div>
           <div style={{ display: "flex", gap: 8 }}>
             <button disabled={createMut.isPending || !weightKg} onClick={() => createMut.mutate()}
@@ -74,7 +82,7 @@ export default function AgWeightHistoryTab({ targetType, targetId }: { targetTyp
         </div>
       )}
 
-      {isLoading ? <p style={{ color: "var(--hf-text-faint)", fontSize: 12.5 }}>Loading…</p> :
+      {isLoading ? <p style={{ color: "var(--hf-text-faint)", fontSize: 12.5 }}>Loading…</p> : isError ? <QueryError onRetry={() => void refetch()} /> :
         records.length === 0 ? <p style={{ color: "var(--hf-text-faint)", fontSize: 12.5 }}>No weight records yet.</p> : (
         <div style={{ border: "1px solid var(--hf-border)", borderRadius: 10, overflow: "hidden" }}>
           {records.map((r, i) => (
@@ -89,11 +97,9 @@ export default function AgWeightHistoryTab({ targetType, targetId }: { targetTyp
           ))}
         </div>
       )}
+      {total > PAGE_SIZE && <p style={{ fontSize: 12, color: "var(--hf-text-muted)", margin: "10px 0 0" }}>{rangeLabel(page, total, "weight record")}</p>}
+      <AgPager page={page} total={total} size={PAGE_SIZE} onPage={setPage} />
     </div>
   )
 }
 
-const lbl: React.CSSProperties = { fontSize: 10.5, fontWeight: 600, color: "var(--hf-text-secondary)", marginBottom: 3, display: "block" }
-const inp: React.CSSProperties = { width: "100%", padding: "7px 9px", border: "1px solid var(--hf-border)", borderRadius: 6, fontSize: 12, boxSizing: "border-box" }
-const btnPrimary: React.CSSProperties = { display: "inline-flex", alignItems: "center", padding: "7px 12px", borderRadius: 7, border: "none", background: AG_ACCENT, color: "var(--hf-text-on-solid)", fontSize: 12, fontWeight: 700, cursor: "pointer" }
-const btnGhost: React.CSSProperties = { padding: "7px 12px", borderRadius: 7, border: "1px solid var(--hf-border)", background: "var(--hf-surface)", color: "var(--hf-text-muted)", fontSize: 12, fontWeight: 600, cursor: "pointer" }

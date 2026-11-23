@@ -6,7 +6,9 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import za.co.handyflow.platform.agriculture.domain.model.AgAnimal;
 import za.co.handyflow.platform.agriculture.domain.model.AgBreedingRecord;
+import za.co.handyflow.platform.agriculture.domain.rules.AgBreedingRules;
 import za.co.handyflow.platform.agriculture.domain.repository.AgAnimalRepository;
 import za.co.handyflow.platform.agriculture.domain.repository.AgBreedingRecordRepository;
 import za.co.handyflow.platform.agriculture.domain.repository.AgGroupRepository;
@@ -45,7 +47,7 @@ public class AgBreedingRecordService {
 
     @Transactional
     public BreedingRecordResponse createBreedingRecord(TenantId tenantId, CreateBreedingRecordRequest req) {
-        validateTarget(tenantId, req.animalId(), req.groupId());
+        validateTarget(tenantId, req.animalId(), req.groupId(), req.sireId());
         AgBreedingRecord record = AgBreedingRecord.create(tenantId, req.animalId(), req.groupId(), req.breedingType(),
                 req.matingDate(), req.sireId(), req.sireDescription(), req.expectedDueDate(), req.notes());
         breedingRecordRepository.save(record);
@@ -70,7 +72,7 @@ public class AgBreedingRecordService {
     @Transactional
     public BreedingRecordResponse recordBirth(TenantId tenantId, UUID id, RecordBirthRequest req) {
         AgBreedingRecord record = findByTenantAndId(tenantId, id);
-        record.recordBirth(req.actualBirthDate(), req.offspringCount());
+        record.recordBirth(req.actualBirthDate(), req.offspringCount(), req.stillbornCount());
         return toResponse(record);
     }
 
@@ -93,12 +95,21 @@ public class AgBreedingRecordService {
                 .orElseThrow(() -> new ResourceNotFoundException("BreedingRecord", id.toString()));
     }
 
-    private void validateTarget(TenantId tenantId, UUID animalId, UUID groupId) {
-        if (animalId != null && animalRepository.findActiveById(tenantId, animalId).isEmpty()) {
-            throw new ResourceNotFoundException("Animal", animalId.toString());
+    /** The animal or group must exist; an animal must be a live female; a named sire must be a live, uncastrated male. */
+    private void validateTarget(TenantId tenantId, UUID animalId, UUID groupId, UUID sireId) {
+        if (animalId != null) {
+            AgAnimal dam = animalRepository.findActiveById(tenantId, animalId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Animal", animalId.toString()));
+            AgBreedingRules.requireDam(dam.getSex(), dam.getStatus());
         }
         if (groupId != null && groupRepository.findActiveById(tenantId, groupId).isEmpty()) {
             throw new ResourceNotFoundException("Group", groupId.toString());
+        }
+        if (sireId != null) {
+            if (sireId.equals(animalId)) throw new IllegalArgumentException("An animal cannot be its own sire");
+            AgAnimal sire = animalRepository.findActiveById(tenantId, sireId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Animal", sireId.toString()));
+            AgBreedingRules.requireSire(sire.getSex(), sire.getStatus());
         }
     }
 
@@ -106,7 +117,7 @@ public class AgBreedingRecordService {
         return new BreedingRecordResponse(
                 b.getId(), b.getAnimalId(), b.getGroupId(), b.getBreedingType(), b.getMatingDate(), b.getSireId(),
                 b.getSireDescription(), b.getExpectedDueDate(), b.getActualBirthDate(), b.getOutcome(),
-                b.getOffspringCount(), b.getNotes(), b.getCreatedAt(), b.getUpdatedAt()
+                b.getOffspringCount(), b.getStillbornCount(), b.getNotes(), b.getCreatedAt(), b.getUpdatedAt()
         );
     }
 }

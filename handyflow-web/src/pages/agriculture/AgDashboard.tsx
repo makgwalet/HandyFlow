@@ -15,6 +15,7 @@ import AgMarginOverview from "./AgMarginOverview"
 import { barPercent, dueLabel, fmtNum, percent, severityLabel, tidy, typeLabel } from "./agDashboard.logic"
 import { todayISO } from "./agCrops.logic"
 import { AG_ACCENT, AG_ACCENT_TEXT, btnGhost, card, kpiLabel, kpiValue, statusBadge } from "./constants"
+import { QueryError } from "./agUi"
 
 const AgFarmMap = lazy(() => import("./AgFarmMap"))
 const STRIP_KEYS = ["TOTAL_COST", "HARVEST_TONNES", "BIRTHS", "DEATHS"]
@@ -75,9 +76,7 @@ export default function AgDashboard() {
   if (isLoading) return <p style={{ fontSize: 13, color: "var(--hf-text-faint)" }}>Loading dashboard…</p>
   if (isError || !data) {
     return (
-      <p role="alert" style={{ fontSize: 13, color: "var(--hf-danger-text)" }}>
-        We couldn't load the dashboard. <button type="button" onClick={() => refetch()} style={{ background: "none", border: "none", textDecoration: "underline", cursor: "pointer", color: "inherit", fontWeight: 700 }}>Try again</button>
-      </p>
+      <QueryError onRetry={() => void refetch()} what="the dashboard" />
     )
   }
   const t = data.totals

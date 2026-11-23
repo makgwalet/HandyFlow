@@ -42,6 +42,10 @@ const KNOWN_ROUTES = new Set<string>([
 //   tasks            : /tasks?board=&task= opens that task
 const PRESERVES_DEEP_PATH = new Set(['quotes', 'projects', 'tasks'])
 
+// Agriculture opens a farm, and from it an animal, group or tab, from the query: /agriculture/farms?farm=<id>[&animal=|&group=|&tab=],
+// and the crop cycles of a farm: /agriculture/crop-cycles?farm=<id>. Only those two pages and those four names survive.
+const AGRICULTURE_LINK = /^\/agriculture\/(farms|crop-cycles)\?(?:(?:farm|animal|group|tab)=[A-Za-z0-9-]+&?)+$/
+
 // Security has real detail pages: /security/guards/:id, /security/complaints/:id, /security/incidents/:id and
 // /security/sites/:id. Anything deeper or unknown on that module still lands on /security.
 const SECURITY_DETAIL = /^\/security\/(guards|complaints|incidents|sites)\/[^/]+\/?$/
@@ -54,6 +58,7 @@ export function resolveSafeActionUrl(actionUrl: string): string | null {
   const base = segments[0]
   if (!KNOWN_ROUTES.has(base)) return null
   if (PRESERVES_DEEP_PATH.has(base)) return actionUrl
+  if (base === 'agriculture' && AGRICULTURE_LINK.test(actionUrl)) return actionUrl
   if (base === 'security' && SECURITY_DETAIL.test(path)) return actionUrl
   return '/' + base
 }

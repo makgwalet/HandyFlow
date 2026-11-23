@@ -24,10 +24,10 @@ public interface AgCropCycleRepository extends JpaRepository<AgCropCycle, UUID> 
     @Query("SELECT c FROM AgCropCycle c WHERE c.tenantId = :tenantId AND c.id = :id AND c.deletedAt IS NULL")
     Optional<AgCropCycle> findActiveById(TenantId tenantId, UUID id);
 
-    @Query("SELECT c FROM AgCropCycle c WHERE c.tenantId = :tenantId AND c.farmId = :farmId AND c.deletedAt IS NULL ORDER BY c.createdAt DESC")
+    @Query("SELECT c FROM AgCropCycle c WHERE c.tenantId = :tenantId AND c.farmId = :farmId AND c.deletedAt IS NULL ORDER BY c.createdAt DESC, c.id DESC")
     Page<AgCropCycle> findAllActiveForFarm(TenantId tenantId, UUID farmId, Pageable pageable);
 
-    @Query("SELECT c FROM AgCropCycle c WHERE c.tenantId = :tenantId AND c.farmId = :farmId AND c.status = :status AND c.deletedAt IS NULL ORDER BY c.createdAt DESC")
+    @Query("SELECT c FROM AgCropCycle c WHERE c.tenantId = :tenantId AND c.farmId = :farmId AND c.status = :status AND c.deletedAt IS NULL ORDER BY c.createdAt DESC, c.id DESC")
     Page<AgCropCycle> findByStatusForFarm(TenantId tenantId, UUID farmId, String status, Pageable pageable);
 
     // FIX (Agriculture GAP 4 — mobile gap report, "Home/Today" summary).
@@ -37,7 +37,7 @@ public interface AgCropCycleRepository extends JpaRepository<AgCropCycle, UUID> 
     @Query("SELECT COUNT(c) FROM AgCropCycle c WHERE c.tenantId = :tenantId AND c.farmId = :farmId AND c.deletedAt IS NULL AND c.status NOT IN ('HARVESTED', 'FAILED', 'ABANDONED')")
     long countActiveForFarm(TenantId tenantId, UUID farmId);
 
-    @Query("SELECT c FROM AgCropCycle c WHERE c.tenantId = :tenantId AND c.seasonId = :seasonId AND c.deletedAt IS NULL ORDER BY c.createdAt DESC")
+    @Query("SELECT c FROM AgCropCycle c WHERE c.tenantId = :tenantId AND c.seasonId = :seasonId AND c.deletedAt IS NULL ORDER BY c.createdAt DESC, c.id DESC")
     Page<AgCropCycle> findAllActiveForSeason(TenantId tenantId, UUID seasonId, Pageable pageable);
 
     // Tenant-wide dashboard aggregates. One grouped query each instead of one query per farm.

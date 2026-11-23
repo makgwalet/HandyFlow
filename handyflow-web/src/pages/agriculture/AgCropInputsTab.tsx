@@ -6,8 +6,10 @@ import { usePermission } from "../../hooks/usePermission"
 import EmployeePicker, { type EmployeeOption } from "../training/EmployeePicker"
 import { agKeys, api, useAgMutation, useInputs, useInventory } from "./agCrops.api"
 import { canLog, stockProblem, suggestInputCost, todayISO } from "./agCrops.logic"
+import { clearOn, formatDay, periodProblem } from "./agCompliance.logic"
 import type { CropCycle } from "./agCrops.types"
 import { Empty, Field, Th, Warn } from "./agCropsUi"
+import { QueryError } from "./agUi"
 import { btnGhost, btnPrimary, fmtDate, fmtMoney, grid, inp, panel, td, theadStyle } from "./constants"
 
 const INPUT_TYPES = ["FERTILISER", "HERBICIDE", "PESTICIDE", "FUNGICIDE", "IRRIGATION", "OTHER"]
@@ -15,7 +17,7 @@ const STOCK_CATEGORIES = ["FERTILISER", "CHEMICAL", "SEED", "OTHER"]
 
 function InputForm({ cycle, onDone }: { cycle: CropCycle; onDone: () => void }) {
   const items = (useInventory(cycle.farmId).data ?? []).filter(i => i.status === "ACTIVE" && STOCK_CATEGORIES.includes(i.category))
-  const [f, setF] = useState({ date: todayISO(), type: "FERTILISER", itemId: "", qty: "", unit: "", product: "", method: "", hours: "", cost: "", weather: "", notes: "" })
+  const [f, setF] = useState({ date: todayISO(), type: "FERTILISER", itemId: "", qty: "", unit: "", product: "", method: "", hours: "", cost: "", weather: "", notes: "", phi: "" })
   const [costTouched, setCostTouched] = useState(false)
   const [by, setBy] = useState<EmployeeOption | null>(null)
   const item = items.find(i => i.id === f.itemId)
@@ -33,13 +35,15 @@ function InputForm({ cycle, onDone }: { cycle: CropCycle; onDone: () => void }) 
   }
 
   const problem = stockProblem(qty, item)
-  const valid = qty > 0 && !!f.unit.trim() && !!f.date && !problem
+  const phiProblem = periodProblem(f.phi, "Pre-harvest interval")
+  const valid = qty > 0 && !!f.unit.trim() && !!f.date && !problem && !phiProblem
   const create = useAgMutation(
     () => api.post(`/crop-cycles/${cycle.id}/input-applications`, {
       applicationDate: f.date, inputType: f.type, inventoryItemId: f.itemId || undefined, productUsed: f.product.trim() || undefined,
       quantityApplied: qty, unitOfMeasure: f.unit.trim(), applicationMethod: f.method.trim() || undefined, appliedBy: by?.id,
       laborHours: f.hours ? Number(f.hours) : undefined, cost: f.cost !== "" ? Number(f.cost) : undefined,
       weatherConditions: f.weather.trim() || undefined, notes: f.notes.trim() || undefined,
+      preHarvestIntervalDays: f.phi !== "" ? Number(f.phi) : undefined,
     }),
     { invalidate: [agKeys.inputs(cycle.id), agKeys.cycleCost(cycle.id), agKeys.inventory(cycle.farmId), ["ag", "costs", "crops", cycle.farmId]], success: "Input recorded", failure: "Couldn't record the input." })
 
@@ -60,9 +64,12 @@ function InputForm({ cycle, onDone }: { cycle: CropCycle; onDone: () => void }) 
         <Field label="Labour hours" htmlFor="in-hours"><input id="in-hours" type="number" min="0" step="0.25" style={inp} value={f.hours} onChange={e => update({ hours: e.target.value })} /></Field>
         <Field label="Applied by"><EmployeePicker value={by} onChange={setBy} /></Field>
         <Field label="Weather" htmlFor="in-weather"><input id="in-weather" style={inp} value={f.weather} onChange={e => update({ weather: e.target.value })} placeholder="e.g. calm, 22°C" /></Field>
+        <Field label="Pre-harvest interval (days)" htmlFor="in-phi"><input id="in-phi" type="number" min="0" max="730" step="1" style={inp} value={f.phi} onChange={e => update({ phi: e.target.value })} placeholder="From the product label" /></Field>
         <Field label="Notes" htmlFor="in-notes"><input id="in-notes" style={inp} value={f.notes} onChange={e => update({ notes: e.target.value })} /></Field>
       </div>
       {problem && <Warn tone="danger">{problem}</Warn>}
+      {phiProblem && <Warn tone="danger">{phiProblem}</Warn>}
+      {!phiProblem && clearOn(f.date, f.phi) && <Warn>The crop cannot be harvested before {formatDay(clearOn(f.date, f.phi))}.</Warn>}
       {f.cost === "" && <Warn>Without a cost, this input won't count towards the cycle's cost per hectare.</Warn>}
       <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
         <button type="button" style={{ ...btnPrimary, opacity: valid && !create.isPending ? 1 : 0.5 }} disabled={!valid || create.isPending} onClick={() => create.mutate(undefined, { onSuccess: onDone })}>Record input</button>
@@ -75,7 +82,7 @@ function InputForm({ cycle, onDone }: { cycle: CropCycle; onDone: () => void }) 
 export default function AgCropInputsTab({ cycle }: { cycle: CropCycle }) {
   const canManage = usePermission("AGRICULTURE_MANAGE")
   const [adding, setAdding] = useState(false)
-  const { data: inputs = [], isLoading } = useInputs(cycle.id)
+  const { data: inputs = [], isLoading, isError, refetch } = useInputs(cycle.id)
   const total = inputs.reduce((s, i) => s + (i.cost ?? 0), 0)
   return (
     <div>
@@ -83,20 +90,20 @@ export default function AgCropInputsTab({ cycle }: { cycle: CropCycle }) {
         <div style={{ marginBottom: 12 }}><button type="button" style={btnPrimary} onClick={() => setAdding(true)}><Plus size={14} />Record input</button></div>
       )}
       {adding && <InputForm cycle={cycle} onDone={() => setAdding(false)} />}
-      {isLoading ? <Empty>Loading inputs…</Empty> : inputs.length === 0 ? <Empty>No inputs recorded for this cycle yet.</Empty> : (
+      {isLoading ? <Empty>Loading inputs…</Empty> : isError ? <QueryError onRetry={() => void refetch()} what="the inputs" /> : inputs.length === 0 ? <Empty>No inputs recorded for this cycle yet.</Empty> : (
         <div style={{ overflowX: "auto" }}>
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12.5 }}>
-            <thead><tr style={theadStyle}>{["Date", "Type", "Product", "Quantity", "Applied by", "Labour h", "Cost"].map(h => <Th key={h}>{h}</Th>)}</tr></thead>
+            <thead><tr style={theadStyle}>{["Date", "Type", "Product", "Quantity", "Applied by", "Harvest clear on", "Labour h", "Cost"].map(h => <Th key={h}>{h}</Th>)}</tr></thead>
             <tbody>
               {inputs.map(i => (
                 <tr key={i.id} style={{ borderTop: "1px solid var(--hf-border-subtle)" }}>
                   <td style={td}>{fmtDate(i.applicationDate)}</td><td style={td}>{i.inputType}</td>
                   <td style={td}>{i.productUsed ?? "—"}{i.applicationMethod ? <div style={{ fontSize: 11, color: "var(--hf-text-faint)" }}>{i.applicationMethod}</div> : null}</td>
-                  <td style={td}>{i.quantityApplied} {i.unitOfMeasure}</td><td style={td}>{i.appliedByName ?? "—"}</td>
+                  <td style={td}>{i.quantityApplied} {i.unitOfMeasure}</td><td style={td}>{i.appliedByName ?? "—"}</td><td style={td}>{i.harvestClearOn ? fmtDate(i.harvestClearOn) : "—"}</td>
                   <td style={td}>{i.laborHours ?? "—"}</td><td style={td}>{fmtMoney(i.cost)}</td>
                 </tr>
               ))}
-              <tr style={{ borderTop: "2px solid var(--hf-border)", fontWeight: 700 }}><td style={td} colSpan={6}>Total recorded cost</td><td style={td}>{fmtMoney(total)}</td></tr>
+              <tr style={{ borderTop: "2px solid var(--hf-border)", fontWeight: 700 }}><td style={td} colSpan={7}>Total recorded cost</td><td style={td}>{fmtMoney(total)}</td></tr>
             </tbody>
           </table>
         </div>

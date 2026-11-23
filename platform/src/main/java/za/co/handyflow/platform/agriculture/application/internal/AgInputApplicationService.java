@@ -15,6 +15,7 @@ import za.co.handyflow.platform.agriculture.domain.repository.AgCropCycleReposit
 import za.co.handyflow.platform.agriculture.domain.repository.AgInputApplicationRepository;
 import za.co.handyflow.platform.agriculture.domain.repository.AgInventoryItemRepository;
 import za.co.handyflow.platform.agriculture.domain.repository.AgStockMovementRepository;
+import za.co.handyflow.platform.agriculture.domain.rules.AgWithdrawalRules;
 import za.co.handyflow.platform.agriculture.dto.CreateInputApplicationRequest;
 import za.co.handyflow.platform.agriculture.dto.InputApplicationResponse;
 import za.co.handyflow.platform.hr.application.HrFacade;
@@ -57,7 +58,7 @@ public class AgInputApplicationService {
         AgInputApplication application = AgInputApplication.create(tenantId, cropCycleId, req.applicationDate(),
                 req.inputType(), req.inventoryItemId(), req.productUsed(), req.quantityApplied(), req.unitOfMeasure(),
                 req.applicationMethod(), req.appliedBy(), appliedByName, req.laborHours(), req.cost(),
-                req.weatherConditions(), req.notes());
+                req.weatherConditions(), req.notes(), req.preHarvestIntervalDays());
         inputApplicationRepository.save(application);
 
         if (req.inventoryItemId() != null) {
@@ -101,7 +102,8 @@ public class AgInputApplicationService {
                 a.getId(), a.getCropCycleId(), a.getApplicationDate(), a.getInputType(), a.getInventoryItemId(),
                 a.getProductUsed(), a.getQuantityApplied(), a.getUnitOfMeasure(), a.getApplicationMethod(),
                 a.getAppliedBy(), a.getAppliedByName(), a.getLaborHours(), a.getCost(), a.getWeatherConditions(),
-                a.getNotes(), a.getCreatedAt()
+                a.getNotes(), a.getCreatedAt(), a.getPreHarvestIntervalDays(),
+                AgWithdrawalRules.clearOn(a.getApplicationDate(), a.getPreHarvestIntervalDays())
         );
     }
 }

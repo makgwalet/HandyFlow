@@ -63,6 +63,15 @@ public class AgSpeciesController {
                 speciesService.createSpecies(TenantContext.getTenantIdAsObject(), request)));
     }
 
+    @PostMapping("/defaults")
+    @PreAuthorize("hasAuthority('AGRICULTURE_MANAGE')")
+    @Operation(summary = "Add the standard species list; species the tenant already has are left alone")
+    public ResponseEntity<ApiResponse<za.co.handyflow.platform.agriculture.dto.SeedDefaultsResponse>> addStandardSpecies() {
+        featureGuard.requireModule("agriculture");
+        return ResponseEntity.ok(ApiResponse.success("Standard species added",
+                speciesService.addStandardSpecies(TenantContext.getTenantIdAsObject())));
+    }
+
     @PutMapping("/{id}")
     @PreAuthorize("hasAuthority('AGRICULTURE_MANAGE')")
     public ResponseEntity<ApiResponse<SpeciesResponse>> updateSpecies(

@@ -4,10 +4,16 @@
 // ponds, orchards) — confirmed via AgProductionAreaController.
 import type React from "react"
 import { useState } from "react"
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
+import { useQuery, useQueryClient } from "@tanstack/react-query"
+import { useAgToastMutation } from "./agMutation"
 import { MapPin, Plus, Pencil, Trash2 } from "lucide-react"
 import { apiClient } from "../../api/client"
-import { AG_ACCENT, AG_ACCENT_TEXT, statusBadge } from "./constants"
+import { AG_ACCENT_TEXT, statusBadge, inp, btnPrimary, btnGhost } from "./constants"
+import { agConfirm } from "./agConfirm"
+import { Field, QueryError } from "./agUi"
+import AgManage from "./AgManage"
+import { SOIL_TYPES, withCurrent } from "./agLookups"
+import { usePermission } from "../../hooks/usePermission"
 
 export interface ProductionAreaResponse {
   id: string
@@ -31,9 +37,11 @@ const AREA_TYPES = ["CAMP", "FIELD", "PADDOCK", "HOUSE", "PEN", "POND", "ORCHARD
 // rotations" domain; adjust if the backend rejects RESTING.
 const AREA_STATUSES = ["ACTIVE", "RESTING", "INACTIVE"]
 
+type AreaValues = { name: string; areaType: string; sizeHectares: string; capacity: string; soilType: string; notes: string }
+
 function AreaForm({ farmId, initial, saving, onCancel, onSave }: {
   farmId: string; initial?: Partial<ProductionAreaResponse>; saving: boolean; onCancel: () => void
-  onSave: (v: { name: string; areaType: string; sizeHectares: string; capacity: string; soilType: string; notes: string }) => void
+  onSave: (v: AreaValues) => void
 }) {
   const [name, setName] = useState(initial?.name ?? "")
   const [areaType, setAreaType] = useState(initial?.areaType ?? "CAMP")
@@ -44,17 +52,15 @@ function AreaForm({ farmId, initial, saving, onCancel, onSave }: {
   void farmId
   return (
     <div style={{ background: "var(--hf-surface-muted)", border: "1px solid var(--hf-border)", borderRadius: 12, padding: 16, marginBottom: 16 }}>
-      <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr 1fr", gap: 10, marginBottom: 10 }}>
-        <div><label style={lbl}>Name</label><input value={name} onChange={e => setName(e.target.value)} style={inp} /></div>
-        <div><label style={lbl}>Type</label>
-          <select value={areaType} onChange={e => setAreaType(e.target.value)} style={inp}>{AREA_TYPES.map(t => <option key={t} value={t}>{t}</option>)}</select>
-        </div>
-        <div><label style={lbl}>Size (ha)</label><input type="number" min={0} step="0.01" value={sizeHectares} onChange={e => setSizeHectares(e.target.value)} style={inp} /></div>
-        <div><label style={lbl}>Capacity</label><input type="number" min={0} value={capacity} onChange={e => setCapacity(e.target.value)} style={inp} /></div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))", gap: 10, marginBottom: 10 }}>
+        <Field label="Name"><input value={name} onChange={e => setName(e.target.value)} style={inp} /></Field>
+        <Field label="Type"><select value={areaType} onChange={e => setAreaType(e.target.value)} style={inp}>{AREA_TYPES.map(t => <option key={t} value={t}>{t}</option>)}</select></Field>
+        <Field label="Size (ha)"><input type="number" min={0} step="0.01" value={sizeHectares} onChange={e => setSizeHectares(e.target.value)} style={inp} /></Field>
+        <Field label="Capacity"><input type="number" min={0} value={capacity} onChange={e => setCapacity(e.target.value)} style={inp} /></Field>
       </div>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 2fr", gap: 10, marginBottom: 12 }}>
-        <div><label style={lbl}>Soil type</label><input value={soilType} onChange={e => setSoilType(e.target.value)} style={inp} /></div>
-        <div><label style={lbl}>Notes</label><input value={notes} onChange={e => setNotes(e.target.value)} style={inp} /></div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))", gap: 10, marginBottom: 12 }}>
+        <Field label="Soil type"><select value={soilType} onChange={e => setSoilType(e.target.value)} style={inp}><option value="">Not set</option>{withCurrent(SOIL_TYPES, soilType).map(t => <option key={t} value={t}>{t}</option>)}</select></Field>
+        <Field label="Notes"><input value={notes} onChange={e => setNotes(e.target.value)} style={inp} /></Field>
       </div>
       <div style={{ display: "flex", gap: 8 }}>
         <button disabled={saving || !name.trim()} onClick={() => onSave({ name, areaType, sizeHectares, capacity, soilType, notes })}
@@ -66,36 +72,37 @@ function AreaForm({ farmId, initial, saving, onCancel, onSave }: {
 }
 
 export default function AgProductionAreasTab({ farmId }: { farmId: string }) {
+  const canManage = usePermission("AGRICULTURE_MANAGE")
   const qc = useQueryClient()
   const [showCreate, setShowCreate] = useState(false)
   const [editing, setEditing] = useState<ProductionAreaResponse | null>(null)
 
-  const { data, isLoading } = useQuery<Page<ProductionAreaResponse>>({
+  const { data, isLoading, isError, refetch } = useQuery<Page<ProductionAreaResponse>>({
     queryKey: ["ag-production-areas", farmId],
     queryFn: async () => (await apiClient.get(`/api/v1/agriculture/farms/${farmId}/production-areas`, { params: { size: 200 } })).data,
   })
   const invalidate = () => qc.invalidateQueries({ queryKey: ["ag-production-areas", farmId] })
 
-  const createMut = useMutation({
-    mutationFn: (v: any) => apiClient.post(`/api/v1/agriculture/farms/${farmId}/production-areas`, {
+  const createMut = useAgToastMutation({
+    mutationFn: (v: AreaValues) => apiClient.post(`/api/v1/agriculture/farms/${farmId}/production-areas`, {
       farmId, name: v.name, areaType: v.areaType,
       sizeHectares: v.sizeHectares ? Number(v.sizeHectares) : null,
       capacity: v.capacity ? Number(v.capacity) : null, soilType: v.soilType || null,
     }),
     onSuccess: () => { invalidate(); setShowCreate(false) },
   })
-  const updateMut = useMutation({
-    mutationFn: (v: any) => apiClient.put(`/api/v1/agriculture/production-areas/${editing!.id}`, {
+  const updateMut = useAgToastMutation({
+    mutationFn: (v: AreaValues) => apiClient.put(`/api/v1/agriculture/production-areas/${editing!.id}`, {
       name: v.name, areaType: v.areaType, sizeHectares: v.sizeHectares ? Number(v.sizeHectares) : null,
       capacity: v.capacity ? Number(v.capacity) : null, soilType: v.soilType || null, notes: v.notes || null,
     }),
     onSuccess: () => { invalidate(); setEditing(null) },
   })
-  const statusMut = useMutation({
+  const statusMut = useAgToastMutation({
     mutationFn: (v: { id: string; status: string }) => apiClient.patch(`/api/v1/agriculture/production-areas/${v.id}/status`, { status: v.status }),
     onSuccess: invalidate,
   })
-  const deleteMut = useMutation({ mutationFn: (id: string) => apiClient.delete(`/api/v1/agriculture/production-areas/${id}`), onSuccess: invalidate })
+  const deleteMut = useAgToastMutation({ mutationFn: (id: string) => apiClient.delete(`/api/v1/agriculture/production-areas/${id}`), onSuccess: invalidate })
 
   const areas = data?.content ?? []
 
@@ -103,10 +110,10 @@ export default function AgProductionAreasTab({ farmId }: { farmId: string }) {
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
         <p style={{ fontSize: 13, color: "var(--hf-text-muted)", margin: 0 }}>{areas.length} production area{areas.length === 1 ? "" : "s"}.</p>
-        {!showCreate && <button onClick={() => setShowCreate(true)} style={btnPrimary}><Plus size={14} style={{ marginRight: 5, verticalAlign: -2 }} />Add area</button>}
+        {!showCreate && <AgManage><button onClick={() => setShowCreate(true)} style={btnPrimary}><Plus size={14} style={{ marginRight: 5, verticalAlign: -2 }} />Add area</button></AgManage>}
       </div>
       {showCreate && <AreaForm farmId={farmId} saving={createMut.isPending} onCancel={() => setShowCreate(false)} onSave={v => createMut.mutate(v)} />}
-      {isLoading ? <p style={{ color: "var(--hf-text-faint)", fontSize: 13 }}>Loading…</p> :
+      {isLoading ? <p style={{ color: "var(--hf-text-faint)", fontSize: 13 }}>Loading…</p> : isError ? <QueryError onRetry={() => void refetch()} /> :
         areas.length === 0 ? <p style={{ color: "var(--hf-text-faint)", fontSize: 13 }}>No production areas yet.</p> : (
         <div style={{ border: "1px solid var(--hf-border)", borderRadius: 12, overflow: "hidden" }}>
           {areas.map((a, i) => (
@@ -120,11 +127,13 @@ export default function AgProductionAreasTab({ farmId }: { farmId: string }) {
                   </div>
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <select value={a.status} onChange={e => statusMut.mutate({ id: a.id, status: e.target.value })} style={{ ...statusBadge(a.status), border: "none", cursor: "pointer" }}>
+                  <select value={a.status} disabled={!canManage} onChange={e => statusMut.mutate({ id: a.id, status: e.target.value })} style={{ ...statusBadge(a.status), border: "none", cursor: canManage ? "pointer" : "default" }}>
                     {AREA_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
                   </select>
+                  <AgManage>
                   <button onClick={() => setEditing(a)} title="Edit" style={iconBtn}><Pencil size={13} /></button>
-                  <button onClick={() => { if (confirm(`Delete area "${a.name}"?`)) deleteMut.mutate(a.id) }} title="Delete" style={{ ...iconBtn, color: "var(--hf-danger-text)" }}><Trash2 size={13} /></button>
+                  <button onClick={async () => { if (await agConfirm({ title: `Delete area "${a.name}"?`, confirmLabel: "Delete", danger: true })) deleteMut.mutate(a.id) }} title="Delete" style={{ ...iconBtn, color: "var(--hf-danger-text)" }}><Trash2 size={13} /></button>
+                  </AgManage>
                 </div>
               </div>
               {editing?.id === a.id && (
@@ -140,8 +149,4 @@ export default function AgProductionAreasTab({ farmId }: { farmId: string }) {
   )
 }
 
-const lbl: React.CSSProperties = { fontSize: 11, fontWeight: 600, color: "var(--hf-text-secondary)", marginBottom: 4, display: "block" }
-const inp: React.CSSProperties = { width: "100%", padding: "8px 10px", border: "1px solid var(--hf-border)", borderRadius: 7, fontSize: 12.5, boxSizing: "border-box" }
-const btnPrimary: React.CSSProperties = { display: "inline-flex", alignItems: "center", padding: "8px 14px", borderRadius: 8, border: "none", background: AG_ACCENT, color: "var(--hf-text-on-solid)", fontSize: 12.5, fontWeight: 700, cursor: "pointer" }
-const btnGhost: React.CSSProperties = { padding: "8px 14px", borderRadius: 8, border: "1px solid var(--hf-border)", background: "var(--hf-surface)", color: "var(--hf-text-muted)", fontSize: 12.5, fontWeight: 600, cursor: "pointer" }
 const iconBtn: React.CSSProperties = { display: "flex", alignItems: "center", justifyContent: "center", width: 28, height: 28, borderRadius: 7, border: "1px solid var(--hf-border)", background: "var(--hf-surface)", color: "var(--hf-text-muted)", cursor: "pointer" }

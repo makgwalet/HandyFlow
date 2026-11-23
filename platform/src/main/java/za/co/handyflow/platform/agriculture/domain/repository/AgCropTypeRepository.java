@@ -20,9 +20,9 @@ public interface AgCropTypeRepository extends JpaRepository<AgCropType, UUID> {
     @Query("SELECT c FROM AgCropType c WHERE c.tenantId = :tenantId AND c.id = :id AND c.deletedAt IS NULL")
     Optional<AgCropType> findActiveById(TenantId tenantId, UUID id);
 
-    @Query("SELECT c FROM AgCropType c WHERE c.tenantId = :tenantId AND c.deletedAt IS NULL ORDER BY c.name")
+    @Query("SELECT c FROM AgCropType c WHERE c.tenantId = :tenantId AND c.deletedAt IS NULL ORDER BY c.name, c.id")
     Page<AgCropType> findAllActive(TenantId tenantId, Pageable pageable);
 
-    @Query("SELECT c FROM AgCropType c WHERE c.tenantId = :tenantId AND c.category = :category AND c.deletedAt IS NULL ORDER BY c.name")
+    @Query("SELECT c FROM AgCropType c WHERE c.tenantId = :tenantId AND c.category = :category AND c.deletedAt IS NULL ORDER BY c.name, c.id")
     Page<AgCropType> findAllActiveByCategory(TenantId tenantId, String category, Pageable pageable);
 }

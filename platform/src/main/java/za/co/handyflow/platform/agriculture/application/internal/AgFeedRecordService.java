@@ -14,11 +14,13 @@ import za.co.handyflow.platform.agriculture.domain.repository.AgFeedRecordReposi
 import za.co.handyflow.platform.agriculture.domain.repository.AgGroupRepository;
 import za.co.handyflow.platform.agriculture.domain.repository.AgInventoryItemRepository;
 import za.co.handyflow.platform.agriculture.domain.repository.AgStockMovementRepository;
+import za.co.handyflow.platform.agriculture.domain.rules.AgFeedRules;
 import za.co.handyflow.platform.agriculture.dto.CreateFeedRecordRequest;
 import za.co.handyflow.platform.agriculture.dto.FeedRecordResponse;
 import za.co.handyflow.platform.shared.ResourceNotFoundException;
 import za.co.handyflow.platform.shared.TenantId;
 
+import java.math.BigDecimal;
 import java.util.UUID;
 
 /**
@@ -53,18 +55,28 @@ public class AgFeedRecordService {
 
     @Transactional
     public FeedRecordResponse createFeedRecord(TenantId tenantId, CreateFeedRecordRequest req) {
-        validateTarget(tenantId, req.animalId(), req.groupId());
+        UUID targetFarmId = validateTarget(tenantId, req.animalId(), req.groupId());
+        AgFeedRules.requirePositive(req.quantityKg());
+
+        AgInventoryItem item = null;
+        BigDecimal costPerKg = req.costPerKg();
+        if (req.inventoryItemId() != null) {
+            item = inventoryItemRepository.findActiveById(tenantId, req.inventoryItemId())
+                    .orElseThrow(() -> new ResourceNotFoundException("InventoryItem", req.inventoryItemId().toString()));
+            AgFeedRules.requireStockItem(item.getFarmId(), item.getStatus(), targetFarmId, item.getItemName());
+            costPerKg = AgFeedRules.costPerKg(req.costPerKg(), item.getUnitCost(), item.getUnitOfMeasure());
+        }
 
         AgFeedRecord record = AgFeedRecord.create(tenantId, req.animalId(), req.groupId(), req.feedDate(),
-                req.inventoryItemId(), req.feedType(), req.quantityKg(), req.costPerKg(), req.notes());
+                req.inventoryItemId(), req.feedType(), req.quantityKg(), costPerKg, req.notes());
         feedRecordRepository.save(record);
 
-        if (req.inventoryItemId() != null) {
-            AgInventoryItem item = inventoryItemRepository.findActiveById(tenantId, req.inventoryItemId())
-                    .orElseThrow(() -> new ResourceNotFoundException("InventoryItem", req.inventoryItemId().toString()));
-            item.issue(req.quantityKg());
-            AgStockMovement movement = AgStockMovement.create(tenantId, req.inventoryItemId(), "ISSUE",
-                    req.feedDate(), req.quantityKg(), req.costPerKg(), "AgFeedRecord", record.getId(),
+        if (item != null) {
+            // the stock is counted in the item's own unit; the kilograms fed are converted into it
+            BigDecimal issued = AgFeedRules.quantityInItemUnit(req.quantityKg(), item.getUnitOfMeasure(), item.getItemName());
+            item.issue(issued);
+            AgStockMovement movement = AgStockMovement.create(tenantId, item.getId(), "ISSUE",
+                    req.feedDate(), issued, item.getUnitCost(), "AgFeedRecord", record.getId(),
                     null, null, "Feed issued: " + req.feedType());
             stockMovementRepository.save(movement);
         }
@@ -73,13 +85,16 @@ public class AgFeedRecordService {
         return toResponse(record);
     }
 
-    private void validateTarget(TenantId tenantId, UUID animalId, UUID groupId) {
-        if (animalId != null && animalRepository.findActiveById(tenantId, animalId).isEmpty()) {
-            throw new ResourceNotFoundException("Animal", animalId.toString());
+    /** Checks the animal or group exists and returns the farm it is on. */
+    private UUID validateTarget(TenantId tenantId, UUID animalId, UUID groupId) {
+        if ((animalId == null) == (groupId == null))
+            throw new IllegalArgumentException("exactly one of animalId or groupId is required");
+        if (animalId != null) {
+            return animalRepository.findActiveById(tenantId, animalId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Animal", animalId.toString())).getFarmId();
         }
-        if (groupId != null && groupRepository.findActiveById(tenantId, groupId).isEmpty()) {
-            throw new ResourceNotFoundException("Group", groupId.toString());
-        }
+        return groupRepository.findActiveById(tenantId, groupId)
+                .orElseThrow(() -> new ResourceNotFoundException("Group", groupId.toString())).getFarmId();
     }
 
     private FeedRecordResponse toResponse(AgFeedRecord f) {

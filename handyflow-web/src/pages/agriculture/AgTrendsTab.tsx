@@ -12,6 +12,7 @@ import { ComparisonCard } from "./AgTrendParts"
 import { costChartData, hasCosts, hasHarvest, hasLivestockEvents, livestockChartData, monthLabel, tonnesChartData } from "./agTrends.logic"
 import { fmtNum } from "./agDashboard.logic"
 import { card, fmtMoney, inp, lbl } from "./constants"
+import { QueryError } from "./agUi"
 
 const COST_COLOURS: Record<string, string> = { Seed: "var(--hf-success)", Inputs: "var(--hf-info)", Feed: "var(--hf-warning)", Health: "var(--hf-danger)", "Animal purchases": "var(--hf-violet)" }
 const MONTH_CHOICES = [6, 12, 24]
@@ -52,7 +53,7 @@ export default function AgTrendsTab() {
       </div>
 
       {isLoading ? <p style={muted}>Loading trends…</p> : isError || !data ? (
-        <p role="alert" style={{ fontSize: 13, color: "var(--hf-danger-text)" }}>We couldn't load the trends. <button type="button" onClick={() => refetch()} style={{ background: "none", border: "none", textDecoration: "underline", cursor: "pointer", color: "inherit", fontWeight: 700 }}>Try again</button></p>
+        <QueryError onRetry={() => void refetch()} what="the trends" />
       ) : (
         <>
           <p style={{ ...muted, marginBottom: 10 }}>Last 30 days compared with the 30 days before ({data.comparisons[0]?.currentFrom} to {data.comparisons[0]?.currentTo}).</p>

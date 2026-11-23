@@ -16,6 +16,7 @@ import { splitPreview, type ShareInput } from "./agLedger.logic"
 import { useTargetOptions, type TargetOption } from "./agTargets"
 import { Empty, Field, Th, Warn } from "./agCropsUi"
 import { btnGhost, btnPrimary, card, fmtDate, fmtMoney, grid, inp, panel } from "./constants"
+import { QueryError } from "./agUi"
 
 const blankShares = (): ShareInput[] => [{ targetType: "", targetId: "", percentage: "100" }]
 const pct = (s: string) => Number(s.replace(",", "."))
@@ -43,7 +44,7 @@ function MachineUse({ farmId, options }: { farmId: string; options: TargetOption
   const [shares, setShares] = useState<ShareInput[]>(blankShares())
 
   if (machines.isLoading) return <Empty>Loading machines…</Empty>
-  if (machines.isError || !machines.data) return <p role="alert" style={{ fontSize: 13, color: "var(--hf-danger-text)" }}>We couldn't load the machines. <button type="button" onClick={() => machines.refetch()} style={{ background: "none", border: "none", textDecoration: "underline", cursor: "pointer", color: "inherit", fontWeight: 700 }}>Try again</button></p>
+  if (machines.isError || !machines.data) return <QueryError onRetry={() => void machines.refetch()} what="the machines" />
   const list = machines.data
   const machine = list.find(m => m.vehicleId === vehicleId)
   const h = pct(hours)
@@ -131,7 +132,7 @@ function OwnFuel({ farmId, options }: { farmId: string; options: TargetOption[] 
         <Field label="To" htmlFor="fu-to"><input id="fu-to" type="date" max={today} style={{ ...inp, width: 160 }} value={to} onChange={e => setTo(e.target.value)} /></Field>
       </div>
       {fuel.isLoading && <Empty>Loading fuel…</Empty>}
-      {(fuel.isError || (!fuel.isLoading && !fuel.data)) && <p role="alert" style={{ fontSize: 13, color: "var(--hf-danger-text)" }}>We couldn't load fuel. <button type="button" onClick={() => fuel.refetch()} style={{ background: "none", border: "none", textDecoration: "underline", cursor: "pointer", color: "inherit", fontWeight: 700 }}>Try again</button></p>}
+      {(fuel.isError || (!fuel.isLoading && !fuel.data)) && <QueryError onRetry={() => void fuel.refetch()} what="fuel" />}
       {fuel.data && (fuel.data.dispatches.length === 0
         ? <Empty>No fuel is waiting to be allocated in this range.{fuel.data.alreadyAllocated > 0 ? ` ${fuel.data.alreadyAllocated} already allocated.` : ""}</Empty>
         : (

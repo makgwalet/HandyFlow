@@ -18,10 +18,10 @@ public interface AgFeedRecordRepository extends JpaRepository<AgFeedRecord, UUID
     @Query("SELECT f FROM AgFeedRecord f WHERE f.tenantId = :tenantId AND f.id = :id")
     Optional<AgFeedRecord> findByTenantAndId(TenantId tenantId, UUID id);
 
-    @Query("SELECT f FROM AgFeedRecord f WHERE f.tenantId = :tenantId AND f.animalId = :animalId ORDER BY f.feedDate DESC")
+    @Query("SELECT f FROM AgFeedRecord f WHERE f.tenantId = :tenantId AND f.animalId = :animalId ORDER BY f.feedDate DESC, f.id DESC")
     Page<AgFeedRecord> findByAnimal(TenantId tenantId, UUID animalId, Pageable pageable);
 
-    @Query("SELECT f FROM AgFeedRecord f WHERE f.tenantId = :tenantId AND f.groupId = :groupId ORDER BY f.feedDate DESC")
+    @Query("SELECT f FROM AgFeedRecord f WHERE f.tenantId = :tenantId AND f.groupId = :groupId ORDER BY f.feedDate DESC, f.id DESC")
     Page<AgFeedRecord> findByGroup(TenantId tenantId, UUID groupId, Pageable pageable);
 
     // Backs AgCostReportingService — COALESCE so an animal/group with zero

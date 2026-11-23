@@ -21,5 +21,17 @@ public record CreateHealthEventRequest(
         Integer withdrawalPeriodDays,
         LocalDate nextDueDate,
         String status,
-        String notes
-) {}
+        String notes,
+        /** Days milk must stay out of sale after this treatment; null when not given. */
+        Integer milkWithdrawalDays,
+        /** Days eggs must stay out of sale after this treatment; null when not given. */
+        Integer eggWithdrawalDays
+) {
+    /** Without milk and egg periods (callers written before they existed). */
+    public CreateHealthEventRequest(UUID animalId, UUID groupId, String eventType, LocalDate eventDate, String description,
+                                    String productUsed, String dosage, UUID administeredBy, String veterinarian, BigDecimal cost,
+                                    Integer withdrawalPeriodDays, LocalDate nextDueDate, String status, String notes) {
+        this(animalId, groupId, eventType, eventDate, description, productUsed, dosage, administeredBy, veterinarian, cost,
+                withdrawalPeriodDays, nextDueDate, status, notes, null, null);
+    }
+}

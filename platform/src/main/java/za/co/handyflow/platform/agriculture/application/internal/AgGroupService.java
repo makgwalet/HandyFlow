@@ -3,6 +3,7 @@ package za.co.handyflow.platform.agriculture.application.internal;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -10,6 +11,12 @@ import za.co.handyflow.platform.agriculture.domain.model.AgGroup;
 import za.co.handyflow.platform.agriculture.domain.model.AgWeightRecord;
 import za.co.handyflow.platform.agriculture.domain.repository.AgGroupRepository;
 import za.co.handyflow.platform.agriculture.domain.repository.AgWeightRecordRepository;
+import za.co.handyflow.platform.agriculture.domain.model.AgProductionArea;
+import za.co.handyflow.platform.agriculture.domain.repository.AgProductionAreaRepository;
+import za.co.handyflow.platform.agriculture.domain.model.AgGroupCountLog;
+import za.co.handyflow.platform.agriculture.domain.rules.AgLifecycleRules;
+import za.co.handyflow.platform.agriculture.domain.rules.AgListRules;
+import za.co.handyflow.platform.agriculture.domain.rules.AgMovementRules;
 import za.co.handyflow.platform.agriculture.dto.*;
 import za.co.handyflow.platform.hr.application.HrFacade;
 import za.co.handyflow.platform.hr.EmployeeSummary;
@@ -33,13 +40,21 @@ public class AgGroupService {
     private final AgGroupRepository groupRepository;
     private final AgWeightRecordRepository weightRecordRepository;
     private final HrFacade hrFacade;
+    private final AgProductionAreaRepository areaRepository;
+    private final AgGroupCountLogService countLog;
+    private final AgReferenceChecker references;
 
     @Transactional(readOnly = true)
     public Page<GroupResponse> getGroupsForFarm(TenantId tenantId, UUID farmId, String status, Pageable pageable) {
-        Page<AgGroup> page = (status != null && !status.isBlank())
-                ? groupRepository.findByStatusForFarm(tenantId, farmId, status, pageable)
-                : groupRepository.findAllActiveForFarm(tenantId, farmId, pageable);
-        return page.map(this::toResponse);
+        return getGroupsForFarm(tenantId, farmId, status, null, pageable);
+    }
+
+    /** Filtered by status and a search on batch number and breed. The page is clamped to 1-200 rows and ordered by batch number. */
+    @Transactional(readOnly = true)
+    public Page<GroupResponse> getGroupsForFarm(TenantId tenantId, UUID farmId, String status, String q, Pageable pageable) {
+        Pageable page = PageRequest.of(AgListRules.pageIndex(pageable.getPageNumber()), AgListRules.pageSize(pageable.getPageSize()));
+        return groupRepository.searchForFarm(tenantId, farmId, AgListRules.status(status), AgListRules.likePattern(q), page)
+                .map(this::toResponse);
     }
 
     @Transactional(readOnly = true)
@@ -53,6 +68,9 @@ public class AgGroupService {
             throw new IllegalArgumentException(
                     "A group with batch number '" + req.batchNumber() + "' already exists on this farm");
         }
+        references.requireActiveFarm(tenantId, req.farmId());
+        references.requireSpecies(tenantId, req.speciesId());
+        references.checkPlacement(tenantId, req.farmId(), req.productionAreaId(), req.enterpriseId());
         AgGroup group = AgGroup.create(tenantId, req.farmId(), req.productionAreaId(), req.enterpriseId(),
                 req.speciesId(), req.batchNumber(), req.breed(), req.initialCount(), req.originDate(),
                 req.acquisitionType());
@@ -64,7 +82,15 @@ public class AgGroupService {
     @Transactional
     public GroupResponse updateGroup(TenantId tenantId, UUID id, UpdateGroupRequest req) {
         AgGroup group = findActive(tenantId, id);
-        group.update(req.productionAreaId(), req.enterpriseId(), req.breed(), req.notes());
+        java.util.Set<String> clear = AgPatchRules.clearSet(req.clear(), AgPatchRules.GROUP_CLEARABLE);
+        UUID newArea = AgPatchRules.apply("productionAreaId", group.getProductionAreaId(), req.productionAreaId(), clear);
+        UUID newEnterprise = AgPatchRules.apply("enterpriseId", group.getEnterpriseId(), req.enterpriseId(), clear);
+        references.checkPlacement(tenantId, group.getFarmId(),
+                java.util.Objects.equals(newArea, group.getProductionAreaId()) ? null : newArea,
+                java.util.Objects.equals(newEnterprise, group.getEnterpriseId()) ? null : newEnterprise);
+        group.update(newArea, newEnterprise,
+                AgPatchRules.apply("breed", group.getBreed(), req.breed(), clear),
+                AgPatchRules.apply("notes", group.getNotes(), req.notes(), clear));
         return toResponse(group);
     }
 
@@ -89,6 +115,11 @@ public class AgGroupService {
     @Transactional
     public GroupResponse moveGroup(TenantId tenantId, UUID id, MoveGroupRequest req) {
         AgGroup group = findActive(tenantId, id);
+        if (req.productionAreaId() != null) {
+            AgProductionArea area = areaRepository.findActiveById(tenantId, req.productionAreaId())
+                    .orElseThrow(() -> new ResourceNotFoundException("ProductionArea", req.productionAreaId().toString()));
+            AgMovementRules.requireUsableArea(area.getFarmId(), area.getStatus(), group.getFarmId());
+        }
         group.moveTo(req.productionAreaId());
         return toResponse(group);
     }
@@ -96,15 +127,29 @@ public class AgGroupService {
     @Transactional
     public GroupResponse reduceCount(TenantId tenantId, UUID id, AdjustGroupCountRequest req) {
         AgGroup group = findActive(tenantId, id);
+        AgLifecycleRules.requireOnFarm(group.getStatus(), "This group");
+        String reason = AgLifecycleRules.requireReason(req.reason());
+        int before = group.getCurrentCount();
         group.reduceCount(req.count());
+        countLog.record(tenantId, id, AgGroupCountLog.DECREASE, before, group.getCurrentCount(), reason, null, null);
         return toResponse(group);
     }
 
     @Transactional
     public GroupResponse increaseCount(TenantId tenantId, UUID id, AdjustGroupCountRequest req) {
         AgGroup group = findActive(tenantId, id);
+        AgLifecycleRules.requireOnFarm(group.getStatus(), "This group");
+        String reason = AgLifecycleRules.requireReason(req.reason());
+        int before = group.getCurrentCount();
         group.increaseCount(req.count());
+        countLog.record(tenantId, id, AgGroupCountLog.INCREASE, before, group.getCurrentCount(), reason, null, null);
         return toResponse(group);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<GroupCountLogResponse> getCountLog(TenantId tenantId, UUID id, Pageable pageable) {
+        findActive(tenantId, id);
+        return countLog.history(tenantId, id, pageable);
     }
 
     @Transactional
@@ -127,6 +172,9 @@ public class AgGroupService {
         group.softDelete();
         log.info("Group deleted id={} tenant={}", id, tenantId.getValue());
     }
+
+    /** Throws "not found" unless this group exists, is not deleted, and belongs to the tenant. */
+    public void requireExists(TenantId tenantId, UUID id) { findActive(tenantId, id); }
 
     AgGroup findActive(TenantId tenantId, UUID id) {
         return groupRepository.findActiveById(tenantId, id)

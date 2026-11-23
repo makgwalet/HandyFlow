@@ -1,0 +1,64 @@
+/*
+ * Agriculture polish. Scoped to .hf-ag (the root of AgriculturePage) so no other module changes.
+ * The screens style themselves inline, and inline styles cannot do :hover, :focus-visible, media queries or dark-mode
+ * defaults. This file adds those, reading theme tokens only, so it follows light and dark mode. The few rules that
+ * must beat an inline value use !important. Same approach as fuel.css.
+ */
+
+.hf-ag { font-feature-settings: "tnum" 1; }
+
+/* Fields: follow the theme even where a screen forgot to set a colour (they were white in dark mode). */
+.hf-ag input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+.hf-ag select,
+.hf-ag textarea {
+  background: var(--hf-surface);
+  color: var(--hf-text);
+  font-family: inherit;
+  transition: border-color .12s ease, box-shadow .12s ease;
+}
+.hf-ag input::placeholder, .hf-ag textarea::placeholder { color: var(--hf-text-faint); }
+.hf-ag input:disabled, .hf-ag select:disabled, .hf-ag textarea:disabled { background: var(--hf-surface-sunken); color: var(--hf-text-disabled); cursor: not-allowed; }
+.hf-ag input:focus-visible, .hf-ag select:focus-visible, .hf-ag textarea:focus-visible {
+  outline: none;
+  border-color: var(--hf-success-solid-strong) !important;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--hf-success-solid-strong) 25%, transparent);
+}
+
+/* Buttons and links: a visible keyboard focus, hover feedback, honest disabled state. */
+.hf-ag button:focus-visible, .hf-ag a:focus-visible, .hf-ag [role="button"]:focus-visible { outline: 2px solid var(--hf-success-solid-strong); outline-offset: 2px; }
+.hf-ag button:not(:disabled), .hf-ag [role="button"] { transition: background-color .12s ease, border-color .12s ease, box-shadow .12s ease, opacity .12s ease; }
+.hf-ag button:not(:disabled):hover { filter: brightness(0.97); }
+.hf-ag button:not(:disabled):active { filter: brightness(0.93); }
+.hf-ag button:disabled { cursor: not-allowed; }
+
+/* A list row that opens something: hover band and keyboard focus. */
+.hf-ag .hf-ag-row { transition: background-color .12s ease; }
+.hf-ag .hf-ag-row:hover { background: var(--hf-surface-muted); }
+.hf-ag .hf-ag-row:focus-visible { outline: 2px solid var(--hf-success-solid-strong); outline-offset: -2px; }
+
+/* Tables: quiet header band, hover row, numbers line up. */
+.hf-ag table { border-collapse: separate; border-spacing: 0; width: 100%; font-variant-numeric: tabular-nums; }
+.hf-ag table tbody tr { transition: background-color .12s ease; }
+.hf-ag table tbody tr:hover { background: var(--hf-surface-muted); }
+
+/* Forms with a fixed number of columns collapse to what fits on a tablet or phone. */
+@media (max-width: 860px) {
+  .hf-ag [style*="grid-template-columns: 1fr 1fr"],
+  .hf-ag [style*="grid-template-columns: repeat(3"],
+  .hf-ag [style*="grid-template-columns: repeat(4"],
+  .hf-ag [style*="grid-template-columns: repeat(5"] { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)) !important; }
+}
+@media (max-width: 560px) {
+  /* A row with a name on the left and buttons on the right puts the buttons under the name instead of off the edge. */
+  .hf-ag [style*="justify-content: space-between"] { flex-wrap: wrap; row-gap: 8px; }
+  .hf-ag input:not([type="checkbox"]):not([type="radio"]), .hf-ag select, .hf-ag button { min-height: 38px; }
+  .hf-ag table { display: block; overflow-x: auto; }
+}
+
+/* The app's own confirm question (AgConfirmHost). */
+.hf-ag dialog.hf-ag-dialog { border: 1px solid var(--hf-border); border-radius: 14px; background: var(--hf-surface); color: var(--hf-text); padding: 18px 20px; width: min(420px, calc(100vw - 32px)); box-shadow: var(--hf-shadow-md); }
+.hf-ag dialog.hf-ag-dialog::backdrop { background: rgba(2, 6, 23, .55); }
+
+@media (prefers-reduced-motion: reduce) {
+  .hf-ag *, .hf-ag *::before, .hf-ag *::after { transition: none !important; animation: none !important; }
+}

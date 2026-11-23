@@ -20,6 +20,7 @@ import za.co.handyflow.platform.agriculture.application.internal.AgGroupService;
 import za.co.handyflow.platform.agriculture.application.internal.AgHealthEventService;
 import za.co.handyflow.platform.agriculture.application.internal.AgMortalityRecordService;
 import za.co.handyflow.platform.agriculture.application.internal.AgMovementRecordService;
+import za.co.handyflow.platform.agriculture.domain.rules.AgPathRules;
 import za.co.handyflow.platform.agriculture.dto.*;
 import za.co.handyflow.platform.billing.FeatureGuard;
 import za.co.handyflow.platform.evidence.application.EvidenceFacade;
@@ -64,10 +65,11 @@ public class AgGroupController {
     public ResponseEntity<ApiResponse<Page<GroupResponse>>> getGroupsForFarm(
             @PathVariable UUID farmId,
             @RequestParam(required = false) String status,
+            @RequestParam(required = false) String q,
             @PageableDefault(size = 50) Pageable pageable) {
         featureGuard.requireModule(SOURCE_MODULE);
         return ResponseEntity.ok(ApiResponse.success(
-                groupService.getGroupsForFarm(TenantContext.getTenantIdAsObject(), farmId, status, pageable)));
+                groupService.getGroupsForFarm(TenantContext.getTenantIdAsObject(), farmId, status, q, pageable)));
     }
 
     @PostMapping("/farms/{farmId}/groups")
@@ -111,12 +113,21 @@ public class AgGroupController {
 
     @PatchMapping("/groups/{id}/reduce-count")
     @PreAuthorize("hasAuthority('AGRICULTURE_MANAGE')")
-    @Operation(summary = "Reduce the group's current count (e.g. a sale not routed through mortality) — auto-closes at zero")
+    @Operation(summary = "Reduce the group's count with a reason (use a sale or mortality record for those) — auto-closes at zero, and is logged")
     public ResponseEntity<ApiResponse<GroupResponse>> reduceCount(
             @PathVariable UUID id, @Valid @RequestBody AdjustGroupCountRequest request) {
         featureGuard.requireModule(SOURCE_MODULE);
         return ResponseEntity.ok(ApiResponse.success("Count reduced",
                 groupService.reduceCount(TenantContext.getTenantIdAsObject(), id, request)));
+    }
+
+    @GetMapping("/groups/{id}/count-log")
+    @PreAuthorize("hasAuthority('AGRICULTURE_READ')")
+    @Operation(summary = "Every change to the group's head count: who, when, before, after and why")
+    public ResponseEntity<ApiResponse<Page<GroupCountLogResponse>>> countLog(
+            @PathVariable UUID id, @PageableDefault(size = 50) Pageable pageable) {
+        featureGuard.requireModule(SOURCE_MODULE);
+        return ResponseEntity.ok(ApiResponse.success(groupService.getCountLog(TenantContext.getTenantIdAsObject(), id, pageable)));
     }
 
     @PatchMapping("/groups/{id}/increase-count")
@@ -188,6 +199,7 @@ public class AgGroupController {
     @PreAuthorize("hasAuthority('AGRICULTURE_MANAGE')")
     public ResponseEntity<ApiResponse<HealthEventResponse>> createHealthEventForGroup(
             @PathVariable UUID id, @Valid @RequestBody CreateHealthEventRequest request) {
+        AgPathRules.requireGroup(id, request.animalId(), request.groupId());
         featureGuard.requireModule(SOURCE_MODULE);
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success("Health event recorded",
                 healthEventService.createHealthEvent(TenantContext.getTenantIdAsObject(), request)));
@@ -208,6 +220,7 @@ public class AgGroupController {
     @PreAuthorize("hasAuthority('AGRICULTURE_MANAGE')")
     public ResponseEntity<ApiResponse<BreedingRecordResponse>> createBreedingRecordForGroup(
             @PathVariable UUID id, @Valid @RequestBody CreateBreedingRecordRequest request) {
+        AgPathRules.requireGroup(id, request.animalId(), request.groupId());
         featureGuard.requireModule(SOURCE_MODULE);
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success("Breeding record created",
                 breedingRecordService.createBreedingRecord(TenantContext.getTenantIdAsObject(), request)));
@@ -228,6 +241,7 @@ public class AgGroupController {
     @PreAuthorize("hasAuthority('AGRICULTURE_MANAGE')")
     public ResponseEntity<ApiResponse<MovementRecordResponse>> createMovementRecordForGroup(
             @PathVariable UUID id, @Valid @RequestBody CreateMovementRecordRequest request) {
+        AgPathRules.requireGroup(id, request.animalId(), request.groupId());
         featureGuard.requireModule(SOURCE_MODULE);
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success("Movement recorded",
                 movementRecordService.createMovementRecord(TenantContext.getTenantIdAsObject(), request)));
@@ -249,6 +263,7 @@ public class AgGroupController {
     @Operation(summary = "Record a loss — also reduces the group's current count")
     public ResponseEntity<ApiResponse<MortalityRecordResponse>> createMortalityRecordForGroup(
             @PathVariable UUID id, @Valid @RequestBody CreateMortalityRecordRequest request) {
+        AgPathRules.requireGroup(id, request.animalId(), request.groupId());
         featureGuard.requireModule(SOURCE_MODULE);
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success("Mortality recorded",
                 mortalityRecordService.createMortalityRecord(TenantContext.getTenantIdAsObject(), request)));
@@ -269,6 +284,7 @@ public class AgGroupController {
     @PreAuthorize("hasAuthority('AGRICULTURE_MANAGE')")
     public ResponseEntity<ApiResponse<FeedRecordResponse>> createFeedRecordForGroup(
             @PathVariable UUID id, @Valid @RequestBody CreateFeedRecordRequest request) {
+        AgPathRules.requireGroup(id, request.animalId(), request.groupId());
         featureGuard.requireModule(SOURCE_MODULE);
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success("Feed recorded",
                 feedRecordService.createFeedRecord(TenantContext.getTenantIdAsObject(), request)));
@@ -284,6 +300,7 @@ public class AgGroupController {
             @RequestParam String evidenceType) {
         featureGuard.requireModule(SOURCE_MODULE);
         TenantId tenantId = TenantContext.getTenantIdAsObject();
+        groupService.requireExists(tenantId, id);
         UUID uploadedBy = TenantContext.getCurrentUserId();
         String uploadedByName = TenantContext.getCurrentUserName();
         return ResponseEntity.ok(ApiResponse.success(evidenceFacade.attach(
@@ -302,18 +319,15 @@ public class AgGroupController {
     @PreAuthorize("hasAuthority('AGRICULTURE_READ')")
     public ResponseEntity<byte[]> downloadEvidence(@PathVariable UUID evidenceId) {
         featureGuard.requireModule(SOURCE_MODULE);
-        EvidenceFacade.DownloadedEvidence file = evidenceFacade.download(TenantContext.getTenantIdAsObject(), evidenceId);
-        return ResponseEntity.ok()
-                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + file.fileName() + "\"")
-                .contentType(MediaType.parseMediaType(file.contentType()))
-                .body(file.content());
+        return AgEvidenceResponses.download(evidenceFacade.downloadScoped(
+                TenantContext.getTenantIdAsObject(), SOURCE_MODULE, ENTITY_TYPE, evidenceId));
     }
 
     @PostMapping("/groups/evidence/{evidenceId}/detach")
     @PreAuthorize("hasAuthority('AGRICULTURE_MANAGE')")
     public ResponseEntity<ApiResponse<Void>> detachEvidence(@PathVariable UUID evidenceId) {
         featureGuard.requireModule(SOURCE_MODULE);
-        evidenceFacade.detach(TenantContext.getTenantIdAsObject(), evidenceId);
+        evidenceFacade.detachScoped(TenantContext.getTenantIdAsObject(), SOURCE_MODULE, ENTITY_TYPE, evidenceId);
         return ResponseEntity.ok(ApiResponse.success("Evidence detached", null));
     }
 }

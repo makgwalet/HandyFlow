@@ -52,8 +52,8 @@ public class AgHealthEventService {
         String administeredByName = resolveEmployeeName(tenantId, req.administeredBy());
         AgHealthEvent event = AgHealthEvent.create(tenantId, req.animalId(), req.groupId(), req.eventType(),
                 req.eventDate(), req.description(), req.productUsed(), req.dosage(), req.administeredBy(),
-                administeredByName, req.veterinarian(), req.cost(), req.withdrawalPeriodDays(), req.nextDueDate(),
-                req.status(), req.notes());
+                administeredByName, req.veterinarian(), req.cost(), req.withdrawalPeriodDays(), req.milkWithdrawalDays(), req.eggWithdrawalDays(),
+                req.nextDueDate(), req.status(), req.notes());
         healthEventRepository.save(event);
         log.info("Health event created id={} type={} tenant={}", event.getId(), req.eventType(), tenantId.getValue());
         return toResponse(event);
@@ -63,7 +63,7 @@ public class AgHealthEventService {
     public HealthEventResponse updateHealthEvent(TenantId tenantId, UUID id, UpdateHealthEventRequest req) {
         AgHealthEvent event = findByTenantAndId(tenantId, id);
         event.update(req.description(), req.productUsed(), req.dosage(), req.veterinarian(), req.cost(),
-                req.withdrawalPeriodDays(), req.nextDueDate(), req.notes());
+                req.withdrawalPeriodDays(), req.milkWithdrawalDays(), req.eggWithdrawalDays(), req.nextDueDate(), req.notes());
         return toResponse(event);
     }
 
@@ -109,7 +109,8 @@ public class AgHealthEventService {
                 e.getId(), e.getAnimalId(), e.getGroupId(), e.getEventType(), e.getEventDate(), e.getDescription(),
                 e.getProductUsed(), e.getDosage(), e.getAdministeredBy(), e.getAdministeredByName(),
                 e.getVeterinarian(), e.getCost(), e.getWithdrawalPeriodDays(), e.getNextDueDate(),
-                e.isReminderAcknowledged(), e.getStatus(), e.getNotes(), e.getCreatedAt(), e.getUpdatedAt()
+                e.isReminderAcknowledged(), e.getStatus(), e.getNotes(), e.getCreatedAt(), e.getUpdatedAt(),
+                e.getMilkWithdrawalDays(), e.getEggWithdrawalDays()
         );
     }
 }

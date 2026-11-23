@@ -13,10 +13,17 @@
 // its keep in Increment 1).
 import type React from "react"
 import { useState } from "react"
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
+import { useQuery, useQueryClient } from "@tanstack/react-query"
+import { useAgToastMutation } from "./agMutation"
 import { PawPrint, Plus, Pencil, Ban, RotateCcw, Trash2 } from "lucide-react"
 import { apiClient } from "../../api/client"
-import { AG_ACCENT, AG_ACCENT_TEXT, statusBadge } from "./constants"
+import { AG_ACCENT_TEXT, statusBadge, inp, btnPrimary, btnGhost } from "./constants"
+import { agConfirm } from "./agConfirm"
+import { Field, QueryError } from "./agUi"
+import AgManage from "./AgManage"
+import { toast } from "../../store/toast.store"
+
+interface SeedResult { added: number; alreadyThere: number }
 
 export interface SpeciesResponse {
   id: string
@@ -34,9 +41,11 @@ interface Page<T> { content: T[]; totalElements: number }
 const CATEGORIES = ["LIVESTOCK", "POULTRY", "AQUACULTURE"]
 const TRACKING_MODES = ["INDIVIDUAL", "GROUP", "BOTH"]
 
+type SpeciesValues = { name: string; category: string; defaultUnitOfMeasure: string; trackingMode: string; gestationDays: string; maturityWeightKg: string }
+
 function SpeciesForm({ initial, onCancel, onSave, saving }: {
   initial?: Partial<SpeciesResponse>; onCancel: () => void; saving: boolean
-  onSave: (v: { name: string; category: string; defaultUnitOfMeasure: string; trackingMode: string; gestationDays: string; maturityWeightKg: string }) => void
+  onSave: (v: SpeciesValues) => void
 }) {
   const [name, setName] = useState(initial?.name ?? "")
   const [category, setCategory] = useState(initial?.category ?? "LIVESTOCK")
@@ -47,39 +56,21 @@ function SpeciesForm({ initial, onCancel, onSave, saving }: {
 
   return (
     <div style={{ background: "var(--hf-surface-muted)", border: "1px solid var(--hf-border)", borderRadius: 12, padding: 16, marginBottom: 16 }}>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, marginBottom: 10 }}>
-        <div>
-          <label style={lbl}>Name</label>
-          <input value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Cattle" style={inp} />
-        </div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))", gap: 10, marginBottom: 10 }}>
+        <Field label="Name"><input value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Cattle" style={inp} /></Field>
         {!initial?.id && (
-          <div>
-            <label style={lbl}>Category</label>
-            <select value={category} onChange={e => setCategory(e.target.value)} style={inp}>
+          <Field label="Category"><select value={category} onChange={e => setCategory(e.target.value)} style={inp}>
               {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
-            </select>
-          </div>
+            </select></Field>
         )}
-        <div>
-          <label style={lbl}>Default unit</label>
-          <input value={uom} onChange={e => setUom(e.target.value)} placeholder="head / kg / crate" style={inp} />
-        </div>
+        <Field label="Default unit"><input value={uom} onChange={e => setUom(e.target.value)} placeholder="head / kg / crate" style={inp} /></Field>
       </div>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, marginBottom: 12 }}>
-        <div>
-          <label style={lbl}>Tracking mode</label>
-          <select value={trackingMode} onChange={e => setTrackingMode(e.target.value as "INDIVIDUAL" | "BOTH" | "GROUP")} style={inp}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))", gap: 10, marginBottom: 12 }}>
+        <Field label="Tracking mode"><select value={trackingMode} onChange={e => setTrackingMode(e.target.value as "INDIVIDUAL" | "BOTH" | "GROUP")} style={inp}>
             {TRACKING_MODES.map(m => <option key={m} value={m}>{m}</option>)}
-          </select>
-        </div>
-        <div>
-          <label style={lbl}>Gestation (days)</label>
-          <input type="number" min={0} value={gestationDays} onChange={e => setGestationDays(e.target.value)} style={inp} />
-        </div>
-        <div>
-          <label style={lbl}>Maturity weight (kg)</label>
-          <input type="number" min={0} step="0.1" value={maturityWeightKg} onChange={e => setMaturityWeightKg(e.target.value)} style={inp} />
-        </div>
+          </select></Field>
+        <Field label="Gestation (days)"><input type="number" min={0} value={gestationDays} onChange={e => setGestationDays(e.target.value)} style={inp} /></Field>
+        <Field label="Maturity weight (kg)"><input type="number" min={0} step="0.1" value={maturityWeightKg} onChange={e => setMaturityWeightKg(e.target.value)} style={inp} /></Field>
       </div>
       <div style={{ display: "flex", gap: 8 }}>
         <button disabled={saving || !name.trim()}
@@ -98,33 +89,37 @@ export default function AgSpeciesTab() {
   const [showCreate, setShowCreate] = useState(false)
   const [editing, setEditing] = useState<SpeciesResponse | null>(null)
 
-  const { data, isLoading } = useQuery<Page<SpeciesResponse>>({
+  const { data, isLoading, isError, refetch } = useQuery<Page<SpeciesResponse>>({
     queryKey: ["ag-species"],
     queryFn: async () => (await apiClient.get("/api/v1/agriculture/species", { params: { size: 200 } })).data,
   })
 
   const invalidate = () => qc.invalidateQueries({ queryKey: ["ag-species"] })
 
-  const createMut = useMutation({
-    mutationFn: async (v: any) => apiClient.post("/api/v1/agriculture/species", {
+  const createMut = useAgToastMutation({
+    mutationFn: async (v: SpeciesValues) => apiClient.post("/api/v1/agriculture/species", {
       name: v.name, category: v.category, defaultUnitOfMeasure: v.defaultUnitOfMeasure || "head",
       trackingMode: v.trackingMode, gestationDays: v.gestationDays ? Number(v.gestationDays) : null,
       maturityWeightKg: v.maturityWeightKg ? Number(v.maturityWeightKg) : null,
     }),
     onSuccess: () => { invalidate(); setShowCreate(false) },
   })
-  const updateMut = useMutation({
-    mutationFn: async (v: any) => apiClient.put(`/api/v1/agriculture/species/${editing!.id}`, {
+  const updateMut = useAgToastMutation({
+    mutationFn: async (v: SpeciesValues) => apiClient.put(`/api/v1/agriculture/species/${editing!.id}`, {
       name: v.name, defaultUnitOfMeasure: v.defaultUnitOfMeasure || "head", trackingMode: v.trackingMode,
       gestationDays: v.gestationDays ? Number(v.gestationDays) : null,
       maturityWeightKg: v.maturityWeightKg ? Number(v.maturityWeightKg) : null,
     }),
     onSuccess: () => { invalidate(); setEditing(null) },
   })
-  const deactivateMut = useMutation({ mutationFn: (id: string) => apiClient.patch(`/api/v1/agriculture/species/${id}/deactivate`), onSuccess: invalidate })
-  const reactivateMut = useMutation({ mutationFn: (id: string) => apiClient.patch(`/api/v1/agriculture/species/${id}/reactivate`), onSuccess: invalidate })
-  const deleteMut = useMutation({ mutationFn: (id: string) => apiClient.delete(`/api/v1/agriculture/species/${id}`), onSuccess: invalidate })
+  const deactivateMut = useAgToastMutation({ mutationFn: (id: string) => apiClient.patch(`/api/v1/agriculture/species/${id}/deactivate`), onSuccess: invalidate })
+  const reactivateMut = useAgToastMutation({ mutationFn: (id: string) => apiClient.patch(`/api/v1/agriculture/species/${id}/reactivate`), onSuccess: invalidate })
+  const deleteMut = useAgToastMutation({ mutationFn: (id: string) => apiClient.delete(`/api/v1/agriculture/species/${id}`), onSuccess: invalidate })
 
+  const addStandardMut = useAgToastMutation({
+    mutationFn: async () => (await apiClient.post<SeedResult>("/api/v1/agriculture/species/defaults")).data,
+    onSuccess: r => { invalidate(); qc.invalidateQueries({ queryKey: ["ag-species", "picker"] }); toast.success(r.added === 0 ? "You already have all the standard species." : `Added ${r.added} standard species.`) },
+  })
   const species = data?.content ?? []
 
   return (
@@ -132,9 +127,14 @@ export default function AgSpeciesTab() {
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
         <p style={{ fontSize: 13, color: "var(--hf-text-muted)", margin: 0 }}>Tenant-wide catalogue used when registering animals and groups on any farm.</p>
         {!showCreate && (
-          <button onClick={() => setShowCreate(true)} style={btnPrimary}>
-            <Plus size={14} style={{ marginRight: 5, verticalAlign: -2 }} />Add species
-          </button>
+          <AgManage>
+            <button onClick={() => addStandardMut.mutate()} disabled={addStandardMut.isPending} title="Adds cattle, sheep, goats, pigs, poultry and more. Anything you already have is kept." style={{ ...btnGhost, marginRight: 8, opacity: addStandardMut.isPending ? 0.6 : 1 }}>
+              {addStandardMut.isPending ? "Adding…" : "Add standard list"}
+            </button>
+            <button onClick={() => setShowCreate(true)} style={btnPrimary}>
+              <Plus size={14} style={{ marginRight: 5, verticalAlign: -2 }} />Add species
+            </button>
+          </AgManage>
         )}
       </div>
 
@@ -144,8 +144,10 @@ export default function AgSpeciesTab() {
 
       {isLoading ? (
         <p style={{ color: "var(--hf-text-faint)", fontSize: 13 }}>Loading…</p>
+      ) : isError ? (
+        <QueryError onRetry={() => void refetch()} what="the species list" />
       ) : species.length === 0 ? (
-        <p style={{ color: "var(--hf-text-faint)", fontSize: 13 }}>No species in the catalogue yet.</p>
+        <p style={{ color: "var(--hf-text-faint)", fontSize: 13 }}>No species in the catalogue yet. Use "Add standard list" for cattle, sheep, goats, pigs, poultry and more, or add your own.</p>
       ) : (
         <div style={{ border: "1px solid var(--hf-border)", borderRadius: 12, overflow: "hidden" }}>
           {species.map((s, i) => (
@@ -160,13 +162,15 @@ export default function AgSpeciesTab() {
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                   <span style={statusBadge(s.status)}>{s.status}</span>
+                  <AgManage>
                   <button onClick={() => setEditing(s)} title="Edit" style={iconBtn}><Pencil size={13} /></button>
                   {s.status === "ACTIVE" ? (
                     <button onClick={() => deactivateMut.mutate(s.id)} title="Deactivate" style={iconBtn}><Ban size={13} /></button>
                   ) : (
                     <button onClick={() => reactivateMut.mutate(s.id)} title="Reactivate" style={iconBtn}><RotateCcw size={13} /></button>
                   )}
-                  <button onClick={() => { if (confirm(`Delete species "${s.name}"?`)) deleteMut.mutate(s.id) }} title="Delete" style={{ ...iconBtn, color: "var(--hf-danger-text)" }}><Trash2 size={13} /></button>
+                  <button onClick={async () => { if (await agConfirm({ title: `Delete species "${s.name}"?`, confirmLabel: "Delete", danger: true })) deleteMut.mutate(s.id) }} title="Delete" style={{ ...iconBtn, color: "var(--hf-danger-text)" }}><Trash2 size={13} /></button>
+                  </AgManage>
                 </div>
               </div>
               {editing?.id === s.id && (
@@ -182,8 +186,4 @@ export default function AgSpeciesTab() {
   )
 }
 
-const lbl: React.CSSProperties = { fontSize: 11, fontWeight: 600, color: "var(--hf-text-secondary)", marginBottom: 4, display: "block" }
-const inp: React.CSSProperties = { width: "100%", padding: "8px 10px", border: "1px solid var(--hf-border)", borderRadius: 7, fontSize: 12.5, boxSizing: "border-box" }
-const btnPrimary: React.CSSProperties = { display: "inline-flex", alignItems: "center", padding: "8px 14px", borderRadius: 8, border: "none", background: AG_ACCENT, color: "var(--hf-text-on-solid)", fontSize: 12.5, fontWeight: 700, cursor: "pointer" }
-const btnGhost: React.CSSProperties = { padding: "8px 14px", borderRadius: 8, border: "1px solid var(--hf-border)", background: "var(--hf-surface)", color: "var(--hf-text-muted)", fontSize: 12.5, fontWeight: 600, cursor: "pointer" }
 const iconBtn: React.CSSProperties = { display: "flex", alignItems: "center", justifyContent: "center", width: 28, height: 28, borderRadius: 7, border: "1px solid var(--hf-border)", background: "var(--hf-surface)", color: "var(--hf-text-muted)", cursor: "pointer" }

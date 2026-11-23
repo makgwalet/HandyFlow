@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import za.co.handyflow.platform.agriculture.domain.rules.AgWithdrawalRules;
 import za.co.handyflow.platform.shared.TenantId;
 
 import java.math.BigDecimal;
@@ -83,6 +84,10 @@ public class AgInputApplication {
     @Column(columnDefinition = "TEXT")
     private String notes;
 
+    /** Days after this application before the crop may be harvested (the product label's pre-harvest interval). Null = none given. */
+    @Column(name = "pre_harvest_interval_days")
+    private Integer preHarvestIntervalDays;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
@@ -91,6 +96,17 @@ public class AgInputApplication {
                                              BigDecimal quantityApplied, String unitOfMeasure, String applicationMethod,
                                              UUID appliedBy, String appliedByName, BigDecimal laborHours,
                                              BigDecimal cost, String weatherConditions, String notes) {
+        return create(tenantId, cropCycleId, applicationDate, inputType, inventoryItemId, productUsed, quantityApplied,
+                unitOfMeasure, applicationMethod, appliedBy, appliedByName, laborHours, cost, weatherConditions, notes, null);
+    }
+
+    public static AgInputApplication create(TenantId tenantId, UUID cropCycleId, LocalDate applicationDate,
+                                             String inputType, UUID inventoryItemId, String productUsed,
+                                             BigDecimal quantityApplied, String unitOfMeasure, String applicationMethod,
+                                             UUID appliedBy, String appliedByName, BigDecimal laborHours,
+                                             BigDecimal cost, String weatherConditions, String notes,
+                                             Integer preHarvestIntervalDays) {
+        AgWithdrawalRules.requireValidDays(preHarvestIntervalDays, "Pre-harvest interval");
         if (tenantId == null) throw new IllegalArgumentException("tenantId is required");
         if (cropCycleId == null) throw new IllegalArgumentException("cropCycleId is required");
         if (applicationDate == null) throw new IllegalArgumentException("applicationDate is required");
@@ -113,6 +129,7 @@ public class AgInputApplication {
         a.laborHours = laborHours;
         a.cost = cost;
         a.weatherConditions = weatherConditions;
+        a.preHarvestIntervalDays = preHarvestIntervalDays;
         a.notes = notes;
         a.createdAt = Instant.now();
         return a;

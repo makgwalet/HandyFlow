@@ -11,5 +11,13 @@ public record UpdateHealthEventRequest(
         BigDecimal cost,
         Integer withdrawalPeriodDays,
         LocalDate nextDueDate,
-        String notes
-) {}
+        String notes,
+        Integer milkWithdrawalDays,
+        Integer eggWithdrawalDays
+) {
+    /** Without milk and egg periods (callers written before they existed). */
+    public UpdateHealthEventRequest(String description, String productUsed, String dosage, String veterinarian, BigDecimal cost,
+                                    Integer withdrawalPeriodDays, LocalDate nextDueDate, String notes) {
+        this(description, productUsed, dosage, veterinarian, cost, withdrawalPeriodDays, nextDueDate, notes, null, null);
+    }
+}

@@ -15,9 +15,9 @@ public interface AgSpeciesRepository extends JpaRepository<AgSpecies, UUID> {
     @Query("SELECT s FROM AgSpecies s WHERE s.tenantId = :tenantId AND s.id = :id AND s.deletedAt IS NULL")
     Optional<AgSpecies> findActiveById(TenantId tenantId, UUID id);
 
-    @Query("SELECT s FROM AgSpecies s WHERE s.tenantId = :tenantId AND s.deletedAt IS NULL ORDER BY s.name")
+    @Query("SELECT s FROM AgSpecies s WHERE s.tenantId = :tenantId AND s.deletedAt IS NULL ORDER BY s.name, s.id")
     Page<AgSpecies> findAllActive(TenantId tenantId, Pageable pageable);
 
-    @Query("SELECT s FROM AgSpecies s WHERE s.tenantId = :tenantId AND s.category = :category AND s.deletedAt IS NULL ORDER BY s.name")
+    @Query("SELECT s FROM AgSpecies s WHERE s.tenantId = :tenantId AND s.category = :category AND s.deletedAt IS NULL ORDER BY s.name, s.id")
     Page<AgSpecies> findAllActiveByCategory(TenantId tenantId, String category, Pageable pageable);
 }

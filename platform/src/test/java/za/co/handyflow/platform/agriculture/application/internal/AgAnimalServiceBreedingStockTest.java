@@ -33,7 +33,7 @@ class AgAnimalServiceBreedingStockTest {
     @Mock AgWeightRecordRepository weightRecordRepository;
     static final TenantId TENANT = TenantId.of(UUID.randomUUID());
 
-    private AgAnimalService service() { return new AgAnimalService(animalRepository, weightRecordRepository, mock(HrFacade.class)); }
+    private AgAnimalService service() { return new AgAnimalService(animalRepository, weightRecordRepository, mock(HrFacade.class), mock(za.co.handyflow.platform.agriculture.domain.repository.AgProductionAreaRepository.class), mock(AgReferenceChecker.class), mock(AgWithdrawalService.class)); }
 
     private AgAnimal bull() {
         AgAnimal a = AgAnimal.create(TENANT, UUID.randomUUID(), null, null, UUID.randomUUID(), "T-1042", "Samson", "Bonsmara", "MALE",

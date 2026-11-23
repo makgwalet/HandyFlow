@@ -51,6 +51,15 @@ public interface EvidenceFacade {
     void detach(TenantId tenantId, UUID evidenceId);
 
     /**
+     * Like download(), but only if the file is active, not restricted, and was attached by this module to this kind of record. The
+     * unscoped download() lets any module read any other module's files by id; a module that serves files by id should use this.
+     */
+    DownloadedEvidence downloadScoped(TenantId tenantId, String sourceModule, String relatedEntityType, UUID evidenceId);
+
+    /** Like detach(), with the same scoping as downloadScoped(). */
+    void detachScoped(TenantId tenantId, String sourceModule, String relatedEntityType, UUID evidenceId);
+
+    /**
      * Evidence whose source module starts with this prefix is restricted: only its own module can attach, list, download or remove it, through
      * the methods below. The generic endpoints, the tenant-wide listing and sharing with an external auditor never see it. Used for files
      * that must not leave the case they belong to, such as employee relations evidence.

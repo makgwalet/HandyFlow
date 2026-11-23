@@ -7,6 +7,7 @@ import { usePermission } from "../../hooks/usePermission"
 import { agKeys, api, useAgMutation, useCropTypes } from "./agCrops.api"
 import type { CropType } from "./agCrops.types"
 import { Empty, Field, Th } from "./agCropsUi"
+import { QueryError } from "./agUi"
 import { btnDanger, btnGhost, btnPrimary, grid, inp, panel, statusBadge, td, theadStyle } from "./constants"
 
 const CATEGORIES = ["CEREAL", "OILSEED", "LEGUME", "VEGETABLE", "FRUIT", "FODDER", "OTHER"]
@@ -44,17 +45,19 @@ export default function AgCropTypesTab() {
   const [adding, setAdding] = useState(false)
   const [editing, setEditing] = useState<CropType | null>(null)
   const [deleting, setDeleting] = useState<CropType | null>(null)
-  const { data: types = [], isLoading } = useCropTypes(category || undefined)
+  const { data: types = [], isLoading, isError, refetch } = useCropTypes(category || undefined)
   const keys = [agKeys.cropTypes(category || undefined), ["ag", "crop-types"]]
   const deactivate = useAgMutation((id: string) => api.patch(`/crop-types/${id}/deactivate`), { invalidate: keys, success: "Deactivated", failure: "Couldn't deactivate it." })
   const reactivate = useAgMutation((id: string) => api.patch(`/crop-types/${id}/reactivate`), { invalidate: keys, success: "Reactivated", failure: "Couldn't reactivate it." })
   const remove = useAgMutation((id: string) => api.del(`/crop-types/${id}`), { invalidate: keys, success: "Crop type deleted", failure: "Couldn't delete it." })
+  const addStandard = useAgMutation(() => api.post("/crop-types/defaults"), { invalidate: keys, success: "Standard crop types added. Anything you already had was kept.", failure: "Couldn't add the standard list." })
   const small: React.CSSProperties = { ...btnGhost, padding: "4px 10px", fontSize: 11.5 }
   return (
     <div>
       <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 14, flexWrap: "wrap" }}>
         <select aria-label="Filter by category" value={category} onChange={e => setCategory(e.target.value)} style={{ ...inp, width: "auto" }}><option value="">All categories</option>{CATEGORIES.map(c => <option key={c}>{c}</option>)}</select>
         <div style={{ flex: 1 }} />
+        {canManage && !adding && !editing && <button type="button" style={btnGhost} disabled={addStandard.isPending} title="Adds maize, wheat, soybeans, potatoes, citrus and more. Anything you already have is kept." onClick={() => addStandard.mutate(undefined)}>{addStandard.isPending ? "Adding…" : "Add standard list"}</button>}
         {canManage && !adding && !editing && <button type="button" style={btnPrimary} onClick={() => setAdding(true)}><Plus size={14} />Add crop type</button>}
       </div>
       {adding && <TypeForm onDone={() => setAdding(false)} />}
@@ -68,7 +71,7 @@ export default function AgCropTypesTab() {
           </div>
         </div>
       )}
-      {isLoading ? <Empty>Loading crop types…</Empty> : types.length === 0 ? <Empty>No crop types yet. Add the crops you grow (maize, soybeans…) before creating crop cycles.</Empty> : (
+      {isLoading ? <Empty>Loading crop types…</Empty> : isError ? <QueryError onRetry={() => void refetch()} what="the crop types" /> : types.length === 0 ? <Empty>No crop types yet. Use "Add standard list" for the usual South African crops, or add the ones you grow, before creating crop cycles.</Empty> : (
         <div style={{ overflowX: "auto" }}>
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12.5 }}>
             <thead><tr style={theadStyle}>{["Crop", "Category", "Growing days", "Yield unit", "Status", ""].map((h, i) => <Th key={i}>{h}</Th>)}</tr></thead>

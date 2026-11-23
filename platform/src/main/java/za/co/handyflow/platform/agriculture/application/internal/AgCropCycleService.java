@@ -190,6 +190,9 @@ public class AgCropCycleService {
         }
     }
 
+    /** Throws "not found" unless this crop cycle exists, is not deleted, and belongs to the tenant. */
+    public void requireExists(TenantId tenantId, UUID id) { findActive(tenantId, id); }
+
     AgCropCycle findActive(TenantId tenantId, UUID id) {
         return cropCycleRepository.findActiveById(tenantId, id)
                 .orElseThrow(() -> new ResourceNotFoundException("CropCycle", id.toString()));

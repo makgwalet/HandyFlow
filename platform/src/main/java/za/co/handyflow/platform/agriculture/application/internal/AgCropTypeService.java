@@ -24,6 +24,10 @@ public class AgCropTypeService {
 
     private final AgCropTypeRepository cropTypeRepository;
 
+    private java.util.List<String> existingNames(TenantId tenantId) {
+        return cropTypeRepository.findAllActive(tenantId, org.springframework.data.domain.Pageable.unpaged()).stream().map(AgCropType::getName).toList();
+    }
+
     @Transactional(readOnly = true)
     public Page<CropTypeResponse> getCropTypes(TenantId tenantId, String category, Pageable pageable) {
         Page<AgCropType> page = (category != null && !category.isBlank())
@@ -39,6 +43,7 @@ public class AgCropTypeService {
 
     @Transactional
     public CropTypeResponse createCropType(TenantId tenantId, CreateCropTypeRequest req) {
+        za.co.handyflow.platform.agriculture.domain.rules.AgLookupDefaults.requireNewName(existingNames(tenantId), req.name(), "crop type");
         AgCropType cropType = AgCropType.create(tenantId, req.name(), req.category(),
                 req.typicalGrowingDays(), req.defaultUnitOfMeasure());
         cropTypeRepository.save(cropType);
@@ -46,9 +51,24 @@ public class AgCropTypeService {
         return toResponse(cropType);
     }
 
+    /** Adds the standard crop types the tenant does not have yet (matched by name, ignoring case); anything it already has is left alone. */
+    @Transactional
+    public za.co.handyflow.platform.agriculture.dto.SeedDefaultsResponse addStandardCropTypes(TenantId tenantId) {
+        java.util.List<String> have = existingNames(tenantId);
+        var missing = za.co.handyflow.platform.agriculture.domain.rules.AgLookupDefaults.missingCropTypes(have);
+        for (var d : missing) {
+            cropTypeRepository.save(AgCropType.create(tenantId, d.name(), d.category(), d.typicalGrowingDays(), d.unit()));
+        }
+        log.info("Standard crop types added count={} tenant={}", missing.size(), tenantId.getValue());
+        return new za.co.handyflow.platform.agriculture.dto.SeedDefaultsResponse(missing.size(), za.co.handyflow.platform.agriculture.domain.rules.AgLookupDefaults.CROP_TYPES.size() - missing.size());
+    }
+
     @Transactional
     public CropTypeResponse updateCropType(TenantId tenantId, UUID id, UpdateCropTypeRequest req) {
         AgCropType cropType = findActive(tenantId, id);
+        if (req.name() != null && !za.co.handyflow.platform.agriculture.domain.rules.AgLookupDefaults.normalise(req.name()).equals(za.co.handyflow.platform.agriculture.domain.rules.AgLookupDefaults.normalise(cropType.getName()))) {
+            za.co.handyflow.platform.agriculture.domain.rules.AgLookupDefaults.requireNewName(existingNames(tenantId), req.name(), "crop type");
+        }
         cropType.update(req.name(), req.typicalGrowingDays(), req.defaultUnitOfMeasure());
         return toResponse(cropType);
     }

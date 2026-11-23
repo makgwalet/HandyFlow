@@ -31,6 +31,7 @@ export interface InputApplication {
   productUsed: string | null; quantityApplied: number; unitOfMeasure: string; applicationMethod: string | null
   appliedBy: string | null; appliedByName: string | null; laborHours: number | null; cost: number | null
   weatherConditions: string | null; notes: string | null; createdAt: string
+  preHarvestIntervalDays?: number | null; harvestClearOn?: string | null
 }
 
 export interface ScoutingRecord {
@@ -44,6 +45,7 @@ export interface HarvestRecord {
   id: string; cropCycleId: string; harvestDate: string; quantityHarvested: number; unitOfMeasure: string
   qualityGrade: string | null; moistureContent: number | null; storageLocation: string | null
   harvestedBy: string | null; harvestedByName: string | null; laborHours: number | null; notes: string | null; createdAt: string
+  withdrawalOverrideReason?: string | null; withdrawalHeldUntil?: string | null
 }
 
 // -- Cost reporting (costs only: there is no revenue, labour-cost or equipment-cost data in Agriculture) -----

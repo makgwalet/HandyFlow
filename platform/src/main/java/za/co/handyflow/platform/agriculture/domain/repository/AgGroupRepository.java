@@ -16,17 +16,24 @@ public interface AgGroupRepository extends JpaRepository<AgGroup, UUID> {
     @Query("SELECT g FROM AgGroup g WHERE g.tenantId = :tenantId AND g.id = :id AND g.deletedAt IS NULL")
     Optional<AgGroup> findActiveById(TenantId tenantId, UUID id);
 
-    @Query("SELECT g FROM AgGroup g WHERE g.tenantId = :tenantId AND g.farmId = :farmId AND g.deletedAt IS NULL ORDER BY g.batchNumber")
+    @Query("SELECT g FROM AgGroup g WHERE g.tenantId = :tenantId AND g.farmId = :farmId AND g.deletedAt IS NULL ORDER BY g.batchNumber, g.id")
     Page<AgGroup> findAllActiveForFarm(TenantId tenantId, UUID farmId, Pageable pageable);
+
+    /** Same as AgAnimalRepository.searchForFarm: status "" = any; pattern matches batch number and breed. */
+    @Query("SELECT g FROM AgGroup g WHERE g.tenantId = :tenantId AND g.farmId = :farmId AND g.deletedAt IS NULL "
+            + "AND (:status = '' OR g.status = :status) "
+            + "AND (LOWER(g.batchNumber) LIKE :pattern ESCAPE '!' OR LOWER(COALESCE(g.breed, '')) LIKE :pattern ESCAPE '!') "
+            + "ORDER BY g.batchNumber, g.id")
+    Page<AgGroup> searchForFarm(TenantId tenantId, UUID farmId, String status, String pattern, Pageable pageable);
 
     // FIX (Agriculture GAP 4 — mobile gap report, "Home/Today" summary).
     @Query("SELECT COUNT(g) FROM AgGroup g WHERE g.tenantId = :tenantId AND g.farmId = :farmId AND g.deletedAt IS NULL AND g.status = 'ACTIVE'")
     long countActiveForFarm(TenantId tenantId, UUID farmId);
 
-    @Query("SELECT g FROM AgGroup g WHERE g.tenantId = :tenantId AND g.farmId = :farmId AND g.status = :status AND g.deletedAt IS NULL ORDER BY g.batchNumber")
+    @Query("SELECT g FROM AgGroup g WHERE g.tenantId = :tenantId AND g.farmId = :farmId AND g.status = :status AND g.deletedAt IS NULL ORDER BY g.batchNumber, g.id")
     Page<AgGroup> findByStatusForFarm(TenantId tenantId, UUID farmId, String status, Pageable pageable);
 
-    @Query("SELECT g FROM AgGroup g WHERE g.tenantId = :tenantId AND g.productionAreaId = :productionAreaId AND g.deletedAt IS NULL ORDER BY g.batchNumber")
+    @Query("SELECT g FROM AgGroup g WHERE g.tenantId = :tenantId AND g.productionAreaId = :productionAreaId AND g.deletedAt IS NULL ORDER BY g.batchNumber, g.id")
     Page<AgGroup> findAllActiveForProductionArea(TenantId tenantId, UUID productionAreaId, Pageable pageable);
 
     // Backs the pre-insert uniqueness check in AgGroupService.createGroup() —

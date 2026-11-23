@@ -5,19 +5,17 @@
 // actions confirmed via AgGroupService (updateGroup/reduceCount/
 // increaseCount/close/reopen all exist there) —
 //
-// ⚠ UNVERIFIED PATHS: the exact controller route mappings for
-// move/reduce-count/increase-count/close/reopen were not directly seen in
-// source (AgGroupController's fragment read stopped before that section);
-// the paths below (PATCH /groups/{id}/move|reduce-count|increase-count|
-// close|reopen) are inferred from this module's own naming convention
-// used everywhere else (farms' /deactivate·/reactivate, health-events'
-// /complete·/acknowledge). Adjust the path strings below if these 404.
+// Every head-count change asks for a reason and is kept in the group's count history (GET /groups/{id}/count-log).
 import type React from "react"
 import { useState } from "react"
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
+import { useQuery, useQueryClient } from "@tanstack/react-query"
+import { useAgToastMutation } from "./agMutation"
 import { ArrowLeft, Users, Pencil, Lock, Unlock, MinusCircle, PlusCircle } from "lucide-react"
 import { apiClient } from "../../api/client"
-import { AG_ACCENT, AG_ACCENT_TEXT, statusBadge } from "./constants"
+import { AG_ACCENT, statusBadge, inp, btnPrimary, btnGhost } from "./constants"
+import { Field } from "./agUi"
+import AgProduceNotice from "./AgProduceNotice"
+import { AgTabs } from "./agUi"
 import type { GroupResponse } from "./AgGroupsTab"
 import AgWeightHistoryTab from "./AgWeightHistoryTab"
 import AgHealthEventsTab from "./AgHealthEventsTab"
@@ -26,6 +24,13 @@ import AgMovementRecordsTab from "./AgMovementRecordsTab"
 import AgMortalityRecordsTab from "./AgMortalityRecordsTab"
 import AgFeedRecordsTab from "./AgFeedRecordsTab"
 import AgEvidenceTab from "./AgEvidenceTab"
+import { buildTextPatch } from "./agPatch"
+import AgManage from "./AgManage"
+import { breedSuggestions } from "./agLookups"
+import { useSpeciesNames } from "./agLookups.api"
+import { countAdjustError, countLogLabel } from "./agLifecycle.logic"
+
+interface CountLogEntry { id: string; changeType: string; delta: number; countBefore: number; countAfter: number; reason: string; createdByName: string | null; createdAt: string }
 
 type SubTab = "weight" | "health" | "breeding" | "movement" | "mortality" | "feed" | "evidence"
 const SUB_TABS: { key: SubTab; label: string }[] = [
@@ -35,12 +40,15 @@ const SUB_TABS: { key: SubTab; label: string }[] = [
 
 export default function AgGroupDetail({ group, onBack }: { group: GroupResponse; onBack: () => void }) {
   const qc = useQueryClient()
+  const speciesNames = useSpeciesNames()
   const [sub, setSub] = useState<SubTab>("weight")
   const [editing, setEditing] = useState(false)
   const [breed, setBreed] = useState(group.breed ?? "")
   const [notes, setNotes] = useState(group.notes ?? "")
   const [adjusting, setAdjusting] = useState<"increase" | "decrease" | null>(null)
   const [adjustCount, setAdjustCount] = useState("")
+  const [adjustReason, setAdjustReason] = useState("")
+  const [adjustError, setAdjustError] = useState("")
 
   const { data: current } = useQuery<GroupResponse>({
     queryKey: ["ag-group", group.id],
@@ -49,18 +57,30 @@ export default function AgGroupDetail({ group, onBack }: { group: GroupResponse;
   })
   const invalidate = () => qc.invalidateQueries({ queryKey: ["ag-group", group.id] })
 
-  const updateMut = useMutation({
-    mutationFn: () => apiClient.put(`/api/v1/agriculture/groups/${group.id}`, { productionAreaId: null, enterpriseId: null, breed: breed || null, notes: notes || null }),
+  const updateMut = useAgToastMutation({
+    mutationFn: async () => {
+      const patch = buildTextPatch({ breed: current?.breed, notes: current?.notes }, { breed, notes })
+      if (patch) await apiClient.put(`/api/v1/agriculture/groups/${group.id}`, patch)
+    },
     onSuccess: () => { invalidate(); setEditing(false) },
   })
-  const closeMut = useMutation({ mutationFn: () => apiClient.patch(`/api/v1/agriculture/groups/${group.id}/close`), onSuccess: invalidate })
-  const reopenMut = useMutation({ mutationFn: () => apiClient.patch(`/api/v1/agriculture/groups/${group.id}/reopen`), onSuccess: invalidate })
-  const adjustMut = useMutation({
-    mutationFn: () => apiClient.patch(`/api/v1/agriculture/groups/${group.id}/${adjusting === "increase" ? "increase-count" : "reduce-count"}`, { count: Number(adjustCount) }),
-    onSuccess: () => { invalidate(); setAdjusting(null); setAdjustCount("") },
+  const closeMut = useAgToastMutation({ mutationFn: () => apiClient.patch(`/api/v1/agriculture/groups/${group.id}/close`), onSuccess: invalidate })
+  const reopenMut = useAgToastMutation({ mutationFn: () => apiClient.patch(`/api/v1/agriculture/groups/${group.id}/reopen`), onSuccess: invalidate })
+  const adjustMut = useAgToastMutation({
+    mutationFn: () => apiClient.patch(`/api/v1/agriculture/groups/${group.id}/${adjusting === "increase" ? "increase-count" : "reduce-count"}`, { count: Number(adjustCount), reason: adjustReason.trim() }),
+    onSuccess: () => { invalidate(); qc.invalidateQueries({ queryKey: ["ag-group-count-log", group.id] }); qc.invalidateQueries({ queryKey: ["ag-groups"] }); setAdjusting(null); setAdjustCount(""); setAdjustReason(""); setAdjustError("") },
   })
 
   const g = current ?? group
+  const { data: countLog = [] } = useQuery<CountLogEntry[]>({
+    queryKey: ["ag-group-count-log", group.id],
+    queryFn: async () => (await apiClient.get(`/api/v1/agriculture/groups/${group.id}/count-log`, { params: { size: 20 } })).data.content ?? [],
+  })
+  const applyAdjust = () => {
+    const problem = countAdjustError(adjusting ?? "increase", adjustCount, adjustReason, g.currentCount)
+    if (problem) { setAdjustError(problem); return }
+    setAdjustError(""); adjustMut.mutate()
+  }
 
   return (
     <div>
@@ -78,6 +98,7 @@ export default function AgGroupDetail({ group, onBack }: { group: GroupResponse;
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <span style={statusBadge(g.status)}>{g.status}</span>
+          <AgManage>
           <button onClick={() => setAdjusting("increase")} title="Increase count" style={iconBtn}><PlusCircle size={13} /></button>
           <button onClick={() => setAdjusting("decrease")} title="Reduce count" style={iconBtn}><MinusCircle size={13} /></button>
           {g.status === "ACTIVE" ? (
@@ -86,25 +107,32 @@ export default function AgGroupDetail({ group, onBack }: { group: GroupResponse;
             <button onClick={() => reopenMut.mutate()} title="Reopen group" style={iconBtn}><Unlock size={13} /></button>
           )}
           <button onClick={() => setEditing(v => !v)} title="Edit" style={iconBtn}><Pencil size={13} /></button>
+          </AgManage>
         </div>
       </div>
 
       {adjusting && (
-        <div style={{ background: "var(--hf-surface-muted)", border: "1px solid var(--hf-border)", borderRadius: 12, padding: 14, marginBottom: 16, display: "flex", gap: 8, alignItems: "flex-end" }}>
-          <div>
-            <label style={lbl}>{adjusting === "increase" ? "Increase count by" : "Reduce count by"}</label>
-            <input type="number" min={1} value={adjustCount} onChange={e => setAdjustCount(e.target.value)} style={{ ...inp, width: 120 }} />
+        <div style={{ background: "var(--hf-surface-muted)", border: "1px solid var(--hf-border)", borderRadius: 12, padding: 14, marginBottom: 16 }}>
+          <div style={{ display: "flex", gap: 8, alignItems: "flex-end", marginBottom: 8 }}>
+            <Field label={adjusting === "increase" ? "Increase count by" : "Reduce count by"}><input type="number" min={1} value={adjustCount} onChange={e => setAdjustCount(e.target.value)} style={{ ...inp, width: 120 }} /></Field>
+            <div style={{ flex: 1 }}>
+              <Field label="Reason (required)"><input value={adjustReason} onChange={e => setAdjustReason(e.target.value)} placeholder={adjusting === "increase" ? "e.g. Recount found 4 more" : "e.g. Recount, 3 missing"} style={inp} /></Field>
+            </div>
           </div>
-          <button disabled={adjustMut.isPending || !adjustCount} onClick={() => adjustMut.mutate()} style={{ ...btnPrimary, opacity: adjustMut.isPending || !adjustCount ? 0.6 : 1 }}>Apply</button>
-          <button onClick={() => { setAdjusting(null); setAdjustCount("") }} style={btnGhost}>Cancel</button>
+          <p style={{ fontSize: 11.5, color: "var(--hf-text-muted)", margin: "0 0 8px" }}>For sales, transfers out and deaths use the Movement and Mortality tabs, so they are recorded properly.</p>
+          {adjustError && <p role="alert" style={{ fontSize: 12.5, color: "var(--hf-danger-text)", margin: "0 0 8px" }}>{adjustError}</p>}
+          <div style={{ display: "flex", gap: 8 }}>
+            <button disabled={adjustMut.isPending} onClick={applyAdjust} style={{ ...btnPrimary, opacity: adjustMut.isPending ? 0.6 : 1 }}>Apply</button>
+            <button onClick={() => { setAdjusting(null); setAdjustCount(""); setAdjustReason(""); setAdjustError("") }} style={btnGhost}>Cancel</button>
+          </div>
         </div>
       )}
 
       {editing && (
         <div style={{ background: "var(--hf-surface-muted)", border: "1px solid var(--hf-border)", borderRadius: 12, padding: 16, marginBottom: 16 }}>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 2fr", gap: 10, marginBottom: 12 }}>
-            <div><label style={lbl}>Breed</label><input value={breed} onChange={e => setBreed(e.target.value)} style={inp} /></div>
-            <div><label style={lbl}>Notes</label><input value={notes} onChange={e => setNotes(e.target.value)} style={inp} /></div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))", gap: 10, marginBottom: 12 }}>
+            <><Field label="Breed"><input list="ag-breed-options" value={breed} onChange={e => setBreed(e.target.value)} style={inp} /></Field><datalist id="ag-breed-options">{breedSuggestions(speciesNames[g.speciesId]).map(b => <option key={b} value={b} />)}</datalist></>
+            <Field label="Notes"><input value={notes} onChange={e => setNotes(e.target.value)} style={inp} /></Field>
           </div>
           <div style={{ display: "flex", gap: 8 }}>
             <button disabled={updateMut.isPending} onClick={() => updateMut.mutate()} style={{ ...btnPrimary, opacity: updateMut.isPending ? 0.6 : 1 }}>Save</button>
@@ -113,33 +141,33 @@ export default function AgGroupDetail({ group, onBack }: { group: GroupResponse;
         </div>
       )}
 
-      <div style={{ display: "flex", gap: 4, borderBottom: "1px solid var(--hf-border)", marginBottom: 18, overflowX: "auto" }}>
-        {SUB_TABS.map(t => {
-          const active = sub === t.key
-          return (
-            <button key={t.key} onClick={() => setSub(t.key)}
-              style={{ padding: "9px 14px", border: "none", background: "none", cursor: "pointer", fontSize: 12.5, fontWeight: 600, whiteSpace: "nowrap",
-                color: active ? AG_ACCENT_TEXT : "var(--hf-text-muted)", borderBottom: active ? `2px solid ${AG_ACCENT}` : "2px solid transparent", marginBottom: -1 }}>
-              {t.label}
-            </button>
-          )
-        })}
-      </div>
+      {countLog.length > 0 && (
+        <details style={{ marginBottom: 16 }}>
+          <summary style={{ fontSize: 12.5, fontWeight: 600, color: "var(--hf-text-muted)", cursor: "pointer" }}>Head-count history ({countLog.length})</summary>
+          <div style={{ border: "1px solid var(--hf-border)", borderRadius: 10, overflow: "hidden", marginTop: 8 }}>
+            {countLog.map((l, i) => (
+              <div key={l.id} style={{ padding: "8px 14px", borderTop: i === 0 ? "none" : "1px solid var(--hf-border-subtle)" }}>
+                <p style={{ fontSize: 12.5, color: "var(--hf-text)", fontWeight: 600, margin: 0 }}>{countLogLabel(l)}</p>
+                <p style={{ fontSize: 11, color: "var(--hf-text-faint)", margin: 0 }}>{l.createdAt.slice(0, 10)}{l.createdByName ? ` · ${l.createdByName}` : ""} · {l.reason}</p>
+              </div>
+            ))}
+          </div>
+        </details>
+      )}
+
+      <AgProduceNotice kind="group" id={group.id} />
+      <AgTabs label="Group records" tabs={SUB_TABS} active={sub} onChange={setSub} size="sm" spacing={18} />
 
       {sub === "weight" && <AgWeightHistoryTab targetType="group" targetId={g.id} />}
       {sub === "health" && <AgHealthEventsTab targetType="group" targetId={g.id} />}
       {sub === "breeding" && <AgBreedingRecordsTab targetType="group" targetId={g.id} />}
-      {sub === "movement" && <AgMovementRecordsTab targetType="group" targetId={g.id} />}
+      {sub === "movement" && <AgMovementRecordsTab targetType="group" targetId={g.id} farmId={g.farmId} currentAreaId={g.productionAreaId} currentCount={g.currentCount} />}
       {sub === "mortality" && <AgMortalityRecordsTab targetType="group" targetId={g.id} />}
-      {sub === "feed" && <AgFeedRecordsTab targetType="group" targetId={g.id} />}
+      {sub === "feed" && <AgFeedRecordsTab targetType="group" targetId={g.id} farmId={g.farmId} speciesName={speciesNames[g.speciesId]} />}
       {sub === "evidence" && <AgEvidenceTab targetType="group" targetId={g.id} />}
     </div>
   )
 }
 
-const lbl: React.CSSProperties = { fontSize: 11, fontWeight: 600, color: "var(--hf-text-secondary)", marginBottom: 4, display: "block" }
-const inp: React.CSSProperties = { width: "100%", padding: "8px 10px", border: "1px solid var(--hf-border)", borderRadius: 7, fontSize: 12.5, boxSizing: "border-box" }
-const btnPrimary: React.CSSProperties = { padding: "8px 14px", borderRadius: 8, border: "none", background: AG_ACCENT, color: "var(--hf-text-on-solid)", fontSize: 12.5, fontWeight: 700, cursor: "pointer" }
-const btnGhost: React.CSSProperties = { padding: "8px 14px", borderRadius: 8, border: "1px solid var(--hf-border)", background: "var(--hf-surface)", color: "var(--hf-text-muted)", fontSize: 12.5, fontWeight: 600, cursor: "pointer" }
 const iconBtn: React.CSSProperties = { display: "flex", alignItems: "center", justifyContent: "center", width: 28, height: 28, borderRadius: 7, border: "1px solid var(--hf-border)", background: "var(--hf-surface)", color: "var(--hf-text-muted)", cursor: "pointer" }
 const backBtn: React.CSSProperties = { display: "inline-flex", alignItems: "center", background: "none", border: "none", color: "var(--hf-text-muted)", fontSize: 12.5, fontWeight: 600, cursor: "pointer", padding: 0 }

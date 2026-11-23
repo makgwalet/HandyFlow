@@ -1,18 +1,22 @@
 // src/pages/agriculture/AgFeedRecordsTab.tsx
 //
-// Shared animal/group feed history — list + create only. When an
-// inventory item is referenced, recording feed also issues a matching
-// AgStockMovement against it server-side (confirmed via
-// AgFeedRecordService) — no separate frontend action needed for that
-// side-effect. inventoryItemId is a freeform UUID here since this tab
-// isn't threaded the farm's inventory list; a proper picker is a
-// follow-up (same simplification as AgMovementRecordsTab's area picker).
-import type React from "react"
+// Shared animal/group feed history. Feed can be drawn from one of the farm's stock items, chosen from a list: the kilograms
+// fed are taken off the item (converted into its own unit), the feed name and cost per kg are filled in from the item, and
+// the screen warns before saving if there is not enough on hand. Items counted in bags or bales cannot be used until their
+// unit is changed to kg or t.
 import { useState } from "react"
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
+import { useQuery, useQueryClient } from "@tanstack/react-query"
+import { useAgToastMutation } from "./agMutation"
 import { Plus, Wheat } from "lucide-react"
+import AgPager from "./AgPager"
+import { PAGE_SIZE, rangeLabel } from "./agPaging.logic"
 import { apiClient } from "../../api/client"
-import { AG_ACCENT, AG_ACCENT_TEXT, fmtMoney, type AgTargetType, targetBasePath } from "./constants"
+import { AG_ACCENT_TEXT, fmtMoney, type AgTargetType, targetBasePath, inp, btnPrimary, btnGhost } from "./constants"
+import { Field, QueryError } from "./agUi"
+import { useInventory } from "./agCrops.api"
+import { feedChoices, feedPrefill, feedStockProblem } from "./agPickers.logic"
+import AgManage from "./AgManage"
+import { feedSuggestions } from "./agLookups"
 
 interface FeedRecordResponse {
   id: string; animalId: string | null; groupId: string | null
@@ -22,7 +26,7 @@ interface FeedRecordResponse {
 }
 interface Page<T> { content: T[]; totalElements: number }
 
-export default function AgFeedRecordsTab({ targetType, targetId }: { targetType: AgTargetType; targetId: string }) {
+export default function AgFeedRecordsTab({ targetType, targetId, farmId, speciesName }: { targetType: AgTargetType; targetId: string; farmId: string; speciesName?: string }) {
   const qc = useQueryClient()
   const base = targetBasePath(targetType, targetId)
   const [showCreate, setShowCreate] = useState(false)
@@ -31,14 +35,31 @@ export default function AgFeedRecordsTab({ targetType, targetId }: { targetType:
   const [feedType, setFeedType] = useState("")
   const [quantityKg, setQuantityKg] = useState("")
   const [costPerKg, setCostPerKg] = useState("")
+  const { data: stock = [], isLoading: stockLoading } = useInventory(farmId)
+  const choices = feedChoices(stock)
+  const chosen = stock.find(i => i.id === inventoryItemId) ?? null
+  const stockProblem = chosen ? feedStockProblem(chosen, Number(quantityKg)) : null
+  const pickItem = (id: string) => {
+    setInventoryItemId(id)
+    const item = stock.find(i => i.id === id)
+    if (item) {
+      const p = feedPrefill(item)
+      setFeedType(p.feedType)
+      setCostPerKg(p.costPerKg == null ? "" : String(p.costPerKg))
+    }
+  }
 
   const queryKey = ["ag-feed-records", targetType, targetId]
-  const { data, isLoading } = useQuery<Page<FeedRecordResponse>>({
-    queryKey,
-    queryFn: async () => (await apiClient.get(`${base}/feed-records`, { params: { size: 100 } })).data,
+  // 50 a page, newest first; the server never sends more than 200 at a time
+  const [page, setPage] = useState(0)
+  const { data, isLoading, isError, refetch } = useQuery<Page<FeedRecordResponse>>({
+    queryKey: [...queryKey, page],
+    placeholderData: prev => prev,
+    queryFn: async () => (await apiClient.get(`${base}/feed-records`, { params: { page, size: PAGE_SIZE } })).data,
   })
+  const total = data?.totalElements ?? 0
 
-  const createMut = useMutation({
+  const createMut = useAgToastMutation({
     mutationFn: () => apiClient.post(`${base}/feed-records`, {
       [targetType === "animal" ? "animalId" : "groupId"]: targetId,
       feedDate, inventoryItemId: inventoryItemId || null, feedType,
@@ -46,6 +67,9 @@ export default function AgFeedRecordsTab({ targetType, targetId }: { targetType:
     }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey })
+      // stock was drawn down
+      qc.invalidateQueries({ queryKey: ["ag-inventory"] })
+      qc.invalidateQueries({ queryKey: ["ag", "inventory", farmId] })
       setShowCreate(false); setInventoryItemId(""); setFeedType(""); setQuantityKg(""); setCostPerKg("")
     },
   })
@@ -55,28 +79,36 @@ export default function AgFeedRecordsTab({ targetType, targetId }: { targetType:
   return (
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-        <p style={{ fontSize: 12.5, color: "var(--hf-text-muted)", margin: 0 }}>Feed given — linking an inventory item also issues stock against it.</p>
-        {!showCreate && <button onClick={() => setShowCreate(true)} style={btnPrimary}><Plus size={13} style={{ marginRight: 4, verticalAlign: -2 }} />Record feed</button>}
+        <p style={{ fontSize: 12.5, color: "var(--hf-text-muted)", margin: 0 }}>Feed given. Choosing a stock item takes the feed off that item.</p>
+        {!showCreate && <AgManage><button onClick={() => setShowCreate(true)} style={btnPrimary}><Plus size={13} style={{ marginRight: 4, verticalAlign: -2 }} />Record feed</button></AgManage>}
       </div>
 
       {showCreate && (
         <div style={{ background: "var(--hf-surface-muted)", border: "1px solid var(--hf-border)", borderRadius: 10, padding: 14, marginBottom: 14 }}>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr 1fr", gap: 8, marginBottom: 10 }}>
-            <div><label style={lbl}>Date</label><input type="date" value={feedDate} onChange={e => setFeedDate(e.target.value)} style={inp} /></div>
-            <div><label style={lbl}>Feed type</label><input value={feedType} onChange={e => setFeedType(e.target.value)} placeholder="e.g. Broiler starter" style={inp} /></div>
-            <div><label style={lbl}>Quantity (kg)</label><input type="number" min={0} step="0.1" value={quantityKg} onChange={e => setQuantityKg(e.target.value)} style={inp} /></div>
-            <div><label style={lbl}>Cost/kg (R)</label><input type="number" min={0} step="0.01" value={costPerKg} onChange={e => setCostPerKg(e.target.value)} style={inp} /></div>
-            <div><label style={lbl}>Inventory item ID</label><input value={inventoryItemId} onChange={e => setInventoryItemId(e.target.value)} placeholder="optional UUID" style={inp} /></div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))", gap: 8, marginBottom: 8 }}>
+            <Field label="Date"><input type="date" value={feedDate} onChange={e => setFeedDate(e.target.value)} style={inp} /></Field>
+            <div style={{ gridColumn: "1 / -1" }}>
+              <Field label="From stock (optional)">
+                <select value={inventoryItemId} onChange={e => pickItem(e.target.value)} style={inp} disabled={stockLoading}>
+                  <option value="">{stockLoading ? "Loading stock…" : "Not from stock (type the feed below)"}</option>
+                  {choices.map(c => <option key={c.id} value={c.id} disabled={c.disabled}>{c.label}</option>)}
+                </select>
+              </Field>
+            </div>
+            <><Field label="Feed type"><input list="ag-feed-options" value={feedType} onChange={e => setFeedType(e.target.value)} placeholder="e.g. Broiler starter" style={inp} /></Field><datalist id="ag-feed-options">{feedSuggestions(speciesName).map(f => <option key={f} value={f} />)}</datalist></>
+            <Field label="Quantity (kg)"><input type="number" min={0} step="0.1" value={quantityKg} onChange={e => setQuantityKg(e.target.value)} style={inp} /></Field>
+            <Field label="Cost/kg (R)"><input type="number" min={0} step="0.01" value={costPerKg} onChange={e => setCostPerKg(e.target.value)} placeholder={chosen ? "from stock cost" : ""} style={inp} /></Field>
           </div>
+          {stockProblem && <p role="alert" style={{ fontSize: 12.5, color: "var(--hf-danger-text)", margin: "0 0 8px" }}>{stockProblem}</p>}
           <div style={{ display: "flex", gap: 8 }}>
-            <button disabled={createMut.isPending || !feedType.trim() || !quantityKg} onClick={() => createMut.mutate()}
-              style={{ ...btnPrimary, opacity: createMut.isPending || !feedType.trim() || !quantityKg ? 0.6 : 1 }}>{createMut.isPending ? "Saving…" : "Save"}</button>
+            <button disabled={createMut.isPending || !feedType.trim() || !quantityKg || !!stockProblem} onClick={() => createMut.mutate()}
+              style={{ ...btnPrimary, opacity: createMut.isPending || !feedType.trim() || !quantityKg || stockProblem ? 0.6 : 1 }}>{createMut.isPending ? "Saving…" : "Save"}</button>
             <button onClick={() => setShowCreate(false)} style={btnGhost}>Cancel</button>
           </div>
         </div>
       )}
 
-      {isLoading ? <p style={{ color: "var(--hf-text-faint)", fontSize: 12.5 }}>Loading…</p> :
+      {isLoading ? <p style={{ color: "var(--hf-text-faint)", fontSize: 12.5 }}>Loading…</p> : isError ? <QueryError onRetry={() => void refetch()} /> :
         records.length === 0 ? <p style={{ color: "var(--hf-text-faint)", fontSize: 12.5 }}>No feed records yet.</p> : (
         <div style={{ border: "1px solid var(--hf-border)", borderRadius: 10, overflow: "hidden" }}>
           {records.map((r, i) => (
@@ -92,11 +124,9 @@ export default function AgFeedRecordsTab({ targetType, targetId }: { targetType:
           ))}
         </div>
       )}
+      {total > PAGE_SIZE && <p style={{ fontSize: 12, color: "var(--hf-text-muted)", margin: "10px 0 0" }}>{rangeLabel(page, total, "feed record")}</p>}
+      <AgPager page={page} total={total} size={PAGE_SIZE} onPage={setPage} />
     </div>
   )
 }
 
-const lbl: React.CSSProperties = { fontSize: 10.5, fontWeight: 600, color: "var(--hf-text-secondary)", marginBottom: 3, display: "block" }
-const inp: React.CSSProperties = { width: "100%", padding: "7px 9px", border: "1px solid var(--hf-border)", borderRadius: 6, fontSize: 12, boxSizing: "border-box" }
-const btnPrimary: React.CSSProperties = { display: "inline-flex", alignItems: "center", padding: "7px 12px", borderRadius: 7, border: "none", background: AG_ACCENT, color: "var(--hf-text-on-solid)", fontSize: 12, fontWeight: 700, cursor: "pointer" }
-const btnGhost: React.CSSProperties = { padding: "7px 12px", borderRadius: 7, border: "1px solid var(--hf-border)", background: "var(--hf-surface)", color: "var(--hf-text-muted)", fontSize: 12, fontWeight: 600, cursor: "pointer" }

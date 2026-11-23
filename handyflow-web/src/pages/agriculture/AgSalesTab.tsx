@@ -3,6 +3,7 @@
 // Sales attributed to production (ADR-001, W2) for one farm. Agriculture does not own sales: an invoice line stays in Invoicing and the
 // revenue shown here is computed live from it (ex-VAT, net of credit notes, only while the invoice is issued). Needs AGRICULTURE_FINANCE and
 // INVOICE_READ, because it shows invoice data. Costs, margin and the combined profitability view come later (W5).
+import { truncationNote } from "./agPaging.logic"
 import { useState } from "react"
 import { Plus, Lock } from "lucide-react"
 import { usePermission } from "../../hooks/usePermission"
@@ -14,6 +15,7 @@ import { useTargetOptions } from "./agTargets"
 import AgSaleAllocator from "./AgSaleAllocator"
 import { Empty, Field } from "./agCropsUi"
 import { btnDanger, btnGhost, btnPrimary, card, fmtDate, fmtMoney, inp, kpiLabel, kpiValue, panel, statusBadge } from "./constants"
+import { QueryError } from "./agUi"
 
 function SalesBody({ farmId }: { farmId: string }) {
   const [type, setType] = useState<TargetType | "">("")
@@ -74,7 +76,7 @@ function SalesBody({ farmId }: { farmId: string }) {
       )}
 
       {allocations.isLoading ? <Empty>Loading sales…</Empty> : allocations.isError ? (
-        <p role="alert" style={{ fontSize: 13, color: "var(--hf-danger-text)" }}>We couldn't load sales. <button type="button" onClick={() => allocations.refetch()} style={{ background: "none", border: "none", textDecoration: "underline", cursor: "pointer", color: "inherit", fontWeight: 700 }}>Try again</button></p>
+        <QueryError onRetry={() => void allocations.refetch()} what="sales" />
       ) : rows.length === 0 ? <Empty>{filter ? "No sales are attributed to this yet." : "No sales attributed to production yet. Use Allocate a sale to link an issued invoice line to a crop cycle, group or animal."}</Empty> : (
         <div style={{ overflowX: "auto" }}>
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12.5 }}>
@@ -98,6 +100,7 @@ function SalesBody({ farmId }: { farmId: string }) {
               ))}
             </tbody>
           </table>
+          {truncationNote(rows.length, allocations.data?.totalElements ?? 0, "sales") && <p style={{ fontSize: 11.5, color: "var(--hf-text-faint)", margin: "8px 10px" }}>{truncationNote(rows.length, allocations.data?.totalElements ?? 0, "sales")}</p>}
         </div>
       )}
     </div>

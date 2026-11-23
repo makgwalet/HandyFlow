@@ -9,6 +9,7 @@ import { Tractor } from "lucide-react"
 import { useActiveFarms } from "./agCrops.api"
 import type { FarmResponse } from "./AgFarmsTab"
 import { AG_ACCENT_TEXT, inp, lbl } from "./constants"
+import { QueryError } from "./agUi"
 
 export default function AgFarmScope({ children }: { children: (farm: FarmResponse) => ReactNode }) {
   const { data: farms, isLoading, isError, refetch } = useActiveFarms()
@@ -17,9 +18,7 @@ export default function AgFarmScope({ children }: { children: (farm: FarmRespons
   if (isLoading) return <p style={{ fontSize: 13, color: "var(--hf-text-faint)" }}>Loading farms…</p>
   if (isError) {
     return (
-      <div role="alert" style={{ fontSize: 13, color: "var(--hf-danger-text)" }}>
-        We couldn't load your farms. <button type="button" onClick={() => refetch()} style={{ background: "none", border: "none", textDecoration: "underline", cursor: "pointer", color: "inherit", fontWeight: 700 }}>Try again</button>
-      </div>
+      <QueryError onRetry={() => void refetch()} what="your farms" />
     )
   }
   if (!farms || farms.length === 0) {

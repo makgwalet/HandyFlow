@@ -248,6 +248,31 @@ public class EvidenceService implements EvidenceFacade {
 
     @Override
     @Transactional
+    public DownloadedEvidence downloadScoped(TenantId tenantId, String sourceModule, String relatedEntityType, UUID evidenceId) {
+        return read(tenantId, scoped(tenantId, sourceModule, relatedEntityType, evidenceId));
+    }
+
+    @Override
+    @Transactional
+    public void detachScoped(TenantId tenantId, String sourceModule, String relatedEntityType, UUID evidenceId) {
+        Evidence evidence = scoped(tenantId, sourceModule, relatedEntityType, evidenceId);
+        evidence.detach();
+        evidenceRepo.save(evidence);
+        trail.record(tenantId, "EVIDENCE_DETACHED", "EVIDENCE", evidenceId, java.util.Map.of("status", "ACTIVE"), java.util.Map.of("status", "DETACHED"));
+        log.info("Evidence detached={} source={} tenant={}", evidenceId, sourceModule, tenantId.getValue());
+    }
+
+    /** The active, non-restricted file, only if this module attached it to this kind of record. Anything else is "not found". */
+    private Evidence scoped(TenantId tenantId, String sourceModule, String relatedEntityType, UUID evidenceId) {
+        if (EvidenceFacade.isRestricted(sourceModule))
+            throw new IllegalArgumentException("Restricted evidence is reached through the restricted methods.");
+        return evidenceRepo.findByTenantAndId(tenantId.getValue(), evidenceId)
+                .filter(e -> EvidenceScope.matches(e.getStatus(), e.getSourceModule(), e.getRelatedEntityType(), sourceModule, relatedEntityType))
+                .orElseThrow(() -> new ResourceNotFoundException("Evidence", evidenceId.toString()));
+    }
+
+    @Override
+    @Transactional
     public void detach(TenantId tenantId, UUID evidenceId) {
         Evidence evidence = evidenceRepo.findByTenantAndId(tenantId.getValue(), evidenceId)
                 .filter(e -> !EvidenceFacade.isRestricted(e.getSourceModule()))

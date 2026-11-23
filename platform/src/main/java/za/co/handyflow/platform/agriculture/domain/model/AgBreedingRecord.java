@@ -1,9 +1,11 @@
 package za.co.handyflow.platform.agriculture.domain.model;
 
+import za.co.handyflow.platform.agriculture.domain.rules.AgDates;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import za.co.handyflow.platform.agriculture.domain.rules.AgBreedingRules;
 import za.co.handyflow.platform.shared.TenantId;
 
 import java.time.Instant;
@@ -40,7 +42,7 @@ public class AgBreedingRecord {
     @Column(name = "group_id")
     private UUID groupId;
 
-    /** NATURAL | AI (artificial insemination) */
+    /** NATURAL | AI (artificial insemination) | EMBRYO_TRANSFER */
     @Column(name = "breeding_type", nullable = false)
     private String breedingType;
 
@@ -62,10 +64,14 @@ public class AgBreedingRecord {
     private LocalDate actualBirthDate;
 
     @Column(nullable = false)
-    private String outcome = "PENDING"; // PENDING | CONFIRMED_PREGNANT | NOT_PREGNANT | BIRTHED | ABORTED | FAILED
+    private String outcome = "PENDING"; // PENDING | CONFIRMED_PREGNANT | NOT_PREGNANT | BIRTHED | STILLBORN | ABORTED | FAILED (see AgBreedingRules)
 
+    /** Born alive. (Before stillbirths were tracked separately this held the total born.) */
     @Column(name = "offspring_count")
     private Integer offspringCount;
+
+    @Column(name = "stillborn_count")
+    private Integer stillbornCount;
 
     @Column(columnDefinition = "TEXT")
     private String notes;
@@ -84,14 +90,14 @@ public class AgBreedingRecord {
                                            LocalDate expectedDueDate, String notes) {
         if (tenantId == null) throw new IllegalArgumentException("tenantId is required");
         AgTrackingTarget.requireExactlyOne(animalId, groupId);
-        if (breedingType == null || breedingType.isBlank()) throw new IllegalArgumentException("breedingType is required");
-        if (matingDate == null) throw new IllegalArgumentException("matingDate is required");
+        String type = AgBreedingRules.normaliseType(breedingType);
+        AgBreedingRules.requireMatingDates(matingDate, expectedDueDate, AgDates.today());
 
         AgBreedingRecord b = new AgBreedingRecord();
         b.tenantId = tenantId;
         b.animalId = animalId;
         b.groupId = groupId;
-        b.breedingType = breedingType;
+        b.breedingType = type;
         b.matingDate = matingDate;
         b.sireId = sireId;
         b.sireDescription = sireDescription;
@@ -103,22 +109,36 @@ public class AgBreedingRecord {
     }
 
     public void confirmPregnant(LocalDate expectedDueDate) {
-        this.outcome = "CONFIRMED_PREGNANT";
-        if (expectedDueDate != null) this.expectedDueDate = expectedDueDate;
+        AgBreedingRules.requireTransition(outcome, AgBreedingRules.CONFIRMED_PREGNANT);
+        if (expectedDueDate != null) {
+            AgBreedingRules.requireMatingDates(matingDate, expectedDueDate, AgDates.today());
+            this.expectedDueDate = expectedDueDate;
+        }
+        this.outcome = AgBreedingRules.CONFIRMED_PREGNANT;
     }
 
-    public void markNotPregnant() { this.outcome = "NOT_PREGNANT"; }
+    public void markNotPregnant() { moveTo(AgBreedingRules.NOT_PREGNANT); }
 
-    public void recordBirth(LocalDate actualBirthDate, Integer offspringCount) {
-        if (actualBirthDate == null) throw new IllegalArgumentException("actualBirthDate is required");
-        this.outcome = "BIRTHED";
+    /** live and stillborn may be null (zero); at least one animal must have been born. */
+    public void recordBirth(LocalDate actualBirthDate, Integer live, Integer stillborn) {
+        int[] counts = AgBreedingRules.requireBirthCounts(live, stillborn);
+        String next = AgBreedingRules.outcomeForBirth(counts[0]);
+        AgBreedingRules.requireTransition(outcome, next);
+        AgBreedingRules.requireBirthDate(matingDate, actualBirthDate, AgDates.today());
+        this.outcome = next;
         this.actualBirthDate = actualBirthDate;
-        this.offspringCount = offspringCount;
+        this.offspringCount = counts[0];
+        this.stillbornCount = counts[1];
     }
 
-    public void markAborted() { this.outcome = "ABORTED"; }
+    public void markAborted() { moveTo(AgBreedingRules.ABORTED); }
 
-    public void markFailed() { this.outcome = "FAILED"; }
+    public void markFailed() { moveTo(AgBreedingRules.FAILED); }
+
+    private void moveTo(String next) {
+        AgBreedingRules.requireTransition(outcome, next);
+        this.outcome = next;
+    }
 
     public boolean isForAnimal() { return animalId != null; }
 

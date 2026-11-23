@@ -9,6 +9,7 @@ import { agKeys, api, useAgMutation, useScouting } from "./agCrops.api"
 import { canLog, todayISO } from "./agCrops.logic"
 import type { CropCycle, ScoutingRecord } from "./agCrops.types"
 import { Empty, Field, Th, Warn } from "./agCropsUi"
+import { QueryError } from "./agUi"
 import { btnGhost, btnPrimary, fmtDate, grid, inp, panel, statusBadge, td, theadStyle } from "./constants"
 
 // observationType is free text on the server (VARCHAR 30); this is the vocabulary the screens offer
@@ -52,7 +53,7 @@ function ScoutingForm({ cycle, onDone }: { cycle: CropCycle; onDone: () => void 
 export default function AgCropScoutingTab({ cycle }: { cycle: CropCycle }) {
   const canManage = usePermission("AGRICULTURE_MANAGE")
   const [adding, setAdding] = useState(false)
-  const { data: records = [], isLoading } = useScouting(cycle.id)
+  const { data: records = [], isLoading, isError, refetch } = useScouting(cycle.id)
   const keys = [agKeys.scouting(cycle.id)]
   const resolve = useAgMutation((id: string) => api.patch(`/scouting-records/${id}/resolve`), { invalidate: keys, success: "Marked resolved", failure: "Couldn't resolve that record." })
   const reopen = useAgMutation((id: string) => api.patch(`/scouting-records/${id}/reopen`), { invalidate: keys, success: "Reopened", failure: "Couldn't reopen that record." })
@@ -77,7 +78,7 @@ export default function AgCropScoutingTab({ cycle }: { cycle: CropCycle }) {
         {records.length > 0 && <span style={{ fontSize: 12, color: "var(--hf-text-muted)" }}>{open} open · {records.length - open} resolved</span>}
       </div>
       {adding && <ScoutingForm cycle={cycle} onDone={() => setAdding(false)} />}
-      {isLoading ? <Empty>Loading scouting records…</Empty> : records.length === 0 ? <Empty>No scouting recorded for this cycle yet.</Empty> : (
+      {isLoading ? <Empty>Loading scouting records…</Empty> : isError ? <QueryError onRetry={() => void refetch()} what="the scouting records" /> : records.length === 0 ? <Empty>No scouting recorded for this cycle yet.</Empty> : (
         <div style={{ overflowX: "auto" }}>
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12.5 }}>
             <thead><tr style={theadStyle}>{["Date", "Observation", "Severity", "Details", "Follow-up", "Status", ""].map((h, i) => <Th key={i}>{h}</Th>)}</tr></thead>

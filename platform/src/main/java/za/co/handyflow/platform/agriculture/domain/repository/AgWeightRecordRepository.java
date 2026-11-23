@@ -15,9 +15,9 @@ public interface AgWeightRecordRepository extends JpaRepository<AgWeightRecord, 
     @Query("SELECT w FROM AgWeightRecord w WHERE w.tenantId = :tenantId AND w.id = :id")
     Optional<AgWeightRecord> findByTenantAndId(TenantId tenantId, UUID id);
 
-    @Query("SELECT w FROM AgWeightRecord w WHERE w.tenantId = :tenantId AND w.animalId = :animalId ORDER BY w.recordedDate DESC")
+    @Query("SELECT w FROM AgWeightRecord w WHERE w.tenantId = :tenantId AND w.animalId = :animalId ORDER BY w.recordedDate DESC, w.id DESC")
     Page<AgWeightRecord> findByAnimal(TenantId tenantId, UUID animalId, Pageable pageable);
 
-    @Query("SELECT w FROM AgWeightRecord w WHERE w.tenantId = :tenantId AND w.groupId = :groupId ORDER BY w.recordedDate DESC")
+    @Query("SELECT w FROM AgWeightRecord w WHERE w.tenantId = :tenantId AND w.groupId = :groupId ORDER BY w.recordedDate DESC, w.id DESC")
     Page<AgWeightRecord> findByGroup(TenantId tenantId, UUID groupId, Pageable pageable);
 }

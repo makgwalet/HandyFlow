@@ -61,6 +61,15 @@ public class AgCropTypeController {
                 cropTypeService.createCropType(TenantContext.getTenantIdAsObject(), request)));
     }
 
+    @PostMapping("/defaults")
+    @PreAuthorize("hasAuthority('AGRICULTURE_MANAGE')")
+    @Operation(summary = "Add the standard crop type list; crop types the tenant already has are left alone")
+    public ResponseEntity<ApiResponse<za.co.handyflow.platform.agriculture.dto.SeedDefaultsResponse>> addStandardCropTypes() {
+        featureGuard.requireModule("agriculture");
+        return ResponseEntity.ok(ApiResponse.success("Standard crop types added",
+                cropTypeService.addStandardCropTypes(TenantContext.getTenantIdAsObject())));
+    }
+
     @PutMapping("/{id}")
     @PreAuthorize("hasAuthority('AGRICULTURE_MANAGE')")
     public ResponseEntity<ApiResponse<CropTypeResponse>> updateCropType(

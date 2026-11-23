@@ -16,6 +16,7 @@ public record BreedingRecordResponse(
         LocalDate actualBirthDate,
         String outcome,
         Integer offspringCount,
+        Integer stillbornCount,
         String notes,
         Instant createdAt,
         Instant updatedAt

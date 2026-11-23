@@ -18,7 +18,7 @@ public interface AgStockMovementRepository extends JpaRepository<AgStockMovement
     @Query("SELECT m FROM AgStockMovement m WHERE m.tenantId = :tenantId AND m.id = :id")
     Optional<AgStockMovement> findByTenantAndId(TenantId tenantId, UUID id);
 
-    @Query("SELECT m FROM AgStockMovement m WHERE m.tenantId = :tenantId AND m.inventoryItemId = :inventoryItemId ORDER BY m.movementDate DESC")
+    @Query("SELECT m FROM AgStockMovement m WHERE m.tenantId = :tenantId AND m.inventoryItemId = :inventoryItemId ORDER BY m.movementDate DESC, m.id DESC")
     Page<AgStockMovement> findByInventoryItem(TenantId tenantId, UUID inventoryItemId, Pageable pageable);
 
     // Backs AgCostReportingService's seed-cost figure — AgCropCycle has no
