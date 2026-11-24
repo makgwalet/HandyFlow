@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { describe, it, expect, beforeEach } from 'vitest'
 import { needsAttention, attentionList, bannerText, errorMessage, readSoundPref, writeSoundPref, SOUND_KEY } from './alarmLogic'
 

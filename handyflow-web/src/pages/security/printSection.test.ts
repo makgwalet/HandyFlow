@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { afterEach, describe, it, expect, vi } from "vitest"
 import { printCss, printSection } from "./printSection"
 
