@@ -7,6 +7,8 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.mock.web.MockMultipartFile;
+import za.co.handyflow.platform.complianceservices.domain.model.ClientComplianceRegistration;
+import za.co.handyflow.platform.complianceservices.domain.repository.ClientComplianceRegistrationRepository;
 import za.co.handyflow.platform.complianceservices.domain.model.ComplianceClient;
 import za.co.handyflow.platform.complianceservices.domain.repository.ClientComplianceDocumentRepository;
 import za.co.handyflow.platform.complianceservices.domain.repository.ComplianceClientRepository;
@@ -39,10 +41,11 @@ class ClientComplianceDocumentServiceTest {
 
     @Mock private ClientComplianceDocumentRepository documentRepository;
     @Mock private ComplianceClientRepository clientRepository;
+    @Mock private ClientComplianceRegistrationRepository registrationRepository;
     @Mock private EvidenceFacade evidenceFacade;
 
     private ClientComplianceDocumentService service() {
-        return new ClientComplianceDocumentService(documentRepository, clientRepository, evidenceFacade);
+        return new ClientComplianceDocumentService(documentRepository, clientRepository, registrationRepository, evidenceFacade);
     }
 
     private static final TenantId TENANT = TenantId.generate();
@@ -59,6 +62,39 @@ class ClientComplianceDocumentServiceTest {
         assertThatThrownBy(() -> service().upload(TENANT, clientId, null, "Tax Clearance Certificate",
                 null, null, file, USER, "Jane Doe"))
                 .isInstanceOf(ResourceNotFoundException.class);
+    }
+
+    @Test
+    @DisplayName("upload() rejects a registration that belongs to a different client, and attaches nothing")
+    void upload_registrationOfAnotherClient_rejects() {
+        UUID clientId = UUID.randomUUID();
+        UUID otherClient = UUID.randomUUID();
+        ComplianceClient client = ComplianceClient.create(TENANT, "Acme Construction", null, null, null, null, USER);
+        ClientComplianceRegistration foreign = ClientComplianceRegistration.create(TENANT, otherClient, "CIPC", "Business Registration", "1", null, null, null, USER);
+        when(clientRepository.findByIdForTenant(TENANT, clientId)).thenReturn(Optional.of(client));
+        when(registrationRepository.findByIdForTenant(TENANT, foreign.getId())).thenReturn(Optional.of(foreign));
+
+        MockMultipartFile file = new MockMultipartFile("file", "cert.pdf", "application/pdf", new byte[]{1, 2, 3});
+
+        assertThatThrownBy(() -> service().upload(TENANT, clientId, foreign.getId(), "Tax Clearance Certificate", null, null, file, USER, "Jane Doe"))
+                .isInstanceOf(ResourceNotFoundException.class);
+        org.mockito.Mockito.verifyNoInteractions(evidenceFacade);
+    }
+
+    @Test
+    @DisplayName("upload() rejects a registration id that does not exist in this tenant")
+    void upload_unknownRegistration_rejects() {
+        UUID clientId = UUID.randomUUID();
+        UUID regId = UUID.randomUUID();
+        ComplianceClient client = ComplianceClient.create(TENANT, "Acme Construction", null, null, null, null, USER);
+        when(clientRepository.findByIdForTenant(TENANT, clientId)).thenReturn(Optional.of(client));
+        when(registrationRepository.findByIdForTenant(TENANT, regId)).thenReturn(Optional.empty());
+
+        MockMultipartFile file = new MockMultipartFile("file", "cert.pdf", "application/pdf", new byte[]{1, 2, 3});
+
+        assertThatThrownBy(() -> service().upload(TENANT, clientId, regId, "Tax Clearance Certificate", null, null, file, USER, "Jane Doe"))
+                .isInstanceOf(ResourceNotFoundException.class);
+        org.mockito.Mockito.verifyNoInteractions(evidenceFacade);
     }
 
     @Test

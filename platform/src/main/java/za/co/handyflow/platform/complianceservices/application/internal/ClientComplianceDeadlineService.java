@@ -6,6 +6,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import za.co.handyflow.platform.complianceservices.domain.model.ClientComplianceDeadline;
 import za.co.handyflow.platform.complianceservices.domain.repository.ClientComplianceDeadlineRepository;
+import za.co.handyflow.platform.complianceservices.domain.repository.ClientComplianceRegistrationRepository;
 import za.co.handyflow.platform.complianceservices.domain.repository.ComplianceClientRepository;
 import za.co.handyflow.platform.complianceservices.dto.ClientComplianceDeadlineResponse;
 import za.co.handyflow.platform.complianceservices.dto.CreateClientComplianceDeadlineRequest;
@@ -25,6 +26,7 @@ public class ClientComplianceDeadlineService {
 
     private final ClientComplianceDeadlineRepository deadlineRepository;
     private final ComplianceClientRepository clientRepository;
+    private final ClientComplianceRegistrationRepository registrationRepository;
 
     @Transactional(readOnly = true)
     public List<ClientComplianceDeadlineResponse> getPendingDeadlines(TenantId tenantId, UUID clientId) {
@@ -36,6 +38,7 @@ public class ClientComplianceDeadlineService {
     public ClientComplianceDeadlineResponse create(TenantId tenantId, UUID clientId,
                                                     CreateClientComplianceDeadlineRequest req, UUID createdBy) {
         requireClient(tenantId, clientId);
+        requireRegistrationOf(tenantId, clientId, req.registrationId());
         ClientComplianceDeadline deadline = ClientComplianceDeadline.create(tenantId, clientId, req.registrationId(),
                 req.deadlineType(), req.description(), req.dueDate(), createdBy);
         deadlineRepository.save(deadline);
@@ -56,6 +59,17 @@ public class ClientComplianceDeadlineService {
     public void delete(TenantId tenantId, UUID id) {
         deadlineRepository.delete(find(tenantId, id));
         log.info("Client compliance deadline deleted id={} tenant={}", id, tenantId);
+    }
+
+    /**
+     * A registration named on a document or deadline must be one of THIS client's, in this tenant. Without the check, a user could attach a record to another client's
+     * registration by passing its id, and the client's own screens would then show (or hide) it wrongly.
+     */
+    private void requireRegistrationOf(TenantId tenantId, UUID clientId, UUID registrationId) {
+        if (registrationId == null) return;
+        boolean ok = registrationRepository.findByIdForTenant(tenantId, registrationId)
+                .map(r -> clientId.equals(r.getClientId())).orElse(false);
+        if (!ok) throw new ResourceNotFoundException("ClientComplianceRegistration", registrationId.toString());
     }
 
     private void requireClient(TenantId tenantId, UUID clientId) {

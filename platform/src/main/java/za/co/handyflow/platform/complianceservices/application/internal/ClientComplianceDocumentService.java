@@ -7,6 +7,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 import za.co.handyflow.platform.complianceservices.domain.model.ClientComplianceDocument;
 import za.co.handyflow.platform.complianceservices.domain.repository.ClientComplianceDocumentRepository;
+import za.co.handyflow.platform.complianceservices.domain.repository.ClientComplianceRegistrationRepository;
 import za.co.handyflow.platform.complianceservices.domain.repository.ComplianceClientRepository;
 import za.co.handyflow.platform.complianceservices.dto.ClientComplianceDocumentResponse;
 import za.co.handyflow.platform.evidence.application.EvidenceFacade;
@@ -32,6 +33,7 @@ public class ClientComplianceDocumentService {
 
     private final ClientComplianceDocumentRepository documentRepository;
     private final ComplianceClientRepository clientRepository;
+    private final ClientComplianceRegistrationRepository registrationRepository;
     private final EvidenceFacade evidenceFacade;
 
     @Transactional
@@ -39,6 +41,7 @@ public class ClientComplianceDocumentService {
                                                     String documentType, LocalDate issueDate, LocalDate expiryDate,
                                                     MultipartFile file, UUID uploadedBy, String uploadedByName) {
         requireClient(tenantId, clientId);
+        requireRegistrationOf(tenantId, clientId, registrationId);
 
         UUID documentId = UUID.randomUUID();
         var evidence = evidenceFacade.attach(tenantId, file, documentType, "complianceservices",
@@ -78,6 +81,17 @@ public class ClientComplianceDocumentService {
     private void requireClient(TenantId tenantId, UUID clientId) {
         if (clientRepository.findByIdForTenant(tenantId, clientId).isEmpty())
             throw new ResourceNotFoundException("ComplianceClient", clientId.toString());
+    }
+
+    /**
+     * A registration named on a document or deadline must be one of THIS client's, in this tenant. Without the check, a user could attach a record to another client's
+     * registration by passing its id, and the client's own screens would then show (or hide) it wrongly.
+     */
+    private void requireRegistrationOf(TenantId tenantId, UUID clientId, UUID registrationId) {
+        if (registrationId == null) return;
+        boolean ok = registrationRepository.findByIdForTenant(tenantId, registrationId)
+                .map(r -> clientId.equals(r.getClientId())).orElse(false);
+        if (!ok) throw new ResourceNotFoundException("ClientComplianceRegistration", registrationId.toString());
     }
 
     private ClientComplianceDocument find(TenantId tenantId, UUID id) {
