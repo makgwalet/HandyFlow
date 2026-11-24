@@ -22,4 +22,7 @@ public interface ComplianceClientRepository extends JpaRepository<ComplianceClie
 
     @Query("SELECT c FROM ComplianceClient c WHERE c.tenantId.value = :#{#tenantId.value} AND c.crmCustomerId = :crmCustomerId")
     Optional<ComplianceClient> findByCrmCustomerId(@Param("tenantId") TenantId tenantId, @Param("crmCustomerId") UUID crmCustomerId);
+
+    @Query("SELECT c FROM ComplianceClient c WHERE c.tenantId.value = :#{#tenantId.value} AND c.registrationNumber = :registrationNumber")
+    Optional<ComplianceClient> findByRegistrationNumber(@Param("tenantId") TenantId tenantId, @Param("registrationNumber") String registrationNumber);
 }

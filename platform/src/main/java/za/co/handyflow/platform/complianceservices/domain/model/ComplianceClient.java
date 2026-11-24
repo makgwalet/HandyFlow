@@ -59,6 +59,44 @@ public class ComplianceClient {
     @Column(nullable = false)
     private String status = "ACTIVE"; // ACTIVE, INACTIVE
 
+    @Column(name = "legal_name")
+    private String legalName;
+
+    @Column(name = "trading_name")
+    private String tradingName;
+
+    @Column(name = "registration_number")
+    private String registrationNumber;
+
+    @Column(name = "entity_type")
+    private String entityType;
+
+    @Column(name = "tax_number")
+    private String taxNumber;
+
+    @Column(name = "vat_number")
+    private String vatNumber;
+
+    @Column(name = "registered_address", columnDefinition = "TEXT")
+    private String registeredAddress;
+
+    @Column(name = "postal_address", columnDefinition = "TEXT")
+    private String postalAddress;
+
+    private String industry;
+
+    @Column(name = "employee_count")
+    private Integer employeeCount;
+
+    @Column(name = "turnover_band")
+    private String turnoverBand;
+
+    @Column(name = "risk_rating")
+    private String riskRating;
+
+    @Column(name = "onboarding_status", nullable = false)
+    private String onboardingStatus = "NOT_STARTED";
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
@@ -99,6 +137,60 @@ public class ComplianceClient {
         this.mandateNotes = mandateNotes;
         this.updatedAt = Instant.now();
         this.updatedBy = updatedBy;
+    }
+
+    /** The values for the profile fields, already in the shape the screen sends them. */
+    public record Profile(String legalName, String tradingName, String registrationNumber, String entityType,
+                          String taxNumber, String vatNumber, String registeredAddress, String postalAddress,
+                          String industry, Integer employeeCount, String turnoverBand, String riskRating,
+                          String onboardingStatus) {}
+
+    /**
+     * Sets the profile and returns the names of the tracked facts that changed, so the caller can
+     * restart the source record for exactly those.
+     */
+    public java.util.List<String> updateProfile(Profile p, UUID updatedBy) {
+        String legal = ClientProfileRules.clean(p.legalName(), 255);
+        String reg = ClientProfileRules.registrationNumber(p.registrationNumber());
+        String type = ClientProfileRules.requireOneOf("entityType", p.entityType(), ClientProfileRules.ENTITY_TYPES);
+        String tax = ClientProfileRules.taxNumber(p.taxNumber());
+        String vat = ClientProfileRules.vatNumber(p.vatNumber());
+        String regAddr = ClientProfileRules.clean(p.registeredAddress(), 1000);
+        String industry = ClientProfileRules.clean(p.industry(), 120);
+        Integer emp = ClientProfileRules.employeeCount(p.employeeCount());
+        String band = ClientProfileRules.requireOneOf("turnoverBand", p.turnoverBand(), ClientProfileRules.TURNOVER_BANDS);
+        String risk = ClientProfileRules.requireOneOf("riskRating", p.riskRating(), ClientProfileRules.RISK_RATINGS);
+        String onboarding = p.onboardingStatus() == null || p.onboardingStatus().isBlank() ? this.onboardingStatus
+                : ClientProfileRules.requireOneOf("onboardingStatus", p.onboardingStatus(),
+                        java.util.Set.copyOf(ClientProfileRules.ONBOARDING_STATUSES));
+
+        java.util.List<String> changed = new java.util.ArrayList<>();
+        if (!java.util.Objects.equals(legal, legalName)) changed.add("legalName");
+        if (!java.util.Objects.equals(reg, registrationNumber)) changed.add("registrationNumber");
+        if (!java.util.Objects.equals(type, entityType)) changed.add("entityType");
+        if (!java.util.Objects.equals(tax, taxNumber)) changed.add("taxNumber");
+        if (!java.util.Objects.equals(vat, vatNumber)) changed.add("vatNumber");
+        if (!java.util.Objects.equals(regAddr, registeredAddress)) changed.add("registeredAddress");
+        if (!java.util.Objects.equals(industry, this.industry)) changed.add("industry");
+        if (!java.util.Objects.equals(emp, employeeCount)) changed.add("employeeCount");
+        if (!java.util.Objects.equals(band, turnoverBand)) changed.add("turnoverBand");
+
+        this.legalName = legal;
+        this.tradingName = ClientProfileRules.clean(p.tradingName(), 255);
+        this.registrationNumber = reg;
+        this.entityType = type;
+        this.taxNumber = tax;
+        this.vatNumber = vat;
+        this.registeredAddress = regAddr;
+        this.postalAddress = ClientProfileRules.clean(p.postalAddress(), 1000);
+        this.industry = industry;
+        this.employeeCount = emp;
+        this.turnoverBand = band;
+        this.riskRating = risk;
+        this.onboardingStatus = onboarding;
+        this.updatedAt = Instant.now();
+        this.updatedBy = updatedBy;
+        return changed;
     }
 
     public void deactivate(UUID updatedBy) {
