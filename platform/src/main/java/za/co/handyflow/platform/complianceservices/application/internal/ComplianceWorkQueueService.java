@@ -25,6 +25,7 @@ public class ComplianceWorkQueueService {
     private final ComplianceObligationRepository obligations;
     private final ComplianceObligationVersionRepository versions;
     private final ComplianceAssessmentRepository assessments;
+    private final ComplianceCaseRepository cases;
 
     @Transactional(readOnly = true)
     public WorkQueueResponse queue(TenantId tenantId, boolean admin, LocalDate today) {
@@ -56,6 +57,10 @@ public class ComplianceWorkQueueService {
         for (ComplianceAssessment a : assessments.findDraftsForTenant(tenantId)) {
             if (!names.containsKey(a.getClientId())) continue;
             items.add(WorkQueueRules.assessmentOpen(today, a.getClientId(), names.get(a.getClientId()), a.getStartedAt()));
+        }
+        for (ComplianceCase c : cases.findLiveForTenant(tenantId)) {
+            if (!names.containsKey(c.getClientId())) continue;
+            items.add(WorkQueueRules.caseItem(today, c.getClientId(), names.get(c.getClientId()), c.getTitle(), c.getStatus(), c.getSeverity(), c.getDueDate()));
         }
 
         List<WorkQueueRules.Item> ordered = WorkQueueRules.order(WorkQueueRules.visibleTo(items.stream().filter(Objects::nonNull).toList(), admin));

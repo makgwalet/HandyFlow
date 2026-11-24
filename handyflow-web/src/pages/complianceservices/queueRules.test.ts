@@ -29,6 +29,7 @@ describe("filterItems", () => {
 describe("labels", () => {
   it("names types and severities and falls back to the raw value", () => {
     expect(typeLabel("APPROVAL")).toBe("Approvals")
+    expect(typeLabel("CASE")).toBe("Cases")
     expect(typeLabel("NEW")).toBe("NEW")
     expect(severityLabel("HIGH")).toBe("Urgent")
   })

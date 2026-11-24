@@ -6,7 +6,7 @@ export type QueueItem = {
 
 export const TYPE_LABELS: Record<string, string> = {
   DEADLINE: "Deadlines", DOCUMENT_REVIEW: "Documents to review", DOCUMENT_EXPIRY: "Documents expiring",
-  APPROVAL: "Approvals", CATALOGUE_REVIEW: "Catalogue reviews", ASSESSMENT: "Assessments open",
+  APPROVAL: "Approvals", CATALOGUE_REVIEW: "Catalogue reviews", ASSESSMENT: "Assessments open", CASE: "Cases",
 }
 export const typeLabel = (t: string) => TYPE_LABELS[t] ?? t
 

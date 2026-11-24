@@ -92,4 +92,19 @@ describe('ClientAssessmentsTab', () => {
     renderIt()
     expect(await screen.findByText('CIPC-AR: Compliant → Evidence expired (Certificate expired)')).toBeTruthy()
   })
+
+  it('offers to open a case for a problem item only, and posts the assessment and obligation', async () => {
+    get.mockImplementation(async (url: string) => {
+      if (url.endsWith('/assessment-weights')) return { data: { data: { low: 1, medium: 2, high: 4, critical: 8, isDefault: true } } }
+      if (url.endsWith('/assessments')) return { data: { data: summaries } }
+      return { data: { data: assessment({ items: [item({ status: 'NON_COMPLIANT', displayStatus: 'NON_COMPLIANT' }), item({ obligationId: 'o2', code: 'OK-1', status: 'COMPLIANT', displayStatus: 'COMPLIANT' })] }) } }
+    })
+    post.mockResolvedValue({ data: { data: { summary: { title: 'CIPC-AR: Annual return' } } } })
+    renderIt()
+    const buttons = await screen.findAllByRole('button', { name: 'Open case' })
+    expect(buttons).toHaveLength(1)
+    fireEvent.click(buttons[0])
+    await waitFor(() => expect(post).toHaveBeenCalledWith('/api/v1/compliance-services/clients/c1/cases', { assessmentId: 'a1', obligationId: 'o1' }))
+    expect(await screen.findByText(/Case opened: CIPC-AR: Annual return/)).toBeTruthy()
+  })
 })

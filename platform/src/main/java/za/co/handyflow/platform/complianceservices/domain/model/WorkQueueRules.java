@@ -74,6 +74,18 @@ public final class WorkQueueRules {
                 age <= 0 ? "Started today" : "Started " + age + (age == 1 ? " day ago" : " days ago"), null, "assessments", false);
     }
 
+    /** A case being worked on. Overdue or due within three days is urgent, within two weeks needs watching, and no date is low. */
+    public static Item caseItem(LocalDate today, UUID clientId, String clientName, String title, String status, String severity, LocalDate due) {
+        String urgency;
+        if (due == null) urgency = LOW;
+        else if (!due.isAfter(today.plusDays(DEADLINE_URGENT_DAYS))) urgency = HIGH;
+        else if (!due.isAfter(today.plusDays(DEADLINE_SOON_DAYS))) urgency = MEDIUM;
+        else urgency = LOW;
+        String detail = status.toLowerCase().replace('_', ' ') + " · " + severity.toLowerCase()
+                + (due == null ? "" : due.isBefore(today) ? " · overdue" : "");
+        return new Item("CASE", urgency, clientId, clientName, title, detail, due, "cases", false);
+    }
+
     /** Most urgent first, then the earliest date, then client and title so the order never jumps about. */
     public static List<Item> order(List<Item> items) {
         return items.stream().filter(java.util.Objects::nonNull).sorted(

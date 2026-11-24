@@ -7,10 +7,11 @@ import { useState } from "react"
 import { useParams, useNavigate, useSearchParams } from "react-router-dom"
 import { useQuery } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
-import { ArrowLeft, Building2, ShieldCheck, FileText, CalendarClock, Briefcase, ListChecks, IdCard, Users, Scale, Gauge } from "lucide-react"
+import { ArrowLeft, Building2, ShieldCheck, FileText, CalendarClock, Briefcase, ListChecks, IdCard, Users, Scale, Gauge, LifeBuoy } from "lucide-react"
 import ClientProfileTab from "./ClientProfileTab"
 import ClientPartiesTab from "./ClientPartiesTab"
 import ClientObligationsTab from "./ClientObligationsTab"
+import ClientCasesTab from "./ClientCasesTab"
 import ClientAssessmentsTab from "./ClientAssessmentsTab"
 import ClientRegistrationsTab from "./ClientRegistrationsTab"
 import ClientDocumentsTab from "./ClientDocumentsTab"
@@ -24,13 +25,14 @@ interface Client {
   mandateNotes: string | null; status: string
 }
 
-type Tab = "profile" | "parties" | "obligations" | "assessments" | "registrations" | "documents" | "deadlines" | "tenders" | "requirements"
+type Tab = "profile" | "parties" | "obligations" | "assessments" | "cases" | "registrations" | "documents" | "deadlines" | "tenders" | "requirements"
 
 const TABS: { id: Tab; label: string; icon: React.ElementType }[] = [
   { id: "profile",       label: "Profile",       icon: IdCard        },
   { id: "parties",       label: "People & sites", icon: Users        },
   { id: "obligations",   label: "Obligations",   icon: Scale         },
   { id: "assessments",   label: "Assessments",   icon: Gauge         },
+  { id: "cases",         label: "Cases",         icon: LifeBuoy      },
   { id: "registrations", label: "Registrations", icon: ShieldCheck   },
   { id: "documents",     label: "Documents",     icon: FileText      },
   { id: "deadlines",     label: "Deadlines",     icon: CalendarClock },
@@ -112,6 +114,7 @@ export default function ClientDetailPage() {
         {tab === "parties"       && <ClientPartiesTab clientId={clientId} />}
         {tab === "obligations"   && <ClientObligationsTab clientId={clientId} />}
         {tab === "assessments"   && <ClientAssessmentsTab clientId={clientId} />}
+        {tab === "cases"         && <ClientCasesTab clientId={clientId} />}
         {tab === "registrations" && <ClientRegistrationsTab clientId={clientId} />}
         {tab === "documents"     && <ClientDocumentsTab clientId={clientId} />}
         {tab === "deadlines"     && <ClientDeadlinesTab clientId={clientId} />}

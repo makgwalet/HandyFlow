@@ -7,6 +7,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import { usePermission, usePermissions } from "../../hooks/usePermission"
 import { RefreshCw } from "lucide-react"
+import { isProblem } from "./caseRules"
 import { CONTROLS, WORKFLOWS, statusLabel, statusTone, controlLabel, judgementProblem, weightsProblem, scoreText, changeText, type Change, type JudgementDraft } from "./assessmentRules"
 
 interface Evidence { documentType: string; mandatory: boolean; result: string; detail: string | null; expiresOn: string | null }
@@ -57,6 +58,13 @@ export default function ClientAssessmentsTab({ clientId }: { clientId: string })
   const judge = useMutation({
     mutationFn: async (id: string) => unwrap<Assessment>(await apiClient.put(`${base}/${a?.id}/items/${id}`, { control: j.control, workflow: j.workflow, note: j.note || null })),
     onSuccess: got, onError: fail,
+  })
+  const [caseFor, setCaseFor] = useState<string | null>(null)
+  const [caseNote, setCaseNote] = useState("")
+  const openCase = useMutation({
+    mutationFn: async (obligationId: string) => unwrap<{ summary: { title: string } }>(await apiClient.post(`/api/v1/compliance-services/clients/${clientId}/cases`, { assessmentId: a?.id, obligationId })),
+    onSuccess: r => { setError(""); setCaseNote(`Case opened: ${r.summary.title}. Find it on the Cases tab.`); qc.invalidateQueries({ queryKey: ["cs-cases", clientId] }); qc.invalidateQueries({ queryKey: ["cs-work-queue"] }) },
+    onError: fail,
   })
   const complete = useMutation({ mutationFn: async () => unwrap<Assessment>(await apiClient.post(`${base}/${a?.id}/complete`, { summaryNote: summary || null })), onSuccess: got, onError: fail })
   const saveWeights = useMutation({
@@ -111,7 +119,11 @@ export default function ClientAssessmentsTab({ clientId }: { clientId: string })
                     {draft && canManage && i.applicability === "APPLICABLE" && (
                       <button style={ghost} onClick={() => { setOpen(open === i.obligationId ? null : i.obligationId); setJ({ control: i.control, workflow: i.workflow, note: i.note ?? "" }) }}>Judge</button>
                     )}
+                    {canManage && isProblem(i.status) && (
+                      <button style={ghost} disabled={openCase.isPending} onClick={() => { setCaseFor(i.obligationId); setCaseNote(""); openCase.mutate(i.obligationId) }}>Open case</button>
+                    )}
                   </div>
+                  {caseFor === i.obligationId && caseNote && <div style={{ fontSize: 12, color: "var(--hf-success-text, #1e7e34)", marginTop: 4 }}>{caseNote}</div>}
                   <div style={{ fontSize: 12, color: "var(--hf-text-muted)", marginTop: 4 }}>
                     {i.applicability !== "APPLICABLE" ? (i.applicability === "PENDING" ? "Not yet decided whether this applies" : "Does not apply to this client") : `Control: ${controlLabel(i.control)}`}
                   </div>

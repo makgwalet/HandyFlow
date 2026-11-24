@@ -82,4 +82,17 @@ class WorkQueueRulesTest {
         assertThat(out.get(2)).isEqualTo(med);
         assertThat(out.get(3)).isEqualTo(low);
     }
+
+    @Test @DisplayName("a case is urgent when overdue or due in three days, medium within two weeks, and low otherwise")
+    void caseUrgency() {
+        assertThat(WorkQueueRules.caseItem(TODAY, C, "Acme", "T", "IN_PROGRESS", "HIGH", TODAY.minusDays(1)).severity()).isEqualTo("HIGH");
+        assertThat(WorkQueueRules.caseItem(TODAY, C, "Acme", "T", "IN_PROGRESS", "HIGH", TODAY.minusDays(1)).detail()).contains("overdue");
+        assertThat(WorkQueueRules.caseItem(TODAY, C, "Acme", "T", "OPEN", "LOW", TODAY.plusDays(3)).severity()).isEqualTo("HIGH");
+        assertThat(WorkQueueRules.caseItem(TODAY, C, "Acme", "T", "OPEN", "LOW", TODAY.plusDays(10)).severity()).isEqualTo("MEDIUM");
+        assertThat(WorkQueueRules.caseItem(TODAY, C, "Acme", "T", "OPEN", "LOW", TODAY.plusDays(40)).severity()).isEqualTo("LOW");
+        var none = WorkQueueRules.caseItem(TODAY, C, "Acme", "T", "AWAITING_CLIENT", "MEDIUM", null);
+        assertThat(none.severity()).isEqualTo("LOW");
+        assertThat(none.detail()).isEqualTo("awaiting client · medium");
+        assertThat(none.tab()).isEqualTo("cases");
+    }
 }
