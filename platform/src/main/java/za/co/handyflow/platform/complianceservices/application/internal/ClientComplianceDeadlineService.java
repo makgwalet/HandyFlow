@@ -57,7 +57,12 @@ public class ClientComplianceDeadlineService {
 
     @Transactional
     public void delete(TenantId tenantId, UUID id) {
-        deadlineRepository.delete(find(tenantId, id));
+        ClientComplianceDeadline deadline = find(tenantId, id);
+        if (deadline.isGenerated()) {
+            throw new za.co.handyflow.platform.shared.HandyFlowException("This date comes from an obligation's due rule, so deleting it would only bring it back. Mark it done, or change the obligation",
+                    org.springframework.http.HttpStatus.CONFLICT, "DEADLINE_GENERATED");
+        }
+        deadlineRepository.delete(deadline);
         log.info("Client compliance deadline deleted id={} tenant={}", id, tenantId);
     }
 
@@ -85,6 +90,7 @@ public class ClientComplianceDeadlineService {
     private ClientComplianceDeadlineResponse toResponse(ClientComplianceDeadline d) {
         return new ClientComplianceDeadlineResponse(d.getId(), d.getClientId(), d.getRegistrationId(),
                 d.getDeadlineType(), d.getDescription(), d.getDueDate(), d.getStatus(),
-                d.isDueWithin(DUE_SOON_DAYS), d.getCompletedAt());
+                d.isDueWithin(DUE_SOON_DAYS), d.getCompletedAt(),
+                d.getObligationId(), d.getObligationVersionNumber(), d.isGenerated(), d.getResponsibleRole(), d.getCancelledReason());
     }
 }

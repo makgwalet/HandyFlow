@@ -12,10 +12,13 @@ import StatTile from "../../components/ui/StatTile"
 import LookupInput from "../../components/ui/LookupInput"
 import { DEADLINE_TYPES } from "../../lookups/southAfrica"
 import { deadlineChip } from "../compliancetender/registration.logic"
+import DeadlineGeneratorPanel from "./DeadlineGeneratorPanel"
+import { sourceText } from "./deadlineRules"
 
 interface Deadline {
   id: string; registrationId: string | null; deadlineType: string; description: string | null
   dueDate: string; status: string; dueSoon: boolean; completedAt: string | null
+  obligationVersionNumber?: number | null; generated?: boolean
 }
 
 const ACCENT = "var(--hf-success-solid-strong)"
@@ -84,6 +87,7 @@ export default function ClientDeadlinesTab({ clientId }: { clientId: string }) {
 
   return (
     <div>
+      <DeadlineGeneratorPanel clientId={clientId} />
       <div style={{ display: "flex", gap: 12, marginBottom: 18, flexWrap: "wrap" }}>
         <StatTile label="Overdue" value={overdue.length} icon={<AlertCircle size={18} />} tone={overdue.length > 0 ? "bad" : "neutral"} />
         <StatTile label="Due soon" value={dueSoon.length} icon={<CalendarClock size={18} />} tone={dueSoon.length > 0 ? "warn" : "neutral"} />
@@ -120,7 +124,7 @@ export default function ClientDeadlinesTab({ clientId }: { clientId: string }) {
                     <div style={{ minWidth: 0 }}>
                       <div style={{ fontWeight: 700, fontSize: 13, color: "var(--hf-text)" }}>{d.deadlineType}</div>
                       <div style={{ fontSize: 12, color: "var(--hf-text-muted)", marginTop: 2 }}>
-                        Due {fmtDate(d.dueDate)}{d.description ? ` · ${d.description}` : ""}
+                        Due {fmtDate(d.dueDate)}{d.description ? ` · ${d.description}` : ""}{d.generated ? ` · ${sourceText((d.description ?? "").split(" - ")[0] || null, d.obligationVersionNumber ?? null)}` : ""}
                       </div>
                     </div>
                     <div style={{ display: "flex", gap: 6, flexShrink: 0, alignItems: "center" }}>
@@ -128,7 +132,7 @@ export default function ClientDeadlinesTab({ clientId }: { clientId: string }) {
                       {canManage && (
                         <button onClick={() => markDone.mutate(d.id)} title="Mark done" style={{ background: "var(--hf-success-soft-strong)", border: "none", borderRadius: 6, padding: "6px 8px", cursor: "pointer", color: "var(--hf-success-text-strong)" }}><CheckCircle2 size={13} /></button>
                       )}
-                      {canAdmin && (
+                      {canAdmin && !d.generated && (
                         <button onClick={() => { if (confirm(`Delete deadline "${d.deadlineType}"?`)) remove.mutate(d.id) }} title="Delete" style={{ background: "var(--hf-danger-soft)", border: "none", borderRadius: 6, padding: "6px 8px", cursor: "pointer", color: "var(--hf-danger-text)" }}><Trash2 size={13} /></button>
                       )}
                     </div>

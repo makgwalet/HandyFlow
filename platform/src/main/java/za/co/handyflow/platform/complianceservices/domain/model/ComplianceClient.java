@@ -97,6 +97,12 @@ public class ComplianceClient {
     @Column(name = "onboarding_status", nullable = false)
     private String onboardingStatus = "NOT_STARTED";
 
+    @Column(name = "financial_year_end_month")
+    private Integer financialYearEndMonth;
+
+    @Column(name = "registered_on")
+    private java.time.LocalDate registeredOn;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
@@ -140,6 +146,15 @@ public class ComplianceClient {
     }
 
     /** The values for the profile fields, already in the shape the screen sends them. */
+    /** Dates some due rules depend on. Either can be cleared by passing null. */
+    public void setKeyDates(Integer financialYearEndMonth, java.time.LocalDate registeredOn, java.time.LocalDate today, UUID by) {
+        DueDateRules.keyDates(financialYearEndMonth, registeredOn, today);
+        this.financialYearEndMonth = financialYearEndMonth;
+        this.registeredOn = registeredOn;
+        this.updatedBy = by;
+        this.updatedAt = Instant.now();
+    }
+
     public record Profile(String legalName, String tradingName, String registrationNumber, String entityType,
                           String taxNumber, String vatNumber, String registeredAddress, String postalAddress,
                           String industry, Integer employeeCount, String turnoverBand, String riskRating,

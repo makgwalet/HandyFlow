@@ -6,5 +6,6 @@ import java.util.UUID;
 
 public record ClientComplianceDeadlineResponse(
         UUID id, UUID clientId, UUID registrationId, String deadlineType, String description,
-        LocalDate dueDate, String status, boolean dueSoon, Instant completedAt
+        LocalDate dueDate, String status, boolean dueSoon, Instant completedAt,
+        UUID obligationId, Integer obligationVersionNumber, boolean generated, String responsibleRole, String cancelledReason
 ) {}

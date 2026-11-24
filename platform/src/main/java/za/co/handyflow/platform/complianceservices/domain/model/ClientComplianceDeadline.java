@@ -45,6 +45,21 @@ public class ClientComplianceDeadline {
     @Column(name = "completed_at")
     private Instant completedAt;
 
+    @Column(name = "obligation_id")
+    private UUID obligationId;
+
+    @Column(name = "obligation_version_number")
+    private Integer obligationVersionNumber;
+
+    @Column(nullable = false)
+    private boolean generated;
+
+    @Column(name = "responsible_role")
+    private String responsibleRole;
+
+    @Column(name = "cancelled_reason", columnDefinition = "TEXT")
+    private String cancelledReason;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
@@ -74,7 +89,29 @@ public class ClientComplianceDeadline {
         return d;
     }
 
+    /** A deadline worked out from an obligation's due rule. */
+    public static ClientComplianceDeadline generated(TenantId tenantId, UUID clientId, UUID obligationId, int versionNumber, String responsibleRole,
+                                                      String description, LocalDate dueDate, UUID createdBy) {
+        ClientComplianceDeadline d = create(tenantId, clientId, null, "OBLIGATION", description, dueDate, createdBy);
+        d.obligationId = obligationId;
+        d.obligationVersionNumber = versionNumber;
+        d.responsibleRole = responsibleRole;
+        d.generated = true;
+        return d;
+    }
+
+    /** A generated date that is no longer wanted. It stays on record with the reason. Only a pending one can be cancelled. */
+    public void cancel(String reason, UUID by) {
+        if (!"PENDING".equals(status)) throw new IllegalStateException("Only a pending deadline can be cancelled");
+        if (reason == null || reason.isBlank()) throw new IllegalArgumentException("A reason is required");
+        this.status = "CANCELLED";
+        this.cancelledReason = reason.trim();
+        this.updatedBy = by;
+        this.updatedAt = Instant.now();
+    }
+
     public void markDone(UUID completedBy) {
+        if ("CANCELLED".equals(status)) throw new IllegalStateException("Deadline was cancelled");
         if ("DONE".equals(status)) throw new IllegalStateException("Deadline is already marked done");
         this.status = "DONE";
         this.completedAt = Instant.now();
