@@ -7,11 +7,12 @@ import { useState } from "react"
 import { useParams, useNavigate, useSearchParams } from "react-router-dom"
 import { useQuery } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
-import { ArrowLeft, Building2, ShieldCheck, FileText, CalendarClock, Briefcase, ListChecks, IdCard, Users, Scale, Gauge, LifeBuoy } from "lucide-react"
+import { ArrowLeft, Building2, ShieldCheck, FileText, CalendarClock, Briefcase, ListChecks, IdCard, Users, Scale, Gauge, LifeBuoy, Receipt } from "lucide-react"
 import ClientProfileTab from "./ClientProfileTab"
 import ClientPartiesTab from "./ClientPartiesTab"
 import ClientObligationsTab from "./ClientObligationsTab"
 import ClientCasesTab from "./ClientCasesTab"
+import ClientQuotesTab from "./ClientQuotesTab"
 import ClientAssessmentsTab from "./ClientAssessmentsTab"
 import ClientRegistrationsTab from "./ClientRegistrationsTab"
 import ClientDocumentsTab from "./ClientDocumentsTab"
@@ -25,7 +26,7 @@ interface Client {
   mandateNotes: string | null; status: string
 }
 
-type Tab = "profile" | "parties" | "obligations" | "assessments" | "cases" | "registrations" | "documents" | "deadlines" | "tenders" | "requirements"
+type Tab = "profile" | "parties" | "obligations" | "assessments" | "cases" | "quotes" | "registrations" | "documents" | "deadlines" | "tenders" | "requirements"
 
 const TABS: { id: Tab; label: string; icon: React.ElementType }[] = [
   { id: "profile",       label: "Profile",       icon: IdCard        },
@@ -33,6 +34,7 @@ const TABS: { id: Tab; label: string; icon: React.ElementType }[] = [
   { id: "obligations",   label: "Obligations",   icon: Scale         },
   { id: "assessments",   label: "Assessments",   icon: Gauge         },
   { id: "cases",         label: "Cases",         icon: LifeBuoy      },
+  { id: "quotes",        label: "Quotes",        icon: Receipt       },
   { id: "registrations", label: "Registrations", icon: ShieldCheck   },
   { id: "documents",     label: "Documents",     icon: FileText      },
   { id: "deadlines",     label: "Deadlines",     icon: CalendarClock },
@@ -115,6 +117,7 @@ export default function ClientDetailPage() {
         {tab === "obligations"   && <ClientObligationsTab clientId={clientId} />}
         {tab === "assessments"   && <ClientAssessmentsTab clientId={clientId} />}
         {tab === "cases"         && <ClientCasesTab clientId={clientId} />}
+        {tab === "quotes"        && <ClientQuotesTab clientId={clientId} />}
         {tab === "registrations" && <ClientRegistrationsTab clientId={clientId} />}
         {tab === "documents"     && <ClientDocumentsTab clientId={clientId} />}
         {tab === "deadlines"     && <ClientDeadlinesTab clientId={clientId} />}

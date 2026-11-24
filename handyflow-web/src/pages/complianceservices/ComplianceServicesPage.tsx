@@ -26,6 +26,7 @@ import { SectionedModulePage } from "../../components/shell/SectionedModulePage"
 import { COMPLIANCE_SERVICES_SECTIONS } from "../../navigation/moduleSections"
 import ServiceCatalogue from "./ServiceCatalogue"
 import PriceBook from "./PriceBook"
+import QuotesPage from "./QuotesPage"
 import ObligationCatalogue from "./ObligationCatalogue"
 import WorkQueue from "./WorkQueue"
 
@@ -198,6 +199,7 @@ export default function ComplianceServicesPage() {
           case "catalogue": return <ObligationCatalogue />
           case "services": return <ServiceCatalogue />
           case "pricebook": return <PriceBook />
+          case "quotes": return <QuotesPage />
           default: return null
         }
       }}>

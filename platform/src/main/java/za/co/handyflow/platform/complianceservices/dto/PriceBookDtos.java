@@ -47,7 +47,7 @@ public final class PriceBookDtos {
 
     public record PartView(String label, BigDecimal amount) {}
 
-    public record CalculateResponse(String serviceCode, int priceBookVersion, String currency, List<PartView> parts, BigDecimal professionalBeforeDiscount,
+    public record CalculateResponse(String serviceCode, String pricingModel, int priceBookVersion, String currency, List<PartView> parts, BigDecimal professionalBeforeDiscount,
                                     BigDecimal discount, BigDecimal professional, BigDecimal disbursements, BigDecimal vat, BigDecimal vatRatePct,
                                     BigDecimal total, String discountApprover) {}
 
