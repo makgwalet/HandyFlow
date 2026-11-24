@@ -7,8 +7,9 @@ import { useState } from "react"
 import { useParams, useNavigate, useSearchParams } from "react-router-dom"
 import { useQuery } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
-import { ArrowLeft, Building2, ShieldCheck, FileText, CalendarClock, Briefcase, ListChecks, IdCard } from "lucide-react"
+import { ArrowLeft, Building2, ShieldCheck, FileText, CalendarClock, Briefcase, ListChecks, IdCard, Users } from "lucide-react"
 import ClientProfileTab from "./ClientProfileTab"
+import ClientPartiesTab from "./ClientPartiesTab"
 import ClientRegistrationsTab from "./ClientRegistrationsTab"
 import ClientDocumentsTab from "./ClientDocumentsTab"
 import ClientDeadlinesTab from "./ClientDeadlinesTab"
@@ -21,10 +22,11 @@ interface Client {
   mandateNotes: string | null; status: string
 }
 
-type Tab = "profile" | "registrations" | "documents" | "deadlines" | "tenders" | "requirements"
+type Tab = "profile" | "parties" | "registrations" | "documents" | "deadlines" | "tenders" | "requirements"
 
 const TABS: { id: Tab; label: string; icon: React.ElementType }[] = [
   { id: "profile",       label: "Profile",       icon: IdCard        },
+  { id: "parties",       label: "People & sites", icon: Users        },
   { id: "registrations", label: "Registrations", icon: ShieldCheck   },
   { id: "documents",     label: "Documents",     icon: FileText      },
   { id: "deadlines",     label: "Deadlines",     icon: CalendarClock },
@@ -103,6 +105,7 @@ export default function ClientDetailPage() {
         </div>
 
         {tab === "profile"       && <ClientProfileTab clientId={clientId} />}
+        {tab === "parties"       && <ClientPartiesTab clientId={clientId} />}
         {tab === "registrations" && <ClientRegistrationsTab clientId={clientId} />}
         {tab === "documents"     && <ClientDocumentsTab clientId={clientId} />}
         {tab === "deadlines"     && <ClientDeadlinesTab clientId={clientId} />}
