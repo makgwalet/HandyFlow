@@ -20,4 +20,7 @@ public interface ComplianceObligationVersionRepository extends JpaRepository<Com
 
     @Query("SELECT v FROM ComplianceObligationVersion v WHERE v.tenantId.value = :#{#tenantId.value} AND v.obligationId = :obligationId AND v.id = :id")
     Optional<ComplianceObligationVersion> findOne(@Param("tenantId") TenantId tenantId, @Param("obligationId") UUID obligationId, @Param("id") UUID id);
+
+    @Query("SELECT v FROM ComplianceObligationVersion v WHERE v.tenantId.value = :#{#tenantId.value} AND v.reviewStatus = 'IN_REVIEW'")
+    List<ComplianceObligationVersion> findInReview(@Param("tenantId") TenantId tenantId);
 }

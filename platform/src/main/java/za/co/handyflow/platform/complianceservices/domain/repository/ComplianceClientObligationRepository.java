@@ -17,4 +17,7 @@ public interface ComplianceClientObligationRepository extends JpaRepository<Comp
 
     @Query("SELECT a FROM ComplianceClientObligation a WHERE a.tenantId.value = :#{#tenantId.value} AND a.clientId = :clientId AND a.obligationId = :obligationId")
     Optional<ComplianceClientObligation> findOne(@Param("tenantId") TenantId tenantId, @Param("clientId") UUID clientId, @Param("obligationId") UUID obligationId);
+
+    @Query("SELECT a FROM ComplianceClientObligation a WHERE a.tenantId.value = :#{#tenantId.value} AND a.approvalStatus = 'AWAITING'")
+    List<ComplianceClientObligation> findAwaitingApproval(@Param("tenantId") TenantId tenantId);
 }

@@ -20,4 +20,7 @@ public interface ComplianceAssessmentRepository extends JpaRepository<Compliance
 
     @Query("SELECT a FROM ComplianceAssessment a WHERE a.tenantId.value = :#{#tenantId.value} AND a.clientId = :clientId AND a.status = 'DRAFT'")
     Optional<ComplianceAssessment> findDraft(@Param("tenantId") TenantId tenantId, @Param("clientId") UUID clientId);
+
+    @Query("SELECT a FROM ComplianceAssessment a WHERE a.tenantId.value = :#{#tenantId.value} AND a.status = 'DRAFT'")
+    List<ComplianceAssessment> findDraftsForTenant(@Param("tenantId") TenantId tenantId);
 }

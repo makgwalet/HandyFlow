@@ -1150,9 +1150,9 @@ export const COMPLIANCE_SERVICES_SECTIONS: ModuleSections = {
   basePath: '/complianceservices',
   title: 'Compliance Services',
   icon: Building2,
-  defaultSection: 'clients',
+  defaultSection: 'queue',
   groups: [
-    { label: 'Overview', sections: [{ id: 'clients', label: 'Clients', icon: Users }] },
+    { label: 'Overview', sections: [{ id: 'queue', label: 'Work queue', icon: ListChecks }, { id: 'clients', label: 'Clients', icon: Users }] },
     { label: 'Regulatory', sections: [{ id: 'catalogue', label: 'Obligation catalogue', icon: BookOpen }] },
   ],
 }

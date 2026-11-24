@@ -25,6 +25,7 @@ import StatTile from "../../components/ui/StatTile"
 import { SectionedModulePage } from "../../components/shell/SectionedModulePage"
 import { COMPLIANCE_SERVICES_SECTIONS } from "../../navigation/moduleSections"
 import ObligationCatalogue from "./ObligationCatalogue"
+import WorkQueue from "./WorkQueue"
 
 interface Client {
   id: string; name: string; crmCustomerId: string | null; crmCustomerFound: boolean
@@ -191,6 +192,7 @@ export default function ComplianceServicesPage() {
               )}
             </>
           )
+          case "queue": return <WorkQueue />
           case "catalogue": return <ObligationCatalogue />
           default: return null
         }
