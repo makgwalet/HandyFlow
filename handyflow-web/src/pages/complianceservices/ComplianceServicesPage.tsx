@@ -24,6 +24,7 @@ import { Plus, Building2, X, AlertCircle, ChevronRight, Ban, CheckCircle2, Searc
 import StatTile from "../../components/ui/StatTile"
 import { SectionedModulePage } from "../../components/shell/SectionedModulePage"
 import { COMPLIANCE_SERVICES_SECTIONS } from "../../navigation/moduleSections"
+import ServiceCatalogue from "./ServiceCatalogue"
 import ObligationCatalogue from "./ObligationCatalogue"
 import WorkQueue from "./WorkQueue"
 
@@ -194,6 +195,7 @@ export default function ComplianceServicesPage() {
           )
           case "queue": return <WorkQueue />
           case "catalogue": return <ObligationCatalogue />
+          case "services": return <ServiceCatalogue />
           default: return null
         }
       }}>
