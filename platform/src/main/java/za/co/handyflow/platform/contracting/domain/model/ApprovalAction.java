@@ -31,6 +31,8 @@ public enum ApprovalAction {
 
     public boolean requiredByDefault() { return requiredByDefault; }
     public String subjectType() { return subjectType; }
+    /** The permissions that let someone decide this kind of approval. */
+    public java.util.Set<String> approverAuthorities() { return approverAuthorities; }
     public boolean canBeDecidedBy(java.util.Collection<String> authorities) {
         return authorities != null && authorities.stream().anyMatch(approverAuthorities::contains);
     }

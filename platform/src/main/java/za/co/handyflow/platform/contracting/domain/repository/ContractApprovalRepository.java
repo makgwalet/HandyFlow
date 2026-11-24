@@ -30,4 +30,12 @@ public interface ContractApprovalRepository extends JpaRepository<ContractApprov
 
     @Query("SELECT a FROM ContractApproval a WHERE a.tenantId = :tenantId AND a.action = :action AND a.subjectId = :subjectId ORDER BY a.requestedAt DESC")
     List<ContractApproval> findBySubject(@Param("tenantId") UUID tenantId, @Param("action") ApprovalAction action, @Param("subjectId") UUID subjectId);
+
+    /** Ids of requests still waiting, oldest first. The sweep takes ids and handles each in its own transaction. */
+    @Query("SELECT a.id FROM ContractApproval a WHERE a.tenantId = :tenantId AND a.status = 'PENDING' ORDER BY a.requestedAt")
+    List<UUID> findPendingIds(@Param("tenantId") UUID tenantId, org.springframework.data.domain.Pageable page);
+
+    /** Requests made in a period, for the response-time report. */
+    @Query("SELECT a FROM ContractApproval a WHERE a.tenantId = :tenantId AND a.requestedAt >= :from AND a.requestedAt < :to ORDER BY a.requestedAt")
+    List<ContractApproval> findRequestedBetween(@Param("tenantId") UUID tenantId, @Param("from") java.time.Instant from, @Param("to") java.time.Instant to);
 }

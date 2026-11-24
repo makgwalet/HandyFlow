@@ -35,6 +35,12 @@ public class ContractApproval {
     @Column(name = "sole_user_exception") private boolean soleUserException;
     @Column(name = "exception_reason") private String exceptionReason;
     @Column(name = "closed_at") private Instant closedAt;
+    // Follow-up. Routing only: who is reminded first, and how far the reminders have got. None of it decides the approval.
+    @Column(name = "assigned_to") private UUID assignedTo;
+    @Column(name = "assigned_by") private UUID assignedBy;
+    @Column(name = "assigned_at") private Instant assignedAt;
+    @Column(name = "escalation_stage") private int escalationStage;
+    @Column(name = "escalation_stage_at") private Instant escalationStageAt;
 
     public static ContractApproval request(UUID tenantId, ApprovalAction action, UUID subjectId, String label, String hash, UUID by, String note) {
         ContractApproval a = new ContractApproval();
@@ -82,6 +88,22 @@ public class ContractApproval {
     }
 
     /** The subject changed after the request was made (or approved). */
+    /** Names who is reminded first (or, with null, hands it back to everyone who can approve). Does not stop anyone else from deciding it. */
+    public void assign(UUID to, UUID by) {
+        if (!isPending()) throw new IllegalStateException("This request is already " + status.toLowerCase());
+        if (to != null && to.equals(requestedBy)) throw new IllegalStateException("The person who asked cannot be the one asked to approve it");
+        this.assignedTo = to; this.assignedBy = to == null ? null : by; this.assignedAt = to == null ? null : Instant.now();
+    }
+
+    public EscalationRules.Stage escalationStage() { return EscalationRules.Stage.ofLevel(escalationStage); }
+
+    /** Records that a reminder or the escalation went out. The stage only goes up, and only while the request is still waiting. */
+    public void reachStage(EscalationRules.Stage stage, Instant at) {
+        if (!isPending()) throw new IllegalStateException("This request is already " + status.toLowerCase());
+        if (stage.level() <= escalationStage) throw new IllegalStateException("That step has already been taken");
+        this.escalationStage = stage.level(); this.escalationStageAt = at;
+    }
+
     public void invalidate() {
         if (!isOpen()) return;
         this.status = "INVALIDATED"; this.closedAt = Instant.now();
