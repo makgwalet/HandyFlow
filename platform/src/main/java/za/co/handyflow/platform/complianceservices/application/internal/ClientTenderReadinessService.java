@@ -9,6 +9,7 @@ import za.co.handyflow.platform.businessreadiness.RegistrationFact;
 import za.co.handyflow.platform.businessreadiness.RequirementReadinessEvaluator;
 import za.co.handyflow.platform.businessreadiness.RequirementRule;
 import za.co.handyflow.platform.businessreadiness.RequirementToEvaluate;
+import za.co.handyflow.platform.complianceservices.domain.model.ClientComplianceDocument;
 import za.co.handyflow.platform.complianceservices.domain.model.ClientComplianceRequirement;
 import za.co.handyflow.platform.complianceservices.domain.model.ClientTender;
 import za.co.handyflow.platform.complianceservices.domain.model.ClientTenderRequirement;
@@ -84,7 +85,7 @@ public class ClientTenderReadinessService {
 
         List<RegistrationFact> registrations = registrationRepository.findByClient(tenantId, clientId).stream()
                 .map(g -> new RegistrationFact(g.getAuthority(), g.getRegistrationType(), g.getStatus(), g.getExpiryDate())).toList();
-        List<DocumentFact> documents = documentRepository.findByClient(tenantId, clientId).stream()
+        List<DocumentFact> documents = documentRepository.findByClient(tenantId, clientId).stream().filter(ClientComplianceDocument::isCurrent)
                 .map(d -> new DocumentFact(d.getDocumentType(), d.getExpiryDate(), d.isVerified())).toList();
 
         return RequirementReadinessEvaluator.evaluate(today, asOf, basis, toEvaluate, registrations, documents);

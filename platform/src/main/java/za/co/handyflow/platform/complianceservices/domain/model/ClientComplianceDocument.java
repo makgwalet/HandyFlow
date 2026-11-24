@@ -64,6 +64,30 @@ public class ClientComplianceDocument {
     @Column(name = "verification_exception_reason")
     private String verificationExceptionReason;
 
+    @Column(nullable = false)
+    private String status = "UPLOADED";
+
+    @Column(name = "rejected_by")
+    private UUID rejectedBy;
+
+    @Column(name = "rejected_at")
+    private Instant rejectedAt;
+
+    @Column(name = "rejection_reason", columnDefinition = "TEXT")
+    private String rejectionReason;
+
+    @Column(name = "archived_by")
+    private UUID archivedBy;
+
+    @Column(name = "archived_at")
+    private Instant archivedAt;
+
+    @Column(name = "archive_reason", columnDefinition = "TEXT")
+    private String archiveReason;
+
+    @Column(name = "superseded_by_id")
+    private UUID supersededById;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
@@ -109,6 +133,8 @@ public class ClientComplianceDocument {
     public void verify(UUID verifiedByUserId, String exceptionReason) {
         if (verifiedByUserId == null) throw new IllegalArgumentException("Who is verifying this document?");
         if (isVerified()) throw new IllegalStateException("This document is already verified");
+        if (!"UPLOADED".equals(status) && !"UNDER_REVIEW".equals(status))
+            throw new IllegalStateException("A " + status.toLowerCase().replace('_', ' ') + " document cannot be verified. Upload a new one");
         boolean self = verifiedByUserId.equals(createdBy);
         String reason = exceptionReason == null ? "" : exceptionReason.trim();
         if (self) {
@@ -121,10 +147,57 @@ public class ClientComplianceDocument {
         }
         this.verifiedBy = verifiedByUserId;
         this.verifiedAt = Instant.now();
+        this.status = "VERIFIED";
         this.updatedAt = Instant.now();
     }
 
-    public boolean isVerified() { return verifiedAt != null; }
+    /** Only a document that is verified and has not been replaced, rejected or archived counts as verified. */
+    public boolean isVerified() { return "VERIFIED".equals(status) && verifiedAt != null; }
+
+    /** Still in use: not rejected, replaced or archived. Only these are looked at when checking evidence. */
+    public boolean isCurrent() { return "UPLOADED".equals(status) || "UNDER_REVIEW".equals(status) || "VERIFIED".equals(status); }
+
+    /** A mistaken upload that nobody has looked at yet can be removed. Anything reviewed is archived instead. */
+    public boolean canDelete() { return "UPLOADED".equals(status) && verifiedAt == null; }
+
+    public void startReview() {
+        if (!"UPLOADED".equals(status)) throw new IllegalStateException("Only a newly uploaded document can be sent for review");
+        this.status = "UNDER_REVIEW";
+        this.updatedAt = Instant.now();
+    }
+
+    public void reject(UUID by, String reason) {
+        if (by == null) throw new IllegalArgumentException("Who is rejecting this document?");
+        if (!"UPLOADED".equals(status) && !"UNDER_REVIEW".equals(status)) throw new IllegalStateException("Only a document waiting for review can be rejected");
+        String r = reason == null ? "" : reason.trim();
+        if (r.length() < MIN_EXCEPTION_REASON) throw new IllegalArgumentException("Say why it is rejected, in at least " + MIN_EXCEPTION_REASON + " characters");
+        this.rejectionReason = r.length() > 1000 ? r.substring(0, 1000) : r;
+        this.rejectedBy = by;
+        this.rejectedAt = Instant.now();
+        this.status = "REJECTED";
+        this.updatedAt = Instant.now();
+    }
+
+    /** A newer upload takes over. The old one stays on record but no longer counts. */
+    public void supersede(UUID newerId) {
+        if (newerId == null) throw new IllegalArgumentException("The replacing document is required");
+        if (!isCurrent() && !"REJECTED".equals(status)) throw new IllegalStateException("This document has already been replaced or archived");
+        this.supersededById = newerId;
+        this.status = "SUPERSEDED";
+        this.updatedAt = Instant.now();
+    }
+
+    public void archive(UUID by, String reason) {
+        if (by == null) throw new IllegalArgumentException("Who is archiving this document?");
+        if ("ARCHIVED".equals(status) || "SUPERSEDED".equals(status)) throw new IllegalStateException("This document has already been replaced or archived");
+        String r = reason == null ? "" : reason.trim();
+        if (r.length() < MIN_EXCEPTION_REASON) throw new IllegalArgumentException("Say why it is archived, in at least " + MIN_EXCEPTION_REASON + " characters");
+        this.archiveReason = r.length() > 1000 ? r.substring(0, 1000) : r;
+        this.archivedBy = by;
+        this.archivedAt = Instant.now();
+        this.status = "ARCHIVED";
+        this.updatedAt = Instant.now();
+    }
 
     @PreUpdate
     void onUpdate() { this.updatedAt = Instant.now(); }

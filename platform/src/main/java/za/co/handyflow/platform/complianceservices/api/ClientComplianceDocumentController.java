@@ -35,6 +35,7 @@ public class ClientComplianceDocumentController {
     public ResponseEntity<ApiResponse<ClientComplianceDocumentResponse>> upload(
             @PathVariable UUID clientId,
             @RequestParam(required = false) UUID registrationId,
+            @RequestParam(required = false) UUID replacesId,
             @RequestParam String documentType,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate issueDate,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate expiryDate,
@@ -42,7 +43,7 @@ public class ClientComplianceDocumentController {
         featureGuard.requireModule("complianceservices");
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success("Document uploaded",
                 documentService.upload(TenantContext.getTenantIdAsObject(), clientId, registrationId, documentType,
-                        issueDate, expiryDate, file, TenantContext.getCurrentUserId(), TenantContext.getCurrentUserName())));
+                        issueDate, expiryDate, file, TenantContext.getCurrentUserId(), TenantContext.getCurrentUserName(), replacesId)));
     }
 
     @GetMapping("/clients/{clientId}/documents")
@@ -61,6 +62,39 @@ public class ClientComplianceDocumentController {
         return ResponseEntity.ok(ApiResponse.success("Document verified",
                 documentService.verify(TenantContext.getTenantIdAsObject(), id, TenantContext.getCurrentUserId(),
                         body == null ? null : body.exceptionReason())));
+    }
+
+    @PostMapping("/documents/{id}/review")
+    @PreAuthorize("hasAnyAuthority('COMPLIANCE_SERVICES_MANAGE','COMPLIANCE_SERVICES_ADMIN')")
+    public ResponseEntity<ApiResponse<ClientComplianceDocumentResponse>> startReview(@PathVariable UUID id) {
+        featureGuard.requireModule("complianceservices");
+        return ResponseEntity.ok(ApiResponse.success("Sent for review",
+                documentService.startReview(TenantContext.getTenantIdAsObject(), id, TenantContext.getCurrentUserId())));
+    }
+
+    @PostMapping("/documents/{id}/reject")
+    @PreAuthorize("hasAnyAuthority('COMPLIANCE_SERVICES_MANAGE','COMPLIANCE_SERVICES_ADMIN')")
+    public ResponseEntity<ApiResponse<ClientComplianceDocumentResponse>> reject(@PathVariable UUID id,
+            @jakarta.validation.Valid @RequestBody za.co.handyflow.platform.complianceservices.dto.ClientComplianceDocumentLifecycleDtos.ReasonRequest body) {
+        featureGuard.requireModule("complianceservices");
+        return ResponseEntity.ok(ApiResponse.success("Document rejected",
+                documentService.reject(TenantContext.getTenantIdAsObject(), id, TenantContext.getCurrentUserId(), body.reason())));
+    }
+
+    @PostMapping("/documents/{id}/archive")
+    @PreAuthorize("hasAnyAuthority('COMPLIANCE_SERVICES_MANAGE','COMPLIANCE_SERVICES_ADMIN')")
+    public ResponseEntity<ApiResponse<ClientComplianceDocumentResponse>> archive(@PathVariable UUID id,
+            @jakarta.validation.Valid @RequestBody za.co.handyflow.platform.complianceservices.dto.ClientComplianceDocumentLifecycleDtos.ReasonRequest body) {
+        featureGuard.requireModule("complianceservices");
+        return ResponseEntity.ok(ApiResponse.success("Document archived",
+                documentService.archive(TenantContext.getTenantIdAsObject(), id, TenantContext.getCurrentUserId(), body.reason())));
+    }
+
+    @GetMapping("/documents/{id}/events")
+    @PreAuthorize("hasAnyAuthority('COMPLIANCE_SERVICES_READ','COMPLIANCE_SERVICES_MANAGE','COMPLIANCE_SERVICES_ADMIN')")
+    public ResponseEntity<ApiResponse<List<za.co.handyflow.platform.complianceservices.dto.ClientComplianceDocumentLifecycleDtos.DocumentEventView>>> events(@PathVariable UUID id) {
+        featureGuard.requireModule("complianceservices");
+        return ResponseEntity.ok(ApiResponse.success(documentService.events(TenantContext.getTenantIdAsObject(), id)));
     }
 
     @DeleteMapping("/documents/{id}")

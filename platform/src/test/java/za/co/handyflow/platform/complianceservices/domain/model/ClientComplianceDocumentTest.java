@@ -70,4 +70,70 @@ class ClientComplianceDocumentTest {
     void verifierRequired() {
         assertThatThrownBy(() -> doc().verify(null, null)).isInstanceOf(IllegalArgumentException.class);
     }
+
+    @Test @DisplayName("a new document starts uploaded and counts as current but not verified")
+    void startsUploaded() {
+        ClientComplianceDocument d = doc();
+        assertThat(d.getStatus()).isEqualTo("UPLOADED");
+        assertThat(d.isCurrent()).isTrue();
+        assertThat(d.isVerified()).isFalse();
+        assertThat(d.canDelete()).isTrue();
+    }
+
+    @Test @DisplayName("verifying moves it to verified and it can no longer be deleted")
+    void verifiedKept() {
+        ClientComplianceDocument d = doc();
+        d.verify(UUID.randomUUID(), null);
+        assertThat(d.getStatus()).isEqualTo("VERIFIED");
+        assertThat(d.canDelete()).isFalse();
+    }
+
+    @Test @DisplayName("review, then reject needs a reason and the document stops counting")
+    void rejects() {
+        ClientComplianceDocument d = doc();
+        d.startReview();
+        assertThat(d.getStatus()).isEqualTo("UNDER_REVIEW");
+        UUID by = UUID.randomUUID();
+        assertThatThrownBy(() -> d.reject(by, "no")).isInstanceOf(IllegalArgumentException.class);
+        d.reject(by, "The certificate is for a different company");
+        assertThat(d.getStatus()).isEqualTo("REJECTED");
+        assertThat(d.isCurrent()).isFalse();
+        assertThat(d.getRejectionReason()).contains("different company");
+        assertThatThrownBy(() -> d.verify(UUID.randomUUID(), null)).isInstanceOf(IllegalStateException.class);
+        assertThat(d.canDelete()).isFalse();
+    }
+
+    @Test @DisplayName("a verified document cannot be rejected, and review only starts from uploaded")
+    void orderMatters() {
+        ClientComplianceDocument d = doc();
+        d.verify(UUID.randomUUID(), null);
+        assertThatThrownBy(() -> d.reject(UUID.randomUUID(), "Changed my mind about this one")).isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(d::startReview).isInstanceOf(IllegalStateException.class);
+    }
+
+    @Test @DisplayName("a replaced document is kept but no longer verified or current")
+    void supersedes() {
+        ClientComplianceDocument d = doc();
+        d.verify(UUID.randomUUID(), null);
+        UUID newer = UUID.randomUUID();
+        d.supersede(newer);
+        assertThat(d.getStatus()).isEqualTo("SUPERSEDED");
+        assertThat(d.getSupersededById()).isEqualTo(newer);
+        assertThat(d.isVerified()).isFalse();
+        assertThat(d.isCurrent()).isFalse();
+        assertThatThrownBy(() -> d.supersede(UUID.randomUUID())).isInstanceOf(IllegalStateException.class);
+    }
+
+    @Test @DisplayName("archiving needs a reason, stops it counting, and happens once")
+    void archives() {
+        ClientComplianceDocument d = doc();
+        d.verify(UUID.randomUUID(), null);
+        UUID by = UUID.randomUUID();
+        assertThatThrownBy(() -> d.archive(by, "short")).isInstanceOf(IllegalArgumentException.class);
+        d.archive(by, "Client left the practice in October");
+        assertThat(d.getStatus()).isEqualTo("ARCHIVED");
+        assertThat(d.isVerified()).isFalse();
+        assertThat(d.isCurrent()).isFalse();
+        assertThatThrownBy(() -> d.archive(by, "Client left the practice in October")).isInstanceOf(IllegalStateException.class);
+    }
 }

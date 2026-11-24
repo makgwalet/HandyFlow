@@ -13,13 +13,15 @@ import LookupInput from "../../components/ui/LookupInput"
 import { DOCUMENT_TYPES } from "../../lookups/southAfrica"
 import { documentState } from "../compliancetender/registration.logic"
 import { useAuth } from "../../hooks/useAuth"
-import { needsVerifyException, verifyBlocker } from "./documentRules"
+import { needsVerifyException, verifyBlocker, statusText, isRetired, canReview, canVerify, canReject, canReplace, canArchive, reasonBlocker } from "./documentRules"
 
 interface Doc {
   id: string; registrationId: string | null; documentType: string; evidenceId: string
   issueDate: string | null; expiryDate: string | null; verified: boolean; verifiedAt: string | null; createdAt: string
   uploadedBy?: string | null; verifiedBy?: string | null; verifiedByUploader?: boolean
+  status: string; rejectionReason?: string | null; archiveReason?: string | null; supersededById?: string | null; canDelete?: boolean
 }
+interface DocEvent { event: string; fromStatus: string | null; toStatus: string; reason: string | null; occurredAt: string }
 interface RegistrationOption { id: string; authority: string; registrationType: string }
 
 const ACCENT = "var(--hf-success-solid-strong)"
@@ -42,6 +44,12 @@ export default function ClientDocumentsTab({ clientId }: { clientId: string }) {
   const [file, setFile] = useState<File | null>(null)
   const [apiError, setApiError] = useState("")
   const [filterRegistration, setFilterRegistration] = useState("ALL")
+  const [replacing, setReplacing] = useState<Doc | null>(null)
+  const [reasonFor, setReasonFor] = useState<{ id: string; kind: "reject" | "archive" } | null>(null)
+  const [reasonText, setReasonText] = useState("")
+  const [showRetired, setShowRetired] = useState(false)
+  const [historyId, setHistoryId] = useState<string | null>(null)
+  const [stepError, setStepError] = useState("")
 
   const { data: documents = [], isLoading } = useQuery<Doc[]>({
     queryKey: ["cs-documents", clientId],
@@ -65,19 +73,31 @@ export default function ClientDocumentsTab({ clientId }: { clientId: string }) {
   }
 
   const invalidate = () => qc.invalidateQueries({ queryKey: ["cs-documents", clientId] })
+  const { data: events = [] } = useQuery<DocEvent[]>({
+    queryKey: ["cs-document-events", historyId], enabled: !!historyId,
+    queryFn: async () => { const r = await apiClient.get(`/api/v1/compliance-services/documents/${historyId}/events`); return r.data?.data ?? r.data ?? [] },
+  })
+  const stepFail = (e: { response?: { data?: { message?: string } } }) => setStepError(e.response?.data?.message ?? "That did not work")
+  const stepDone = () => { setStepError(""); setReasonFor(null); setReasonText(""); invalidate(); qc.invalidateQueries({ queryKey: ["cs-document-events"] }) }
+  const review = useMutation({ mutationFn: (id: string) => apiClient.post(`/api/v1/compliance-services/documents/${id}/review`, {}), onSuccess: stepDone, onError: stepFail })
+  const withReason = useMutation({
+    mutationFn: (v: { id: string; kind: "reject" | "archive"; reason: string }) => apiClient.post(`/api/v1/compliance-services/documents/${v.id}/${v.kind}`, { reason: v.reason }),
+    onSuccess: stepDone, onError: stepFail,
+  })
 
   const upload = useMutation({
     mutationFn: () => {
       const fd = new FormData()
       fd.append("documentType", documentType)
       if (registrationId) fd.append("registrationId", registrationId)
+      if (replacing) fd.append("replacesId", replacing.id)
       if (issueDate) fd.append("issueDate", issueDate)
       if (expiryDate) fd.append("expiryDate", expiryDate)
       fd.append("file", file as File)
       return apiClient.post(`/api/v1/compliance-services/clients/${clientId}/documents`, fd, { headers: { "Content-Type": "multipart/form-data" } })
     },
-    onSuccess: () => { invalidate(); setDocumentType(""); setRegistrationId(""); setIssueDate(""); setExpiryDate(""); setFile(null); setApiError("") },
-    onError: (e: any) => setApiError(e.response?.data?.message ?? "Failed to upload document"),
+    onSuccess: () => { invalidate(); setReplacing(null); setDocumentType(""); setRegistrationId(""); setIssueDate(""); setExpiryDate(""); setFile(null); setApiError("") },
+    onError: (e: { response?: { data?: { message?: string } } }) => setApiError(e.response?.data?.message ?? "Failed to upload document"),
   })
 
   const verify = useMutation({
@@ -98,7 +118,8 @@ export default function ClientDocumentsTab({ clientId }: { clientId: string }) {
     <div>
       {canManage && (
         <div style={{ background: "var(--hf-surface-muted)", border: "1px solid var(--hf-border)", borderRadius: 12, padding: 18, marginBottom: 22 }}>
-          <div style={{ fontSize: 13, fontWeight: 700, color: "var(--hf-text)", marginBottom: 12 }}>Upload a document</div>
+          <div style={{ fontSize: 13, fontWeight: 700, color: "var(--hf-text)", marginBottom: 12 }}>{replacing ? `Upload a replacement for ${replacing.documentType}` : "Upload a document"}</div>
+          {replacing && <div style={{ fontSize: 12, color: "var(--hf-text-muted)", marginBottom: 10 }}>The earlier document stays on record but stops counting as evidence. <button onClick={() => setReplacing(null)} style={{ border: "none", background: "transparent", color: "var(--hf-primary-text)", cursor: "pointer", fontSize: 12 }}>Cancel replacement</button></div>}
           <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "flex-end" }}>
             <div>
               <label style={lbl}>Document type *</label>
@@ -154,6 +175,12 @@ export default function ClientDocumentsTab({ clientId }: { clientId: string }) {
         </div>
       )}
 
+      {stepError && <div role="alert" style={{ marginBottom: 10, fontSize: 12, color: "var(--hf-danger-text)" }}>{stepError}</div>}
+      {documents.some(d => isRetired(d.status)) && (
+        <label style={{ display: "inline-flex", gap: 6, alignItems: "center", fontSize: 12, color: "var(--hf-text-muted)", marginBottom: 12 }}>
+          <input type="checkbox" checked={showRetired} onChange={e => setShowRetired(e.target.checked)} /> Show replaced and archived documents
+        </label>
+      )}
       {isLoading ? (
         <div style={{ textAlign: "center", padding: 40, color: "var(--hf-text-faint)" }}>Loading documents...</div>
       ) : documents.length === 0 ? (
@@ -164,6 +191,7 @@ export default function ClientDocumentsTab({ clientId }: { clientId: string }) {
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           {documents
+            .filter(d => showRetired || !isRetired(d.status))
             .filter(d => filterRegistration === "ALL" || (filterRegistration === "UNLINKED" ? !d.registrationId : d.registrationId === filterRegistration))
             .map(d => (
             <div key={d.id} style={{ display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: 14, border: "1px solid var(--hf-border)", borderRadius: 10, padding: "12px 16px", background: "var(--hf-surface)" }}>
@@ -180,14 +208,43 @@ export default function ClientDocumentsTab({ clientId }: { clientId: string }) {
                 </div>
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
-                {(() => { const st = documentState(d, new Date()); return <Chip tone={st.tone} icon={d.verified && st.text.startsWith("Verified") ? <BadgeCheck size={12} /> : undefined}>{st.text}</Chip> })()}
-                {canManage && !d.verified && (
+                {d.status === "VERIFIED" || d.status === "UPLOADED" || d.status === "UNDER_REVIEW"
+                  ? (() => { const st = documentState(d, new Date()); return <Chip tone={st.tone} icon={d.verified && st.text.startsWith("Verified") ? <BadgeCheck size={12} /> : undefined}>{st.text}</Chip> })()
+                  : <Chip tone={d.status === "REJECTED" ? "bad" : "neutral"}>{statusText(d.status)}</Chip>}
+                {d.status === "UNDER_REVIEW" && <Chip tone="neutral">Under review</Chip>}
+                {canManage && canReview(d.status) && <button onClick={() => review.mutate(d.id)} style={miniBtn}>Send for review</button>}
+                {canManage && canReject(d.status) && <button onClick={() => { setStepError(""); setReasonText(""); setReasonFor({ id: d.id, kind: "reject" }) }} style={miniBtn}>Reject</button>}
+                {canManage && canReplace(d.status) && <button onClick={() => { setReplacing(d); setDocumentType(d.documentType); setRegistrationId(d.registrationId ?? ""); window.scrollTo?.({ top: 0 }) }} style={miniBtn}>Replace</button>}
+                {canManage && canArchive(d.status) && <button onClick={() => { setStepError(""); setReasonText(""); setReasonFor({ id: d.id, kind: "archive" }) }} style={miniBtn}>Archive</button>}
+                <button onClick={() => setHistoryId(historyId === d.id ? null : d.id)} style={miniBtn}>History</button>
+                {canManage && canVerify(d.status) && !d.verified && (
                   <button onClick={() => { setVerifyError(""); if (needsVerifyException(d, user?.userId)) { setVerifyingId(verifyingId === d.id ? null : d.id); setExceptionReason("") } else verify.mutate({ id: d.id, reason: null }) }} title="Mark verified" aria-label="Mark verified" style={{ display: "inline-flex", alignItems: "center", background: "var(--hf-success-soft-strong)", border: "none", borderRadius: 6, padding: "6px 8px", cursor: "pointer", color: "var(--hf-success-text-strong)" }}><CheckCircle2 size={13} /> <span style={{ marginLeft: 4, fontSize: 12, fontWeight: 700 }}>Verify</span></button>
                 )}
-                {canAdmin && (
+                {canAdmin && d.canDelete && (
                   <button onClick={() => { if (confirm(`Delete "${d.documentType}"?`)) remove.mutate(d.id) }} title="Delete" style={{ background: "var(--hf-danger-soft)", border: "none", borderRadius: 6, padding: "6px 8px", cursor: "pointer", color: "var(--hf-danger-text)" }}><Trash2 size={13} /></button>
                 )}
               </div>
+              {(d.rejectionReason || d.archiveReason) && (
+                <div style={{ flexBasis: "100%", fontSize: 12, color: "var(--hf-text-muted)" }}>{d.rejectionReason ? `Rejected: ${d.rejectionReason}` : `Archived: ${d.archiveReason}`}</div>
+              )}
+              {reasonFor?.id === d.id && (
+                <div style={{ flexBasis: "100%", paddingTop: 10, borderTop: "1px solid var(--hf-border)" }}>
+                  <textarea rows={2} value={reasonText} onChange={e => setReasonText(e.target.value)} placeholder={reasonFor.kind === "reject" ? "Why is this rejected?" : "Why is this archived?"}
+                    style={{ width: "100%", padding: "8px 10px", border: "1.5px solid var(--hf-border)", borderRadius: 8, fontSize: 13, boxSizing: "border-box" }} />
+                  {reasonText.length > 0 && reasonBlocker(reasonFor.kind, reasonText) && <div style={{ marginTop: 4, fontSize: 12, color: "var(--hf-text-faint)" }}>{reasonBlocker(reasonFor.kind, reasonText)}</div>}
+                  <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+                    <button disabled={!!reasonBlocker(reasonFor.kind, reasonText) || withReason.isPending} onClick={() => withReason.mutate({ id: d.id, kind: reasonFor.kind, reason: reasonText.trim() })}
+                      style={{ padding: "6px 12px", borderRadius: 8, fontSize: 12, fontWeight: 700, border: "none", cursor: "pointer", background: "var(--hf-primary-text)", color: "#fff" }}>{reasonFor.kind === "reject" ? "Reject document" : "Archive document"}</button>
+                    <button onClick={() => setReasonFor(null)} style={{ padding: "6px 12px", borderRadius: 8, fontSize: 12, fontWeight: 600, border: "1.5px solid var(--hf-border)", background: "var(--hf-surface)", cursor: "pointer" }}>Cancel</button>
+                  </div>
+                </div>
+              )}
+              {historyId === d.id && (
+                <div style={{ flexBasis: "100%", fontSize: 12, color: "var(--hf-text-muted)", display: "grid", gap: 3 }}>
+                  {events.length === 0 && <div>No history yet.</div>}
+                  {events.map((e, i) => <div key={i}>{e.occurredAt.slice(0, 10)} · {e.event.toLowerCase().replace("_", " ")}{e.reason ? ` · ${e.reason}` : ""}</div>)}
+                </div>
+              )}
               {verifyingId === d.id && (
                 <div style={{ flexBasis: "100%", marginTop: 10, paddingTop: 10, borderTop: "1px solid var(--hf-border)" }}>
                   <div style={{ fontSize: 12, color: "var(--hf-text-muted)", marginBottom: 6 }}>
@@ -213,4 +270,5 @@ export default function ClientDocumentsTab({ clientId }: { clientId: string }) {
   )
 }
 
+const miniBtn: React.CSSProperties = { padding: "5px 9px", border: "1px solid var(--hf-border)", borderRadius: 6, background: "transparent", color: "var(--hf-text-muted)", fontSize: 12, cursor: "pointer" }
 const lbl: React.CSSProperties = { display: "block", fontSize: 11, fontWeight: 600, color: "var(--hf-text-secondary)", marginBottom: 4 }

@@ -157,7 +157,7 @@ public class ClientAssessmentService {
         Map<UUID, List<ComplianceObligationEvidence>> required = list.isEmpty() ? Map.of()
                 : obligationEvidence.findForVersions(tenantId, list.stream().map(ComplianceAssessmentItem::getVersionId).distinct().toList()).stream()
                         .collect(Collectors.groupingBy(ComplianceObligationEvidence::getVersionId));
-        List<DocumentFact> facts = documents.findByClient(tenantId, clientId).stream()
+        List<DocumentFact> facts = documents.findByClient(tenantId, clientId).stream().filter(ClientComplianceDocument::isCurrent)
                 .map(d -> new DocumentFact(d.getDocumentType(), d.getExpiryDate(), d.isVerified())).toList();
 
         for (ComplianceAssessmentItem item : list) {
