@@ -71,8 +71,11 @@ public class ComplianceCaseService {
             throw new HandyFlowException("There is already a case open for this obligation. Work on that one", HttpStatus.CONFLICT, "CASE_ALREADY_OPEN");
         }
         UUID owner = r.ownerId() != null ? r.ownerId() : by;
-        ComplianceCase c = guard(() -> ComplianceCase.open(tenantId, clientId, title, description, severity, owner, r.dueDate(),
-                r.assessmentId(), obligationId, code, by, today));
+        final String finalTitle = title;
+        final String finalSeverity = severity;
+        final String finalCode = code;
+        ComplianceCase c = guard(() -> ComplianceCase.open(tenantId, clientId, finalTitle, description, finalSeverity, owner, r.dueDate(),
+                r.assessmentId(), obligationId, finalCode, by, today));
         cases.save(c);
         log(tenantId, c, "OPENED", null, c.getStatus(), null, by);
         return detail(tenantId, c);
