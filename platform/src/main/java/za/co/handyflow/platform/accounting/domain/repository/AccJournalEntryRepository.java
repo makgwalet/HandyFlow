@@ -33,6 +33,14 @@ public interface AccJournalEntryRepository extends JpaRepository<AccJournalEntry
     @Query("SELECT e FROM AccJournalEntry e WHERE e.tenantId = :#{#tenantId.value} AND e.entryDate BETWEEN :from AND :to AND e.status IN ('POSTED', 'REVERSED') AND e.deletedAt IS NULL ORDER BY e.entryDate")
     List<AccJournalEntry> findPostedInRange(TenantId tenantId, LocalDate from, LocalDate to);
 
+    /** Everything that counts in the books up to and including a date: the base for "as at" reports. */
+    @Query("SELECT e FROM AccJournalEntry e WHERE e.tenantId = :#{#tenantId.value} AND e.entryDate <= :to AND e.status IN ('POSTED', 'REVERSED') AND e.deletedAt IS NULL ORDER BY e.entryDate")
+    List<AccJournalEntry> findPostedUpTo(TenantId tenantId, LocalDate to);
+
+    /** The journal that holds a given line, for this company only (used to check a bank match). */
+    @Query("SELECT e FROM AccJournalEntry e JOIN e.lines l WHERE e.tenantId = :#{#tenantId.value} AND l.id = :lineId AND e.deletedAt IS NULL")
+    Optional<AccJournalEntry> findByLineId(TenantId tenantId, UUID lineId);
+
     /** The live (not reversed, not discarded) journal for a business event, if any (finance patch F3). */
     @Query("SELECT e FROM AccJournalEntry e WHERE e.tenantId = :#{#tenantId.value} AND e.sourceKey = :sourceKey AND e.status <> 'REVERSED' AND e.deletedAt IS NULL")
     Optional<AccJournalEntry> findLiveBySourceKey(TenantId tenantId, String sourceKey);

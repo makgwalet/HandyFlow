@@ -69,4 +69,15 @@ public class AccBankTransaction {
         this.reconciledAt  = Instant.now();
         this.updatedAt     = Instant.now();
     }
+
+    /** Undoes a match made against an existing journal line. */
+    public void unreconcile() {
+        this.reconciled    = false;
+        this.journalLineId = null;
+        this.reconciledAt  = null;
+        this.reconciledBy  = null;
+        this.reconcileKind = null;
+        this.ruleId        = null;
+        this.updatedAt     = Instant.now();
+    }
 }

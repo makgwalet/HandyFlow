@@ -8,10 +8,13 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import za.co.handyflow.platform.accounting.domain.model.*;
 import za.co.handyflow.platform.accounting.domain.repository.*;
+import za.co.handyflow.platform.accounting.domain.rules.BankMatchRules;
+import za.co.handyflow.platform.accounting.domain.rules.JournalInputRules;
+import za.co.handyflow.platform.accounting.domain.rules.PositionReportRules;
+import za.co.handyflow.platform.accounting.domain.rules.VatReturnRules;
 import za.co.handyflow.platform.accounting.dto.*;
 import za.co.handyflow.platform.crm.CrmFacade;
 import za.co.handyflow.platform.invoicing.application.InvoicingFacade;
-import za.co.handyflow.platform.invoicing.domain.model.Invoice;
 import za.co.handyflow.platform.shared.EmailService;
 import za.co.handyflow.platform.shared.HandyFlowException;
 import za.co.handyflow.platform.shared.ResourceNotFoundException;
@@ -51,6 +54,15 @@ public class AccountingService {
     // Finance patch F28: lines without a cost centre are tagged by the business's own rules.
     private final TagRuleService               tagRules;
     private final za.co.handyflow.platform.shared.SeparationOfDutiesChecker duties;
+
+    // Field injection keeps the constructor as it was. Without a calendar (a plain `new`) the default business zone applies.
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private za.co.handyflow.platform.shared.BusinessCalendar calendar;
+
+    /** The company's business day today (its own time zone, not the server's). */
+    private LocalDate today(TenantId tenantId) {
+        return za.co.handyflow.platform.shared.BusinessCalendar.todayOf(calendar, tenantId);
+    }
 
     // ── Chart of Accounts ─────────────────────────────────────────────────────
 
@@ -175,6 +187,12 @@ public class AccountingService {
                                 + "each line must be one or the other, not both");
         }
 
+        // Audit 1.8: a known entry type, every line on an active account of this company, amounts in whole cents.
+        Set<UUID> usableAccounts = accountRepo.findAllActive(tenantId).stream().map(AccAccount::getId).collect(Collectors.toSet());
+        String inputProblem = JournalInputRules.problem(req.entryType(), usableAccounts, req.lines().stream()
+                .map(l -> new JournalInputRules.Line(l.accountId(), l.debitAmount(), l.creditAmount())).toList());
+        if (inputProblem != null) throw new IllegalArgumentException(inputProblem);
+
         // F28: a line the poster left untagged takes the first matching rule's cost centre (income and expense lines only).
         List<UUID> centreFor = autoTag(tenantId, req);
         costCentres.requireUsable(tenantId, centreFor);
@@ -278,6 +296,8 @@ public class AccountingService {
     public void discardDraft(TenantId tenantId, UUID id, UUID discardedBy) {
         AccJournalEntry entry = journalRepo.findActiveById(tenantId, id)
                 .orElseThrow(() -> new ResourceNotFoundException("JournalEntry", id.toString()));
+        String discardProblem = JournalInputRules.discardProblem(entry.getSourceKey(), entry.getEntryNumber());
+        if (discardProblem != null) throw new HandyFlowException(discardProblem, HttpStatus.CONFLICT, "SYSTEM_DRAFT");
         entry.discard();
         journalRepo.save(entry);
         log.info("Discarded draft journal entry={} tenant={} by={}", entry.getEntryNumber(), tenantId, discardedBy);
@@ -328,7 +348,7 @@ public class AccountingService {
         String problem = JournalReviewRules.reversalProblem(original.getStatus(), pending);
         if (problem != null) throw new IllegalStateException(problem);
 
-        LocalDate date = reversalDate != null ? reversalDate : LocalDate.now();
+        LocalDate date = reversalDate != null ? reversalDate : today(tenantId);
         periodLock.requireOpen(tenantId, date);
         String reversalNumber = numberGen.next(tenantId);
 
@@ -607,6 +627,7 @@ public class AccountingService {
 
         List<MatchCandidateResponse> candidates = new ArrayList<>();
         for (AccJournalEntry entry : entries) {
+            if (!"POSTED".equals(entry.getStatus())) continue;   // a reversed journal cannot be matched (audit 1.7)
             for (AccJournalLine line : entry.getLines()) {
                 if (!bank.getAccountId().equals(line.getAccountId())) continue;
                 if (alreadyLinked.contains(line.getId())) continue;
@@ -646,7 +667,7 @@ public class AccountingService {
     @Transactional
     public BankTransactionResponse reconcileTransaction(TenantId tenantId, UUID bankAccountId,
                                                         UUID transactionId, ReconcileRequest req, UUID userId) {
-        bankAccountRepo.findActiveById(tenantId, bankAccountId)
+        AccBankAccount bank = bankAccountRepo.findActiveById(tenantId, bankAccountId)
                 .orElseThrow(() -> new ResourceNotFoundException("BankAccount", bankAccountId.toString()));
         AccBankTransaction tx = bankTxRepo.findById(transactionId)
                 .filter(t -> t.getBankAccountId().equals(bankAccountId))
@@ -657,9 +678,40 @@ public class AccountingService {
         if (bankTxRepo.findLinkedJournalLineIds(tenantId).contains(req.journalLineId()))
             throw new IllegalStateException("That journal line is already linked to a different transaction");
 
+        // Audit 1.7: the line must be this company's, posted, on this bank's ledger account, in the right direction, for the
+        // same amount, and the period must not be signed off. Otherwise a wrong match hides a difference.
+        BankMatchRules.Candidate chosen = journalRepo.findByLineId(tenantId, req.journalLineId())
+                .map(e -> e.getLines().stream().filter(l -> req.journalLineId().equals(l.getId())).findFirst()
+                        .map(l -> new BankMatchRules.Candidate(true, e.getStatus(), l.getAccountId(), l.getDebitAmount(), l.getCreditAmount()))
+                        .orElse(BankMatchRules.Candidate.missing()))
+                .orElse(BankMatchRules.Candidate.missing());
+        String matchProblem = BankMatchRules.matchProblem(bank.getAccountId(), "CREDIT".equals(tx.getTransactionType()),
+                tx.getAmount(), tx.getTransactionDate(), bankRecRepo.signedOffThrough(tenantId, bankAccountId), chosen);
+        if (matchProblem != null) throw new IllegalStateException(matchProblem);
+
         tx.reconcile(req.journalLineId(), userId, "MATCHED", null);
         bankTxRepo.save(tx);
         log.info("Reconciled bank transaction={} to journalLine={}", transactionId, req.journalLineId());
+        return toBankTransactionResponse(tx);
+    }
+
+    /**
+     * Undoes a match to an existing journal line (audit 1.7), so a wrong match can be corrected. Not allowed once the
+     * period is signed off, nor for a line matched by creating a journal (reverse that journal instead).
+     */
+    @Transactional
+    public BankTransactionResponse unreconcileTransaction(TenantId tenantId, UUID bankAccountId, UUID transactionId, UUID userId) {
+        bankAccountRepo.findActiveById(tenantId, bankAccountId)
+                .orElseThrow(() -> new ResourceNotFoundException("BankAccount", bankAccountId.toString()));
+        AccBankTransaction tx = bankTxRepo.findById(transactionId)
+                .filter(t -> t.getBankAccountId().equals(bankAccountId))
+                .orElseThrow(() -> new ResourceNotFoundException("BankTransaction", transactionId.toString()));
+        String problem = BankMatchRules.unmatchProblem(tx.isReconciled(), tx.getReconcileKind(), tx.getTransactionDate(),
+                bankRecRepo.signedOffThrough(tenantId, bankAccountId));
+        if (problem != null) throw new IllegalStateException(problem);
+        tx.unreconcile();
+        bankTxRepo.save(tx);
+        log.info("Un-matched bank transaction={} by={}", transactionId, userId);
         return toBankTransactionResponse(tx);
     }
 
@@ -806,26 +858,28 @@ public class AccountingService {
         return toVatPeriodResponse(period);
     }
 
+    /**
+     * VAT201 figures from the ledger: output VAT is what the books owe (VAT Output 2100, credits less debits, so credit
+     * notes reduce it and VAT posted by other modules counts); input VAT is the VAT asset account, debits less credits.
+     * The invoice count and sales total come from the invoices issued in the period and are only a supporting schedule.
+     */
     @Transactional(readOnly = true)
     public Vat201Response getVat201(TenantId tenantId, LocalDate from, LocalDate to) {
         InvoicingFacade.VatSummary vatSummary = invoicingFacade.getVatSummary(tenantId, from, to);
-        BigDecimal outputVat  = vatSummary.totalOutputVat();
-        BigDecimal totalSales = vatSummary.totalSubtotal();
 
-        Map<UUID, AccAccount> accounts = accountRepo.findAllActive(tenantId)
-                .stream().collect(Collectors.toMap(AccAccount::getId, a -> a));
-        BigDecimal inputVat = journalRepo.findPostedInRange(tenantId, from, to).stream()
-                .flatMap(e -> e.getLines().stream())
-                .filter(l -> {
-                    AccAccount acc = accounts.get(l.getAccountId());
-                    return acc != null && "VAT".equals(acc.getAccountSubtype())
-                            && "ASSET".equals(acc.getAccountType());
-                })
-                .map(l -> l.getDebitAmount().subtract(l.getCreditAmount()))
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        List<VatReturnRules.Acct> accounts = accountRepo.findAllIncludingInactive(tenantId).stream()
+                .map(a -> new VatReturnRules.Acct(a.getId(), a.getAccountCode(), a.getAccountType(), a.getAccountSubtype()))
+                .toList();
+        List<VatReturnRules.Line> lines = new ArrayList<>();
+        for (AccJournalEntry e : journalRepo.findPostedInRange(tenantId, from, to)) {
+            for (AccJournalLine l : e.getLines()) {
+                lines.add(new VatReturnRules.Line(l.getAccountId(), l.getDebitAmount(), l.getCreditAmount()));
+            }
+        }
+        VatReturnRules.Result vat = VatReturnRules.compute(accounts, lines);
 
-        return new Vat201Response(from, to, vatSummary.invoiceCount(), totalSales, outputVat,
-                inputVat, outputVat.subtract(inputVat));
+        return new Vat201Response(from, to, vatSummary.invoiceCount(), vatSummary.totalSubtotal(), vat.outputVat(),
+                vat.inputVat(), vat.netVatPayable());
     }
 
     // ── AR Aging ──────────────────────────────────────────────────────────────
@@ -834,7 +888,7 @@ public class AccountingService {
     public AgingReportResponse getArAging(TenantId tenantId) {
         List<InvoicingFacade.OutstandingInvoiceSummary> outstanding =
                 invoicingFacade.findOutstandingInvoices(tenantId);
-        LocalDate today = LocalDate.now();
+        LocalDate today = today(tenantId);
 
         BigDecimal current = BigDecimal.ZERO, days30 = BigDecimal.ZERO,
                 days60 = BigDecimal.ZERO, days90 = BigDecimal.ZERO, over90 = BigDecimal.ZERO;
@@ -893,92 +947,65 @@ public class AccountingService {
                 totalIncome.subtract(totalExpense));
     }
 
+    /**
+     * Trial balance as at {@code to}. Balance-sheet accounts are cumulative; income and expense cover {@code from}
+     * (the start of the financial year) to {@code to}, with earlier years rolled into Retained Earnings.
+     */
     @Transactional(readOnly = true)
     public FinancialReportResponse getTrialBalance(TenantId tenantId,
                                                    LocalDate from, LocalDate to) {
         coaSeeder.seedForTenant(tenantId);
-        List<AccJournalEntry> entries = journalRepo.findPostedInRange(tenantId, from, to);
-        Map<UUID, AccAccount> accounts = accountRepo.findAllActive(tenantId)
-                .stream().collect(Collectors.toMap(AccAccount::getId, a -> a));
-
-        Map<UUID, BigDecimal[]> grossMap = new HashMap<>();
-        for (AccJournalEntry e : entries) {
-            for (AccJournalLine l : e.getLines()) {
-                grossMap.computeIfAbsent(l.getAccountId(), k -> new BigDecimal[]{BigDecimal.ZERO, BigDecimal.ZERO});
-                grossMap.get(l.getAccountId())[0] = grossMap.get(l.getAccountId())[0].add(l.getDebitAmount());
-                grossMap.get(l.getAccountId())[1] = grossMap.get(l.getAccountId())[1].add(l.getCreditAmount());
-            }
-        }
+        PositionReportRules.Position position = position(tenantId, from, to);
 
         List<FinancialReportResponse.ReportLine> lines = new ArrayList<>();
         BigDecimal totalDebits = BigDecimal.ZERO, totalCredits = BigDecimal.ZERO;
-        for (var entry : grossMap.entrySet()) {
-            AccAccount acc = accounts.get(entry.getKey());
-            if (acc == null) continue;
-            BigDecimal debit  = entry.getValue()[0];
-            BigDecimal credit = entry.getValue()[1];
-            if (debit.compareTo(BigDecimal.ZERO) == 0 && credit.compareTo(BigDecimal.ZERO) == 0) continue;
+        for (PositionReportRules.Row row : PositionReportRules.trialBalance(position)) {
             lines.add(new FinancialReportResponse.ReportLine(
-                    acc.getAccountCode(), acc.getAccountName(),
-                    debit.subtract(credit), debit, credit));
-            totalDebits  = totalDebits.add(debit);
-            totalCredits = totalCredits.add(credit);
+                    row.code(), row.name(), row.net(), row.debit(), row.credit()));
+            totalDebits  = totalDebits.add(row.debit());
+            totalCredits = totalCredits.add(row.credit());
         }
-        lines.sort(Comparator.comparing(FinancialReportResponse.ReportLine::accountCode));
 
         return new FinancialReportResponse("TRIAL_BALANCE", from, to,
                 List.of(new FinancialReportResponse.ReportSection("All Accounts", lines, totalDebits)),
                 totalDebits.subtract(totalCredits));
     }
 
+    /**
+     * Balance sheet as at {@code to}: every posted journal up to that date. {@code from} is the start of the financial
+     * year: profit before it is Retained Earnings (3020), profit from it is Current Year Earnings (3040).
+     */
     @Transactional(readOnly = true)
     public FinancialReportResponse getBalanceSheet(TenantId tenantId, LocalDate from, LocalDate to) {
         coaSeeder.seedForTenant(tenantId);
-        List<AccJournalEntry> entries = journalRepo.findPostedInRange(tenantId, from, to);
-        Map<UUID, AccAccount> accounts = accountRepo.findAllActive(tenantId)
-                .stream().collect(Collectors.toMap(AccAccount::getId, a -> a));
-        Map<UUID, BigDecimal> balances = computeBalancesWithOpeningBalances(entries, accounts);
-
-        // THE FIX: buildLines() below only ever reads ASSET/LIABILITY/
-        // EQUITY account types — every journal line that hits an INCOME
-        // or EXPENSE account (i.e. every revenue and cost posting ever
-        // made) was silently invisible to the Balance Sheet, with no
-        // closing entry ever folding that activity into Equity. Assets
-        // would only ever equal Liabilities + Equity by coincidence, for
-        // a tenant that happened to break exactly even. Confirmed
-        // directly against real data: zero journal lines have ever
-        // touched account 3020 or 3040 for this tenant, for any period.
-        //
-        // Fix: compute Net Profit the identical way getProfitAndLoss()
-        // already does (same buildLines() calls, same sign convention),
-        // then fold it into the real "Current Year Earnings" (3040)
-        // account before the Equity section is built — not an ad-hoc
-        // synthetic line, but the actual seeded account that exists
-        // specifically for this purpose.
-        var incomeLinesForClose  = buildLines(accounts, balances, "INCOME",  true);
-        var expenseLinesForClose = buildLines(accounts, balances, "EXPENSE", false);
-        BigDecimal netProfitForClose = sum(incomeLinesForClose).subtract(sum(expenseLinesForClose));
-
-        accountRepo.findByTenantAndCode(tenantId, "3040").ifPresent(currentYearEarnings ->
-                balances.merge(currentYearEarnings.getId(), netProfitForClose.negate(), BigDecimal::add));
-        // .negate() because buildLines() negates EQUITY balances again on
-        // the way out (positiveIsCredit=true) — storing the pre-negated
-        // value here means a real profit displays as a positive Equity
-        // contribution, not a negative one.
-
-        var assetLines     = buildLines(accounts, balances, "ASSET",     false);
-        var liabilityLines = buildLines(accounts, balances, "LIABILITY", true);
-        var equityLines    = buildLines(accounts, balances, "EQUITY",    true);
-
-        BigDecimal totalAssets      = sum(assetLines);
-        BigDecimal totalLiabilities = sum(liabilityLines);
-        BigDecimal totalEquity      = sum(equityLines);
+        PositionReportRules.Sheet sheet = PositionReportRules.balanceSheet(position(tenantId, from, to));
 
         return new FinancialReportResponse("BALANCE_SHEET", from, to,
-                List.of(new FinancialReportResponse.ReportSection("Assets",      assetLines,     totalAssets),
-                        new FinancialReportResponse.ReportSection("Liabilities", liabilityLines, totalLiabilities),
-                        new FinancialReportResponse.ReportSection("Equity",      equityLines,    totalEquity)),
-                totalLiabilities.add(totalEquity));
+                List.of(new FinancialReportResponse.ReportSection("Assets",      reportLines(sheet.assets()),      sheet.totalAssets()),
+                        new FinancialReportResponse.ReportSection("Liabilities", reportLines(sheet.liabilities()), sheet.totalLiabilities()),
+                        new FinancialReportResponse.ReportSection("Equity",      reportLines(sheet.equity()),      sheet.totalEquity())),
+                sheet.totalLiabilities().add(sheet.totalEquity()));
+    }
+
+    private PositionReportRules.Position position(TenantId tenantId, LocalDate from, LocalDate to) {
+        List<PositionReportRules.Acct> accounts = accountRepo.findAllIncludingInactive(tenantId).stream()
+                .map(a -> new PositionReportRules.Acct(a.getId(), a.getAccountCode(), a.getAccountName(),
+                        a.getAccountType(), a.getOpeningBalance()))
+                .toList();
+        List<PositionReportRules.Move> moves = new ArrayList<>();
+        for (AccJournalEntry e : journalRepo.findPostedUpTo(tenantId, to)) {
+            for (AccJournalLine l : e.getLines()) {
+                moves.add(new PositionReportRules.Move(l.getAccountId(), e.getEntryDate(),
+                        l.getDebitAmount(), l.getCreditAmount()));
+            }
+        }
+        return PositionReportRules.compute(accounts, moves, from, to);
+    }
+
+    private List<FinancialReportResponse.ReportLine> reportLines(List<PositionReportRules.Line> lines) {
+        return lines.stream()
+                .map(l -> new FinancialReportResponse.ReportLine(l.code(), l.name(), l.amount()))
+                .toList();
     }
 
     /**
@@ -995,7 +1022,12 @@ public class AccountingService {
         AccAccount account = accountRepo.findByTenantAndCode(tenantId, accountCode)
                 .orElseThrow(() -> new ResourceNotFoundException("Account", accountCode));
 
-        List<AccJournalEntry> entries = journalRepo.findPostedInRange(tenantId, from, to);
+        // Income and expense lines are those of the period; balance-sheet accounts carry everything up to the date,
+        // which is what the Balance Sheet and Trial Balance show for them.
+        boolean periodOnly = "INCOME".equals(account.getAccountType()) || "EXPENSE".equals(account.getAccountType());
+        List<AccJournalEntry> entries = periodOnly
+                ? journalRepo.findPostedInRange(tenantId, from, to)
+                : journalRepo.findPostedUpTo(tenantId, to);
 
         List<AccountDrillDownResponse.DrillDownLine> lines = new ArrayList<>();
         BigDecimal totalDebit = BigDecimal.ZERO, totalCredit = BigDecimal.ZERO;
@@ -1105,7 +1137,7 @@ public class AccountingService {
     @Transactional(readOnly = true)
     public List<MonthlySummaryResponse> getMonthlySummary(TenantId tenantId, int months) {
         List<MonthlySummaryResponse> result = new ArrayList<>();
-        YearMonth current = YearMonth.now();
+        YearMonth current = YearMonth.from(today(tenantId));
 
         for (int i = months - 1; i >= 0; i--) {
             YearMonth ym   = current.minusMonths(i);

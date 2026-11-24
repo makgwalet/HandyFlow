@@ -1,6 +1,9 @@
 package za.co.handyflow.platform.accounting.application.internal;
 
-import lombok.RequiredArgsConstructor;
+import java.time.Instant;
+import za.co.handyflow.platform.shared.BusinessCalendar;
+import za.co.handyflow.platform.accounting.domain.rules.PostingDateRules;
+import org.springframework.beans.factory.annotation.Autowired;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.modulith.events.ApplicationModuleListener;
 import org.springframework.stereotype.Component;
@@ -50,7 +53,6 @@ import java.util.UUID;
  */
 @Slf4j
 @Component
-@RequiredArgsConstructor
 class InvoicingAccountingEventHandler {
 
     private static final String AR_ACCOUNT_CODE          = "1100";
@@ -61,6 +63,29 @@ class InvoicingAccountingEventHandler {
     private final AccBankAccountRepository bankAccountRepo;
     // Finance patch F4: posts in its own transaction and queues failures where people can see and retry them.
     private final LedgerPostingService     ledgerPosting;
+    // Dates journals in the company's own zone. Optional so the three-argument constructor (and its tests) still work;
+    // without it the default business zone is used. Never the server's zone.
+    private final BusinessCalendar         calendar;
+
+    @Autowired
+    InvoicingAccountingEventHandler(AccAccountRepository accountRepo, AccBankAccountRepository bankAccountRepo,
+                                    LedgerPostingService ledgerPosting, BusinessCalendar calendar) {
+        this.accountRepo = accountRepo;
+        this.bankAccountRepo = bankAccountRepo;
+        this.ledgerPosting = ledgerPosting;
+        this.calendar = calendar;
+    }
+
+    InvoicingAccountingEventHandler(AccAccountRepository accountRepo, AccBankAccountRepository bankAccountRepo,
+                                    LedgerPostingService ledgerPosting) {
+        this(accountRepo, bankAccountRepo, ledgerPosting, null);
+    }
+
+    /** The day the document was issued, in the company's zone (finance audit 1.6): not the day this listener runs. */
+    private LocalDate documentDate(TenantId tenantId, Instant occurredOn) {
+        return PostingDateRules.documentDate(BusinessCalendar.zoneOf(calendar, tenantId), occurredOn,
+                BusinessCalendar.todayOf(calendar, tenantId));
+    }
 
     @ApplicationModuleListener
     void onInvoiceIssued(InvoiceIssuedEvent event) {
@@ -98,13 +123,16 @@ class InvoicingAccountingEventHandler {
             }
 
             CreateJournalEntryRequest req = new CreateJournalEntryRequest(
-                    LocalDate.now(), "Invoice issued: " + event.invoiceNumber(),
+                    documentDate(event.tenantId(), event.occurredOn()), "Invoice issued: " + event.invoiceNumber(),
                     event.invoiceNumber(), "MANUAL", lines);
 
             // Finance patch F3/F4: once per invoice, in its own transaction; a failure is queued.
             ledgerPosting.postOnceOrRecord(event.tenantId(), key, req);
             log.info("[Accounting] Posted issuance journal for invoice={} tenant={}", event.invoiceNumber(), event.tenantId());
         } catch (Exception e) {
+            // Audit P1: a failure before the post (a lookup, a bad value) used to be only logged, and the event was then
+            // marked complete, so the posting was lost. Queue it where people can see it (kept if the post already queued it).
+            ledgerPosting.recordUnexpectedFailure(event.tenantId(), key, summary, e);
             // Same principle as every other cross-module side-effect hookup
             // in this codebase: the invoice is already saved/issued by the
             // time this listener runs — a posting failure must never look
@@ -118,7 +146,8 @@ class InvoicingAccountingEventHandler {
     void onInvoicePaymentRecorded(InvoicePaymentRecordedEvent event) {
         // Finance patch F3: once per payment. Events stored before F3 carry no payment id; they get a fresh one here.
         String key = PostingKeys.of("invoicing", "payment-received",
-                event.paymentEventId() != null ? event.paymentEventId() : UUID.randomUUID());
+                event.paymentEventId() != null ? event.paymentEventId()
+                        : PostingKeys.stableId(event.invoiceId(), event.amountPaid(), event.occurredOn()));
         String summary = "Payment received: " + event.invoiceNumber() + " R " + event.amountPaid();
         try {
             if (event.bankAccountId() == null) {
@@ -156,12 +185,15 @@ class InvoicingAccountingEventHandler {
                             arAccountId, "Payment received — " + event.invoiceNumber(), null, event.amountPaid()));
 
             CreateJournalEntryRequest req = new CreateJournalEntryRequest(
-                    LocalDate.now(), "Payment received: " + event.invoiceNumber(),
+                    documentDate(event.tenantId(), event.occurredOn()), "Payment received: " + event.invoiceNumber(),
                     event.invoiceNumber(), "PAYMENT", lines);
 
             ledgerPosting.postOnceOrRecord(event.tenantId(), key, req);
             log.info("[Accounting] Posted payment journal for invoice={} tenant={}", event.invoiceNumber(), event.tenantId());
         } catch (Exception e) {
+            // Audit P1: a failure before the post (a lookup, a bad value) used to be only logged, and the event was then
+            // marked complete, so the posting was lost. Queue it where people can see it (kept if the post already queued it).
+            ledgerPosting.recordUnexpectedFailure(event.tenantId(), key, summary, e);
             log.error("[Accounting] Failed to post payment journal for invoice={} tenant={}: {}",
                     event.invoiceNumber(), event.tenantId(), e.getMessage(), e);
         }
@@ -200,13 +232,16 @@ class InvoicingAccountingEventHandler {
             }
             String memo = "Payment received — " + event.receiptNumber() + " (" + what + ")";
             CreateJournalEntryRequest req = new CreateJournalEntryRequest(
-                    event.receivedOn() != null ? event.receivedOn() : LocalDate.now(), summary,
+                    event.receivedOn() != null ? event.receivedOn() : documentDate(event.tenantId(), event.occurredOn()), summary,
                     event.reference() != null ? event.reference() : event.receiptNumber(), "PAYMENT", List.of(
                     new CreateJournalEntryRequest.JournalLineRequest(bankAccount.getAccountId(), memo, event.amount(), null),
                     new CreateJournalEntryRequest.JournalLineRequest(arAccountId, memo, null, event.amount())));
             ledgerPosting.postOnceOrRecord(event.tenantId(), key, req);
             log.info("[Accounting] Posted receipt={} tenant={}", event.receiptNumber(), event.tenantId());
         } catch (Exception e) {
+            // Audit P1: a failure before the post (a lookup, a bad value) used to be only logged, and the event was then
+            // marked complete, so the posting was lost. Queue it where people can see it (kept if the post already queued it).
+            ledgerPosting.recordUnexpectedFailure(event.tenantId(), key, summary, e);
             log.error("[Accounting] Failed to post receipt={} tenant={}: {}", event.receiptNumber(), event.tenantId(), e.getMessage(), e);
         }
     }
@@ -227,13 +262,16 @@ class InvoicingAccountingEventHandler {
             }
             String memo = "Refund " + event.refundNumber() + " of credit " + event.receiptNumber();
             CreateJournalEntryRequest req = new CreateJournalEntryRequest(
-                    event.refundedOn() != null ? event.refundedOn() : LocalDate.now(), summary,
+                    event.refundedOn() != null ? event.refundedOn() : documentDate(event.tenantId(), event.occurredOn()), summary,
                     event.reference() != null ? event.reference() : event.refundNumber(), "PAYMENT", List.of(
                     new CreateJournalEntryRequest.JournalLineRequest(arAccountId, memo, event.amount(), null),
                     new CreateJournalEntryRequest.JournalLineRequest(bankAccount.getAccountId(), memo, null, event.amount())));
             ledgerPosting.postOnceOrRecord(event.tenantId(), key, req);
             log.info("[Accounting] Posted refund={} tenant={}", event.refundNumber(), event.tenantId());
         } catch (Exception e) {
+            // Audit P1: a failure before the post (a lookup, a bad value) used to be only logged, and the event was then
+            // marked complete, so the posting was lost. Queue it where people can see it (kept if the post already queued it).
+            ledgerPosting.recordUnexpectedFailure(event.tenantId(), key, summary, e);
             log.error("[Accounting] Failed to post refund={} tenant={}: {}", event.refundNumber(), event.tenantId(), e.getMessage(), e);
         }
     }
@@ -280,13 +318,16 @@ class InvoicingAccountingEventHandler {
                     arAccountId, "Credit note — " + ref, null, event.total()));
 
             CreateJournalEntryRequest req = new CreateJournalEntryRequest(
-                    LocalDate.now(), "Credit note issued: " + ref,
+                    documentDate(event.tenantId(), event.occurredOn()), "Credit note issued: " + ref,
                     event.creditNoteNumber(), "INVOICE", lines);
 
             // Finance patch F3/F4: once per credit note, in its own transaction; a failure is queued.
             ledgerPosting.postOnceOrRecord(event.tenantId(), key, req);
             log.info("[Accounting] Posted credit note journal for credit note={} tenant={}", event.creditNoteNumber(), event.tenantId());
         } catch (Exception e) {
+            // Audit P1: a failure before the post (a lookup, a bad value) used to be only logged, and the event was then
+            // marked complete, so the posting was lost. Queue it where people can see it (kept if the post already queued it).
+            ledgerPosting.recordUnexpectedFailure(event.tenantId(), key, summary, e);
             log.error("[Accounting] Failed to post credit note journal for credit note={} tenant={}: {}",
                     event.creditNoteNumber(), event.tenantId(), e.getMessage(), e);
         }

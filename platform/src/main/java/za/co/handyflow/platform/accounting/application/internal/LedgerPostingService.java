@@ -81,6 +81,26 @@ public class LedgerPostingService {
         record(tenantId, sourceKey, summary, null, new IllegalStateException(reason));
     }
 
+    /**
+     * Queues a failure nobody has queued yet, for the case where something went wrong before or around the post. If the
+     * post itself already queued the failure (with the journal request and the exact reason) that entry is left as it is.
+     * Never throws.
+     */
+    public void recordUnexpectedFailure(TenantId tenantId, String sourceKey, String summary, Throwable cause) {
+        try {
+            separately.executeWithoutResult(status -> jdbc.update("""
+                    INSERT INTO acc_posting_failures (tenant_id, source_key, summary, request_json, reason)
+                    VALUES (?, ?, ?, NULL, ?)
+                    ON CONFLICT (tenant_id, source_key) WHERE status = 'OPEN' DO NOTHING""",
+                    tenantId.getValue(), sourceKey, PostingFailureRules.summary(summary), PostingFailureRules.reason(cause)));
+            log.warn("[Accounting] Posting failed before it could be tried: source={} tenant={} reason={}",
+                    sourceKey, tenantId, PostingFailureRules.reason(cause));
+        } catch (Exception recordError) {
+            log.error("[Accounting] Posting failed AND could not be queued: source={} tenant={} reason={} queueError={}",
+                    sourceKey, tenantId, PostingFailureRules.reason(cause), recordError.getMessage(), recordError);
+        }
+    }
+
     private void record(TenantId tenantId, String sourceKey, String summary, CreateJournalEntryRequest req, Throwable cause) {
         try {
             String requestJson = req != null ? json.writeValueAsString(req) : null;

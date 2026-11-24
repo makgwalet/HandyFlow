@@ -14,6 +14,10 @@ public interface AccAccountRepository extends JpaRepository<AccAccount, UUID> {
     @Query("SELECT a FROM AccAccount a WHERE a.tenantId = :#{#tenantId.value} AND a.active = true ORDER BY a.accountCode")
     List<AccAccount> findAllActive(TenantId tenantId);
 
+    /** Every account, deactivated ones too: a deactivated account can still hold a balance that reports must show. */
+    @Query("SELECT a FROM AccAccount a WHERE a.tenantId = :#{#tenantId.value} ORDER BY a.accountCode")
+    List<AccAccount> findAllIncludingInactive(TenantId tenantId);
+
     @Query("SELECT a FROM AccAccount a WHERE a.tenantId = :#{#tenantId.value} AND a.accountType = :type AND a.active = true ORDER BY a.accountCode")
     List<AccAccount> findByType(TenantId tenantId, String type);
 

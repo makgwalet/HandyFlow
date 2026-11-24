@@ -34,4 +34,14 @@ public final class PostingKeys {
             throw new IllegalArgumentException("A posting key is at most " + MAX_LENGTH + " characters");
         return key;
     }
+
+    /**
+     * A repeatable id for an event that has none of its own (events stored before they carried one): the same parts always
+     * give the same id, so a redelivered event gets the same posting key and posts once.
+     */
+    public static java.util.UUID stableId(Object... parts) {
+        StringBuilder sb = new StringBuilder();
+        for (Object part : parts) sb.append(part == null ? "" : part.toString()).append('|');
+        return java.util.UUID.nameUUIDFromBytes(sb.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8));
+    }
 }

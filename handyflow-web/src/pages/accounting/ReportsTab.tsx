@@ -2,6 +2,7 @@ import { useState } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { BarChart2, TrendingUp, Scale, X, ChevronRight } from "lucide-react"
 import { apiClient } from "../../api/client"
+import { fromLabel, reportHint, toLabel } from "./reports.logic"
 
 type ReportType = "profit-and-loss" | "balance-sheet" | "trial-balance"
 
@@ -96,11 +97,11 @@ export default function ReportsTab() {
           </div>
         </div>
         <div>
-          <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: "var(--hf-text-secondary)", marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.05em" }}>From</label>
+          <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: "var(--hf-text-secondary)", marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.05em" }}>{fromLabel(reportType)}</label>
           <input type="date" value={from} onChange={e => { setFrom(e.target.value); setRun(false) }} style={inp} />
         </div>
         <div>
-          <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: "var(--hf-text-secondary)", marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.05em" }}>To</label>
+          <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: "var(--hf-text-secondary)", marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.05em" }}>{toLabel(reportType)}</label>
           <input type="date" value={to} onChange={e => { setTo(e.target.value); setRun(false) }} style={inp} />
         </div>
         <button onClick={handleRun}
@@ -109,6 +110,10 @@ export default function ReportsTab() {
           Run Report
         </button>
       </div>
+
+      {reportHint(reportType) && (
+        <div style={{ fontSize: 12, color: "var(--hf-text-muted)", marginBottom: 12 }}>{reportHint(reportType)}</div>
+      )}
 
       {isLoading && <div style={{ padding: 60, textAlign: "center", color: "var(--hf-text-faint)" }}>Generating report...</div>}
       {isError   && <div style={{ padding: 60, textAlign: "center", color: "var(--hf-danger-text)" }}>Failed to load report — check your date range.</div>}

@@ -177,4 +177,35 @@ class InvoicingAccountingEventHandlerTest {
                 .map(l -> (l.debitAmount() == null ? BigDecimal.ZERO : l.debitAmount()).subtract(l.creditAmount() == null ? BigDecimal.ZERO : l.creditAmount()))
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
+
+    @Test
+    void anInvoiceIssuedJustAfterMidnightInSouthAfricaIsDatedThatDayNotTheDayBefore() {
+        UUID id = UUID.randomUUID();
+        // 00:30 SAST on 1 April is 22:30 UTC on 31 March.
+        handler.onInvoiceIssued(new InvoiceIssuedEvent(tenant, id, "INV-1", UUID.randomUUID(), new BigDecimal("100.00"),
+                new BigDecimal("15.00"), new BigDecimal("115.00"), java.time.Instant.parse("2026-03-31T22:30:00Z")));
+
+        assertThat(postedFor("invoicing:invoice-issued:" + id).entryDate()).isEqualTo(java.time.LocalDate.of(2026, 4, 1));
+    }
+
+    @Test
+    void aRetriedInvoiceEventStillPostsOnTheDayTheInvoiceWasIssued() {
+        UUID id = UUID.randomUUID();
+        handler.onInvoiceIssued(new InvoiceIssuedEvent(tenant, id, "INV-1", UUID.randomUUID(), new BigDecimal("100.00"),
+                new BigDecimal("15.00"), new BigDecimal("115.00"), java.time.Instant.parse("2020-01-15T10:00:00Z")));
+
+        assertThat(postedFor("invoicing:invoice-issued:" + id).entryDate()).isEqualTo(java.time.LocalDate.of(2020, 1, 15));
+    }
+
+    @Test
+    void aCreditNoteIsDatedOnTheDayItWasIssued() {
+        UUID id = UUID.randomUUID();
+        handler.onCreditNoteIssued(new CreditNoteIssuedEvent(tenant, id, "CN-1", UUID.randomUUID(), "INV-1",
+                new BigDecimal("100.00"), new BigDecimal("15.00"), new BigDecimal("115.00"),
+                java.time.Instant.parse("2026-02-28T22:10:00Z")));
+
+        ArgumentCaptor<CreateJournalEntryRequest> req = ArgumentCaptor.forClass(CreateJournalEntryRequest.class);
+        verify(posting).postOnceOrRecord(eq(tenant), anyString(), req.capture());
+        assertThat(req.getValue().entryDate()).isEqualTo(java.time.LocalDate.of(2026, 3, 1));
+    }
 }

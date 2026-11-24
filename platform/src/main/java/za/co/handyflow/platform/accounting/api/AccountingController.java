@@ -333,6 +333,16 @@ public class AccountingController {
                         TenantContext.getCurrentUserId())));
     }
 
+    @PostMapping("/bank-accounts/{id}/transactions/{txId}/unreconcile")
+    @PreAuthorize("hasAuthority('ACCOUNTING_MANAGE')")
+    @Operation(summary = "Undo a match to an existing journal line (not allowed once the period is signed off)")
+    public ResponseEntity<ApiResponse<BankTransactionResponse>> unreconcileTransaction(
+            @PathVariable UUID id, @PathVariable UUID txId) {
+        return ResponseEntity.ok(ApiResponse.success("Match removed",
+                accountingService.unreconcileTransaction(TenantContext.getTenantIdAsObject(), id, txId,
+                        TenantContext.getCurrentUserId())));
+    }
+
     @PostMapping("/bank-accounts/{id}/transactions/{txId}/reconcile-new")
     @PreAuthorize("hasAuthority('ACCOUNTING_MANAGE')")
     @Operation(summary = "Reconcile a bank transaction by creating a new journal entry for it (no existing match — bank fees, direct debits, etc.)")
@@ -404,7 +414,7 @@ public class AccountingController {
 
     @GetMapping("/reports/trial-balance")
     @PreAuthorize("hasAuthority('ACCOUNTING_READ')")
-    @Operation(summary = "Trial balance with gross debit and credit columns for a date range")
+    @Operation(summary = "Trial balance as at a date. 'from' is the start of the financial year; balance-sheet accounts are cumulative to 'to'")
     public ResponseEntity<ApiResponse<FinancialReportResponse>> getTrialBalance(
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
@@ -414,7 +424,7 @@ public class AccountingController {
 
     @GetMapping("/reports/balance-sheet")
     @PreAuthorize("hasAuthority('ACCOUNTING_READ')")
-    @Operation(summary = "Balance sheet as at a date (includes opening balances)")
+    @Operation(summary = "Balance sheet as at 'to' (every posted journal up to it, plus opening balances). 'from' is the start of the financial year: earlier profit goes to Retained Earnings")
     public ResponseEntity<ApiResponse<FinancialReportResponse>> getBalanceSheet(
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {

@@ -77,7 +77,7 @@ public interface InvoiceRepository extends JpaRepository<Invoice, UUID> {
         SELECT * FROM invoices
         WHERE tenant_id = CAST(:tenantId AS uuid)
         AND deleted_at IS NULL
-        AND status IN ('ISSUED', 'PARTIALLY_PAID', 'PAID', 'OVERPAID')
+        AND status IN ('ISSUED', 'PARTIALLY_PAID', 'PAID', 'OVERPAID', 'OVERDUE')
         AND (
             (issued_at IS NOT NULL AND issued_at::date >= :from AND issued_at::date <= :to)
             OR
