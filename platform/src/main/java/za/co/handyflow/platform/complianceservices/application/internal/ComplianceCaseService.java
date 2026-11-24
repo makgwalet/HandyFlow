@@ -55,9 +55,9 @@ public class ComplianceCaseService {
         String code = null;
         if (r.assessmentId() != null) {
             if (obligationId == null) throw new HandyFlowException("Say which obligation in the assessment this case is for", HttpStatus.BAD_REQUEST, "CASE_OBLIGATION_REQUIRED");
-            assessments.findOne(tenantId, clientId, r.assessmentId()).orElseThrow(() -> new ResourceNotFoundException("Assessment not found"));
+            assessments.findOne(tenantId, clientId, r.assessmentId()).orElseThrow(() -> new ResourceNotFoundException("ComplianceAssessment", r.assessmentId().toString()));
             ComplianceAssessmentItem item = assessmentItems.findOne(tenantId, r.assessmentId(), obligationId)
-                    .orElseThrow(() -> new ResourceNotFoundException("That obligation is not part of the assessment"));
+                    .orElseThrow(() -> new ResourceNotFoundException("ComplianceAssessmentItem", obligationId.toString()));
             if (!CaseRules.PROBLEM_STATUSES.contains(item.getStatus())) {
                 throw new HandyFlowException("That obligation is not a problem in this assessment, so there is nothing to put right", HttpStatus.CONFLICT, "CASE_NOT_A_PROBLEM");
             }
@@ -184,18 +184,18 @@ public class ComplianceCaseService {
     }
 
     private ComplianceClient requireClient(TenantId tenantId, UUID clientId) {
-        return clients.findByIdForTenant(tenantId, clientId).orElseThrow(() -> new ResourceNotFoundException("Client not found"));
+        return clients.findByIdForTenant(tenantId, clientId).orElseThrow(() -> new ResourceNotFoundException("ComplianceClient", clientId.toString()));
     }
 
     private ComplianceCase find(TenantId tenantId, UUID clientId, UUID id) {
         requireClient(tenantId, clientId);
-        ComplianceCase c = cases.findOne(tenantId, id).orElseThrow(() -> new ResourceNotFoundException("Case not found"));
-        if (!c.getClientId().equals(clientId)) throw new ResourceNotFoundException("Case not found");
+        ComplianceCase c = cases.findOne(tenantId, id).orElseThrow(() -> new ResourceNotFoundException("ComplianceCase", id.toString()));
+        if (!c.getClientId().equals(clientId)) throw new ResourceNotFoundException("ComplianceCase", id.toString());
         return c;
     }
 
     private ComplianceCaseStep findStep(TenantId tenantId, ComplianceCase c, UUID stepId) {
-        return steps.findOne(tenantId, c.getId(), stepId).orElseThrow(() -> new ResourceNotFoundException("Step not found"));
+        return steps.findOne(tenantId, c.getId(), stepId).orElseThrow(() -> new ResourceNotFoundException("ComplianceCaseStep", stepId.toString()));
     }
 
     private static void requireLive(ComplianceCase c) {

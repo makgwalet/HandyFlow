@@ -143,7 +143,7 @@ class ComplianceCaseServiceTest {
         ComplianceCase c = stored("OPEN");
         UUID elsewhere = UUID.randomUUID();
         when(clients.findByIdForTenant(TENANT, elsewhere)).thenReturn(Optional.of(client));
-        assertThatThrownBy(() -> service.get(TENANT, elsewhere, c.getId())).hasMessageContaining("Case not found");
+        assertThatThrownBy(() -> service.get(TENANT, elsewhere, c.getId())).hasMessageContaining("ComplianceCase not found");
     }
 
     @Test @DisplayName("steps cannot be added to a closed case")

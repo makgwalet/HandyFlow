@@ -113,7 +113,7 @@ public class ClientAssessmentService {
         ComplianceAssessment a = find(tenantId, clientId, assessmentId);
         requireDraft(a);
         ComplianceAssessmentItem item = items.findOne(tenantId, assessmentId, obligationId)
-                .orElseThrow(() -> new ResourceNotFoundException("Assessment item not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("ComplianceAssessmentItem", obligationId.toString()));
         try {
             item.judge(r.control(), r.workflow(), r.note(), by);
         } catch (IllegalArgumentException e) {
@@ -241,11 +241,11 @@ public class ClientAssessmentService {
     }
 
     private ComplianceClient requireClient(TenantId tenantId, UUID clientId) {
-        return clients.findByIdForTenant(tenantId, clientId).orElseThrow(() -> new ResourceNotFoundException("Client not found"));
+        return clients.findByIdForTenant(tenantId, clientId).orElseThrow(() -> new ResourceNotFoundException("ComplianceClient", clientId.toString()));
     }
 
     private ComplianceAssessment find(TenantId tenantId, UUID clientId, UUID id) {
-        return assessments.findOne(tenantId, clientId, id).orElseThrow(() -> new ResourceNotFoundException("Assessment not found"));
+        return assessments.findOne(tenantId, clientId, id).orElseThrow(() -> new ResourceNotFoundException("ComplianceAssessment", id.toString()));
     }
 
     private static void requireDraft(ComplianceAssessment a) {
