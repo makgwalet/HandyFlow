@@ -9,8 +9,8 @@ const post = vi.fn()
 const put = vi.fn()
 const del = vi.fn()
 vi.mock("../../api/client", () => ({ apiClient: { get: (...a: unknown[]) => get(...a), post: (...a: unknown[]) => post(...a), put: (...a: unknown[]) => put(...a), delete: (...a: unknown[]) => del(...a) } }))
-vi.mock("../../hooks/usePermission", () => ({ usePermission: () => true }))
-
+vi.mock("../../hooks/usePermission", () => ({ usePermission: () => true,
+  usePermissions: (ps: string[], mode: 'any' | 'all' = 'any') => { const f = (() => true) as (p: string) => boolean; return mode === 'all' ? ps.every(f) : ps.some(f) } }))
 const wrap = (ui: React.ReactElement) => render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>{ui}</QueryClientProvider>)
 const rule = (over: Partial<RuleRow> = {}): RuleRow => ({ id: "R1", clientId: "C1", clientName: "Acme", itemId: "I1", sku: "WID-1", itemDescription: "Widget", locationId: "L1", locationCode: "A-01-01",
   minQty: 10, maxQty: 40, active: true, faceAvailable: 3, inbound: 0, reserveAvailable: 100, status: "BELOW_MIN", ...over })

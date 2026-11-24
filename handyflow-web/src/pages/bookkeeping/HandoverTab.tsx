@@ -3,7 +3,7 @@ import { useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import { useSubmitGuard } from "../../hooks/useSubmitGuard"
-import { usePermission } from "../../hooks/usePermission"
+import { usePermission, usePermissions } from "../../hooks/usePermission"
 import { dateText, errorOf, handoverProblem, returnProblem, rowsOf, type Handover, type WorkRow } from "./bookkeeping.logic"
 import ClientScope from "./ClientScope"
 import { btn, card, danger, field, muted, primary, td, th } from "./ui"
@@ -16,7 +16,7 @@ const STATUS: Record<string, string> = { SENT: "With the accountant", ACCEPTED: 
 
 function Handovers({ clientId }: { clientId: string }) {
   const qc = useQueryClient()
-  const canManage = usePermission("BOOKKEEPING_MANAGE") || usePermission("BOOKKEEPING_ADMIN")
+  const canManage = usePermissions(["BOOKKEEPING_MANAGE", "BOOKKEEPING_ADMIN"])
   const canRespond = usePermission("BOOKKEEPING_ADMIN")
   const today = new Date().toISOString().slice(0, 10)
   const [periodEnd, setPeriodEnd] = useState(""), [note, setNote] = useState("")

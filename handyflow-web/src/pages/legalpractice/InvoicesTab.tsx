@@ -2,7 +2,7 @@
 import { useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
-import { usePermission } from "../../hooks/usePermission"
+import { usePermission, usePermissions } from "../../hooks/usePermission"
 import { toast } from "../../store/toast.store"
 import { Btn, Dialog, Empty, ErrorLine, Input, Pager, Pill, SectionTitle, Stat, card, day, errorText, fail, inp, money, muted, pageOf, td, th } from "./kit"
 import { BASE, useLookups } from "./lookups"
@@ -13,7 +13,7 @@ const overdue = (i: Invoice) => ["SENT", "PARTIALLY_PAID"].includes(i.status) &&
 
 export default function InvoicesTab() {
   const qc = useQueryClient()
-  const canWrite = usePermission("LEGALPRACTICE_MANAGE") || usePermission("LEGALPRACTICE_ADMIN")
+  const canWrite = usePermissions(["LEGALPRACTICE_MANAGE", "LEGALPRACTICE_ADMIN"])
   const isAdmin = usePermission("LEGALPRACTICE_ADMIN")
   const lookups = useLookups()
   const [page, setPage] = useState(0), [clientId, setClientId] = useState(""), [paying, setPaying] = useState<Invoice | null>(null), [writing, setWriting] = useState<Invoice | null>(null)

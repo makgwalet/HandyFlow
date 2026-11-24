@@ -7,7 +7,7 @@ import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { Ban, ShieldCheck } from "lucide-react"
 import { apiClient } from "../../api/client"
-import { usePermission } from "../../hooks/usePermission"
+import { usePermissions } from "../../hooks/usePermission"
 import { btnDanger, btnGhost, card, Chip, fmtQty, inputStyle, ReasonModal } from "./whseUi"
 import { daysLabel, EXPIRY_STYLE } from "./receiving"
 
@@ -67,7 +67,7 @@ function ExpiringView() {
 
 function LotsView() {
   const qc = useQueryClient()
-  const canBlock = usePermission("WAREHOUSING_MANAGE") || usePermission("WAREHOUSING_ADMIN")
+  const canBlock = usePermissions(["WAREHOUSING_MANAGE", "WAREHOUSING_ADMIN"])
   const [action, setAction] = useState<{ lot: LotRow; kind: "block" | "unblock" } | null>(null)
   const [affected, setAffected] = useState<{ lot: string; orders: AffectedOrder[] } | null>(null)
 

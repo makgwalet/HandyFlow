@@ -3,7 +3,7 @@ import { useSubmitGuard } from "../../hooks/useSubmitGuard"
 import { useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
-import { usePermission } from "../../hooks/usePermission"
+import { usePermissions } from "../../hooks/usePermission"
 import { chunks, dateText, errorOf, money, rowsOf, type Account, type BankAccount, type BankTx, type MatchCandidate, type Suggestion } from "./bookkeeping.logic"
 import ClientScope from "./ClientScope"
 import { btn, card, danger, field, muted, primary, right, td, th } from "./ui"
@@ -21,7 +21,7 @@ const readFile = (file: File) => new Promise<string>((resolve, reject) => {
 
 function Bank({ clientId }: { clientId: string }) {
   const qc = useQueryClient()
-  const canManage = usePermission("BOOKKEEPING_MANAGE") || usePermission("BOOKKEEPING_ADMIN")
+  const canManage = usePermissions(["BOOKKEEPING_MANAGE", "BOOKKEEPING_ADMIN"])
   const base = `/api/v1/bookkeeping/clients/${clientId}`
   const [bankId, setBankId] = useState("")
   const [onlyOpen, setOnlyOpen] = useState(true)

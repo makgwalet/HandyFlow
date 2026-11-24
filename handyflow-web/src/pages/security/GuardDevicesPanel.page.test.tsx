@@ -6,8 +6,8 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 const api = vi.hoisted(() => ({ get: vi.fn(), post: vi.fn() }))
 vi.mock('../../api/client', () => ({ apiClient: api }))
 const perms = new Set<string>()
-vi.mock('../../hooks/usePermission', () => ({ usePermission: (p: string) => perms.has(p) }))
-
+vi.mock('../../hooks/usePermission', () => ({ usePermission: (p: string) => perms.has(p),
+  usePermissions: (ps: string[], mode: 'any' | 'all' = 'any') => { const f = ((p: string) => perms.has(p)) as (p: string) => boolean; return mode === 'all' ? ps.every(f) : ps.some(f) } }))
 import GuardDevicesPanel from './GuardDevicesPanel'
 
 afterEach(() => cleanup())

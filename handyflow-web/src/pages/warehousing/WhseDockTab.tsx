@@ -5,7 +5,7 @@
 import { useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
-import { usePermission } from "../../hooks/usePermission"
+import { usePermissions } from "../../hooks/usePermission"
 import { btnGhost, btnPrimary, card, Chip, ErrorLine, inputStyle, labelStyle, ReasonModal } from "./whseUi"
 import { DOCK_STATUS, dayBounds, lateLabel, localDay, nextStep, slotProblem, toInstant, type DockStatus } from "./dock"
 
@@ -118,7 +118,7 @@ function Row({ a, canWork, onChange }: { a: Appointment; canWork: boolean; onCha
 
 export default function WhseDockTab() {
   const qc = useQueryClient()
-  const canWork = usePermission("WAREHOUSING_MANAGE") || usePermission("WAREHOUSING_ADMIN")
+  const canWork = usePermissions(["WAREHOUSING_MANAGE", "WAREHOUSING_ADMIN"])
   const [day, setDay] = useState(localDay())
   const { from, to } = dayBounds(day)
   const { data: locations = [] } = useQuery<Location[]>({ queryKey: ["whse-locations"], queryFn: async () => (await apiClient.get("/api/v1/warehousing/locations")).data })

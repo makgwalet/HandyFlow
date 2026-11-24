@@ -2,7 +2,7 @@
 import { useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
-import { usePermission } from "../../hooks/usePermission"
+import { usePermissions } from "../../hooks/usePermission"
 import { toast } from "../../store/toast.store"
 import { Btn, Dialog, Empty, ErrorLine, Input, Pager, Pick, Pill, ReasonDialog, Row, SectionTitle, card, day, errorText, fail, money, muted, pageOf, td, th, when } from "./kit"
 import { BASE, useLookups, type Lookups } from "./lookups"
@@ -15,7 +15,7 @@ const todayIso = () => new Date().toISOString().slice(0, 10)
 
 export default function QuotesTab() {
   const qc = useQueryClient(), lookups = useLookups()
-  const canWrite = usePermission("FACILITIESMANAGEMENT_MANAGE") || usePermission("FACILITIESMANAGEMENT_ADMIN")
+  const canWrite = usePermissions(["FACILITIESMANAGEMENT_MANAGE", "FACILITIESMANAGEMENT_ADMIN"])
   const [page, setPage] = useState(0), [status, setStatus] = useState(""), [clientId, setClientId] = useState("")
   const [editing, setEditing] = useState<Quote | "new" | null>(null), [open, setOpen] = useState<Quote | null>(null)
   const { data, isLoading, isError } = useQuery({ queryKey: ["fm-quotes", page, status, clientId], queryFn: async () => pageOf<Quote>(await apiClient.get(`${BASE}/quotes`, { params: { page, size: 25, status: status || undefined, clientId: clientId || undefined } })) })

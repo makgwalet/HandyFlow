@@ -12,8 +12,8 @@ let perms: string[] = []
 let me = "someone-else"
 vi.mock("../../store/auth.store", () => ({ useAuthStore: (sel: (s: any) => unknown) => sel({ user: { userId: me } }) }))
 vi.mock("../../api/client", () => ({ apiClient: { get: (...a: unknown[]) => get(...a), post: (...a: unknown[]) => post(...a), put: (...a: unknown[]) => put(...a) } }))
-vi.mock("../../hooks/usePermission", () => ({ usePermission: (p: string) => perms.includes(p) }))
-
+vi.mock("../../hooks/usePermission", () => ({ usePermission: (p: string) => perms.includes(p),
+  usePermissions: (ps: string[], mode: 'any' | 'all' = 'any') => { const f = ((p: string) => perms.includes(p)) as (p: string) => boolean; return mode === 'all' ? ps.every(f) : ps.some(f) } }))
 const wrap = (ui: React.ReactElement) =>
   render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>{ui}</QueryClientProvider>)
 

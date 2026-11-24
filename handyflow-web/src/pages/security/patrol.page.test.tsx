@@ -16,7 +16,8 @@ const post = vi.fn(() => Promise.resolve({ data: {} }))
 vi.mock("../../api/client", () => ({ apiClient: {
   get: vi.fn((url: string) => Promise.resolve({ data: { data: url.includes("/patrols/") ? detail : url.includes("/patrols?") ? list : { content: [{ id: "x", name: "Centurion Mall" }] } } })),
   post: (...a: any[]) => (post as any)(...a) } }))
-vi.mock("../../hooks/usePermission", () => ({ usePermission: () => true }))
+vi.mock("../../hooks/usePermission", () => ({ usePermission: () => true,
+  usePermissions: (ps: string[], mode: 'any' | 'all' = 'any') => { const f = (() => true) as (p: string) => boolean; return mode === 'all' ? ps.every(f) : ps.some(f) } }))
 import PatrolsTab from "./PatrolsTab"
 import PatrolDetailPage from "./PatrolDetailPage"
 

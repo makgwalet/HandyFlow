@@ -3,7 +3,7 @@
 import { useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
-import { usePermission } from "../../hooks/usePermission"
+import { usePermissions } from "../../hooks/usePermission"
 import { toast } from "../../store/toast.store"
 import { Btn, Dialog, Empty, ErrorLine, Input, Pager, Pick, Pill, SectionTitle, card, day, errorText, fail, money, muted, pageOf, td, th } from "./kit"
 import { BASE, useLookups, type Lookups } from "./lookups"
@@ -14,7 +14,7 @@ export interface Agreement { id: string; clientId: string; name: string | null; 
 
 export default function AgreementsTab() {
   const qc = useQueryClient(), lookups = useLookups()
-  const canWrite = usePermission("FACILITIESMANAGEMENT_MANAGE") || usePermission("FACILITIESMANAGEMENT_ADMIN") || usePermission("FACILITIESMANAGEMENT_CONTRACT_MANAGE")
+  const canWrite = usePermissions(["FACILITIESMANAGEMENT_MANAGE", "FACILITIESMANAGEMENT_ADMIN", "FACILITIESMANAGEMENT_CONTRACT_MANAGE"])
   const [clientId, setClientId] = useState(""), [page, setPage] = useState(0), [editing, setEditing] = useState<Agreement | "new" | null>(null), [ending, setEnding] = useState<Agreement | null>(null), [checking, setChecking] = useState(false)
   const { data, isLoading, isError } = useQuery({ enabled: !!clientId, queryKey: ["fm-agreements", clientId, page], queryFn: async () => pageOf<Agreement>(await apiClient.get(`${BASE}/service-agreements`, { params: { clientId, page, size: 25 } })) })
   const refresh = () => { qc.invalidateQueries({ queryKey: ["fm-agreements"] }); qc.invalidateQueries({ queryKey: ["fm-agreements-active"] }) }

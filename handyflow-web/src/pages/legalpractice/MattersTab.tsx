@@ -2,7 +2,7 @@
 import { useMemo, useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
-import { usePermission } from "../../hooks/usePermission"
+import { usePermissions } from "../../hooks/usePermission"
 import { toast } from "../../store/toast.store"
 import { Btn, Dialog, Empty, ErrorLine, Input, Pager, Pick, Pill, SectionTitle, card, day, errorText, fail, inp, money, muted, pageOf, td, th } from "./kit"
 import EvidencePanel from "./EvidencePanel"
@@ -14,7 +14,7 @@ import ConflictPanel from "./ConflictPanel"
 export interface Matter { id: string; clientId: string; attorneyId: string; matterNumber: string; matterType: string; matterName: string; description: string | null; billingType: string; fixedFeeAmount: number | null; status: string; openedDate: string | null; closedDate: string | null; notes: string | null }
 
 export default function MattersTab() {
-  const canWrite = usePermission("LEGALPRACTICE_MANAGE") || usePermission("LEGALPRACTICE_ADMIN")
+  const canWrite = usePermissions(["LEGALPRACTICE_MANAGE", "LEGALPRACTICE_ADMIN"])
   const lookups = useLookups()
   const [clientId, setClientId] = useState(""), [status, setStatus] = useState(""), [search, setSearch] = useState(""), [page, setPage] = useState(0)
   const [openId, setOpenId] = useState<string | null>(null), [editing, setEditing] = useState<Matter | "new" | null>(null)

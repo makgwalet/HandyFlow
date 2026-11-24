@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
-import { usePermission } from "../../hooks/usePermission"
+import { usePermissions } from "../../hooks/usePermission"
 import { errorOf, unwrap } from "./bookkeeping.logic"
 import { danger, field, muted, primary } from "./ui"
 
@@ -12,7 +12,7 @@ const looksLikeEmail = (s: string) => !s.trim() || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.
 
 export default function ProfileTab() {
   const qc = useQueryClient()
-  const canEdit = usePermission("BOOKKEEPING_MANAGE") || usePermission("BOOKKEEPING_ADMIN")
+  const canEdit = usePermissions(["BOOKKEEPING_MANAGE", "BOOKKEEPING_ADMIN"])
   const [form, setForm] = useState(EMPTY), [error, setError] = useState<string | null>(null), [saved, setSaved] = useState(false)
   // A practice that has not saved a profile yet gets a 404; that means "empty form", not an error.
   const { data, isLoading } = useQuery<Profile | null>({

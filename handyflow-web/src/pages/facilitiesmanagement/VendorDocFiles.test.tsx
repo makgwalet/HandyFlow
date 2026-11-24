@@ -6,7 +6,8 @@ import VendorsTab from "./VendorsTab"
 
 const get = vi.fn(), post = vi.fn()
 vi.mock("../../api/client", () => ({ apiClient: { get: (...a: unknown[]) => get(...a), post: (...a: unknown[]) => post(...a), put: vi.fn(), delete: vi.fn() } }))
-vi.mock("../../hooks/usePermission", () => ({ usePermission: () => true }))
+vi.mock("../../hooks/usePermission", () => ({ usePermission: () => true,
+  usePermissions: (ps: string[], mode: 'any' | 'all' = 'any') => { const f = (() => true) as (p: string) => boolean; return mode === 'all' ? ps.every(f) : ps.some(f) } }))
 const toast = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn() }))
 vi.mock("../../store/toast.store", () => ({ toast }))
 const wrap = () => render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><VendorsTab /></QueryClientProvider>)

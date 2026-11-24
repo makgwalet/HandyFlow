@@ -7,8 +7,8 @@ import WhseSlottingTab, { type Overview, type Suggestion } from "./WhseSlottingT
 const get = vi.fn()
 const post = vi.fn()
 vi.mock("../../api/client", () => ({ apiClient: { get: (...a: unknown[]) => get(...a), post: (...a: unknown[]) => post(...a) } }))
-vi.mock("../../hooks/usePermission", () => ({ usePermission: () => true }))
-
+vi.mock("../../hooks/usePermission", () => ({ usePermission: () => true,
+  usePermissions: (ps: string[], mode: 'any' | 'all' = 'any') => { const f = (() => true) as (p: string) => boolean; return mode === 'all' ? ps.every(f) : ps.some(f) } }))
 const wrap = (ui: React.ReactElement) => render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>{ui}</QueryClientProvider>)
 const sug = (over: Partial<Suggestion> = {}): Suggestion => ({ clientId: "C1", clientName: "Acme", itemId: "I1", sku: "FAST-1", description: "Fast thing", abc: "A", picked: 900,
   fromLocationId: "L9", fromCode: "Z-99", toLocationId: "L1", toCode: "A-01", qty: 30, improvement: 89, ...over })

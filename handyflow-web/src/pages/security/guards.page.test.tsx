@@ -13,7 +13,8 @@ const result = (rows: any[], total = rows.length) => ({ rows, totalElements: tot
 const first = result([row(guard()), row(guard({ id: "g2", fullName: "Bafana Khumalo", firstName: "Bafana", lastName: "Khumalo" }), { psiraState: "EXPIRED", psiraDaysLeft: -3, screeningStatus: "FLAGGED" })], 60)
 const get = vi.fn((_url: string) => Promise.resolve({ data: { data: first } })), patch = vi.fn((..._a: any[]) => Promise.resolve({ data: {} }))
 vi.mock("../../api/client", () => ({ apiClient: { get: (u: string) => get(u), patch: (...a: any[]) => patch(...a), post: vi.fn(), put: vi.fn(), delete: vi.fn() } }))
-vi.mock("../../hooks/usePermission", () => ({ usePermission: () => true }))
+vi.mock("../../hooks/usePermission", () => ({ usePermission: () => true,
+  usePermissions: (ps: string[], mode: 'any' | 'all' = 'any') => { const f = (() => true) as (p: string) => boolean; return mode === 'all' ? ps.every(f) : ps.some(f) } }))
 import GuardsTab from "./GuardsTab"
 
 const show = () => render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><MemoryRouter><GuardsTab /></MemoryRouter></QueryClientProvider>)

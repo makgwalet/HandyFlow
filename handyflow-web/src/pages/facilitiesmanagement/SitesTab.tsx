@@ -2,7 +2,7 @@
 import { useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
-import { usePermission } from "../../hooks/usePermission"
+import { usePermissions } from "../../hooks/usePermission"
 import { toast } from "../../store/toast.store"
 import { Btn, Dialog, Empty, ErrorLine, Input, Pager, Pick, Pill, SectionTitle, card, errorText, fail, inp, muted, pageOf, td, th } from "./kit"
 import { BASE, useLookups, type FSite } from "./lookups"
@@ -10,7 +10,7 @@ import { PROVINCES, SITE_TYPES, postalDigits, addressLine, emptySite, labelOf, s
 
 export default function SitesTab() {
   const qc = useQueryClient(), lookups = useLookups()
-  const canWrite = usePermission("FACILITIESMANAGEMENT_MANAGE") || usePermission("FACILITIESMANAGEMENT_ADMIN")
+  const canWrite = usePermissions(["FACILITIESMANAGEMENT_MANAGE", "FACILITIESMANAGEMENT_ADMIN"])
   const [page, setPage] = useState(0), [clientId, setClientId] = useState(""), [editing, setEditing] = useState<FSite | "new" | null>(null)
   const { data, isLoading, isError } = useQuery({ queryKey: ["fm-sites", page, clientId], queryFn: async () => pageOf<FSite>(await apiClient.get(`${BASE}/sites`, { params: { page, size: 25, clientId: clientId || undefined } })) })
   const refresh = () => { qc.invalidateQueries({ queryKey: ["fm-sites"] }); qc.invalidateQueries({ queryKey: ["fm-sites-all"] }) }

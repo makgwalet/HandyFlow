@@ -2,7 +2,7 @@
 import { useMemo, useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
-import { usePermission } from "../../hooks/usePermission"
+import { usePermissions } from "../../hooks/usePermission"
 import { toast } from "../../store/toast.store"
 import { Btn, Dialog, Empty, ErrorLine, ReasonDialog, SectionTitle, card, day, fail, inp, muted, th, td } from "../projects/tabs/pmKit"
 import {
@@ -20,7 +20,7 @@ const BASE = "/api/v1/insurance/policies"
 const STATUSES = ["ACTIVE", "LAPSED", "CANCELLED", "EXPIRED", "RENEWED"]
 
 export default function PoliciesTab() {
-  const canWrite = usePermission("INSURANCE_MANAGE") || usePermission("INSURANCE_ADMIN")
+  const canWrite = usePermissions(["INSURANCE_MANAGE", "INSURANCE_ADMIN"])
   const [status, setStatus] = useState(""), [line, setLine] = useState(""), [search, setSearch] = useState(""), [page, setPage] = useState(0), [due, setDue] = useState(false)
   const [open, setOpen] = useState<Policy | null>(null), [editing, setEditing] = useState<Policy | "new" | null>(null)
   const params = due ? { status: "ACTIVE", size: 200 } : { status: status || undefined, lineOfBusiness: line || undefined, search: search.trim() || undefined, page, size: 20 }

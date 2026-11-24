@@ -3,7 +3,7 @@ import { useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import { useSubmitGuard } from "../../hooks/useSubmitGuard"
-import { usePermission } from "../../hooks/usePermission"
+import { usePermissions } from "../../hooks/usePermission"
 import { dateText, errorOf, rowsOf } from "./bookkeeping.logic"
 import { BILLING_TYPES, agreementProblem, agreementTerms, billingLabel, type Agreement } from "./practice.logic"
 import ClientScope from "./ClientScope"
@@ -13,7 +13,7 @@ export default function AgreementsTab() { return <ClientScope>{id => <Agreements
 
 function Agreements({ clientId }: { clientId: string }) {
   const qc = useQueryClient()
-  const canManage = usePermission("BOOKKEEPING_MANAGE") || usePermission("BOOKKEEPING_ADMIN")
+  const canManage = usePermissions(["BOOKKEEPING_MANAGE", "BOOKKEEPING_ADMIN"])
   const [f, setF] = useState({ type: "RETAINER", fee: "", rate: "", start: new Date().toISOString().slice(0, 10), end: "" })
   const [error, setError] = useState<string | null>(null)
   const { data = [] } = useQuery<Agreement[]>({ queryKey: ["bk-agreements", clientId], queryFn: async () => rowsOf<Agreement>(await apiClient.get(`/api/v1/bookkeeping/service-agreements?clientId=${clientId}&size=50`)) })

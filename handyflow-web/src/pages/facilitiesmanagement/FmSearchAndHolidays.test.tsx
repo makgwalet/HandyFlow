@@ -7,7 +7,8 @@ import ClientsTab from "./ClientsTab"
 
 const get = vi.fn(), post = vi.fn()
 vi.mock("../../api/client", () => ({ apiClient: { get: (...a: unknown[]) => get(...a), post: (...a: unknown[]) => post(...a), put: vi.fn(), delete: vi.fn() } }))
-vi.mock("../../hooks/usePermission", () => ({ usePermission: () => true }))
+vi.mock("../../hooks/usePermission", () => ({ usePermission: () => true,
+  usePermissions: (ps: string[], mode: 'any' | 'all' = 'any') => { const f = (() => true) as (p: string) => boolean; return mode === 'all' ? ps.every(f) : ps.some(f) } }))
 vi.mock("../../store/toast.store", () => ({ toast: { success: vi.fn(), error: vi.fn() } }))
 const wrap = (ui: React.ReactElement) => render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>{ui}</QueryClientProvider>)
 

@@ -3,7 +3,7 @@ import { useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import { errorText } from "../../api/projectDocs"
-import { usePermission } from "../../hooks/usePermission"
+import { usePermissions } from "../../hooks/usePermission"
 import { toast } from "../../store/toast.store"
 import { Btn, Dialog, Empty, ErrorLine, Pill, SectionTitle, card, fail, muted, th, td } from "../projects/tabs/pmKit"
 import { emptyInsurer, insurerProblem, insurerRequest, type InsurerForm } from "../insurance/insurance.logic"
@@ -12,7 +12,7 @@ import { BASE, pageOf, type BInsurer } from "./lookups"
 
 export default function InsurersTab() {
   const qc = useQueryClient()
-  const canWrite = usePermission("INSURANCEBROKERAGE_MANAGE") || usePermission("INSURANCEBROKERAGE_ADMIN")
+  const canWrite = usePermissions(["INSURANCEBROKERAGE_MANAGE", "INSURANCEBROKERAGE_ADMIN"])
   const [page, setPage] = useState(0), [editing, setEditing] = useState<BInsurer | "new" | null>(null)
   const { data, isLoading, isError } = useQuery({ queryKey: ["ib-insurers", page], queryFn: async () => pageOf<BInsurer>(await apiClient.get(`${BASE}/insurers`, { params: { page, size: 24 } })) })
   const refresh = () => { qc.invalidateQueries({ queryKey: ["ib-insurers"] }); qc.invalidateQueries({ queryKey: ["ib-insurers-all"] }) }

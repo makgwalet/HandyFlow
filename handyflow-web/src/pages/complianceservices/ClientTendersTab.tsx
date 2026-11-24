@@ -7,7 +7,7 @@ import { useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
-import { usePermission } from "../../hooks/usePermission"
+import { usePermissions } from "../../hooks/usePermission"
 import { Plus, Briefcase, X, AlertCircle, Search, Layers, Timer, Wallet, Hourglass, ChevronRight } from "lucide-react"
 import Chip from "../../components/ui/Chip"
 import StatTile from "../../components/ui/StatTile"
@@ -48,7 +48,7 @@ const EMPTY_FORM = {
 export default function ClientTendersTab({ clientId }: { clientId: string }) {
   const nav = useNavigate()
   const qc = useQueryClient()
-  const canManage = usePermission("COMPLIANCE_SERVICES_MANAGE") || usePermission("COMPLIANCE_SERVICES_ADMIN")
+  const canManage = usePermissions(["COMPLIANCE_SERVICES_MANAGE", "COMPLIANCE_SERVICES_ADMIN"])
 
   const [filterStatus, setFilterStatus] = useState("ALL")
   const [search, setSearch] = useState("")

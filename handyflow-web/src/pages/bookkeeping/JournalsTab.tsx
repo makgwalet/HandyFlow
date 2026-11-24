@@ -3,7 +3,7 @@ import { useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import { useSubmitGuard } from "../../hooks/useSubmitGuard"
-import { usePermission } from "../../hooks/usePermission"
+import { usePermissions } from "../../hooks/usePermission"
 import { dateText, errorOf, money, rowsOf, type Account } from "./bookkeeping.logic"
 import { emptyLine, journalProblem, journalRequest, journalTotals, type Journal } from "./practice.logic"
 import ClientScope from "./ClientScope"
@@ -13,7 +13,7 @@ export default function JournalsTab() { return <ClientScope>{id => <Journals cli
 
 function Journals({ clientId }: { clientId: string }) {
   const qc = useQueryClient()
-  const canManage = usePermission("BOOKKEEPING_MANAGE") || usePermission("BOOKKEEPING_ADMIN")
+  const canManage = usePermissions(["BOOKKEEPING_MANAGE", "BOOKKEEPING_ADMIN"])
   const base = "/api/v1/bookkeeping"
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10)), [description, setDescription] = useState(""), [reference, setReference] = useState("")
   const [lines, setLines] = useState([emptyLine(), emptyLine()])

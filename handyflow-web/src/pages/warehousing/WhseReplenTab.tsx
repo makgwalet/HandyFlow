@@ -6,7 +6,7 @@ import { useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { RefreshCw, Trash2 } from "lucide-react"
 import { apiClient } from "../../api/client"
-import { usePermission } from "../../hooks/usePermission"
+import { usePermissions } from "../../hooks/usePermission"
 import { btnGhost, btnPrimary, card, Chip, ErrorLine, fmtQty, inputStyle, labelStyle } from "./whseUi"
 import { parseQty } from "./receiving"
 
@@ -76,7 +76,7 @@ function AddRule({ onDone }: { onDone: () => void }) {
 
 export default function WhseReplenTab() {
   const qc = useQueryClient()
-  const canWork = usePermission("WAREHOUSING_MANAGE") || usePermission("WAREHOUSING_ADMIN")
+  const canWork = usePermissions(["WAREHOUSING_MANAGE", "WAREHOUSING_ADMIN"])
   const { data: rules = [], isLoading } = useQuery<RuleRow[]>({ queryKey: ["whse-replen-rules"], queryFn: async () => (await apiClient.get("/api/v1/warehousing/replenishment/rules")).data })
   const refresh = () => { qc.invalidateQueries({ queryKey: ["whse-replen-rules"] }); qc.invalidateQueries({ queryKey: ["whse-tasks"] }) }
   const sync = useMutation({ mutationFn: async () => (await apiClient.post("/api/v1/warehousing/replenishment/sync")).data as { created: number }, onSuccess: refresh })

@@ -7,7 +7,7 @@
 import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
-import { usePermission } from "../../hooks/usePermission"
+import { usePermission, usePermissions } from "../../hooks/usePermission"
 import { Plus, CalendarClock, CheckCircle2, Trash2, AlertCircle, X, AlarmClock, CalendarCheck } from "lucide-react"
 import LookupInput from "../../components/ui/LookupInput"
 import { DEADLINE_TYPES } from "../../lookups/southAfrica"
@@ -27,7 +27,7 @@ const EMPTY_FORM = { deadlineType: "", description: "", dueDate: "" }
 
 export default function DeadlinesTab() {
   const qc = useQueryClient()
-  const canManage = usePermission("COMPLIANCE_MANAGE") || usePermission("COMPLIANCE_ADMIN")
+  const canManage = usePermissions(["COMPLIANCE_MANAGE", "COMPLIANCE_ADMIN"])
   const canAdmin = usePermission("COMPLIANCE_ADMIN")
 
   const [showAdd, setShowAdd] = useState(false)

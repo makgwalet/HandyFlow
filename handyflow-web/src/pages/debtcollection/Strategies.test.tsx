@@ -6,7 +6,8 @@ import StrategiesTab from "./StrategiesTab"
 import StrategyNote from "./StrategyNote"
 
 const perms = vi.hoisted(() => ({ held: new Set<string>() }))
-vi.mock("../../hooks/usePermission", () => ({ usePermission: (p: string) => perms.held.has(p) }))
+vi.mock("../../hooks/usePermission", () => ({ usePermission: (p: string) => perms.held.has(p),
+  usePermissions: (ps: string[], mode: 'any' | 'all' = 'any') => { const f = ((p: string) => perms.held.has(p)) as (p: string) => boolean; return mode === 'all' ? ps.every(f) : ps.some(f) } }))
 const api = vi.hoisted(() => ({ get: vi.fn(), post: vi.fn(), put: vi.fn(), delete: vi.fn() }))
 vi.mock("../../api/client", () => ({ apiClient: api }))
 const wrap = (ui: React.ReactElement) => render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>{ui}</QueryClientProvider>)

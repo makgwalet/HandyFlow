@@ -10,7 +10,7 @@ import { apiClient } from "../../api/client"
 import { btnGhost, btnPrimary, card, Chip, ErrorLine, fmtQty, inputStyle, labelStyle, Modal, ReasonModal } from "./whseUi"
 import WhseWarehouseSelect, { useWarehouses } from "./WhseWarehouseSelect"
 import { pickWarehouse, showSelector } from "./warehouses"
-import { usePermission } from "../../hooks/usePermission"
+import { usePermissions } from "../../hooks/usePermission"
 import { alertKindText, alertTone, ALERT_KINDS, hasNext, levelsText, listParams, movementText, MOVEMENT_TYPES, rangeText, recommendationText, signedQty, statusText, STOCK_STATUSES, stockBreakdown, thresholdProblem, type AlertRow } from "./stockView"
 
 interface Paged<T> { content: T[]; total: number; page: number; size: number }
@@ -190,7 +190,7 @@ function LevelsModal({ alert, onClose }: { alert: AlertRow; onClose: () => void 
 
 function AlertsView({ warehouseId, clients }: { warehouseId: string | undefined; clients: ClientLite[] }) {
   const qc = useQueryClient()
-  const canAct = usePermission("WAREHOUSING_MANAGE") || usePermission("WAREHOUSING_ADMIN")
+  const canAct = usePermissions(["WAREHOUSING_MANAGE", "WAREHOUSING_ADMIN"])
   const [clientId, setClientId] = useState("")
   const [kind, setKind] = useState("")
   const [showResolved, setShowResolved] = useState(false)

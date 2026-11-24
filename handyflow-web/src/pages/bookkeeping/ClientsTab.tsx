@@ -4,7 +4,7 @@ import { useState } from "react"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { useNavigate } from "react-router-dom"
 import { apiClient } from "../../api/client"
-import { usePermission } from "../../hooks/usePermission"
+import { usePermissions } from "../../hooks/usePermission"
 import { errorOf, type Client } from "./bookkeeping.logic"
 import { useClients } from "./ClientScope"
 import { btn, card, danger, field, muted, primary, td, th } from "./ui"
@@ -14,7 +14,7 @@ const blank = { tradingName: "", registrationNumber: "", vatNumber: "", contactN
 export default function ClientsTab() {
   const qc = useQueryClient()
   const navigate = useNavigate()
-  const canManage = usePermission("BOOKKEEPING_MANAGE") || usePermission("BOOKKEEPING_ADMIN")
+  const canManage = usePermissions(["BOOKKEEPING_MANAGE", "BOOKKEEPING_ADMIN"])
   const { data: clients = [], isLoading } = useClients()
   const [form, setForm] = useState(blank)
   const [editing, setEditing] = useState<string | null>(null)

@@ -9,7 +9,7 @@ import { pickWarehouse, scope } from "./warehouses"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { RefreshCw } from "lucide-react"
 import { apiClient } from "../../api/client"
-import { usePermission } from "../../hooks/usePermission"
+import { usePermissions } from "../../hooks/usePermission"
 import { btnDanger, btnGhost, btnPrimary, card, Chip, ErrorLine, fmtQty, inputStyle, labelStyle, ReasonModal } from "./whseUi"
 import { parseQty } from "./receiving"
 
@@ -148,7 +148,7 @@ function TaskCard({ task, canWork }: { task: TaskRow; canWork: boolean }) {
 
 export default function WhseTasksTab() {
   const qc = useQueryClient()
-  const canWork = usePermission("WAREHOUSING_MANAGE") || usePermission("WAREHOUSING_ADMIN")
+  const canWork = usePermissions(["WAREHOUSING_MANAGE", "WAREHOUSING_ADMIN"])
   const [type, setType] = useState<"PICK" | "PUTAWAY" | "REPLEN" | "MOVE">("PICK")
   const [mine, setMine] = useState(false)
   const [chosenWh, setChosenWh] = useState<string | undefined>(undefined)

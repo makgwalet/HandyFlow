@@ -4,7 +4,7 @@ import { useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import { errorText } from "../../api/projectDocs"
-import { usePermission } from "../../hooks/usePermission"
+import { usePermissions } from "../../hooks/usePermission"
 import { toast } from "../../store/toast.store"
 import { Btn, Dialog, Empty, ErrorLine, Pill, SectionTitle, Stat, card, day, muted, th, td } from "../projects/tabs/pmKit"
 import { paymentProblem } from "../insurance/insurance.logic"
@@ -18,7 +18,7 @@ const overdue = (i: Inv) => i.balance > 0 && !!i.dueDate && i.dueDate < new Date
 
 export default function CommissionTab() {
   const qc = useQueryClient()
-  const canWrite = usePermission("INSURANCEBROKERAGE_MANAGE") || usePermission("INSURANCEBROKERAGE_ADMIN")
+  const canWrite = usePermissions(["INSURANCEBROKERAGE_MANAGE", "INSURANCEBROKERAGE_ADMIN"])
   const { clientName } = useLookups()
   const [page, setPage] = useState(0), [paying, setPaying] = useState<Inv | null>(null)
   const { data, isLoading, isError } = useQuery({ queryKey: ["ib-commission", page], queryFn: async () => pageOf<Inv>(await apiClient.get(`${BASE}/commission-invoices`, { params: { page, size: 24 } })) })

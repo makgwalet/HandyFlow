@@ -6,7 +6,8 @@ import { MemoryRouter } from "react-router-dom"
 
 // Bookkeeping part 2: accounts, journals, time, agreements, invoices, client portal.
 let perms = new Set<string>()
-vi.mock("../../hooks/usePermission", () => ({ usePermission: (p: string) => perms.has(p) }))
+vi.mock("../../hooks/usePermission", () => ({ usePermission: (p: string) => perms.has(p),
+  usePermissions: (ps: string[], mode: 'any' | 'all' = 'any') => { const f = ((p: string) => perms.has(p)) as (p: string) => boolean; return mode === 'all' ? ps.every(f) : ps.some(f) } }))
 const get = vi.fn(), post = vi.fn(), del = vi.fn()
 vi.mock("../../api/client", () => ({ apiClient: { get: (...a: any[]) => get(...a), post: (...a: any[]) => post(...a), put: vi.fn(), delete: (...a: any[]) => del(...a) } }))
 import AccountsTab from "./AccountsTab"

@@ -14,7 +14,8 @@ const get = vi.fn<(u: string) => Promise<unknown>>(() => Promise.resolve({ data:
 const post = vi.fn<(...a: unknown[]) => Promise<unknown>>(() => Promise.resolve({ data: { data: {} } }))
 const perms = new Set<string>(["SECURITY_MANAGE"])
 vi.mock("../../api/client", () => ({ apiClient: { get: (u: string) => get(u), post: (...a: unknown[]) => post(...a), patch: vi.fn(), put: vi.fn(), delete: vi.fn() } }))
-vi.mock("../../hooks/usePermission", () => ({ usePermission: (p: string) => perms.has(p) }))
+vi.mock("../../hooks/usePermission", () => ({ usePermission: (p: string) => perms.has(p),
+  usePermissions: (ps: string[], mode: 'any' | 'all' = 'any') => { const f = ((p: string) => perms.has(p)) as (p: string) => boolean; return mode === 'all' ? ps.every(f) : ps.some(f) } }))
 import GuardsTab from "./GuardsTab"
 
 const show = () => render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><MemoryRouter><GuardsTab /></MemoryRouter></QueryClientProvider>)

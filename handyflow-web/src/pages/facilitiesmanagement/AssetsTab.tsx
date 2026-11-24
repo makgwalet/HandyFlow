@@ -2,7 +2,7 @@
 import { useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
-import { usePermission } from "../../hooks/usePermission"
+import { usePermission, usePermissions } from "../../hooks/usePermission"
 import { toast } from "../../store/toast.store"
 import { Btn, Dialog, Empty, ErrorLine, Input, Pager, Pick, Pill, Row, SectionTitle, card, day, errorText, fail, inp, muted, pageOf, td, th } from "./kit"
 import { BASE, useLookups, type Lookups } from "./lookups"
@@ -15,7 +15,7 @@ const MOVE_LABEL: Record<string, string> = { OPERATIONAL: "Mark working", DOWN: 
 
 export default function AssetsTab() {
   const qc = useQueryClient(), lookups = useLookups()
-  const canWrite = usePermission("FACILITIESMANAGEMENT_MANAGE") || usePermission("FACILITIESMANAGEMENT_ADMIN")
+  const canWrite = usePermissions(["FACILITIESMANAGEMENT_MANAGE", "FACILITIESMANAGEMENT_ADMIN"])
   const [page, setPage] = useState(0), [siteId, setSiteId] = useState(""), [editing, setEditing] = useState<Asset | "new" | null>(null), [open, setOpen] = useState<Asset | null>(null)
   const { data, isLoading, isError } = useQuery({ queryKey: ["fm-assets", page, siteId], queryFn: async () => pageOf<Asset>(await apiClient.get(`${BASE}/assets`, { params: { page, size: 25, siteId: siteId || undefined } })) })
   const refresh = () => { qc.invalidateQueries({ queryKey: ["fm-assets"] }); qc.invalidateQueries({ queryKey: ["fm-assets-site"] }) }

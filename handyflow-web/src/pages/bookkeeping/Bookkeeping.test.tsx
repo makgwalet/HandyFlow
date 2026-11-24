@@ -6,7 +6,8 @@ import { MemoryRouter, useLocation } from "react-router-dom"
 
 // Bookkeeping screens (finance F19 front end).
 let perms = new Set<string>()
-vi.mock("../../hooks/usePermission", () => ({ usePermission: (p: string) => perms.has(p) }))
+vi.mock("../../hooks/usePermission", () => ({ usePermission: (p: string) => perms.has(p),
+  usePermissions: (ps: string[], mode: 'any' | 'all' = 'any') => { const f = ((p: string) => perms.has(p)) as (p: string) => boolean; return mode === 'all' ? ps.every(f) : ps.some(f) } }))
 const get = vi.fn(), post = vi.fn(), put = vi.fn(), del = vi.fn()
 vi.mock("../../api/client", () => ({ apiClient: { get: (...a: any[]) => get(...a), post: (...a: any[]) => post(...a), put: (...a: any[]) => put(...a), delete: (...a: any[]) => del(...a) } }))
 import WorkQueueTab from "./WorkQueueTab"

@@ -2,7 +2,7 @@
 import { useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
-import { usePermission } from "../../hooks/usePermission"
+import { usePermission, usePermissions } from "../../hooks/usePermission"
 import { dateText, errorOf, rowsOf } from "./bookkeeping.logic"
 import type { Grant } from "./practice.logic"
 import ClientScope from "./ClientScope"
@@ -15,7 +15,7 @@ const looksLikeEmail = (s: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s.trim()
 
 function Portal({ clientId }: { clientId: string }) {
   const qc = useQueryClient()
-  const canManage = usePermission("BOOKKEEPING_MANAGE") || usePermission("BOOKKEEPING_ADMIN")
+  const canManage = usePermissions(["BOOKKEEPING_MANAGE", "BOOKKEEPING_ADMIN"])
   const isAdmin = usePermission("BOOKKEEPING_ADMIN")
   const base = `/api/v1/bookkeeping/clients/${clientId}/portal-users`
   const [email, setEmail] = useState(""), [error, setError] = useState<string | null>(null), [sent, setSent] = useState<string | null>(null)

@@ -2,7 +2,7 @@
 import { useRef, useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
-import { usePermission } from "../../hooks/usePermission"
+import { usePermission, usePermissions } from "../../hooks/usePermission"
 import { toast } from "../../store/toast.store"
 import { Btn, Dialog, Empty, ErrorLine, Input, Pager, Pick, Pill, ReasonDialog, Row, SectionTitle, card, day, errorText, fail, money, muted, pageOf, td, th } from "./kit"
 import FmEvidencePanel, { DOC_KINDS, fileProblem, fileSize } from "./FmEvidencePanel"
@@ -15,7 +15,7 @@ interface Compliance { complianceStatus: string; eligible: boolean; problems: st
 
 export default function VendorsTab() {
   const qc = useQueryClient()
-  const canWrite = usePermission("FACILITIESMANAGEMENT_MANAGE") || usePermission("FACILITIESMANAGEMENT_ADMIN")
+  const canWrite = usePermissions(["FACILITIESMANAGEMENT_MANAGE", "FACILITIESMANAGEMENT_ADMIN"])
   const [page, setPage] = useState(0), [editing, setEditing] = useState<Vendor | "new" | null>(null), [open, setOpen] = useState<Vendor | null>(null)
   const { data, isLoading, isError } = useQuery({ queryKey: ["fm-vendors", page], queryFn: async () => pageOf<Vendor>(await apiClient.get(`${BASE}/vendors`, { params: { page, size: 25 } })) })
   const refresh = () => { qc.invalidateQueries({ queryKey: ["fm-vendors"] }); qc.invalidateQueries({ queryKey: ["fm-vendors-all"] }) }

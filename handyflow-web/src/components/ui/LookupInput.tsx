@@ -7,7 +7,7 @@
 import { useId, useState } from "react"
 import { type LookupOption, settle, isCustom, canonical } from "../../lookups/southAfrica"
 import { mergeOptions, useLookupActions, useTenantLookups } from "../../lookups/tenantLookups"
-import { usePermission } from "../../hooks/usePermission"
+import { usePermissions } from "../../hooks/usePermission"
 
 interface Props extends Omit<React.InputHTMLAttributes<HTMLInputElement>, "onChange" | "value" | "list"> {
   value: string
@@ -23,7 +23,7 @@ export default function LookupInput({ value, onChange, options: base, list, id, 
   const auto = useId()
   const listId = `${id ?? auto}-list`
   const extras = useTenantLookups(!!list)
-  const canManage = usePermission("COMPLIANCE_MANAGE") || usePermission("COMPLIANCE_ADMIN")
+  const canManage = usePermissions(["COMPLIANCE_MANAGE", "COMPLIANCE_ADMIN"])
   const actions = useLookupActions()
   const [problem, setProblem] = useState<string | null>(null)
   const options = mergeOptions(base, list, extras)

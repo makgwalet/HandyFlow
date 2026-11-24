@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
-import { usePermission } from "../../hooks/usePermission"
+import { usePermissions } from "../../hooks/usePermission"
 import { toast } from "../../store/toast.store"
 import { Btn, Dialog, Empty, ErrorLine, Input, Pager, Pill, SectionTitle, card, errorText, fail, inp, muted, pageOf, td, th } from "./kit"
 import { BASE, type FClient } from "./lookups"
@@ -11,8 +11,8 @@ import { clientBody, clientProblem, emptyClient, type ClientForm } from "./fm.lo
 
 export default function ClientsTab() {
   const qc = useQueryClient()
-  const canWrite = usePermission("FACILITIESMANAGEMENT_MANAGE") || usePermission("FACILITIESMANAGEMENT_ADMIN")
-  const canInvite = canWrite || usePermission("FACILITIESMANAGEMENT_PORTAL_MANAGE"), canRevoke = usePermission("FACILITIESMANAGEMENT_ADMIN") || usePermission("FACILITIESMANAGEMENT_PORTAL_MANAGE")
+  const canWrite = usePermissions(["FACILITIESMANAGEMENT_MANAGE", "FACILITIESMANAGEMENT_ADMIN"])
+  const canInvite = usePermissions(["FACILITIESMANAGEMENT_MANAGE", "FACILITIESMANAGEMENT_ADMIN", "FACILITIESMANAGEMENT_PORTAL_MANAGE"]), canRevoke = usePermissions(["FACILITIESMANAGEMENT_ADMIN", "FACILITIESMANAGEMENT_PORTAL_MANAGE"])
   const [page, setPage] = useState(0), [editing, setEditing] = useState<FClient | "new" | null>(null), [portal, setPortal] = useState<FClient | null>(null)
   const [typed, setTyped] = useState(""), [search, setSearch] = useState("")
   useEffect(() => { const t = setTimeout(() => { setSearch(typed.trim()); setPage(0) }, 300); return () => clearTimeout(t) }, [typed])

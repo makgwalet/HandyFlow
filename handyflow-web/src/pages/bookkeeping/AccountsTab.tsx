@@ -3,7 +3,7 @@ import { useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import { useSubmitGuard } from "../../hooks/useSubmitGuard"
-import { usePermission } from "../../hooks/usePermission"
+import { usePermissions } from "../../hooks/usePermission"
 import { errorOf, money, rowsOf } from "./bookkeeping.logic"
 import { ACCOUNT_TYPES, accountProblem, typeLabel } from "./practice.logic"
 import ClientScope from "./ClientScope"
@@ -13,7 +13,7 @@ export default function AccountsTab() { return <ClientScope>{id => <Accounts cli
 
 function Accounts({ clientId }: { clientId: string }) {
   const qc = useQueryClient()
-  const canManage = usePermission("BOOKKEEPING_MANAGE") || usePermission("BOOKKEEPING_ADMIN")
+  const canManage = usePermissions(["BOOKKEEPING_MANAGE", "BOOKKEEPING_ADMIN"])
   const [form, setForm] = useState({ code: "", name: "", type: "EXPENSE", description: "" })
   const [error, setError] = useState<string | null>(null)
   const { data = [] } = useQuery<any[]>({ queryKey: ["bk-accounts", clientId], queryFn: async () => rowsOf<any>(await apiClient.get(`/api/v1/bookkeeping/clients/${clientId}/accounts`)) })

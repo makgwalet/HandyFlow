@@ -6,7 +6,7 @@
 import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
-import { usePermission } from "../../hooks/usePermission"
+import { usePermission, usePermissions } from "../../hooks/usePermission"
 import { Upload, FileText, CheckCircle2, Trash2, AlertCircle, BadgeCheck } from "lucide-react"
 import Chip from "../../components/ui/Chip"
 import LookupInput from "../../components/ui/LookupInput"
@@ -25,7 +25,7 @@ const fmtDate = (d: string | null) => d ? new Date(d).toLocaleDateString("en-ZA"
 
 export default function ClientDocumentsTab({ clientId }: { clientId: string }) {
   const qc = useQueryClient()
-  const canManage = usePermission("COMPLIANCE_SERVICES_MANAGE") || usePermission("COMPLIANCE_SERVICES_ADMIN")
+  const canManage = usePermissions(["COMPLIANCE_SERVICES_MANAGE", "COMPLIANCE_SERVICES_ADMIN"])
   const canAdmin = usePermission("COMPLIANCE_SERVICES_ADMIN")
 
   const [documentType, setDocumentType] = useState("")

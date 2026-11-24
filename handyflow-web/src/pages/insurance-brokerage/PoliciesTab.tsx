@@ -4,7 +4,7 @@ import { useMemo, useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import { errorText } from "../../api/projectDocs"
-import { usePermission } from "../../hooks/usePermission"
+import { usePermissions } from "../../hooks/usePermission"
 import { toast } from "../../store/toast.store"
 import { Btn, Dialog, Empty, ErrorLine, SectionTitle, ReasonDialog, card, day, fail, inp, muted, th, td } from "../projects/tabs/pmKit"
 import {
@@ -23,7 +23,7 @@ const STATUSES = ["QUOTE", "BOUND", "ACTIVE", "LAPSED", "CANCELLED", "EXPIRED", 
 const label = (p: Policy) => p.policyNumber ?? p.quoteReference ?? "Quote"
 
 export default function PoliciesTab() {
-  const canWrite = usePermission("INSURANCEBROKERAGE_MANAGE") || usePermission("INSURANCEBROKERAGE_ADMIN")
+  const canWrite = usePermissions(["INSURANCEBROKERAGE_MANAGE", "INSURANCEBROKERAGE_ADMIN"])
   const lookups = useLookups()
   const [status, setStatus] = useState(""), [line, setLine] = useState(""), [q, setQ] = useState(""), [page, setPage] = useState(0), [due, setDue] = useState(false)
   const [openId, setOpenId] = useState<string | null>(null), [editing, setEditing] = useState<Policy | "new" | null>(null)

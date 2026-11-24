@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
-import { usePermission } from "../../hooks/usePermission"
+import { usePermissions } from "../../hooks/usePermission"
 import { toast } from "../../store/toast.store"
 import { Btn, Empty, ErrorLine, Input, Pill, SectionTitle, card, day, errorText, fail, muted, td, th } from "./kit"
 import { BASE } from "./lookups"
@@ -13,7 +13,7 @@ const URL = `${BASE}/sla/calendar`
 
 export default function SlaCalendarTab() {
   const qc = useQueryClient(), key = ["fm-sla-calendar"]
-  const canEdit = usePermission("FACILITIESMANAGEMENT_ADMIN") || usePermission("FACILITIESMANAGEMENT_SLA_MANAGE")
+  const canEdit = usePermissions(["FACILITIESMANAGEMENT_ADMIN", "FACILITIESMANAGEMENT_SLA_MANAGE"])
   const { data, isLoading, isError } = useQuery({ queryKey: key, queryFn: async () => (await apiClient.get<Calendar>(URL)).data })
   const [f, setF] = useState<CalendarForm>({ startTime: "08:00", endTime: "17:00", workingDays: ["MON", "TUE", "WED", "THU", "FRI"], timeZone: "Africa/Johannesburg" })
   const [err, setErr] = useState(""), [hDate, setHDate] = useState(""), [hName, setHName] = useState(""), [hErr, setHErr] = useState("")

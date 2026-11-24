@@ -17,7 +17,7 @@
 import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
-import { usePermission } from "../../hooks/usePermission"
+import { usePermission, usePermissions } from "../../hooks/usePermission"
 import DisputesPanel from "./DisputesPanel"
 import StrategyNote from "./StrategyNote"
 import NewCaseDialog from "./NewCaseDialog"
@@ -302,7 +302,7 @@ function CaseDetailPanel({ c, canManage, canAdmin: _canAdmin, invalidate }: { c:
 
 export default function CasesTab() {
   const qc = useQueryClient()
-  const canManage = usePermission("DEBTCOLLECTION_MANAGE") || usePermission("DEBTCOLLECTION_ADMIN")
+  const canManage = usePermissions(["DEBTCOLLECTION_MANAGE", "DEBTCOLLECTION_ADMIN"])
   const canAdmin = usePermission("DEBTCOLLECTION_ADMIN")
 
   const [filterStatus, setFilterStatus] = useState("ALL")

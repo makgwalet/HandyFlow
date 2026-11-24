@@ -7,7 +7,7 @@
 import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
-import { usePermission } from "../../hooks/usePermission"
+import { usePermission, usePermissions } from "../../hooks/usePermission"
 import { Plus, ShieldCheck, ShieldAlert, ShieldX, Layers, ChevronDown, ChevronUp, X, Edit2, Trash2, AlertCircle, Clock } from "lucide-react"
 import Chip from "../../components/ui/Chip"
 import StatTile from "../../components/ui/StatTile"
@@ -40,7 +40,7 @@ const EMPTY_FORM = { authority: "CIPC", registrationType: "", registrationNumber
 
 export default function ClientRegistrationsTab({ clientId }: { clientId: string }) {
   const qc = useQueryClient()
-  const canManage = usePermission("COMPLIANCE_SERVICES_MANAGE") || usePermission("COMPLIANCE_SERVICES_ADMIN")
+  const canManage = usePermissions(["COMPLIANCE_SERVICES_MANAGE", "COMPLIANCE_SERVICES_ADMIN"])
   const canAdmin = usePermission("COMPLIANCE_SERVICES_ADMIN")
 
   const [filterAuthority, setFilterAuthority] = useState("ALL")

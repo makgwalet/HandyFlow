@@ -2,7 +2,7 @@
 import { useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
-import { usePermission } from "../../hooks/usePermission"
+import { usePermission, usePermissions } from "../../hooks/usePermission"
 import { toast } from "../../store/toast.store"
 import { Btn, Dialog, Empty, ErrorLine, Input, Pager, Pick, Pill, ReasonDialog, Row, SectionTitle, card, day, downloadFile, errorText, fail, money, muted, pageOf, td, th } from "./kit"
 import { BASE, useLookups } from "./lookups"
@@ -59,7 +59,7 @@ export default function BillingTab() {
 
 /** Postings the ledger refused. Shown only to people who may see them; only approvers can send them round again. */
 function GlExceptions({ who, onRetried }: { who: BillWho; onRetried: () => void }) {
-  const see = usePermission("FACILITIESMANAGEMENT_ADMIN") || usePermission("FACILITIESMANAGEMENT_BILLING_MANAGE") || usePermission("FACILITIESMANAGEMENT_BILLING_APPROVE")
+  const see = usePermissions(["FACILITIESMANAGEMENT_ADMIN", "FACILITIESMANAGEMENT_BILLING_MANAGE", "FACILITIESMANAGEMENT_BILLING_APPROVE"])
   const { data } = useQuery({ enabled: see, queryKey: ["fm-gl-exceptions"], queryFn: async () => (await apiClient.get<GlException[]>(`${BASE}/billing/gl-exceptions`)).data })
   const retry = useMutation({
     mutationFn: async () => (await apiClient.post<{ requeued: number }>(`${BASE}/billing/gl-exceptions/retry`)).data,

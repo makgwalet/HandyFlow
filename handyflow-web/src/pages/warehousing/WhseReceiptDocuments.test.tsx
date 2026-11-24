@@ -9,8 +9,8 @@ const get = vi.fn()
 const post = vi.fn()
 let canUpload = true
 vi.mock("../../api/client", () => ({ apiClient: { get: (...a: unknown[]) => get(...a), post: (...a: unknown[]) => post(...a) } }))
-vi.mock("../../hooks/usePermission", () => ({ usePermission: () => canUpload }))
-
+vi.mock("../../hooks/usePermission", () => ({ usePermission: () => canUpload,
+  usePermissions: (ps: string[], mode: 'any' | 'all' = 'any') => { const f = (() => canUpload) as (p: string) => boolean; return mode === 'all' ? ps.every(f) : ps.some(f) } }))
 const wrap = (ui: React.ReactElement) => render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>{ui}</QueryClientProvider>)
 const doc = (over: Partial<ReceiptDocument> = {}): ReceiptDocument => ({ id: "E1", fileName: "delivery-note.pdf", contentType: "application/pdf", fileSizeBytes: 2048, evidenceType: "DELIVERY_NOTE",
   uploadedByName: "Thandi", createdAt: "2026-11-11T08:00:00Z", ...over })

@@ -3,7 +3,7 @@ import { useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import { useSubmitGuard } from "../../hooks/useSubmitGuard"
-import { usePermission } from "../../hooks/usePermission"
+import { usePermissions } from "../../hooks/usePermission"
 import { DIRECTIONS, FIELDS, emptyRule, errorOf, rowsOf, ruleProblem, ruleRequest, ruleSummary, type Account, type BankAccount, type Rule } from "./bookkeeping.logic"
 import ClientScope from "./ClientScope"
 import { btn, card, danger, field, muted, primary, td, th } from "./ui"
@@ -14,7 +14,7 @@ export default function BankRulesTab() {
 
 function Rules({ clientId }: { clientId: string }) {
   const qc = useQueryClient()
-  const canManage = usePermission("BOOKKEEPING_MANAGE") || usePermission("BOOKKEEPING_ADMIN")
+  const canManage = usePermissions(["BOOKKEEPING_MANAGE", "BOOKKEEPING_ADMIN"])
   const base = `/api/v1/bookkeeping/clients/${clientId}`
   const [form, setForm] = useState(emptyRule())
   const [error, setError] = useState<string | null>(null)

@@ -8,7 +8,7 @@ import { Link, useNavigate, useParams } from "react-router-dom"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { AlertOctagon, ArrowLeft, CalendarClock, ClipboardCheck, FileText, Plus, ShieldAlert, ShieldCheck, Trash2, UserRound } from "lucide-react"
 import { apiClient } from "../../api/client"
-import { usePermission } from "../../hooks/usePermission"
+import { usePermissions } from "../../hooks/usePermission"
 import Chip from "../../components/ui/Chip"
 import StatTile from "../../components/ui/StatTile"
 import { PageHeader } from "../../components/ui/PageHeader"
@@ -73,7 +73,7 @@ export default function GuardProfilePage() {
   const navigate = useNavigate()
   const [tab, setTab] = useState<Tab>("Overview")
   const [openCompetency, setOpenCompetency] = useState<string | null>(null)
-  const canManage = usePermission("SECURITY_MANAGE") || usePermission("SECURITY_ADMIN")
+  const canManage = usePermissions(["SECURITY_MANAGE", "SECURITY_ADMIN"])
   const { data, isLoading, error } = useQuery<Overview>({
     queryKey: ["guard-overview", guardId],
     queryFn: async () => { const r = await apiClient.get(`/api/v1/security/guards/${guardId}/overview`); return r.data?.data ?? r.data },
@@ -252,7 +252,7 @@ function ReadinessRing({ readiness }: { readiness: Readiness }) {
 }
 
 function ComplianceTab({ guardId, readiness, screening, onOpenCompetency }: { guardId: string; readiness: Readiness; screening: ScreeningItem[]; onOpenCompetency: (id: string) => void }) {
-  const canManage = usePermission("SECURITY_MANAGE") || usePermission("SECURITY_ADMIN")
+  const canManage = usePermissions(["SECURITY_MANAGE", "SECURITY_ADMIN"])
   const [openId, setOpenId] = useState<string | null>(null)
   const [requesting, setRequesting] = useState(false)
   const open = screening.find(s => s.id === openId) ?? null
@@ -309,7 +309,7 @@ function ComplianceTab({ guardId, readiness, screening, onOpenCompetency }: { gu
 
 function DocumentsTab({ guardId, docs }: { guardId: string; docs: DocumentItem[] }) {
   const qc = useQueryClient()
-  const canManage = usePermission("SECURITY_MANAGE") || usePermission("SECURITY_ADMIN")
+  const canManage = usePermissions(["SECURITY_MANAGE", "SECURITY_ADMIN"])
   const [adding, setAdding] = useState(false)
   const [form, setForm] = useState({ category: "ID_COPY", fileUrl: "", fileName: "", notes: "" })
   const [removing, setRemoving] = useState<DocumentItem | null>(null)

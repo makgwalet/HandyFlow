@@ -2,7 +2,7 @@
 import { useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
-import { usePermission } from "../../hooks/usePermission"
+import { usePermissions } from "../../hooks/usePermission"
 import { Btn, Empty, Pill, SectionTitle, card, day, fail, muted } from "./kit"
 import { BASE } from "./lookups"
 import { DATE_TYPES, KEYDATE_STATUS, MONTHS, dateTone, groupByDay, gridRange, isoDay, keyDateActions, keyDateNote, labelOf, monthGrid, shiftMonth, type Tone } from "./legal.logic"
@@ -13,7 +13,7 @@ const TONE_FG: Record<Tone, string> = { neutral: "var(--hf-text-tertiary)", info
 const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
 
 export default function CalendarTab() {
-  const qc = useQueryClient(), canWrite = usePermission("LEGALPRACTICE_MANAGE") || usePermission("LEGALPRACTICE_ADMIN")
+  const qc = useQueryClient(), canWrite = usePermissions(["LEGALPRACTICE_MANAGE", "LEGALPRACTICE_ADMIN"])
   const now = new Date(), todayIso = isoDay(now)
   const [ym, setYm] = useState({ year: now.getFullYear(), month: now.getMonth() }), [sel, setSel] = useState(todayIso)
   const range = gridRange(ym.year, ym.month), weeks = monthGrid(ym.year, ym.month)

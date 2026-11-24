@@ -2,7 +2,7 @@
 import { useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
-import { usePermission } from "../../hooks/usePermission"
+import { usePermission, usePermissions } from "../../hooks/usePermission"
 import { errorOf, monthName, rowsOf, type Period } from "./bookkeeping.logic"
 import ClientScope from "./ClientScope"
 import { btn, card, danger, muted, td, th } from "./ui"
@@ -13,7 +13,7 @@ export default function PeriodsTab() {
 
 function Periods({ clientId }: { clientId: string }) {
   const qc = useQueryClient()
-  const canManage = usePermission("BOOKKEEPING_MANAGE") || usePermission("BOOKKEEPING_ADMIN")
+  const canManage = usePermissions(["BOOKKEEPING_MANAGE", "BOOKKEEPING_ADMIN"])
   const canReopen = usePermission("BOOKKEEPING_ADMIN")
   const [error, setError] = useState<string | null>(null)
   const { data: periods = [] } = useQuery<Period[]>({

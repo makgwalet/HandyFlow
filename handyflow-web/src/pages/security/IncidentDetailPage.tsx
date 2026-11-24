@@ -8,7 +8,7 @@ import { Link, useParams } from "react-router-dom"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { AlertTriangle, ArrowLeft, FileText } from "lucide-react"
 import { apiClient } from "../../api/client"
-import { usePermission } from "../../hooks/usePermission"
+import { usePermissions } from "../../hooks/usePermission"
 import Chip from "../../components/ui/Chip"
 import { PageHeader } from "../../components/ui/PageHeader"
 import EvidenceFiles from "./EvidenceFiles"
@@ -70,7 +70,7 @@ export default function IncidentDetailPage() {
   useCompanyZone()
   const { id } = useParams<{ id: string }>()
   const qc = useQueryClient()
-  const canManage = usePermission("SECURITY_MANAGE") || usePermission("SECURITY_ADMIN")
+  const canManage = usePermissions(["SECURITY_MANAGE", "SECURITY_ADMIN"])
   const [action, setAction] = useState<string | null>(null)
   const [msg, setMsg] = useState("")
   const { data, isLoading, error } = useQuery<IncidentCase>({

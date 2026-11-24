@@ -27,7 +27,8 @@ const get = vi.fn((url: string) => {
 const put = vi.fn((...args: [string, object]) => Promise.resolve({ data: { data: targets }, args }))
 const del = vi.fn((...args: [string]) => Promise.resolve({ data: { data: targets }, args }))
 vi.mock("../../api/client", () => ({ apiClient: { get: (u: string) => get(u), put: (u: string, b: object) => put(u, b), delete: (u: string) => del(u) } }))
-vi.mock("../../hooks/usePermission", () => ({ usePermission: () => manage }))
+vi.mock("../../hooks/usePermission", () => ({ usePermission: () => manage,
+  usePermissions: (ps: string[], mode: 'any' | 'all' = 'any') => { const f = (() => manage) as (p: string) => boolean; return mode === 'all' ? ps.every(f) : ps.some(f) } }))
 import SlaTab from "./SlaTab"
 
 const show = () => render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><SlaTab /></QueryClientProvider>)

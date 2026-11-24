@@ -2,7 +2,7 @@
 import { useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
-import { usePermission } from "../../hooks/usePermission"
+import { usePermissions } from "../../hooks/usePermission"
 import { toast } from "../../store/toast.store"
 import { Btn, Dialog, Empty, ErrorLine, Input, Pager, Pick, Pill, SectionTitle, card, errorText, fail, muted, pageOf, td, th } from "./kit"
 import { BASE } from "./lookups"
@@ -18,7 +18,7 @@ function useUsers() {
 
 export default function TechniciansTab() {
   const qc = useQueryClient(), users = useUsers()
-  const canWrite = usePermission("FACILITIESMANAGEMENT_MANAGE") || usePermission("FACILITIESMANAGEMENT_ADMIN")
+  const canWrite = usePermissions(["FACILITIESMANAGEMENT_MANAGE", "FACILITIESMANAGEMENT_ADMIN"])
   const [page, setPage] = useState(0), [editing, setEditing] = useState<Tech | "new" | null>(null)
   const { data, isLoading, isError } = useQuery({ queryKey: ["fm-technicians", page], queryFn: async () => pageOf<Tech>(await apiClient.get(`${BASE}/technicians`, { params: { page, size: 25 } })) })
   const refresh = () => { qc.invalidateQueries({ queryKey: ["fm-technicians"] }); qc.invalidateQueries({ queryKey: ["fm-technicians-all"] }) }

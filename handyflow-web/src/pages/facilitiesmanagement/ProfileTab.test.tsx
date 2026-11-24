@@ -6,7 +6,8 @@ import ProfileTab from "./ProfileTab"
 
 const get = vi.fn(), put = vi.fn()
 vi.mock("../../api/client", () => ({ apiClient: { get: (...a: unknown[]) => get(...a), put: (...a: unknown[]) => put(...a) } }))
-vi.mock("../../hooks/usePermission", () => ({ usePermission: () => true }))
+vi.mock("../../hooks/usePermission", () => ({ usePermission: () => true,
+  usePermissions: (ps: string[], mode: 'any' | 'all' = 'any') => { const f = (() => true) as (p: string) => boolean; return mode === 'all' ? ps.every(f) : ps.some(f) } }))
 vi.mock("../../store/toast.store", () => ({ toast: { success: vi.fn(), error: vi.fn() } }))
 
 const wrap = () => render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><ProfileTab /></QueryClientProvider>)

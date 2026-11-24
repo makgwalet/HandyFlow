@@ -19,7 +19,7 @@ import { useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
-import { usePermission } from "../../hooks/usePermission"
+import { usePermission, usePermissions } from "../../hooks/usePermission"
 import { Plus, Building2, X, AlertCircle, ChevronRight, Ban, CheckCircle2, Search, Users, UserX } from "lucide-react"
 import StatTile from "../../components/ui/StatTile"
 import { SectionedModulePage } from "../../components/shell/SectionedModulePage"
@@ -41,7 +41,7 @@ const EMPTY_FORM = { name: "", crmCustomerId: "", contactEmail: "", contactPhone
 export default function ComplianceServicesPage() {
   const nav = useNavigate()
   const qc = useQueryClient()
-  const canManage = usePermission("COMPLIANCE_SERVICES_MANAGE") || usePermission("COMPLIANCE_SERVICES_ADMIN")
+  const canManage = usePermissions(["COMPLIANCE_SERVICES_MANAGE", "COMPLIANCE_SERVICES_ADMIN"])
   const canAdmin = usePermission("COMPLIANCE_SERVICES_ADMIN")
 
   const [filterStatus, setFilterStatus] = useState("ALL")

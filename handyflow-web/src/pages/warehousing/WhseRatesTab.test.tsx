@@ -8,8 +8,8 @@ const get = vi.fn()
 const post = vi.fn()
 let perms: string[] = []
 vi.mock("../../api/client", () => ({ apiClient: { get: (...a: unknown[]) => get(...a), post: (...a: unknown[]) => post(...a) } }))
-vi.mock("../../hooks/usePermission", () => ({ usePermission: (p: string) => perms.includes(p) }))
-
+vi.mock("../../hooks/usePermission", () => ({ usePermission: (p: string) => perms.includes(p),
+  usePermissions: (ps: string[], mode: 'any' | 'all' = 'any') => { const f = ((p: string) => perms.includes(p)) as (p: string) => boolean; return mode === 'all' ? ps.every(f) : ps.some(f) } }))
 const day = (offset: number) => { const d = new Date(); d.setDate(d.getDate() + offset); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}` }
 const wrap = () => render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><WhseRatesTab clientId="c1" /></QueryClientProvider>)
 

@@ -7,7 +7,8 @@ import { alertKindText, hasNext, levelsText, listParams, movementText, rangeText
 
 const get = vi.fn(), post = vi.fn(), put = vi.fn()
 vi.mock("../../api/client", () => ({ apiClient: { get: (u: string, cfg?: unknown) => get(u, cfg), post: (...a: unknown[]) => post(...a), put: (...a: unknown[]) => put(...a) } }))
-vi.mock("../../hooks/usePermission", () => ({ usePermission: (p: string) => p === "WAREHOUSING_MANAGE" }))
+vi.mock("../../hooks/usePermission", () => ({ usePermission: (p: string) => p === "WAREHOUSING_MANAGE",
+  usePermissions: (ps: string[], mode: 'any' | 'all' = 'any') => { const f = ((p: string) => p === "WAREHOUSING_MANAGE") as (p: string) => boolean; return mode === 'all' ? ps.every(f) : ps.some(f) } }))
 const wrap = () => render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><WhseStockTab /></QueryClientProvider>)
 
 const two = [{ id: "w1", code: "CPT", name: "Cape Town", active: true, isDefault: true }, { id: "w2", code: "JHB", name: "Johannesburg", active: true, isDefault: false }]

@@ -11,7 +11,8 @@ const patch = vi.fn(() => Promise.resolve({ data: {} })), post = vi.fn(() => Pro
 vi.mock("../../api/client", () => ({ apiClient: {
   get: vi.fn((url: string) => url.includes("qr-image") ? Promise.reject(new Error("no image")) : Promise.resolve({ data: { data: url.includes("/checkpoints?") ? rows : { content: [{ id: "s1", name: "Centurion Mall" }] } } })),
   patch: (...a: any[]) => (patch as any)(...a), post: (...a: any[]) => (post as any)(...a) } }))
-vi.mock("../../hooks/usePermission", () => ({ usePermission: () => true }))
+vi.mock("../../hooks/usePermission", () => ({ usePermission: () => true,
+  usePermissions: (ps: string[], mode: 'any' | 'all' = 'any') => { const f = (() => true) as (p: string) => boolean; return mode === 'all' ? ps.every(f) : ps.some(f) } }))
 import CheckpointsTab from "./CheckpointsTab"
 
 const show = () => render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><MemoryRouter><CheckpointsTab /></MemoryRouter></QueryClientProvider>)

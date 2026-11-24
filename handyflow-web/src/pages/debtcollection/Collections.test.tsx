@@ -7,7 +7,8 @@ import CasesTab from "./CasesTab"
 import DebtCollectionDashboard from "./DebtCollectionDashboard"
 
 const perms = vi.hoisted(() => ({ held: new Set<string>() }))
-vi.mock("../../hooks/usePermission", () => ({ usePermission: (p: string) => perms.held.has(p) }))
+vi.mock("../../hooks/usePermission", () => ({ usePermission: (p: string) => perms.held.has(p),
+  usePermissions: (ps: string[], mode: 'any' | 'all' = 'any') => { const f = ((p: string) => perms.held.has(p)) as (p: string) => boolean; return mode === 'all' ? ps.every(f) : ps.some(f) } }))
 vi.mock("../../hooks/useAuth", () => ({ useAuth: () => ({ user: { userId: "u1" } }) }))
 const api = vi.hoisted(() => ({ get: vi.fn(), post: vi.fn(), put: vi.fn(), delete: vi.fn() }))
 vi.mock("../../api/client", () => ({ apiClient: api }))

@@ -22,7 +22,8 @@ vi.mock("../../api/client", () => ({
     post: (...a: any[]) => (post as any)(...a),
   },
 }))
-vi.mock("../../hooks/usePermission", () => ({ usePermission: () => true }))
+vi.mock("../../hooks/usePermission", () => ({ usePermission: () => true,
+  usePermissions: (ps: string[], mode: 'any' | 'all' = 'any') => { const f = (() => true) as (p: string) => boolean; return mode === 'all' ? ps.every(f) : ps.some(f) } }))
 import SchedulerTab from "./SchedulerTab"
 
 const show = () => render(

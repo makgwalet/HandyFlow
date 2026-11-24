@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
-import { usePermission } from "../../hooks/usePermission"
+import { usePermissions } from "../../hooks/usePermission"
 import { toast } from "../../store/toast.store"
 import { Btn, ErrorLine, Input, SectionTitle, errorText, muted } from "./kit"
 import { BASE } from "./lookups"
@@ -10,7 +10,7 @@ import { emptyProfile, profileProblem, profileRequest, type ProfileForm } from "
 
 export default function ProfileTab() {
   const qc = useQueryClient()
-  const canEdit = usePermission("LEGALPRACTICE_MANAGE") || usePermission("LEGALPRACTICE_ADMIN")
+  const canEdit = usePermissions(["LEGALPRACTICE_MANAGE", "LEGALPRACTICE_ADMIN"])
   const [f, setF] = useState<ProfileForm>(emptyProfile), [err, setErr] = useState("")
   // A firm that has not saved a profile yet gets a 404; that means "empty form", not an error.
   const { data, isLoading } = useQuery<ProfileForm | null>({

@@ -6,7 +6,7 @@ import { useRef, useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { Paperclip } from "lucide-react"
 import { apiClient } from "../../api/client"
-import { usePermission } from "../../hooks/usePermission"
+import { usePermissions } from "../../hooks/usePermission"
 import { btnGhost, btnPrimary, card, Chip, ErrorLine, inputStyle, labelStyle } from "./whseUi"
 import { DOCUMENT_TYPES, documentTypeLabel, fileProblem, fileSize } from "./receiptDocuments"
 
@@ -14,7 +14,7 @@ export interface ReceiptDocument { id: string; fileName: string; contentType: st
 
 export default function WhseReceiptDocuments({ shipmentId }: { shipmentId: string }) {
   const qc = useQueryClient()
-  const canUpload = usePermission("WAREHOUSING_MANAGE") || usePermission("WAREHOUSING_ADMIN")
+  const canUpload = usePermissions(["WAREHOUSING_MANAGE", "WAREHOUSING_ADMIN"])
   const base = `/api/v1/warehousing/inbound-shipments/${shipmentId}/evidence`
   const input = useRef<HTMLInputElement>(null)
   const [type, setType] = useState("DELIVERY_NOTE")

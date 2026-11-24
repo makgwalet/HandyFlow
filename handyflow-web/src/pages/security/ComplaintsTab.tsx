@@ -7,7 +7,7 @@ import { Link, useNavigate } from "react-router-dom"
 import { useQuery } from "@tanstack/react-query"
 import { AlertOctagon, Plus } from "lucide-react"
 import { apiClient } from "../../api/client"
-import { usePermission } from "../../hooks/usePermission"
+import { usePermissions } from "../../hooks/usePermission"
 import Chip from "../../components/ui/Chip"
 import ComplaintForm from "./ComplaintForm"
 import {
@@ -23,7 +23,7 @@ const fmt = (d: string) => new Date(d + "T00:00:00").toLocaleDateString("en-ZA",
 
 export default function ComplaintsTab({ guardId }: { guardId?: string }) {
   const navigate = useNavigate()
-  const canManage = usePermission("SECURITY_MANAGE") || usePermission("SECURITY_ADMIN")
+  const canManage = usePermissions(["SECURITY_MANAGE", "SECURITY_ADMIN"])
   const [status, setStatus] = useState("OPEN")
   const [severity, setSeverity] = useState("")
   const [category, setCategory] = useState("")

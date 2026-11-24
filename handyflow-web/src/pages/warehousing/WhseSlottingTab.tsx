@@ -6,7 +6,7 @@
 import { useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
-import { usePermission } from "../../hooks/usePermission"
+import { usePermissions } from "../../hooks/usePermission"
 import { btnPrimary, card, Chip, ErrorLine, fmtQty, inputStyle, labelStyle } from "./whseUi"
 
 export interface Suggestion {
@@ -46,7 +46,7 @@ function Row({ s, canWork, onDone }: { s: Suggestion; canWork: boolean; onDone: 
 
 export default function WhseSlottingTab() {
   const qc = useQueryClient()
-  const canWork = usePermission("WAREHOUSING_MANAGE") || usePermission("WAREHOUSING_ADMIN")
+  const canWork = usePermissions(["WAREHOUSING_MANAGE", "WAREHOUSING_ADMIN"])
   const [days, setDays] = useState(90)
   const { data, isLoading, error } = useQuery<Overview>({
     queryKey: ["whse-slotting", days],

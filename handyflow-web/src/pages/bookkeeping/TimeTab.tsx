@@ -3,7 +3,7 @@ import { useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import { useSubmitGuard } from "../../hooks/useSubmitGuard"
-import { usePermission } from "../../hooks/usePermission"
+import { usePermissions } from "../../hooks/usePermission"
 import { dateText, errorOf, money, rowsOf } from "./bookkeeping.logic"
 import { ACTIVITIES, activityLabel, timeProblem, timeValue, unbilledTotal, type TimeEntry } from "./practice.logic"
 import ClientScope from "./ClientScope"
@@ -13,7 +13,7 @@ export default function TimeTab() { return <ClientScope>{id => <Time clientId={i
 
 function Time({ clientId }: { clientId: string }) {
   const qc = useQueryClient()
-  const canManage = usePermission("BOOKKEEPING_MANAGE") || usePermission("BOOKKEEPING_ADMIN")
+  const canManage = usePermissions(["BOOKKEEPING_MANAGE", "BOOKKEEPING_ADMIN"])
   const base = "/api/v1/bookkeeping"
   const today = new Date().toISOString().slice(0, 10)
   const [f, setF] = useState({ date: today, activity: "BOOKKEEPING", description: "", hours: "", rate: "", billable: true, who: "" })

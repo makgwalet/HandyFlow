@@ -13,7 +13,7 @@ import { useState } from "react"
 import { useParams, useNavigate } from "react-router-dom"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
-import { usePermission } from "../../hooks/usePermission"
+import { usePermissions } from "../../hooks/usePermission"
 import TenderReadinessPanel from "../businessreadiness/TenderReadinessPanel"
 import TenderPricingCard from "./TenderPricingCard"
 import TenderPackageCard from "./TenderPackageCard"
@@ -92,7 +92,7 @@ export default function TenderDetailPage() {
   const { id } = useParams<{ id: string }>()
   const nav = useNavigate()
   const qc = useQueryClient()
-  const canManage = usePermission("COMPLIANCE_MANAGE") || usePermission("COMPLIANCE_ADMIN")
+  const canManage = usePermissions(["COMPLIANCE_MANAGE", "COMPLIANCE_ADMIN"])
 
   const [showOutcome, setShowOutcome] = useState<string | null>(null) // "AWARDED" | "UNSUCCESSFUL"
   const [outcomeReason, setOutcomeReason] = useState("")

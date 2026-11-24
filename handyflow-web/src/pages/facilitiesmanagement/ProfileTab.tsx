@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
-import { usePermission } from "../../hooks/usePermission"
+import { usePermissions } from "../../hooks/usePermission"
 import { toast } from "../../store/toast.store"
 import { Btn, Empty, ErrorLine, Field, SectionTitle, card, errorText, inp, muted } from "./kit"
 import { Input } from "../insurance/parts"
@@ -30,7 +30,7 @@ function AccountPick({ label, hint, value, onChange, accounts, disabled }: { lab
 
 export default function ProfileTab() {
   const qc = useQueryClient()
-  const canEdit = usePermission("FACILITIESMANAGEMENT_ADMIN") || usePermission("FACILITIESMANAGEMENT_MANAGE")
+  const canEdit = usePermissions(["FACILITIESMANAGEMENT_ADMIN", "FACILITIESMANAGEMENT_MANAGE"])
   const prof = useQuery({
     queryKey: KEY, retry: false,
     queryFn: async () => {

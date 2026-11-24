@@ -2,7 +2,7 @@
 import { useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
-import { usePermission } from "../../hooks/usePermission"
+import { usePermissions } from "../../hooks/usePermission"
 import { toast } from "../../store/toast.store"
 import { Btn, Dialog, Empty, ErrorLine, Input, Pager, Pick, Pill, SectionTitle, card, errorText, fail, money, muted, pageOf, td, th } from "./kit"
 import { BASE, type LAttorney } from "./lookups"
@@ -10,7 +10,7 @@ import { ROLES, attorneyProblem, attorneyRequest, emptyAttorney, labelOf, type A
 
 export default function AttorneysTab() {
   const qc = useQueryClient()
-  const canWrite = usePermission("LEGALPRACTICE_MANAGE") || usePermission("LEGALPRACTICE_ADMIN")
+  const canWrite = usePermissions(["LEGALPRACTICE_MANAGE", "LEGALPRACTICE_ADMIN"])
   const [page, setPage] = useState(0), [editing, setEditing] = useState<LAttorney | "new" | null>(null)
   const { data, isLoading, isError } = useQuery({ queryKey: ["lp-attorneys", page], queryFn: async () => pageOf<LAttorney>(await apiClient.get(`${BASE}/attorneys`, { params: { page, size: 25 } })) })
   const refresh = () => { qc.invalidateQueries({ queryKey: ["lp-attorneys"] }); qc.invalidateQueries({ queryKey: ["lp-attorneys-all"] }) }

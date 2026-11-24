@@ -8,8 +8,8 @@ import { dayBounds, lateLabel, nextStep, slotProblem, toInstant, localDay } from
 const get = vi.fn()
 const post = vi.fn()
 vi.mock("../../api/client", () => ({ apiClient: { get: (...a: unknown[]) => get(...a), post: (...a: unknown[]) => post(...a) } }))
-vi.mock("../../hooks/usePermission", () => ({ usePermission: () => true }))
-
+vi.mock("../../hooks/usePermission", () => ({ usePermission: () => true,
+  usePermissions: (ps: string[], mode: 'any' | 'all' = 'any') => { const f = (() => true) as (p: string) => boolean; return mode === 'all' ? ps.every(f) : ps.some(f) } }))
 const wrap = (ui: React.ReactElement) => render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>{ui}</QueryClientProvider>)
 const appt = (over: Partial<Appointment> = {}): Appointment => ({ id: "A1", direction: "INBOUND", dockLocationId: "D1", dockCode: "DOCK-1", startsAt: "2026-11-12T08:00:00Z", endsAt: "2026-11-12T09:00:00Z",
   carrier: "Acme Freight", vehicleRegistration: "CA 123", driverName: null, shipmentReference: "PO-7", manifestNumber: null, notes: null, status: "SCHEDULED", arrivedAt: null,
