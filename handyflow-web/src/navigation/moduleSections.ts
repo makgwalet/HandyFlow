@@ -1151,7 +1151,10 @@ export const COMPLIANCE_SERVICES_SECTIONS: ModuleSections = {
   title: 'Compliance Services',
   icon: Building2,
   defaultSection: 'clients',
-  groups: [{ label: 'Overview', sections: [{ id: 'clients', label: 'Clients', icon: Users }] }],
+  groups: [
+    { label: 'Overview', sections: [{ id: 'clients', label: 'Clients', icon: Users }] },
+    { label: 'Regulatory', sections: [{ id: 'catalogue', label: 'Obligation catalogue', icon: BookOpen }] },
+  ],
 }
 
 export const DESK_SECTIONS: ModuleSections = {
