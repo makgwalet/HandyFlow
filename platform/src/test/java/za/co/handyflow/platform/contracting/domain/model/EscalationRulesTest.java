@@ -192,7 +192,16 @@ class EscalationRulesTest {
     void escalationNeverGoesToTheRequesterAndCoversForAbsentContacts() {
         assertEquals(List.of(A), EscalationRules.routeEscalation(List.of(REQ, A), List.of(B), REQ, List.of(), TODAY));
         assertEquals(List.of(D), EscalationRules.routeEscalation(List.of(C), List.of(A), REQ, List.of(out(C, D)), TODAY));
-        assertEquals(List.of(), EscalationRules.routeEscalation(List.of(C), List.of(A), REQ, List.of(out(C, null)), TODAY));
+    }
+
+    @Test
+    void escalationFallsBackToTheAdministratorsWhenNoNamedContactCanBeReached() {
+        // the only named contact is away with no cover
+        assertEquals(List.of(A), EscalationRules.routeEscalation(List.of(C), List.of(A), REQ, List.of(out(C, null)), TODAY));
+        // the only named contact is the person who asked
+        assertEquals(List.of(A), EscalationRules.routeEscalation(List.of(REQ), List.of(A), REQ, List.of(), TODAY));
+        // nobody at all can be reached
+        assertEquals(List.of(), EscalationRules.routeEscalation(List.of(C), List.of(A), REQ, List.of(out(C, null), out(A, null)), TODAY));
     }
 
     // ── stored forms ─────────────────────────────────────────────────────────

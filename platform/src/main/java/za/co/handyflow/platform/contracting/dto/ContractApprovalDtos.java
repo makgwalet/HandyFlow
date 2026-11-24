@@ -25,12 +25,14 @@ public final class ContractApprovalDtos {
                                UUID requestedBy, Instant requestedAt, String requestNote,
                                UUID decidedBy, Instant decidedAt, String decisionNote,
                                boolean soleUserException, String exceptionReason, Instant closedAt,
-                               boolean mine, boolean canDecide) {
+                               boolean mine, boolean canDecide,
+                               UUID assignedTo, Instant assignedAt, int escalationStage, Instant escalationStageAt) {
         public static ApprovalView of(ContractApproval a, UUID me, boolean canDecideRole) {
             boolean mine = a.getRequestedBy().equals(me);
             return new ApprovalView(a.getId(), a.getAction(), a.getSubjectId(), a.getSubjectLabel(), a.getStatus(),
                     a.getRequestedBy(), a.getRequestedAt(), a.getRequestNote(), a.getDecidedBy(), a.getDecidedAt(), a.getDecisionNote(),
-                    a.isSoleUserException(), a.getExceptionReason(), a.getClosedAt(), mine, a.isPending() && canDecideRole);
+                    a.isSoleUserException(), a.getExceptionReason(), a.getClosedAt(), mine, a.isPending() && canDecideRole,
+                    a.getAssignedTo(), a.getAssignedAt(), a.getEscalationStage(), a.getEscalationStageAt());
         }
     }
 

@@ -123,12 +123,13 @@ public final class EscalationRules {
     }
 
     /**
-     * Escalation recipients: the named contacts, or the administrators when none are named. Out-of-office people are replaced by their cover.
-     * The requester is left out (they are told separately that it was escalated).
+     * Escalation recipients: the named contacts, or the administrators when none are named or none of them can be reached (each is the
+     * requester, or away with no cover). Out-of-office people are replaced by their cover. The requester is left out (they are told
+     * separately that it was escalated).
      */
     public static List<UUID> routeEscalation(Collection<UUID> namedContacts, Collection<UUID> administrators, UUID requester, List<Absence> absences, LocalDate today) {
-        Collection<UUID> base = namedContacts == null || namedContacts.isEmpty() ? administrators : namedContacts;
-        return resolve(base, requester, absences, today);
+        List<UUID> named = namedContacts == null ? List.of() : resolve(namedContacts, requester, absences, today);
+        return named.isEmpty() ? resolve(administrators, requester, absences, today) : named;
     }
 
     private static List<UUID> resolve(Collection<UUID> people, UUID requester, List<Absence> absences, LocalDate today) {
