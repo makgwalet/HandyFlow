@@ -82,7 +82,7 @@ class ClientClientTenderReadinessServiceTest {
 
     private static ClientComplianceDocument document(String type, LocalDate expiry, boolean verified) {
         ClientComplianceDocument d = ClientComplianceDocument.create(UUID.randomUUID(), TENANT, CLIENT, null, type, UUID.randomUUID(), null, expiry, USER);
-        if (verified) d.verify(USER);
+        if (verified) d.verify(UUID.randomUUID(), null);
         return d;
     }
 

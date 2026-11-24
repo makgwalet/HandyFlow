@@ -63,9 +63,9 @@ public class ClientComplianceDocumentService {
     }
 
     @Transactional
-    public ClientComplianceDocumentResponse verify(TenantId tenantId, UUID id, UUID verifiedBy) {
+    public ClientComplianceDocumentResponse verify(TenantId tenantId, UUID id, UUID verifiedBy, String exceptionReason) {
         ClientComplianceDocument document = find(tenantId, id);
-        document.verify(verifiedBy);
+        document.verify(verifiedBy, exceptionReason);
         documentRepository.save(document);
         return toResponse(document);
     }
@@ -102,6 +102,6 @@ public class ClientComplianceDocumentService {
     private ClientComplianceDocumentResponse toResponse(ClientComplianceDocument d) {
         return new ClientComplianceDocumentResponse(d.getId(), d.getClientId(), d.getRegistrationId(),
                 d.getDocumentType(), d.getEvidenceId(), d.getIssueDate(), d.getExpiryDate(),
-                d.isVerified(), d.getVerifiedAt(), d.getCreatedAt());
+                d.isVerified(), d.getVerifiedAt(), d.getCreatedAt(), d.getCreatedBy(), d.getVerifiedBy(), d.getVerificationExceptionReason() != null);
     }
 }

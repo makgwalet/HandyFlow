@@ -6,5 +6,6 @@ import java.util.UUID;
 
 public record ClientComplianceDocumentResponse(
         UUID id, UUID clientId, UUID registrationId, String documentType, UUID evidenceId,
-        LocalDate issueDate, LocalDate expiryDate, boolean verified, Instant verifiedAt, Instant createdAt
+        LocalDate issueDate, LocalDate expiryDate, boolean verified, Instant verifiedAt, Instant createdAt,
+        UUID uploadedBy, UUID verifiedBy, boolean verifiedByUploader
 ) {}

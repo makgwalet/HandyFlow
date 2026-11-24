@@ -12,10 +12,13 @@ import Chip from "../../components/ui/Chip"
 import LookupInput from "../../components/ui/LookupInput"
 import { DOCUMENT_TYPES } from "../../lookups/southAfrica"
 import { documentState } from "../compliancetender/registration.logic"
+import { useAuth } from "../../hooks/useAuth"
+import { needsVerifyException, verifyBlocker } from "./documentRules"
 
 interface Doc {
   id: string; registrationId: string | null; documentType: string; evidenceId: string
   issueDate: string | null; expiryDate: string | null; verified: boolean; verifiedAt: string | null; createdAt: string
+  uploadedBy?: string | null; verifiedBy?: string | null; verifiedByUploader?: boolean
 }
 interface RegistrationOption { id: string; authority: string; registrationType: string }
 
@@ -27,6 +30,10 @@ export default function ClientDocumentsTab({ clientId }: { clientId: string }) {
   const qc = useQueryClient()
   const canManage = usePermissions(["COMPLIANCE_SERVICES_MANAGE", "COMPLIANCE_SERVICES_ADMIN"])
   const canAdmin = usePermission("COMPLIANCE_SERVICES_ADMIN")
+  const { user } = useAuth()
+  const [verifyingId, setVerifyingId] = useState<string | null>(null)
+  const [exceptionReason, setExceptionReason] = useState("")
+  const [verifyError, setVerifyError] = useState("")
 
   const [documentType, setDocumentType] = useState("")
   const [registrationId, setRegistrationId] = useState("")
@@ -74,8 +81,10 @@ export default function ClientDocumentsTab({ clientId }: { clientId: string }) {
   })
 
   const verify = useMutation({
-    mutationFn: (id: string) => apiClient.post(`/api/v1/compliance-services/documents/${id}/verify`),
-    onSuccess: () => invalidate(),
+    mutationFn: ({ id, reason }: { id: string; reason: string | null }) =>
+      apiClient.post(`/api/v1/compliance-services/documents/${id}/verify`, { exceptionReason: reason }),
+    onSuccess: () => { setVerifyingId(null); setExceptionReason(""); setVerifyError(""); invalidate() },
+    onError: (e: { response?: { data?: { message?: string } } }) => setVerifyError(e.response?.data?.message ?? "Failed to verify the document"),
   })
 
   const remove = useMutation({
@@ -157,7 +166,7 @@ export default function ClientDocumentsTab({ clientId }: { clientId: string }) {
           {documents
             .filter(d => filterRegistration === "ALL" || (filterRegistration === "UNLINKED" ? !d.registrationId : d.registrationId === filterRegistration))
             .map(d => (
-            <div key={d.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14, border: "1px solid var(--hf-border)", borderRadius: 10, padding: "12px 16px", background: "var(--hf-surface)" }}>
+            <div key={d.id} style={{ display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: 14, border: "1px solid var(--hf-border)", borderRadius: 10, padding: "12px 16px", background: "var(--hf-surface)" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0 }}>
                 <div style={{ width: 36, height: 36, borderRadius: 8, background: "var(--hf-success-soft)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
                   <FileText size={16} style={{ color: ACCENT_TEXT }} />
@@ -173,12 +182,29 @@ export default function ClientDocumentsTab({ clientId }: { clientId: string }) {
               <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
                 {(() => { const st = documentState(d, new Date()); return <Chip tone={st.tone} icon={d.verified && st.text.startsWith("Verified") ? <BadgeCheck size={12} /> : undefined}>{st.text}</Chip> })()}
                 {canManage && !d.verified && (
-                  <button onClick={() => verify.mutate(d.id)} title="Mark verified" aria-label="Mark verified" style={{ display: "inline-flex", alignItems: "center", background: "var(--hf-success-soft-strong)", border: "none", borderRadius: 6, padding: "6px 8px", cursor: "pointer", color: "var(--hf-success-text-strong)" }}><CheckCircle2 size={13} /> <span style={{ marginLeft: 4, fontSize: 12, fontWeight: 700 }}>Verify</span></button>
+                  <button onClick={() => { setVerifyError(""); if (needsVerifyException(d, user?.userId)) { setVerifyingId(verifyingId === d.id ? null : d.id); setExceptionReason("") } else verify.mutate({ id: d.id, reason: null }) }} title="Mark verified" aria-label="Mark verified" style={{ display: "inline-flex", alignItems: "center", background: "var(--hf-success-soft-strong)", border: "none", borderRadius: 6, padding: "6px 8px", cursor: "pointer", color: "var(--hf-success-text-strong)" }}><CheckCircle2 size={13} /> <span style={{ marginLeft: 4, fontSize: 12, fontWeight: 700 }}>Verify</span></button>
                 )}
                 {canAdmin && (
                   <button onClick={() => { if (confirm(`Delete "${d.documentType}"?`)) remove.mutate(d.id) }} title="Delete" style={{ background: "var(--hf-danger-soft)", border: "none", borderRadius: 6, padding: "6px 8px", cursor: "pointer", color: "var(--hf-danger-text)" }}><Trash2 size={13} /></button>
                 )}
               </div>
+              {verifyingId === d.id && (
+                <div style={{ flexBasis: "100%", marginTop: 10, paddingTop: 10, borderTop: "1px solid var(--hf-border)" }}>
+                  <div style={{ fontSize: 12, color: "var(--hf-text-muted)", marginBottom: 6 }}>
+                    You uploaded this document, so someone else should verify it. If no one else can, say why. This is recorded with the document.
+                  </div>
+                  <textarea rows={2} value={exceptionReason} onChange={e => setExceptionReason(e.target.value)} placeholder="Why can no one else verify this?"
+                    style={{ width: "100%", padding: "8px 10px", border: "1.5px solid var(--hf-border)", borderRadius: 8, fontSize: 13, boxSizing: "border-box" }} />
+                  {(verifyBlocker(true, exceptionReason) || verifyError) && (
+                    <div role="alert" style={{ marginTop: 6, fontSize: 12, color: "var(--hf-danger-text)" }}>{verifyError || verifyBlocker(true, exceptionReason)}</div>
+                  )}
+                  <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+                    <button disabled={!!verifyBlocker(true, exceptionReason) || verify.isPending} onClick={() => verify.mutate({ id: d.id, reason: exceptionReason.trim() })}
+                      style={{ padding: "6px 12px", borderRadius: 8, fontSize: 12, fontWeight: 700, border: "none", cursor: "pointer", background: "var(--hf-primary-text)", color: "#fff" }}>Verify as exception</button>
+                    <button onClick={() => setVerifyingId(null)} style={{ padding: "6px 12px", borderRadius: 8, fontSize: 12, fontWeight: 600, border: "1.5px solid var(--hf-border)", background: "var(--hf-surface)", cursor: "pointer" }}>Cancel</button>
+                  </div>
+                </div>
+              )}
             </div>
           ))}
         </div>

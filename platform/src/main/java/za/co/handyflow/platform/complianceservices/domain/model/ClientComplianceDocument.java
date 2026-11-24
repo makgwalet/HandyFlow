@@ -60,6 +60,10 @@ public class ClientComplianceDocument {
     @Column(name = "verified_at")
     private Instant verifiedAt;
 
+    /** Set only when the uploader verified their own document; null when someone else did. */
+    @Column(name = "verification_exception_reason")
+    private String verificationExceptionReason;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
@@ -96,7 +100,25 @@ public class ClientComplianceDocument {
         return d;
     }
 
-    public void verify(UUID verifiedByUserId) {
+    public static final int MIN_EXCEPTION_REASON = 15;
+
+    /**
+     * Separation of duties: the person who uploaded a document does not verify it, unless they say why no one else can (recorded, at least
+     * {@value #MIN_EXCEPTION_REASON} characters). A document is verified once; replace it rather than re-verify it.
+     */
+    public void verify(UUID verifiedByUserId, String exceptionReason) {
+        if (verifiedByUserId == null) throw new IllegalArgumentException("Who is verifying this document?");
+        if (isVerified()) throw new IllegalStateException("This document is already verified");
+        boolean self = verifiedByUserId.equals(createdBy);
+        String reason = exceptionReason == null ? "" : exceptionReason.trim();
+        if (self) {
+            if (reason.length() < MIN_EXCEPTION_REASON)
+                throw new IllegalArgumentException("You uploaded this document, so someone else should verify it. If no one else can, give a reason of at least "
+                        + MIN_EXCEPTION_REASON + " characters.");
+            this.verificationExceptionReason = reason.length() > 1000 ? reason.substring(0, 1000) : reason;
+        } else {
+            this.verificationExceptionReason = null;
+        }
         this.verifiedBy = verifiedByUserId;
         this.verifiedAt = Instant.now();
         this.updatedAt = Instant.now();

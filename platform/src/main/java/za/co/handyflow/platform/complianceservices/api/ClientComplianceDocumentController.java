@@ -55,10 +55,12 @@ public class ClientComplianceDocumentController {
 
     @PostMapping("/documents/{id}/verify")
     @PreAuthorize("hasAnyAuthority('COMPLIANCE_SERVICES_MANAGE','COMPLIANCE_SERVICES_ADMIN')")
-    public ResponseEntity<ApiResponse<ClientComplianceDocumentResponse>> verify(@PathVariable UUID id) {
+    public ResponseEntity<ApiResponse<ClientComplianceDocumentResponse>> verify(@PathVariable UUID id,
+            @jakarta.validation.Valid @RequestBody(required = false) za.co.handyflow.platform.complianceservices.dto.VerifyClientDocumentRequest body) {
         featureGuard.requireModule("complianceservices");
         return ResponseEntity.ok(ApiResponse.success("Document verified",
-                documentService.verify(TenantContext.getTenantIdAsObject(), id, TenantContext.getCurrentUserId())));
+                documentService.verify(TenantContext.getTenantIdAsObject(), id, TenantContext.getCurrentUserId(),
+                        body == null ? null : body.exceptionReason())));
     }
 
     @DeleteMapping("/documents/{id}")
