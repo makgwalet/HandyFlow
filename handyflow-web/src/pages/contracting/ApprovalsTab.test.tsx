@@ -17,8 +17,18 @@ const base = {
 }
 const policy = [{ action: 'SEND_FOR_SIGNING', required: true, allowSoleUserException: true, usingDefault: true }]
 
+const settings = {
+  enabled: true, enabledSince: '2026-11-01T00:00:00Z', reminder1Hours: 24, reminder2Hours: 48, escalateHours: 72, clockMode: 'BUSINESS_HOURS',
+  workStart: '08:00:00', workEnd: '17:00:00', workDays: ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY'], skipPublicHolidays: true, escalationUserIds: [],
+}
+const people = [{ id: 'u1', firstName: 'Asha', lastName: 'Naidoo' }, { id: 'u2', firstName: 'Pieter', lastName: 'Botha' }]
 function wire(approvals: unknown[]) {
-  get.mockImplementation(async (url: string) => ({ data: { data: url.endsWith('/policy') ? policy : approvals } }))
+  get.mockImplementation(async (url: string) => {
+    if (url.endsWith('/identity/users')) return { data: people }
+    if (url.endsWith('/approval-escalation/settings')) return { data: { data: settings } }
+    if (url.includes('/approval-escalation/')) return { data: { data: [] } }
+    return { data: { data: url.endsWith('/policy') ? policy : approvals } }
+  })
 }
 function renderTab() {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
@@ -79,5 +89,37 @@ describe('ApprovalsTab', () => {
     wire([])
     renderTab()
     expect(await screen.findByText('Nothing is waiting for approval.')).toBeTruthy()
+  })
+
+  it('shows how far a waiting request has been chased and who is reminded first', async () => {
+    wire([{ ...base, escalationStage: 3, assignedTo: 'u2' }])
+    renderTab()
+    expect(await screen.findByText('Escalated')).toBeTruthy()
+    expect(await screen.findByText(/Reminders go to Pieter Botha first/)).toBeTruthy()
+  })
+
+  it('shows nothing extra for a request nobody has chased', async () => {
+    wire([base])
+    renderTab()
+    await screen.findByText('Review')
+    expect(screen.queryByText('Escalated')).toBeNull()
+    expect(screen.queryByText('Reminded')).toBeNull()
+  })
+
+  it('reassigns a waiting request', async () => {
+    wire([base])
+    renderTab()
+    fireEvent.click(await screen.findByText('Assign'))
+    const select = await screen.findByLabelText(/Remind first/)
+    await screen.findByRole('option', { name: 'Pieter Botha' })
+    fireEvent.change(select, { target: { value: 'u2' } })
+    fireEvent.click(screen.getByText('Save'))
+    await waitFor(() => expect(post).toHaveBeenCalledWith('/api/v1/contracts/approval-escalation/approvals/a1/reassign', { userId: 'u2', note: null }))
+  })
+
+  it('describes the escalation settings with the working-day equivalent', async () => {
+    wire([base])
+    renderTab()
+    expect(await screen.findByText(/escalated after 72 working hours \(about 8 working days\)/)).toBeTruthy()
   })
 })

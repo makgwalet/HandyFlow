@@ -5,6 +5,8 @@
 //  • Approving your own request is only offered when the tenant policy allows a
 //    sole-user exception, and then needs a written reason (>= 15 characters).
 //  • Policy: which actions need a second person (CONTRACTS_ADMIN only).
+//  • Waiting requests show whether they have been reminded or escalated, and who is reminded first;
+//    reminders, escalation, time away and response times are in EscalationPanels.
 // The server decides everything; buttons just mirror canDecide / mine.
 
 import { useState } from 'react'
@@ -12,6 +14,9 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { apiClient } from '../../api/client'
 import { usePermission } from '../../hooks/usePermission'
 import { ACTION_LABEL, listOf, MIN_EXCEPTION_REASON, decisionBlocker, type Approval, type PolicyRow } from './approvalsShared'
+import { stageLabel } from './escalationShared'
+import { EscalationSettingsPanel, ReassignControl, ResponseTimesPanel } from './EscalationPanels'
+import { useUsers } from './useContractUsers'
 
 const STATUS_STYLE: Record<string, { label: string; color: string; bg: string }> = {
   PENDING:     { label: 'Waiting',     color: 'var(--hf-warning-text)',        bg: 'var(--hf-warning-soft)' },
@@ -98,6 +103,8 @@ function DecisionPanel({ a, allowSole, onDone }: { a: Approval; allowSole: boole
 
 export function ApprovalCard({ a, allowSole }: { a: Approval; allowSole: boolean }) {
   const qc = useQueryClient()
+  const { nameOf } = useUsers()
+  const canReassign = usePermission('CONTRACTS_ADMIN') || (!!a.assignedTo && a.canDecide)
   const [open, setOpen] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const cancel = useMutation({
@@ -114,12 +121,24 @@ export function ApprovalCard({ a, allowSole }: { a: Approval; allowSole: boolean
           <div style={{ fontWeight: 700, fontSize: 14 }}>{ACTION_LABEL[a.action] ?? a.action}</div>
           <div style={{ fontSize: 13, color: 'var(--hf-text-muted)', marginTop: 2 }}>{a.subjectLabel ?? a.subjectId}</div>
         </div>
-        <StatusPill status={a.status} />
+        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+          {a.status === 'PENDING' && stageLabel(a.escalationStage) && (
+            <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 9px', borderRadius: 999,
+              color: (a.escalationStage ?? 0) >= 3 ? 'var(--hf-danger-text)' : 'var(--hf-warning-text)',
+              background: (a.escalationStage ?? 0) >= 3 ? 'var(--hf-danger-soft)' : 'var(--hf-warning-soft)' }}>
+              {stageLabel(a.escalationStage)}
+            </span>
+          )}
+          <StatusPill status={a.status} />
+        </div>
       </div>
       <div style={{ fontSize: 12, color: 'var(--hf-text-muted)', marginTop: 8 }}>
         {a.mine ? 'Asked by you' : 'Asked'} · {when(a.requestedAt)}
         {a.requestNote ? <> · “{a.requestNote}”</> : null}
       </div>
+      {a.status === 'PENDING' && a.assignedTo && (
+        <div style={{ fontSize: 12, color: 'var(--hf-text-muted)', marginTop: 4 }}>Reminders go to {nameOf(a.assignedTo)} first</div>
+      )}
       {a.decidedAt && (
         <div style={{ fontSize: 12, color: 'var(--hf-text-muted)', marginTop: 4 }}>
           Decided {when(a.decidedAt)}{a.decisionNote ? <> · “{a.decisionNote}”</> : null}
@@ -132,9 +151,10 @@ export function ApprovalCard({ a, allowSole }: { a: Approval; allowSole: boolean
       )}
       {error && <div role="alert" style={{ marginTop: 8, fontSize: 12, color: 'var(--hf-danger-text)' }}>{error}</div>}
       {a.status === 'PENDING' && (
-        <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+        <div style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
           {a.canDecide && <button style={btn(true)} onClick={() => setOpen(o => !o)}>{open ? 'Close' : 'Review'}</button>}
           {a.mine && <button style={btn()} disabled={cancel.isPending} onClick={() => cancel.mutate()}>Withdraw</button>}
+          {canReassign && <ReassignControl a={a} />}
         </div>
       )}
       {open && a.canDecide && <DecisionPanel a={a} allowSole={allowSole} onDone={() => setOpen(false)} />}
@@ -217,6 +237,8 @@ export default function ApprovalsTab() {
       ) : (
         <div style={{ display: 'grid', gap: 10 }}>{rows.map(a => <ApprovalCard key={a.id} a={a} allowSole={allowSole(a)} />)}</div>
       )}
+      <EscalationSettingsPanel />
+      <ResponseTimesPanel />
       <PolicyPanel />
     </div>
   )

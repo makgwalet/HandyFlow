@@ -19,6 +19,10 @@ export interface Approval {
   exceptionReason: string | null
   mine: boolean
   canDecide: boolean
+  assignedTo?: string | null
+  assignedAt?: string | null
+  escalationStage?: number
+  escalationStageAt?: string | null
 }
 
 export interface PolicyRow { action: ApprovalAction; required: boolean; allowSoleUserException: boolean; usingDefault: boolean }
