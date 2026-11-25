@@ -20,6 +20,7 @@ import ClientQualityTab from "./ClientQualityTab"
 import ClientRequestsTab from "./ClientRequestsTab"
 import ClientTimeTab from "./ClientTimeTab"
 import ClientProvidersTab from "./ClientProvidersTab"
+import ClientSmsTab from "./ClientSmsTab"
 import ClientAssessmentsTab from "./ClientAssessmentsTab"
 import ClientRegistrationsTab from "./ClientRegistrationsTab"
 import ClientDocumentsTab from "./ClientDocumentsTab"
@@ -33,7 +34,7 @@ interface Client {
   mandateNotes: string | null; status: string
 }
 
-type Tab = "profile" | "parties" | "obligations" | "assessments" | "cases" | "quotes" | "agreements" | "portal" | "regulatory" | "quality" | "requests" | "time" | "providers" | "registrations" | "documents" | "deadlines" | "tenders" | "requirements"
+type Tab = "profile" | "parties" | "obligations" | "assessments" | "cases" | "quotes" | "agreements" | "portal" | "regulatory" | "quality" | "requests" | "time" | "providers" | "sms" | "registrations" | "documents" | "deadlines" | "tenders" | "requirements"
 
 const TABS: { id: Tab; label: string; icon: React.ElementType }[] = [
   { id: "profile",       label: "Profile",       icon: IdCard        },
@@ -48,6 +49,7 @@ const TABS: { id: Tab; label: string; icon: React.ElementType }[] = [
   { id: "requests",      label: "Requests",      icon: MessageSquare },
   { id: "time",          label: "Time",          icon: Clock         },
   { id: "providers",     label: "Providers",     icon: Users         },
+  { id: "sms",           label: "SMS",           icon: MessageSquare },
   { id: "portal",        label: "Portal access", icon: KeyRound      },
   { id: "registrations", label: "Registrations", icon: ShieldCheck   },
   { id: "documents",     label: "Documents",     icon: FileText      },
@@ -138,6 +140,7 @@ export default function ClientDetailPage() {
         {tab === "requests"      && <ClientRequestsTab clientId={clientId} />}
         {tab === "time"          && <ClientTimeTab clientId={clientId} />}
         {tab === "providers"     && <ClientProvidersTab clientId={clientId} />}
+        {tab === "sms"           && <ClientSmsTab clientId={clientId} />}
         {tab === "portal"        && <ClientPortalTab clientId={clientId} />}
         {tab === "registrations" && <ClientRegistrationsTab clientId={clientId} />}
         {tab === "documents"     && <ClientDocumentsTab clientId={clientId} />}

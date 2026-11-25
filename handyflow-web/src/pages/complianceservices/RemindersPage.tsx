@@ -5,6 +5,7 @@
 import { useState } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
+import SmsRemindersPanel from "./SmsRemindersPanel"
 import {
   LEVELS, MAX_ITEMS, MIN_ITEMS, available, body, formOf, problem, runText, same, staffName,
   type Form, type LogEntry, type Preview, type RunResult, type Settings, type Staff,
@@ -25,7 +26,7 @@ const bad: React.CSSProperties = { fontSize: 12, color: "var(--hf-danger-text, #
 const note: React.CSSProperties = { fontSize: 13, color: "var(--hf-text-muted)" }
 
 export default function RemindersPage() {
-  const [view, setView] = useState<"settings" | "preview" | "log">("settings")
+  const [view, setView] = useState<"settings" | "preview" | "log" | "sms">("settings")
   return (
     <div style={{ display: "grid", gap: 12 }}>
       <div style={note}>
@@ -35,10 +36,12 @@ export default function RemindersPage() {
         <button style={chip(view === "settings")} onClick={() => setView("settings")}>Settings</button>
         <button style={chip(view === "preview")} onClick={() => setView("preview")}>Preview and send</button>
         <button style={chip(view === "log")} onClick={() => setView("log")}>History</button>
+        <button style={chip(view === "sms")} onClick={() => setView("sms")}>Client SMS</button>
       </div>
       {view === "settings" && <SettingsPanel />}
       {view === "preview" && <PreviewPanel />}
       {view === "log" && <LogPanel />}
+      {view === "sms" && <SmsRemindersPanel />}
     </div>
   )
 }
