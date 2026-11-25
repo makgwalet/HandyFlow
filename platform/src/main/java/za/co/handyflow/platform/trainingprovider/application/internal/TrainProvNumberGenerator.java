@@ -57,6 +57,7 @@ public class TrainProvNumberGenerator {
     private static final String MODERATION_SEQUENCE = "TRAINPROV_MODERATION";
     private static final String COMPLETION_SEQUENCE = "TRAINPROV_COMPLETION";
     private static final String DOCUMENT_SEQUENCE = "TRAINPROV_DOCUMENT";
+    private static final String LESSON_SEQUENCE = "TRAINPROV_LESSON";
     private static final String DELEGATE_SEQUENCE_PREFIX = "TRAINPROV_DELEGATE:";
 
     private final TenantSequenceService sequenceService;
@@ -128,5 +129,10 @@ public class TrainProvNumberGenerator {
     public String nextDocumentNumber(TenantId tenantId) {
         long next = sequenceService.nextValue(tenantId, DOCUMENT_SEQUENCE);
         return "DOC-%05d".formatted(next);
+    }
+
+    public String nextLessonNumber(TenantId tenantId) {
+        long next = sequenceService.nextValue(tenantId, LESSON_SEQUENCE);
+        return "LSN-%05d".formatted(next);
     }
 }
