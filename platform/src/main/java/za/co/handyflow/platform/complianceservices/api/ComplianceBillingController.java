@@ -23,7 +23,7 @@ import java.util.UUID;
 public class ComplianceBillingController {
 
     private static final String READ = "hasAnyAuthority('COMPLIANCE_SERVICES_READ','COMPLIANCE_SERVICES_MANAGE','COMPLIANCE_SERVICES_ADMIN')";
-    private static final String MANAGE = "hasAnyAuthority('COMPLIANCE_SERVICES_MANAGE','COMPLIANCE_SERVICES_ADMIN')";
+    private static final String MANAGE = "hasAnyAuthority('COMPLIANCE_SERVICES_MANAGE','COMPLIANCE_SERVICES_BILLING_MANAGE','COMPLIANCE_SERVICES_ADMIN')";
 
     private final ComplianceBillingService service;
     private final FeatureGuard featureGuard;

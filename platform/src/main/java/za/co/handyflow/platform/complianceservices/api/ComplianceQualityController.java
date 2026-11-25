@@ -22,7 +22,7 @@ import java.util.UUID;
 public class ComplianceQualityController {
 
     private static final String READ = "hasAnyAuthority('COMPLIANCE_SERVICES_READ','COMPLIANCE_SERVICES_MANAGE','COMPLIANCE_SERVICES_ADMIN')";
-    private static final String MANAGE = "hasAnyAuthority('COMPLIANCE_SERVICES_MANAGE','COMPLIANCE_SERVICES_ADMIN')";
+    private static final String MANAGE = "hasAnyAuthority('COMPLIANCE_SERVICES_MANAGE','COMPLIANCE_SERVICES_QUALITY_MANAGE','COMPLIANCE_SERVICES_ADMIN')";
     private static final String ADMIN = "hasAuthority('COMPLIANCE_SERVICES_ADMIN')";
 
     private final ComplianceQualityService service;

@@ -20,7 +20,7 @@ const solid: React.CSSProperties = { padding: "8px 14px", border: "none", border
 
 export default function ClientProvidersTab({ clientId }: { clientId: string }) {
   const qc = useQueryClient()
-  const canManage = usePermissions(["COMPLIANCE_SERVICES_MANAGE", "COMPLIANCE_SERVICES_ADMIN"])
+  const canManage = usePermissions(["COMPLIANCE_SERVICES_MANAGE", "COMPLIANCE_SERVICES_PROVIDERS_MANAGE", "COMPLIANCE_SERVICES_ADMIN"])
   const [adding, setAdding] = useState(false)
   const [f, setF] = useState({ providerId: "", title: "", description: "", dueDate: "", accreditationRequired: true, waiverNote: "" })
   const [error, setError] = useState("")

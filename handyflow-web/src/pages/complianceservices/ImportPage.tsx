@@ -22,7 +22,7 @@ const card: React.CSSProperties = { border: "1px solid var(--hf-border)", border
 export default function ImportPage() {
   const qc = useQueryClient()
   const isAdmin = usePermissions(["COMPLIANCE_SERVICES_ADMIN"])
-  const canManage = usePermissions(["COMPLIANCE_SERVICES_MANAGE", "COMPLIANCE_SERVICES_ADMIN"])
+  const canManage = usePermissions(["COMPLIANCE_SERVICES_MANAGE", "COMPLIANCE_SERVICES_IMPORT_MANAGE", "COMPLIANCE_SERVICES_ADMIN"])
   const [kind, setKind] = useState("CLIENTS")
   const [file, setFile] = useState<File | null>(null)
   const [detail, setDetail] = useState<ImportDetail | null>(null)

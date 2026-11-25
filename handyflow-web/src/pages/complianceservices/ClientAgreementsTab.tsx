@@ -48,7 +48,7 @@ const toDraft = (a: Agreement): TermsDraft => ({
 
 export default function ClientAgreementsTab({ clientId }: { clientId: string }) {
   const qc = useQueryClient()
-  const canManage = usePermissions(["COMPLIANCE_SERVICES_MANAGE", "COMPLIANCE_SERVICES_ADMIN"])
+  const canManage = usePermissions(["COMPLIANCE_SERVICES_MANAGE", "COMPLIANCE_SERVICES_BILLING_MANAGE", "COMPLIANCE_SERVICES_ADMIN"])
   const base = `/api/v1/compliance-services/clients/${clientId}/agreements`
   const [selected, setSelected] = useState<string | null>(null)
   const [quoteId, setQuoteId] = useState("")

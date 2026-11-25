@@ -15,7 +15,7 @@ const chip = (on: boolean): React.CSSProperties => ({ padding: "5px 12px", borde
 
 export default function BillingPage() {
   const qc = useQueryClient()
-  const canManage = usePermissions(["COMPLIANCE_SERVICES_MANAGE", "COMPLIANCE_SERVICES_ADMIN"])
+  const canManage = usePermissions(["COMPLIANCE_SERVICES_MANAGE", "COMPLIANCE_SERVICES_BILLING_MANAGE", "COMPLIANCE_SERVICES_ADMIN"])
   const [filter, setFilter] = useState("DUE")
   const { data = [], isLoading } = useQuery<BillingEvent[]>({
     queryKey: ["cs-billing-all", filter],

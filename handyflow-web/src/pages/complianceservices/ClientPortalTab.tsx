@@ -20,7 +20,7 @@ const bad: React.CSSProperties = { fontSize: 12, color: "var(--hf-danger-text, #
 
 export default function ClientPortalTab({ clientId }: { clientId: string }) {
   const qc = useQueryClient()
-  const canInvite = usePermissions(["COMPLIANCE_SERVICES_MANAGE", "COMPLIANCE_SERVICES_ADMIN"])
+  const canInvite = usePermissions(["COMPLIANCE_SERVICES_MANAGE", "COMPLIANCE_SERVICES_PORTAL_MANAGE", "COMPLIANCE_SERVICES_ADMIN"])
   const canRevoke = usePermission("COMPLIANCE_SERVICES_ADMIN")
   const base = `/api/v1/compliance-services/clients/${clientId}/portal-users`
   const [email, setEmail] = useState("")

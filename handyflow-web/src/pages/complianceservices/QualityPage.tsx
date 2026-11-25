@@ -44,7 +44,7 @@ export default function QualityPage() {
 
 function Reviews() {
   const qc = useQueryClient()
-  const canManage = usePermissions(["COMPLIANCE_SERVICES_MANAGE", "COMPLIANCE_SERVICES_ADMIN"])
+  const canManage = usePermissions(["COMPLIANCE_SERVICES_MANAGE", "COMPLIANCE_SERVICES_QUALITY_MANAGE", "COMPLIANCE_SERVICES_ADMIN"])
   const [status, setStatus] = useState("")
   const { data = [], isLoading } = useQuery<ReviewSummary[]>({
     queryKey: ["cs-quality-all", status],

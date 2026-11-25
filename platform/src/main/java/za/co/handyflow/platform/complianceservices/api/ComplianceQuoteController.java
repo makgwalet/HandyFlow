@@ -23,7 +23,7 @@ import java.util.UUID;
 public class ComplianceQuoteController {
 
     private static final String READ = "hasAnyAuthority('COMPLIANCE_SERVICES_READ','COMPLIANCE_SERVICES_MANAGE','COMPLIANCE_SERVICES_ADMIN')";
-    private static final String MANAGE = "hasAnyAuthority('COMPLIANCE_SERVICES_MANAGE','COMPLIANCE_SERVICES_ADMIN')";
+    private static final String MANAGE = "hasAnyAuthority('COMPLIANCE_SERVICES_MANAGE','COMPLIANCE_SERVICES_QUOTES_MANAGE','COMPLIANCE_SERVICES_ADMIN')";
     /** A discount above the consultant limit is approved by an administrator. */
     private static final String APPROVE = "hasAuthority('COMPLIANCE_SERVICES_ADMIN')";
 

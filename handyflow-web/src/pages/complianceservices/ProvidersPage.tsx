@@ -22,7 +22,7 @@ const card: React.CSSProperties = { border: "1px solid var(--hf-border)", border
 
 function Detail({ id, onBack }: { id: string; onBack: () => void }) {
   const qc = useQueryClient()
-  const canManage = usePermissions(["COMPLIANCE_SERVICES_MANAGE", "COMPLIANCE_SERVICES_ADMIN"])
+  const canManage = usePermissions(["COMPLIANCE_SERVICES_MANAGE", "COMPLIANCE_SERVICES_PROVIDERS_MANAGE", "COMPLIANCE_SERVICES_ADMIN"])
   const [mode, setMode] = useState<null | "claim" | "deactivate" | "services" | { check: string } | { retire: string }>(null)
   const [f, setF] = useState({ body: "", reference: "", issuedOn: "", expiresOn: "", note: "", flag: false, services: "" })
   const [error, setError] = useState("")
@@ -127,7 +127,7 @@ function Detail({ id, onBack }: { id: string; onBack: () => void }) {
 
 export default function ProvidersPage() {
   const qc = useQueryClient()
-  const canManage = usePermissions(["COMPLIANCE_SERVICES_MANAGE", "COMPLIANCE_SERVICES_ADMIN"])
+  const canManage = usePermissions(["COMPLIANCE_SERVICES_MANAGE", "COMPLIANCE_SERVICES_PROVIDERS_MANAGE", "COMPLIANCE_SERVICES_ADMIN"])
   const [open, setOpen] = useState<string | null>(null)
   const [adding, setAdding] = useState(false)
   const [f, setF] = useState({ name: "", kind: "INDIVIDUAL", email: "", phone: "", coverage: "" })

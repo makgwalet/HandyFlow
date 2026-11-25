@@ -58,7 +58,7 @@ const toDraft = (q: Quote): QuoteDraft => ({
 
 export default function ClientQuotesTab({ clientId }: { clientId: string }) {
   const qc = useQueryClient()
-  const canManage = usePermissions(["COMPLIANCE_SERVICES_MANAGE", "COMPLIANCE_SERVICES_ADMIN"])
+  const canManage = usePermissions(["COMPLIANCE_SERVICES_MANAGE", "COMPLIANCE_SERVICES_QUOTES_MANAGE", "COMPLIANCE_SERVICES_ADMIN"])
   const canApprove = usePermission("COMPLIANCE_SERVICES_ADMIN")
   const { user } = useAuth()
   const base = `/api/v1/compliance-services/clients/${clientId}/quotes`

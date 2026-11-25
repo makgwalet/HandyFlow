@@ -22,7 +22,7 @@ type Ask = { kind: "conflict" | "approve" | "complete" | "cancel" | "deliverable
 
 export default function ProviderAssignmentCard({ initial, showClient }: { initial: AssignmentDetail; showClient?: boolean }) {
   const qc = useQueryClient()
-  const canManage = usePermissions(["COMPLIANCE_SERVICES_MANAGE", "COMPLIANCE_SERVICES_ADMIN"])
+  const canManage = usePermissions(["COMPLIANCE_SERVICES_MANAGE", "COMPLIANCE_SERVICES_PROVIDERS_MANAGE", "COMPLIANCE_SERVICES_ADMIN"])
   const isAdmin = usePermissions(["COMPLIANCE_SERVICES_ADMIN"])
   const [detail, setDetail] = useState(initial)
   const [ask, setAsk] = useState<Ask | null>(null)

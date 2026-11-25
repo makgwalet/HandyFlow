@@ -24,7 +24,7 @@ import java.util.UUID;
 public class ComplianceProviderWorkController {
 
     private static final String READ = "hasAnyAuthority('COMPLIANCE_SERVICES_READ','COMPLIANCE_SERVICES_MANAGE','COMPLIANCE_SERVICES_ADMIN')";
-    private static final String MANAGE = "hasAnyAuthority('COMPLIANCE_SERVICES_MANAGE','COMPLIANCE_SERVICES_ADMIN')";
+    private static final String MANAGE = "hasAnyAuthority('COMPLIANCE_SERVICES_MANAGE','COMPLIANCE_SERVICES_PROVIDERS_MANAGE','COMPLIANCE_SERVICES_ADMIN')";
     private static final String ADMIN = "hasAuthority('COMPLIANCE_SERVICES_ADMIN')";
     private static final ZoneId SAST = ZoneId.of("Africa/Johannesburg");
 

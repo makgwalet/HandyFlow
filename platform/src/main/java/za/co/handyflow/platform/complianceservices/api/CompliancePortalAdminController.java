@@ -33,7 +33,7 @@ public class CompliancePortalAdminController {
     }
 
     @PostMapping
-    @PreAuthorize("hasAnyAuthority('COMPLIANCE_SERVICES_MANAGE','COMPLIANCE_SERVICES_ADMIN')")
+    @PreAuthorize("hasAnyAuthority('COMPLIANCE_SERVICES_MANAGE','COMPLIANCE_SERVICES_PORTAL_MANAGE','COMPLIANCE_SERVICES_ADMIN')")
     public ResponseEntity<ApiResponse<GrantView>> invite(@PathVariable UUID clientId, @Valid @RequestBody InviteRequest request) {
         featureGuard.requireModule("complianceservices");
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success("Invite created",

@@ -23,7 +23,7 @@ type Option = { id: string; label: string }
 
 export default function ClientQualityTab({ clientId }: { clientId: string }) {
   const qc = useQueryClient()
-  const canManage = usePermissions(["COMPLIANCE_SERVICES_MANAGE", "COMPLIANCE_SERVICES_ADMIN"])
+  const canManage = usePermissions(["COMPLIANCE_SERVICES_MANAGE", "COMPLIANCE_SERVICES_QUALITY_MANAGE", "COMPLIANCE_SERVICES_ADMIN"])
   const [starting, setStarting] = useState(false)
   const { data = [], isLoading } = useQuery<ReviewSummary[]>({
     queryKey: ["cs-quality-client", clientId],
