@@ -35,6 +35,8 @@ public class ComplianceWorkQueueService {
     private final ComplianceProviderAccreditationRepository providerAccreditations;
     private final ComplianceProviderAssignmentRepository providerAssignments;
     private final ComplianceProviderDeliverableRepository providerDeliverables;
+    private final ClientTenderRepository tenderRepo;
+    private final ClientTenderReadinessService tenderReadiness;
 
     @Transactional(readOnly = true)
     public WorkQueueResponse queue(TenantId tenantId, boolean admin, LocalDate today) {
@@ -108,6 +110,21 @@ public class ComplianceWorkQueueService {
             if (a == null || !names.containsKey(a.getClientId())) continue;
             items.add(ProviderWorkRules.deliverableItem(providerNames.getOrDefault(a.getProviderId(), "Provider"), a.getTitle(), d.getTitle(), a.getClientId(), names.get(a.getClientId()),
                     d.getReceivedAt().atZone(java.time.ZoneOffset.UTC).toLocalDate(), today));
+        }
+        for (ClientTender t : tenderRepo.findAllForTenant(tenantId)) {
+            if (!names.containsKey(t.getClientId())) continue;
+            String cn = names.get(t.getClientId());
+            int missing = 0, expired = 0;
+            if (TenderWatchRules.worthChecking(t.getStatus(), t.getClosingDate(), today)) {
+                var summary = tenderReadiness.assess(tenantId, t.getId()).summary();
+                missing = summary.missing(); expired = summary.expired();
+            }
+            WorkQueueRules.Item closing = TenderWatchRules.closing(t.getName(), t.getClientId(), cn, t.getStatus(), t.getClosingDate(), today, missing, expired);
+            if (closing != null) items.add(closing);
+            WorkQueueRules.Item briefing = TenderWatchRules.event(t.getName(), t.getClientId(), cn, t.getStatus(), "The briefing", t.getBriefingDate(), today);
+            if (briefing != null) items.add(briefing);
+            WorkQueueRules.Item inspection = TenderWatchRules.event(t.getName(), t.getClientId(), cn, t.getStatus(), "The site inspection", t.getSiteInspectionDate(), today);
+            if (inspection != null) items.add(inspection);
         }
         List<ComplianceRegImpact> liveImpacts = regImpacts.findLive(tenantId);
         Map<UUID, ComplianceRegChange> changeById = liveImpacts.isEmpty() ? Map.of()

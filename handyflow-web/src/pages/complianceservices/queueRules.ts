@@ -11,6 +11,7 @@ export const TYPE_LABELS: Record<string, string> = {
   QUALITY_REVIEW: "Reviews to finish", QUALITY_REWORK: "Work sent back",
   PORTAL_QUERY: "Client queries", DOCUMENT_REQUEST: "Documents we asked for",
   PROVIDER_ACCREDITATION: "Provider accreditations", PROVIDER_WORK: "Provider work", PROVIDER_DELIVERABLE: "Provider items to review",
+  TENDER_CLOSING: "Tenders closing", TENDER_EVENT: "Tender briefings and inspections",
 }
 export const typeLabel = (t: string) => TYPE_LABELS[t] ?? t
 

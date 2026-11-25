@@ -47,6 +47,8 @@ describe("provider rules", () => {
   })
   it("queue labels and links", () => {
     expect(typeLabel("PROVIDER_WORK")).toBe("Provider work")
+    expect(typeLabel("TENDER_CLOSING")).toBe("Tenders closing")
+    expect(linkFor({ clientId: "c1", tab: "tenders", type: "TENDER_CLOSING" })).toBe("/complianceservices/clients/c1?tab=tenders")
     expect(linkFor({ clientId: null, tab: "providers", type: "PROVIDER_ACCREDITATION" })).toBe("/complianceservices/providers")
     expect(linkFor({ clientId: "c1", tab: "providers", type: "PROVIDER_WORK" })).toBe("/complianceservices/clients/c1?tab=providers")
   })
