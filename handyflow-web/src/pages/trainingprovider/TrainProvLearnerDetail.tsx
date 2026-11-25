@@ -15,6 +15,7 @@ import TrainProvLearnerCohortsSection from "./TrainProvLearnerCohorts"
 import TrainProvLearnerAttempts from "./TrainProvLearnerAttempts"
 import TrainProvCompletionPanel from "./TrainProvCompletionPanel"
 import TrainProvDocumentPanel from "./TrainProvDocumentPanel"
+import TrainProvProgressPanel from "./TrainProvProgressPanel"
 
 export function LearnerFormPanel({ initial, onSaved, onCancel }: { initial?: Learner; onSaved: (l: Learner) => void; onCancel: () => void }) {
   const { data: clients = [] } = useClients()
@@ -130,6 +131,7 @@ function EnrolmentCard({ e, canManage, onChanged }: { e: Enrolment; canManage: b
           <Notice text={error} />
         </div>
       )}
+      <TrainProvProgressPanel enrolmentId={e.id} startDate={e.startDate} />
       <TrainProvCompletionPanel enrolmentId={e.id} startDate={e.startDate} />
       <TrainProvDocumentPanel enrolmentId={e.id} />
     </div>
