@@ -538,6 +538,13 @@ export const TRAINING_PROVIDER_SECTIONS: ModuleSections = {
         { id: 'certificates', label: 'Certificates', icon: Award },
       ],
     },
+    {
+      label: 'Accreditation & programmes',
+      sections: [
+        { id: 'accreditation', label: 'Accreditation', icon: ShieldCheck },
+        { id: 'catalogue', label: 'Programme catalogue', icon: BookOpen },
+      ],
+    },
     { label: 'Setup', sections: [{ id: 'profile', label: 'Academy Profile', icon: Landmark }] },
   ],
 }
