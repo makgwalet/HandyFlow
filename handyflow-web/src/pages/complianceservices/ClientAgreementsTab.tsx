@@ -8,6 +8,8 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import { usePermissions } from "../../hooks/usePermission"
 import { formatMoney } from "./pricingRules"
+import BillingEventRow, { type BillingEvent } from "./BillingEventRow"
+import { byUrgency } from "./billingRules"
 import {
   FREQUENCIES, defaultTerms, frequencyLabel, statusLabel, termsProblem, previewTotal, toBody, actionsFor, actionProblem, schedule,
   type Action, type TermsDraft,
@@ -114,8 +116,17 @@ function AgreementPanel({ clientId, id, canManage, onChanged }: { clientId: stri
   const [note, setNote] = useState("")
   const [endDate, setEndDate] = useState("")
   const [error, setError] = useState("")
+  const [madeBills, setMadeBills] = useState<number | null>(null)
 
   const { data: a } = useQuery<Agreement>({ queryKey: ["cs-agreement", id], queryFn: async () => unwrap<Agreement>(await apiClient.get(url)) })
+  const { data: bills = [] } = useQuery<BillingEvent[]>({
+    queryKey: ["cs-billing", id], queryFn: async () => unwrap<BillingEvent[]>(await apiClient.get(`${url}/billing-events`)),
+  })
+  const billsChanged = () => { qc.invalidateQueries({ queryKey: ["cs-billing", id] }); qc.invalidateQueries({ queryKey: ["cs-billing-all"] }) }
+  const generate = useMutation({
+    mutationFn: async () => unwrap<{ created: number }>(await apiClient.post(`${url}/billing-events/generate`, {})),
+    onSuccess: (g: { created: number }) => { setError(""); setMadeBills(g.created); billsChanged() }, onError: (e: unknown) => setError(errText(e)),
+  })
   const done = (v: Agreement) => { setError(""); setDraft(null); setActive(null); setNote(""); setEndDate(""); qc.setQueryData(["cs-agreement", id], v); onChanged() }
   const fail = (e: unknown) => setError(errText(e))
   const save = useMutation({ mutationFn: async (d: TermsDraft) => unwrap<Agreement>(await apiClient.put(url, toBody(d))), onSuccess: done, onError: fail })
@@ -207,6 +218,18 @@ function AgreementPanel({ clientId, id, canManage, onChanged }: { clientId: stri
         </div>
         {a.scheduleTruncated && <div style={{ fontSize: 12, color: "var(--hf-text-faint)", marginTop: 4 }}>This agreement has no end date, so only the next dates are shown.</div>}
       </div>
+
+      {(a.status === "ACTIVE" || bills.length > 0) && (
+        <div style={{ display: "grid", gap: 6 }}>
+          <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+            <div style={{ ...lab, marginBottom: 0 }}>Bills</div>
+            {canManage && a.status === "ACTIVE" && <button style={ghost} disabled={generate.isPending} onClick={() => generate.mutate()}>Make the next bills</button>}
+            {madeBills !== null && <span style={{ fontSize: 12, color: "var(--hf-text-muted)" }}>{madeBills === 0 ? "Nothing new to make" : `${madeBills} bill${madeBills === 1 ? "" : "s"} made`}</span>}
+          </div>
+          {bills.length === 0 && <div style={{ fontSize: 12, color: "var(--hf-text-faint)" }}>No bills made yet. They are made up to about two months ahead.</div>}
+          {byUrgency(bills).map(b => <BillingEventRow key={b.id} event={b} canManage={canManage} onChanged={billsChanged} />)}
+        </div>
+      )}
 
       {actions.length > 0 && !editing && (
         <div style={{ display: "grid", gap: 8 }}>

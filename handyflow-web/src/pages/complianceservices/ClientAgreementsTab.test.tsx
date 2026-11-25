@@ -38,6 +38,7 @@ describe('ClientAgreementsTab', () => {
     manage = true
     get.mockReset(); post.mockReset(); put.mockReset()
     get.mockImplementation(async (url: string) => {
+      if (url.endsWith('/billing-events')) return { data: { data: [] } }
       if (url.endsWith('/available-quotes')) return { data: { data: [option] } }
       if (url.endsWith('/a1')) return { data: { data: agreement() } }
       return { data: { data: [summary()] } }
@@ -105,6 +106,7 @@ describe('ClientAgreementsTab', () => {
 
   it('offers only what the server allows after activation, and ending needs a date and a reason', async () => {
     get.mockImplementation(async (url: string) => {
+      if (url.endsWith('/billing-events')) return { data: { data: [] } }
       if (url.endsWith('/available-quotes')) return { data: { data: [] } }
       if (url.endsWith('/a1')) return { data: { data: agreement({ status: 'ACTIVE', actions: ['suspend', 'end'], canEdit: false, activationNote: 'Signed copy returned' }) } }
       return { data: { data: [summary({ status: 'ACTIVE' })] } }
@@ -120,6 +122,57 @@ describe('ClientAgreementsTab', () => {
     fireEvent.change(screen.getByLabelText('Ends on'), { target: { value: '2027-06-30' } })
     fireEvent.click(screen.getByRole('button', { name: /Confirm: end/ }))
     await waitFor(() => expect(post).toHaveBeenCalledWith(`${base}/a1/end`, { endDate: '2027-06-30', reason: 'The client left the practice' }))
+  })
+
+  const bill = (over: object = {}) => ({
+    id: 'e1', agreementId: 'a1', agreementNumber: 'CA-000001', clientId: 'c1', clientName: 'Acme', dueDate: '2027-03-01', amount: 1500, description: 'x', status: 'SCHEDULED',
+    stage: 'DUE', daysLate: 0, invoiceId: null, invoiceNumber: null, invoice: null, skipReason: null, releaseNote: null, actions: ['raise', 'skip'], blocked: null, ...over,
+  })
+  const activeWithBills = (bills: object[]) => get.mockImplementation(async (url: string) => {
+    if (url.endsWith('/billing-events')) return { data: { data: bills } }
+    if (url.endsWith('/available-quotes')) return { data: { data: [] } }
+    if (url.endsWith('/a1')) return { data: { data: agreement({ status: 'ACTIVE', actions: ['suspend', 'end'], canEdit: false }) } }
+    return { data: { data: [summary({ status: 'ACTIVE' })] } }
+  })
+
+  it('makes the next bills for an active agreement and says how many were made', async () => {
+    activeWithBills([])
+    post.mockResolvedValueOnce({ data: { data: { created: 3, events: [] } } })
+    renderIt()
+    fireEvent.click(await screen.findByText('CA-000001'))
+    fireEvent.click(await screen.findByRole('button', { name: 'Make the next bills' }))
+    await waitFor(() => expect(post).toHaveBeenCalledWith(`${base}/a1/billing-events/generate`, {}))
+    expect(await screen.findByText('3 bills made')).toBeTruthy()
+  })
+
+  it('raises a draft invoice from a bill that is ready', async () => {
+    activeWithBills([bill()])
+    post.mockResolvedValueOnce({ data: { data: bill({ status: 'INVOICED', invoiceNumber: 'INV-00042' }) } })
+    renderIt()
+    fireEvent.click(await screen.findByText('CA-000001'))
+    fireEvent.click(await screen.findByRole('button', { name: 'Raise draft invoice' }))
+    await waitFor(() => expect(post).toHaveBeenCalledWith('/api/v1/compliance-services/clients/c1/billing-events/e1/raise', {}))
+  })
+
+  it('shows where the invoice stands and offers release, which needs a reason', async () => {
+    activeWithBills([bill({ status: 'INVOICED', stage: 'INVOICED', invoiceNumber: 'INV-00042', invoice: { status: 'CANCELLED', total: 1725, paid: null, credited: null }, actions: ['release'] })])
+    renderIt()
+    fireEvent.click(await screen.findByText('CA-000001'))
+    expect(await screen.findByText(/Invoice INV-00042 · cancelled/)).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Release invoice' }))
+    const confirm = await screen.findByRole('button', { name: /Confirm: release invoice/ })
+    expect((confirm as HTMLButtonElement).disabled).toBe(true)
+    fireEvent.change(screen.getByLabelText('Why the invoice is let go'), { target: { value: 'Wrong amount on the draft' } })
+    fireEvent.click(confirm)
+    await waitFor(() => expect(post).toHaveBeenCalledWith('/api/v1/compliance-services/clients/c1/billing-events/e1/release', { reason: 'Wrong amount on the draft' }))
+  })
+
+  it('explains why a bill cannot be raised yet and hides raise', async () => {
+    activeWithBills([bill({ stage: 'UPCOMING', actions: ['skip'], blocked: 'This bill is not due yet. It can be raised from 2027-04-24' })])
+    renderIt()
+    fireEvent.click(await screen.findByText('CA-000001'))
+    expect(await screen.findByText(/not due yet/)).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Raise draft invoice' })).toBeNull()
   })
 
   it('shows a warning line when the server raises one', async () => {
