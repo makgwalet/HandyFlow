@@ -22,4 +22,7 @@ public interface TrainProvCohortFacilitatorRepository extends JpaRepository<Trai
 
     @Query("SELECT COUNT(f) FROM TrainProvCohortFacilitator f WHERE f.tenantId = :#{#tenantId.value} AND f.cohortId = :cohortId AND f.status = 'ACTIVE'")
     long countActive(TenantId tenantId, UUID cohortId);
+
+    @Query("SELECT f FROM TrainProvCohortFacilitator f WHERE f.tenantId = :#{#tenantId.value} AND f.cohortId = :cohortId AND f.practitionerId = :practitionerId AND f.status = 'ACTIVE'")
+    Optional<TrainProvCohortFacilitator> findLive(TenantId tenantId, UUID cohortId, UUID practitionerId);
 }
