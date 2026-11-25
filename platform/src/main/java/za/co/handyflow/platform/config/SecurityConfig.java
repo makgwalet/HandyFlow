@@ -151,6 +151,7 @@ public class SecurityConfig {
                                 "/api/v1/fuel/portal/auth/**",
                                 "/api/v1/training-provider/portal/auth/**",
                                 "/api/v1/facilitiesmanagement/portal/auth/**",
+                                "/api/v1/compliance-services/portal/auth/**",
                                 "/api/v1/recruitment-agency/portal/auth/**",
                                 // FIX (Property tenant portal): added
                                 // proactively as part of building this
