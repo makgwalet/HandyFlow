@@ -51,6 +51,17 @@ class ComplianceTimeServiceTest {
     }
 
     @Test
+    void theDayIsLockedBeforeItsMinutesAreCounted() {
+        clientExists();
+        when(entries.minutesOnDay(TENANT, ME, TODAY)).thenReturn(0L);
+        when(entries.save(any(ComplianceTimeEntry.class))).thenAnswer(i -> i.getArgument(0));
+        service.record(TENANT, new RecordRequest(CLIENT, TODAY, 30, null, null, null, null), ME, false, TODAY);
+        org.mockito.InOrder order = inOrder(entries);
+        order.verify(entries).lockDay(any(String.class));
+        order.verify(entries).minutesOnDay(TENANT, ME, TODAY);
+    }
+
+    @Test
     void refusesMoreThanSixteenHoursInADay() {
         clientExists();
         when(entries.minutesOnDay(TENANT, ME, TODAY)).thenReturn(950L);

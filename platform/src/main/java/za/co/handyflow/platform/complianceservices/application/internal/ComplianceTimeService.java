@@ -30,6 +30,7 @@ public class ComplianceTimeService {
     @Transactional
     public EntryView record(TenantId tenantId, RecordRequest r, UUID userId, boolean admin, LocalDate today) {
         String clientName = clientName(tenantId, r.clientId());
+        entries.lockDay("cs-time|" + tenantId.getValue() + "|" + userId + "|" + r.workDate());
         int already = (int) entries.minutesOnDay(tenantId, userId, r.workDate());
         ComplianceTimeEntry e = guard(() -> ComplianceTimeEntry.record(tenantId, r.clientId(), userId, r.workDate(), r.minutes(), r.serviceCode(), r.kind(),
                 r.billable() == null || r.billable(), r.note(), today, admin, already));

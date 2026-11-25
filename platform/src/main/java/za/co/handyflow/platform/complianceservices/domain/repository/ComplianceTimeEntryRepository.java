@@ -29,4 +29,11 @@ public interface ComplianceTimeEntryRepository extends JpaRepository<ComplianceT
     /** Every active entry in the period, for the whole practice. */
     @Query("SELECT t FROM ComplianceTimeEntry t WHERE t.tenantId.value = :#{#tenantId.value} AND t.status = 'ACTIVE' AND t.workDate BETWEEN :from AND :to")
     List<ComplianceTimeEntry> findActiveBetween(@Param("tenantId") TenantId tenantId, @Param("from") LocalDate from, @Param("to") LocalDate to);
+
+    /**
+     * Holds a lock, until the surrounding transaction ends, on one person's one day. Two entries recorded at the same moment then take turns,
+     * so each sees the other's minutes and the 16-hour limit cannot be passed by both squeezing in.
+     */
+    @Query(value = "SELECT CAST(1 AS integer) FROM (SELECT pg_advisory_xact_lock(hashtextextended(:key, 0))) l", nativeQuery = true)
+    Integer lockDay(@Param("key") String key);
 }
