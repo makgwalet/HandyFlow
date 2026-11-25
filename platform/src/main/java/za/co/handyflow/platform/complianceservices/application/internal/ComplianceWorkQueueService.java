@@ -33,6 +33,8 @@ public class ComplianceWorkQueueService {
     private final ComplianceDocumentRequestRepository documentRequests;
     private final ComplianceProviderRepository providerRepo;
     private final ComplianceProviderAccreditationRepository providerAccreditations;
+    private final ComplianceProviderAssignmentRepository providerAssignments;
+    private final ComplianceProviderDeliverableRepository providerDeliverables;
 
     @Transactional(readOnly = true)
     public WorkQueueResponse queue(TenantId tenantId, boolean admin, LocalDate today) {
@@ -92,6 +94,20 @@ public class ComplianceWorkQueueService {
             WorkQueueRules.Item item = ProviderRules.queueItem(providerNames.getOrDefault(a.getProviderId(), "Provider"), a.getBody(), a.getStatus(), a.getExpiresOn(),
                     a.getRecordedAt().atZone(java.time.ZoneOffset.UTC).toLocalDate(), today);
             if (item != null) items.add(item);
+        }
+        Map<UUID, ComplianceProviderAssignment> openWork = new HashMap<>();
+        for (ComplianceProviderAssignment a : providerAssignments.findOpen(tenantId)) {
+            openWork.put(a.getId(), a);
+            if (!names.containsKey(a.getClientId())) continue;
+            WorkQueueRules.Item item = ProviderWorkRules.assignmentItem(providerNames.getOrDefault(a.getProviderId(), "Provider"), a.getTitle(), a.getClientId(), names.get(a.getClientId()),
+                    a.getStatus(), a.getConflictStatus(), a.isConflictApproved(), a.getDueDate(), a.getCreatedAt().atZone(java.time.ZoneOffset.UTC).toLocalDate(), today);
+            if (item != null) items.add(item);
+        }
+        for (ComplianceProviderDeliverable d : providerDeliverables.findAwaitingReview(tenantId)) {
+            ComplianceProviderAssignment a = openWork.get(d.getAssignmentId());
+            if (a == null || !names.containsKey(a.getClientId())) continue;
+            items.add(ProviderWorkRules.deliverableItem(providerNames.getOrDefault(a.getProviderId(), "Provider"), a.getTitle(), d.getTitle(), a.getClientId(), names.get(a.getClientId()),
+                    d.getReceivedAt().atZone(java.time.ZoneOffset.UTC).toLocalDate(), today));
         }
         List<ComplianceRegImpact> liveImpacts = regImpacts.findLive(tenantId);
         Map<UUID, ComplianceRegChange> changeById = liveImpacts.isEmpty() ? Map.of()
