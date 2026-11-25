@@ -17,6 +17,7 @@ import TrainProvCertificatesTab from "./TrainProvCertificatesTab"
 import TrainProvProfileTab from "./TrainProvProfileTab"
 import TrainProvAccreditationTab from "./TrainProvAccreditationTab"
 import TrainProvCatalogueTab from "./TrainProvCatalogueTab"
+import TrainProvLearnersTab from "./TrainProvLearnersTab"
 import { SectionedModulePage } from "../../components/shell/SectionedModulePage"
 import { TRAINING_PROVIDER_SECTIONS } from "../../navigation/moduleSections"
 
@@ -34,6 +35,7 @@ export default function TrainProvPage() {
           case "profile":      return <TrainProvProfileTab />
           case "accreditation": return <TrainProvAccreditationTab />
           case "catalogue":    return <TrainProvCatalogueTab />
+          case "learners":     return <TrainProvLearnersTab />
           default:             return null
         }
       }} />
