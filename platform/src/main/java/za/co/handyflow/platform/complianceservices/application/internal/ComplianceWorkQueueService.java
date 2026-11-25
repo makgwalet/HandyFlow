@@ -29,6 +29,8 @@ public class ComplianceWorkQueueService {
     private final ComplianceRegChangeRepository regChanges;
     private final ComplianceRegImpactRepository regImpacts;
     private final ComplianceReviewRepository qualityReviews;
+    private final CompliancePortalQueryRepository portalQueries;
+    private final ComplianceDocumentRequestRepository documentRequests;
 
     @Transactional(readOnly = true)
     public WorkQueueResponse queue(TenantId tenantId, boolean admin, LocalDate today) {
@@ -73,6 +75,14 @@ public class ComplianceWorkQueueService {
             if (!names.containsKey(r.getClientId()) || reworkStarted.contains(r.getId())) continue;
             items.add(QualityRules.queueItem(today, r.getClientId(), names.get(r.getClientId()), r.getSubjectLabel(), r.getStatus(),
                     "REWORK_REQUIRED".equals(r.getStatus()) ? r.getCompletedAt() : r.getStartedAt()));
+        }
+        for (CompliancePortalQuery q : portalQueries.findAwaitingAnswer(tenantId)) {
+            if (!names.containsKey(q.getClientId())) continue;
+            items.add(ContactRules.queryItem(today, q.getClientId(), names.get(q.getClientId()), q.getSubject(), q.getLastMessageAt()));
+        }
+        for (ComplianceDocumentRequest r : documentRequests.findOpen(tenantId)) {
+            if (!names.containsKey(r.getClientId())) continue;
+            items.add(ContactRules.requestItem(today, r.getClientId(), names.get(r.getClientId()), r.getTitle(), r.getDueDate()));
         }
         List<ComplianceRegImpact> liveImpacts = regImpacts.findLive(tenantId);
         Map<UUID, ComplianceRegChange> changeById = liveImpacts.isEmpty() ? Map.of()

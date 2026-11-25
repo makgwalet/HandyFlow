@@ -39,6 +39,8 @@ class ComplianceWorkQueueServiceTest {
     @Mock ComplianceRegChangeRepository regChanges;
     @Mock ComplianceRegImpactRepository regImpacts;
     @Mock ComplianceReviewRepository qualityReviews;
+    @Mock CompliancePortalQueryRepository portalQueries;
+    @Mock ComplianceDocumentRequestRepository documentRequests;
 
     private ComplianceWorkQueueService service;
     private ComplianceClient active;
@@ -46,7 +48,7 @@ class ComplianceWorkQueueServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new ComplianceWorkQueueService(clients, deadlines, documents, assignments, obligations, versions, assessments, cases, regChanges, regImpacts, qualityReviews);
+        service = new ComplianceWorkQueueService(clients, deadlines, documents, assignments, obligations, versions, assessments, cases, regChanges, regImpacts, qualityReviews, portalQueries, documentRequests);
         active = ComplianceClient.create(TENANT, "Acme", null, null, null, null, USER);
         other = ComplianceClient.create(TENANT, "Other", null, null, null, null, USER);
         when(clients.findAll(eq(TENANT), eq("ACTIVE"), any(Pageable.class))).thenReturn(new PageImpl<>(List.of(active)));
@@ -61,6 +63,8 @@ class ComplianceWorkQueueServiceTest {
         when(regImpacts.findLive(TENANT)).thenReturn(List.of());
         when(qualityReviews.findNeedingAttention(TENANT)).thenReturn(List.of());
         when(qualityReviews.findPreviousIds(TENANT)).thenReturn(List.of());
+        when(portalQueries.findAwaitingAnswer(TENANT)).thenReturn(List.of());
+        when(documentRequests.findOpen(TENANT)).thenReturn(List.of());
     }
 
     @Test @DisplayName("an overdue deadline of an active client is high, and a deadline of an inactive client is left out")

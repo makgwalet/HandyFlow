@@ -47,6 +47,10 @@ public class CompliancePortalDataService {
         return out;
     }
 
+    /** Every client this portal account may see, for looking a record up without trusting an id it was given. */
+    @Transactional(readOnly = true)
+    public List<Scope> scopesOf(UUID portalUserId) { return distinct(portalUserId); }
+
     @Transactional(readOnly = true)
     public Scope resolveScope(UUID portalUserId, UUID selectedClientId) {
         List<Scope> mine = distinct(portalUserId);
