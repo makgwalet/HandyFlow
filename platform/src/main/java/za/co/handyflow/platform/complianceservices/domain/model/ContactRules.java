@@ -80,4 +80,17 @@ public final class ContactRules {
         if (due != null && due.isBefore(today)) throw new IllegalArgumentException("The date asked for is in the past");
         return due;
     }
+
+    public static final long MAX_UPLOAD_BYTES = 10L * 1024 * 1024;
+    public static final java.util.Set<String> UPLOAD_EXTENSIONS = java.util.Set.of("pdf", "jpg", "jpeg", "png", "xlsx", "docx", "csv");
+
+    /** What a client may upload from the portal: an allowed kind of file, not empty, not over 10 MB. Judged by the file name's ending. */
+    public static void checkUpload(String fileName, long size) {
+        String name = fileName == null ? "" : fileName.trim();
+        int dot = name.lastIndexOf('.');
+        String ext = dot < 0 || dot == name.length() - 1 ? "" : name.substring(dot + 1).toLowerCase(java.util.Locale.ROOT);
+        if (!UPLOAD_EXTENSIONS.contains(ext)) throw new IllegalArgumentException("That kind of file cannot be uploaded. Use PDF, JPG, PNG, XLSX, DOCX or CSV");
+        if (size <= 0) throw new IllegalArgumentException("That file is empty");
+        if (size > MAX_UPLOAD_BYTES) throw new IllegalArgumentException("That file is too large. The most you can upload is 10 MB");
+    }
 }

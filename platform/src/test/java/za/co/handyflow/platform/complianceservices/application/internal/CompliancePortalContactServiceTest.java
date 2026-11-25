@@ -37,6 +37,7 @@ class CompliancePortalContactServiceTest {
     @Mock CompliancePortalMessageRepository messages;
     @Mock ComplianceDocumentRequestRepository requests;
     @Mock PortalUserRepository portalUsers;
+    @Mock ClientComplianceDocumentService documents;
     @InjectMocks CompliancePortalContactService service;
 
     @Test
@@ -76,5 +77,22 @@ class CompliancePortalContactServiceTest {
         PortalMessage m = service.get(PERSON, q.getId()).messages().get(0);
         assertThat(m.fromClient()).isFalse();
         assertThat(m.author().equals(CompliancePortalContactService.PRACTICE)).isTrue();
+    }
+
+    @Test
+    void badFileTypeRefusedBeforeAnythingIsStored() {
+        org.springframework.mock.web.MockMultipartFile f = new org.springframework.mock.web.MockMultipartFile("file", "run.exe", "application/octet-stream", new byte[]{1});
+        assertThatThrownBy(() -> service.upload(PERSON, UUID.randomUUID(), f, java.time.LocalDate.of(2026, 11, 25))).isInstanceOf(HandyFlowException.class);
+        verifyNoInteractions(documents);
+    }
+
+    @Test
+    void requestOfAnotherClientIsNotFound() {
+        ComplianceDocumentRequest r = ComplianceDocumentRequest.create(TENANT, OTHER_CLIENT, "T", null, null, null, java.time.LocalDate.of(2026, 11, 25), PERSON);
+        org.springframework.mock.web.MockMultipartFile f = new org.springframework.mock.web.MockMultipartFile("file", "a.pdf", "application/pdf", new byte[]{1});
+        when(data.scopesOf(PERSON)).thenReturn(List.of(SCOPE));
+        when(requests.findOne(TENANT, r.getId())).thenReturn(Optional.of(r));
+        assertThatThrownBy(() -> service.upload(PERSON, r.getId(), f, java.time.LocalDate.of(2026, 11, 25))).isInstanceOf(ResourceNotFoundException.class);
+        verifyNoInteractions(documents);
     }
 }

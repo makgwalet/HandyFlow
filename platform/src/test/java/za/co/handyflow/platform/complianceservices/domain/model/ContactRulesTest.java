@@ -101,4 +101,27 @@ class ContactRulesTest {
         assertThat(r.isLive()).isFalse();
         assertThatThrownBy(() -> r.cancel(PERSON, "Not needed any more")).isInstanceOf(IllegalStateException.class);
     }
+
+    @Test
+    void uploadAllowlistAndSize() {
+        ContactRules.checkUpload("Statement.PDF", 1000);
+        assertThatThrownBy(() -> ContactRules.checkUpload("run.exe", 1000)).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> ContactRules.checkUpload("noextension", 1000)).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> ContactRules.checkUpload("a.pdf", 0)).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> ContactRules.checkUpload("a.pdf", 10L * 1024 * 1024 + 1)).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> ContactRules.checkUpload("a.pdf.exe", 10)).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> ContactRules.checkUpload(null, 10)).isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void receivedKeepsRequestOpenForReview() {
+        ComplianceDocumentRequest r = ComplianceDocumentRequest.create(TENANT, CLIENT, "T", null, null, null, TODAY, PERSON);
+        UUID doc = UUID.randomUUID();
+        r.received(doc);
+        assertThat(r.getStatus().equals("RECEIVED")).isTrue();
+        assertThat(r.isLive()).isTrue();
+        assertThat(doc.equals(r.getDocumentId())).isTrue();
+        r.close(PERSON, "Checked, all good here");
+        assertThatThrownBy(() -> r.received(doc)).isInstanceOf(IllegalStateException.class);
+    }
 }

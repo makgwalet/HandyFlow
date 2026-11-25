@@ -33,6 +33,7 @@ public class CompliancePortalContactService {
     private final CompliancePortalMessageRepository messages;
     private final ComplianceDocumentRequestRepository requests;
     private final PortalUserRepository portalUsers;
+    private final ClientComplianceDocumentService documents;
 
     @Transactional(readOnly = true)
     public List<PortalQuery> list(UUID portalUserId, UUID clientId) {
@@ -83,6 +84,27 @@ public class CompliancePortalContactService {
                     r.getDueDate() != null && r.getDueDate().isBefore(today)));
         }
         return out;
+    }
+
+    /** Hands a file over against a request. The file lands as an uploaded document for the practice to review; nothing is accepted automatically. */
+    @Transactional
+    public PortalRequest upload(UUID portalUserId, UUID requestId, org.springframework.web.multipart.MultipartFile file, LocalDate today) {
+        if (file == null) throw new IllegalArgumentException("Choose a file to upload");
+        guard(() -> { ContactRules.checkUpload(file.getOriginalFilename(), file.getSize()); return null; });
+        for (Scope s : data.scopesOf(portalUserId)) {
+            var found = requests.findOne(s.tenantId(), requestId).filter(x -> x.getClientId().equals(s.clientId()));
+            if (found.isEmpty()) continue;
+            ComplianceDocumentRequest r = found.get();
+            if (!r.isLive()) guard(() -> { throw new IllegalStateException("This request is " + r.getStatus().toLowerCase() + " and no longer needs a file"); });
+            String name = portalUsers.findById(portalUserId).map(PortalUser::getFullName).orElse(null);
+            String type = r.getDocumentType() != null ? r.getDocumentType() : r.getTitle();
+            var doc = documents.upload(s.tenantId(), s.clientId(), null, type, null, null, file, portalUserId, name);
+            guard(() -> { r.received(doc.id()); return null; });
+            requests.save(r);
+            return new PortalRequest(r.getId(), r.getTitle(), r.getDescription(), r.getDocumentType(), r.getDueDate(), r.getStatus(), r.getRequestedAt(),
+                    r.getDueDate() != null && r.getDueDate().isBefore(today));
+        }
+        throw new ResourceNotFoundException("ComplianceDocumentRequest", requestId.toString());
     }
 
     private record Found(Scope scope, CompliancePortalQuery query) {}

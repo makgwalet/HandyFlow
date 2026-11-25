@@ -60,6 +60,12 @@ public class CompliancePortalContactController {
         return ResponseEntity.ok(ApiResponse.success(contact.requests(userId(), clientId, LocalDate.now(SAST))));
     }
 
+    @PostMapping(value = "/document-requests/{id}/upload", consumes = org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize(PORTAL)
+    public ResponseEntity<ApiResponse<PortalRequest>> upload(@PathVariable UUID id, @RequestPart("file") org.springframework.web.multipart.MultipartFile file) {
+        return ResponseEntity.ok(ApiResponse.success(contact.upload(userId(), id, file, LocalDate.now(SAST))));
+    }
+
     private UUID userId() {
         try {
             return UUID.fromString(SecurityContextHolder.getContext().getAuthentication().getName());

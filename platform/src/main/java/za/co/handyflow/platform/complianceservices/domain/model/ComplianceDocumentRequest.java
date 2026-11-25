@@ -63,6 +63,13 @@ public class ComplianceDocumentRequest {
 
     public boolean isLive() { return "OPEN".equals(status) || "RECEIVED".equals(status); }
 
+    /** A client has uploaded something for this. It stays open until the practice has looked and closes it. */
+    public void received(UUID documentId) {
+        if (!isLive()) throw new IllegalStateException("This request is already " + status.toLowerCase());
+        this.documentId = documentId;
+        this.status = "RECEIVED";
+    }
+
     public void close(UUID by, String note) { finish("CLOSED", by, note); }
 
     public void cancel(UUID by, String note) { finish("CANCELLED", by, note); }
