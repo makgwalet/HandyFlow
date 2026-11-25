@@ -27,6 +27,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class ComplianceAgreementServiceTest {
@@ -49,7 +50,7 @@ class ComplianceAgreementServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new ComplianceAgreementService(clients, quotes, quoteLines, agreements, lines, sequences);
+        service = new ComplianceAgreementService(clients, quotes, quoteLines, agreements, lines, sequences, settings);
         client = ComplianceClient.create(TENANT, "Acme", null, null, null, null, ME);
         accepted = acceptedQuote(client.getId());
         lenient().when(clients.findByIdForTenant(TENANT, client.getId())).thenReturn(Optional.of(client));
