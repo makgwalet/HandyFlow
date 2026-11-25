@@ -7,6 +7,7 @@ import { useQuery } from "@tanstack/react-query"
 import { useNavigate } from "react-router-dom"
 import { apiClient } from "../../api/client"
 import { formatMoney } from "./pricingRules"
+import AgreementSettingsPanel from "./AgreementSettingsPanel"
 import { FILTERS, frequencyLabel, statusLabel } from "./agreementRules"
 
 interface Summary {
@@ -28,6 +29,7 @@ export default function AgreementsPage() {
   return (
     <div style={{ display: "grid", gap: 12 }}>
       <div style={{ fontSize: 13, color: "var(--hf-text-muted)" }}>All agreements, newest first. Open one to read it or work on it in the client's Agreements tab.</div>
+      <AgreementSettingsPanel />
       <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
         {FILTERS.map(f => <button key={f[0]} style={chip(status === f[0])} onClick={() => setStatus(f[0])}>{f[1]}</button>)}
       </div>
