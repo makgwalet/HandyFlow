@@ -28,6 +28,7 @@ public class ComplianceWorkQueueService {
     private final ComplianceCaseRepository cases;
     private final ComplianceRegChangeRepository regChanges;
     private final ComplianceRegImpactRepository regImpacts;
+    private final ComplianceReviewRepository qualityReviews;
 
     @Transactional(readOnly = true)
     public WorkQueueResponse queue(TenantId tenantId, boolean admin, LocalDate today) {
@@ -66,6 +67,12 @@ public class ComplianceWorkQueueService {
         }
         for (ComplianceRegChange c : regChanges.findAwaitingReview(tenantId)) {
             items.add(RegulatoryRules.reviewItem(today, c.getTitle(), c.getStatus(), c.getRaisedAt()));
+        }
+        Set<UUID> reworkStarted = new HashSet<>(qualityReviews.findPreviousIds(tenantId));
+        for (ComplianceReview r : qualityReviews.findNeedingAttention(tenantId)) {
+            if (!names.containsKey(r.getClientId()) || reworkStarted.contains(r.getId())) continue;
+            items.add(QualityRules.queueItem(today, r.getClientId(), names.get(r.getClientId()), r.getSubjectLabel(), r.getStatus(),
+                    "REWORK_REQUIRED".equals(r.getStatus()) ? r.getCompletedAt() : r.getStartedAt()));
         }
         List<ComplianceRegImpact> liveImpacts = regImpacts.findLive(tenantId);
         Map<UUID, ComplianceRegChange> changeById = liveImpacts.isEmpty() ? Map.of()

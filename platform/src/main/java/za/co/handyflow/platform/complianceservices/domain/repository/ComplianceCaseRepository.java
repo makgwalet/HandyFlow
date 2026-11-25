@@ -22,4 +22,7 @@ public interface ComplianceCaseRepository extends JpaRepository<ComplianceCase, 
 
     @Query("SELECT c FROM ComplianceCase c WHERE c.tenantId.value = :#{#tenantId.value} AND c.status IN ('OPEN','IN_PROGRESS','AWAITING_CLIENT')")
     List<ComplianceCase> findLiveForTenant(@Param("tenantId") TenantId tenantId);
+
+    @Query("SELECT c FROM ComplianceCase c WHERE c.tenantId.value = :#{#tenantId.value} AND c.status IN ('RESOLVED','CLOSED') AND c.resolvedAt >= :from AND c.resolvedAt < :to")
+    List<ComplianceCase> findFinishedBetween(@Param("tenantId") TenantId tenantId, @Param("from") java.time.Instant from, @Param("to") java.time.Instant to);
 }
