@@ -20,4 +20,8 @@ public interface ComplianceBillingEventRepository extends JpaRepository<Complian
 
     @Query("SELECT e FROM ComplianceBillingEvent e WHERE e.tenantId.value = :#{#tenantId.value} ORDER BY e.dueDate, e.createdAt")
     List<ComplianceBillingEvent> findAllForTenant(@Param("tenantId") TenantId tenantId);
+
+    /** Bills that have been raised as an invoice and fall due in the period. */
+    @Query("SELECT e FROM ComplianceBillingEvent e WHERE e.tenantId.value = :#{#tenantId.value} AND e.invoiceId IS NOT NULL AND e.dueDate BETWEEN :from AND :to")
+    List<ComplianceBillingEvent> findInvoicedBetween(@Param("tenantId") TenantId tenantId, @Param("from") java.time.LocalDate from, @Param("to") java.time.LocalDate to);
 }

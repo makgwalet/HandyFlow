@@ -25,4 +25,8 @@ public interface ComplianceTimeEntryRepository extends JpaRepository<ComplianceT
     /** Minutes this person has already recorded for the day, not counting voided entries. */
     @Query("SELECT COALESCE(SUM(t.minutes), 0) FROM ComplianceTimeEntry t WHERE t.tenantId.value = :#{#tenantId.value} AND t.userId = :userId AND t.workDate = :day AND t.status = 'ACTIVE'")
     long minutesOnDay(@Param("tenantId") TenantId tenantId, @Param("userId") UUID userId, @Param("day") LocalDate day);
+
+    /** Every active entry in the period, for the whole practice. */
+    @Query("SELECT t FROM ComplianceTimeEntry t WHERE t.tenantId.value = :#{#tenantId.value} AND t.status = 'ACTIVE' AND t.workDate BETWEEN :from AND :to")
+    List<ComplianceTimeEntry> findActiveBetween(@Param("tenantId") TenantId tenantId, @Param("from") LocalDate from, @Param("to") LocalDate to);
 }
