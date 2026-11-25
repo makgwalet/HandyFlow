@@ -31,6 +31,8 @@ public class ComplianceWorkQueueService {
     private final ComplianceReviewRepository qualityReviews;
     private final CompliancePortalQueryRepository portalQueries;
     private final ComplianceDocumentRequestRepository documentRequests;
+    private final ComplianceProviderRepository providerRepo;
+    private final ComplianceProviderAccreditationRepository providerAccreditations;
 
     @Transactional(readOnly = true)
     public WorkQueueResponse queue(TenantId tenantId, boolean admin, LocalDate today) {
@@ -83,6 +85,13 @@ public class ComplianceWorkQueueService {
         for (ComplianceDocumentRequest r : documentRequests.findOpen(tenantId)) {
             if (!names.containsKey(r.getClientId())) continue;
             items.add(ContactRules.requestItem(today, r.getClientId(), names.get(r.getClientId()), r.getTitle(), r.getDueDate()));
+        }
+        Map<UUID, String> providerNames = new HashMap<>();
+        for (ComplianceProvider p : providerRepo.findAllForTenant(tenantId)) providerNames.put(p.getId(), p.getName());
+        for (ComplianceProviderAccreditation a : providerAccreditations.findLiveForActiveProviders(tenantId)) {
+            WorkQueueRules.Item item = ProviderRules.queueItem(providerNames.getOrDefault(a.getProviderId(), "Provider"), a.getBody(), a.getStatus(), a.getExpiresOn(),
+                    a.getRecordedAt().atZone(java.time.ZoneOffset.UTC).toLocalDate(), today);
+            if (item != null) items.add(item);
         }
         List<ComplianceRegImpact> liveImpacts = regImpacts.findLive(tenantId);
         Map<UUID, ComplianceRegChange> changeById = liveImpacts.isEmpty() ? Map.of()
