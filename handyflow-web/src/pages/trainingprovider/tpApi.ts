@@ -47,3 +47,5 @@ export const CMP = "/api/v1/training-provider/completions"
 export const DOC = "/api/v1/training-provider/learner-documents"
 
 export const LSN = "/api/v1/training-provider"
+
+export const LMS = "/api/v1/training-provider/lms-links"

@@ -100,3 +100,46 @@ describe("progress panel", () => {
     await waitFor(() => expect(post).toHaveBeenCalledWith("/api/v1/training-provider/lesson-progress/p1/reverse", { reason: "Marked on the wrong enrolment" }))
   })
 })
+
+describe("learning system links", () => {
+  const link = (over: object = {}) => ({ id: "k1", programmeVersionId: "v1", versionNo: 1, programmeId: "p1", programmeTitle: "Safety skills", systemName: "Moodle", launchUrl: "https://lms.example.org/c/7", notes: null, status: "ACTIVE", endedReason: null, createdAt: "", ...over })
+
+  it("shows the open link on the progress panel when the version has an active link", async () => {
+    get.mockImplementation((url: string) => Promise.resolve({ data: { data: url.includes("lms-links") ? [link()] : url.includes("lesson-progress") ? prog : [] } }))
+    wrap(<TrainProvProgressPanel enrolmentId="e1" startDate="2020-01-01" versionId="v1" />)
+    fireEvent.click(screen.getByText("Learning progress"))
+    const a = await screen.findByText("Open Moodle")
+    expect(a.getAttribute("href")).toBe("https://lms.example.org/c/7")
+    expect(screen.getByText(/Progress there is not synced/)).toBeTruthy()
+  })
+
+  it("does not look for a link without a version", async () => {
+    wrap(<TrainProvProgressPanel enrolmentId="e1" startDate="2020-01-01" />)
+    fireEvent.click(screen.getByText("Learning progress"))
+    await screen.findByText(/records progress only/)
+    expect(get.mock.calls.some(c => String(c[0]).includes("lms-links"))).toBe(false)
+  })
+
+  it("refuses an address with a token and needs a reason to end a link", async () => {
+    get.mockImplementation((url: string) => Promise.resolve({ data: { data: url.includes("lms-links") ? [link()] : lessons } }))
+    wrap(<TrainProvLessonsTab />)
+    fireEvent.click(await screen.findByText("End link"))
+    fireEvent.click(screen.getByText("End the link"))
+    expect(await screen.findAllByText(/at least 10 characters/)).toBeTruthy()
+    expect(post).not.toHaveBeenCalled()
+    fireEvent.change(screen.getByLabelText("Reason for ending the link"), { target: { value: "Contract with the system ended" } })
+    fireEvent.click(screen.getByText("End the link"))
+    await waitFor(() => expect(post).toHaveBeenCalledWith("/api/v1/training-provider/lms-links/k1/end", { reason: "Contract with the system ended" }))
+  })
+
+  it("checks the new link before sending", async () => {
+    get.mockImplementation((url: string) => Promise.resolve({ data: { data: url.includes("lms-links") ? [] : lessons } }))
+    wrap(<TrainProvLessonsTab />)
+    fireEvent.click(await screen.findByText("Add a link"))
+    fireEvent.change(screen.getByLabelText("Learning system name"), { target: { value: "Moodle" } })
+    fireEvent.change(screen.getByLabelText("Launch link"), { target: { value: "https://lms.example.org/c?token=abc" } })
+    fireEvent.click(screen.getByText("Add link"))
+    expect(await screen.findByText(/programme and version/)).toBeTruthy()
+    expect(post).not.toHaveBeenCalled()
+  })
+})

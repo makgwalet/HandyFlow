@@ -6,9 +6,10 @@ import { usePermissions } from "../../hooks/usePermission"
 import { KINDS, PROGRESS_NOTE, finishProblem, label, reasonProblem, type Progress } from "./lessonRules"
 import { Notice } from "./tpUi"
 import { card, errText, fmtDate, ghost, input, muted, solid, todayIso, unwrap } from "./tpStyle"
-import { LSN } from "./tpApi"
+import { LMS, LSN } from "./tpApi"
+import type { LmsLink } from "./lmsRules"
 
-export default function TrainProvProgressPanel({ enrolmentId, startDate }: { enrolmentId: string; startDate: string | null }) {
+export default function TrainProvProgressPanel({ enrolmentId, startDate, versionId = null }: { enrolmentId: string; startDate: string | null; versionId?: string | null }) {
   const qc = useQueryClient()
   const canManage = usePermissions(["TRAININGPROVIDER_MANAGE", "TRAININGPROVIDER_ADMIN"])
   const [open, setOpen] = useState(false)
@@ -22,6 +23,11 @@ export default function TrainProvProgressPanel({ enrolmentId, startDate }: { enr
     queryKey: ["tp-lesson-progress", enrolmentId], enabled: open,
     queryFn: async () => unwrap<Progress>(await apiClient.get(`${LSN}/learner-enrolments/${enrolmentId}/lesson-progress`)),
   })
+  const { data: links = [] } = useQuery<LmsLink[]>({
+    queryKey: ["tp-lms-link", versionId], enabled: open && !!versionId,
+    queryFn: async () => unwrap<LmsLink[]>(await apiClient.get(LMS, { params: { programmeVersionId: versionId, status: "ACTIVE" } })),
+  })
+  const link = links[0]
   if (!open) return <div style={{ marginTop: 8 }}><button style={ghost} onClick={() => setOpen(true)}>Learning progress</button></div>
   const run = async (fn: () => Promise<unknown>) => {
     setBusy(true); setError("")
@@ -38,6 +44,7 @@ export default function TrainProvProgressPanel({ enrolmentId, startDate }: { enr
   return (
     <div style={{ ...card, marginTop: 8, display: "grid", gap: 8 }}>
       <div style={muted}>{PROGRESS_NOTE}</div>
+      {link && <div><a href={link.launchUrl} target="_blank" rel="noreferrer noopener">Open {link.systemName}</a><span style={muted}> · learners sign in on that system. Progress there is not synced.</span></div>}
       {!p ? <div style={muted}>Loading…</div> : (
         <>
           <div style={muted}>{p.summary}</div>

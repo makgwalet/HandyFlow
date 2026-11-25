@@ -13,7 +13,7 @@ export type Application = {
   entryCheckNote: string | null; entryOverrideReason: string | null; nextStatuses: string[]; createdAt: string
 }
 export type Enrolment = {
-  id: string; enrolmentNo: string; learnerId: string; learnerName: string; programmeId: string; programmeTitle: string; programmeVersionNo: number | null
+  id: string; enrolmentNo: string; learnerId: string; learnerName: string; programmeId: string; programmeTitle: string; programmeVersionId?: string; programmeVersionNo: number | null
   siteId: string; siteName: string; applicationId: string | null; clientId: string | null; startDate: string; expectedEndDate: string | null
   status: string; statusReason: string | null; trainingActivity: string; coverOutcome: string | null; coverCheckedOn: string | null
   coverOverrideReason: string | null; nextStatuses: string[]; createdAt: string

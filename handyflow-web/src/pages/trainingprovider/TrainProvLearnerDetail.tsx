@@ -131,7 +131,7 @@ function EnrolmentCard({ e, canManage, onChanged }: { e: Enrolment; canManage: b
           <Notice text={error} />
         </div>
       )}
-      <TrainProvProgressPanel enrolmentId={e.id} startDate={e.startDate} />
+      <TrainProvProgressPanel enrolmentId={e.id} startDate={e.startDate} versionId={e.programmeVersionId ?? null} />
       <TrainProvCompletionPanel enrolmentId={e.id} startDate={e.startDate} />
       <TrainProvDocumentPanel enrolmentId={e.id} />
     </div>

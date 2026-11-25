@@ -9,6 +9,7 @@ import type { ProgrammeDetail } from "./catalogueRules"
 import { Badge, Notice } from "./tpUi"
 import { card, errText, ghost, input, muted, solid, unwrap } from "./tpStyle"
 import { CAT, LSN, useActiveProgrammes } from "./tpApi"
+import TrainProvLmsLinkSection from "./TrainProvLmsLinkSection"
 
 function LessonFormPanel({ initial, onSaved, onCancel }: { initial?: Lesson; onSaved: () => void; onCancel: () => void }) {
   const { data: programmes = [] } = useActiveProgrammes()
@@ -136,6 +137,7 @@ export default function TrainProvLessonsTab() {
       </div>
       {adding && <LessonFormPanel onCancel={() => setAdding(false)} onSaved={() => { setAdding(false); changed() }} />}
       {isLoading ? <div style={muted}>Loading…</div> : data.length === 0 ? <div style={muted}>No lessons found.</div> : data.map(l => <LessonCard key={l.id} l={l} onChanged={changed} />)}
+      <TrainProvLmsLinkSection />
     </div>
   )
 }
