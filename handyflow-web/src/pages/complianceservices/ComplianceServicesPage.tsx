@@ -30,6 +30,7 @@ import QuotesPage from "./QuotesPage"
 import AgreementsPage from "./AgreementsPage"
 import BillingPage from "./BillingPage"
 import RegulatoryPage from "./RegulatoryPage"
+import DashboardPage from "./DashboardPage"
 import ObligationCatalogue from "./ObligationCatalogue"
 import WorkQueue from "./WorkQueue"
 
@@ -198,6 +199,7 @@ export default function ComplianceServicesPage() {
               )}
             </>
           )
+          case "dashboard": return <DashboardPage />
           case "queue": return <WorkQueue />
           case "catalogue": return <ObligationCatalogue />
           case "regulatory": return <RegulatoryPage />
