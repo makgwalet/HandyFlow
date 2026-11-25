@@ -34,3 +34,5 @@ export function useClients() {
 }
 
 export const LRN = "/api/v1/training-provider"
+
+export const PRC = "/api/v1/training-provider/practitioners"
