@@ -15,7 +15,7 @@ public final class ImportRules {
 
     private ImportRules() {}
 
-    public static final String CLIENTS = "CLIENTS", REGISTRATIONS = "REGISTRATIONS";
+    public static final String CLIENTS = "CLIENTS", REGISTRATIONS = "REGISTRATIONS", DEADLINES = "DEADLINES";
     public static final String OK = "OK", DUPLICATE = "DUPLICATE", REJECTED = "REJECTED", IMPORTED = "IMPORTED";
     public static final int MAX_ROWS = 2000;
     public static final int MAX_BYTES = 2_000_000;
@@ -29,7 +29,8 @@ public final class ImportRules {
         return switch (kind) {
             case CLIENTS -> List.of("name", "email", "phone", "notes");
             case REGISTRATIONS -> List.of("client", "authority", "type", "number", "issued", "expiry", "notes");
-            default -> throw new IllegalArgumentException("Choose clients or registrations");
+            case DEADLINES -> List.of("client", "type", "due", "description");
+            default -> throw new IllegalArgumentException("Choose clients, registrations or deadlines");
         };
     }
 
@@ -47,6 +48,8 @@ public final class ImportRules {
             case "registrationtype", "licencetype", "licensetype" -> "type";
             case "registrationnumber", "reference", "referencenumber", "regno" -> "number";
             case "issuedon", "issuedate", "issueddate", "dateissued" -> "issued";
+            case "duedate", "datedue", "deadlinedate", "deadline", "duedateon", "due" -> "due";
+            case "deadlinetype", "obligation", "obligationtype" -> "type";
             case "expireson", "expirydate", "expirydateon", "dateexpires", "expires" -> "expiry";
             default -> h;
         };
@@ -153,6 +156,30 @@ public final class ImportRules {
         out.set(4, i == null ? "" : i.toString());
         out.set(5, e == null ? "" : e.toString());
         return out;
+    }
+
+    /** Returns what is wrong with a deadline row apart from finding the client, or null. */
+    public static String deadlineProblem(List<String> f) {
+        if (f.get(0).isBlank()) return "The client is empty";
+        if (f.get(1).isBlank()) return "The deadline type is empty";
+        if (f.get(1).length() > 60) return "The deadline type is longer than 60 characters";
+        if (f.get(2).isBlank()) return "The due date is empty";
+        try { date(f.get(2)); } catch (IllegalArgumentException e) { return "The due date is not a date (use yyyy-mm-dd or dd/mm/yyyy)"; }
+        if (f.get(3).length() > 2000) return "The description is longer than 2000 characters";
+        return null;
+    }
+
+    /** The stored form of a deadline row has an ISO due date and an upper-case type, so what was previewed is committed unchanged. */
+    public static List<String> isoDeadline(List<String> f) {
+        List<String> out = new ArrayList<>(f);
+        out.set(1, f.get(1).trim().toUpperCase().replaceAll("\\s+", "_"));
+        LocalDate d = date(f.get(2));
+        out.set(2, d == null ? "" : d.toString());
+        return out;
+    }
+
+    public static String deadlineKey(String clientKey, String type, String isoDue, String description) {
+        return clientKey + "|" + type + "|" + isoDue + "|" + (description == null ? "" : description.trim().toLowerCase());
     }
 
     public static String registrationKey(String clientKey, List<String> f) {

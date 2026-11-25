@@ -36,6 +36,7 @@ class ComplianceImportServiceTest {
     @Mock ComplianceImportRowRepository rows;
     @Mock ComplianceClientRepository clients;
     @Mock ClientComplianceRegistrationRepository registrations;
+    @Mock ClientComplianceDeadlineRepository deadlines;
     @InjectMocks ComplianceImportService service;
 
     private static byte[] csv(String s) { return s.getBytes(StandardCharsets.UTF_8); }
@@ -117,5 +118,40 @@ class ComplianceImportServiceTest {
         ArgumentCaptor<ClientComplianceRegistration> c = ArgumentCaptor.forClass(ClientComplianceRegistration.class);
         verify(registrations).save(c.capture());
         assertThat(c.getValue().getStatus().equals("EXPIRED")).isTrue();
+    }
+
+    @Test
+    void deadlinesAreCheckedAgainstTheClientAndWhatTheClientAlreadyHas() {
+        ComplianceClient acme = ComplianceClient.create(TENANT, "Acme", null, null, null, null, ME);
+        existing(acme);
+        ClientComplianceDeadline have = ClientComplianceDeadline.create(TENANT, acme.getId(), null, "ANNUAL_RETURN", "Annual return", LocalDate.of(2027, 1, 31), ME);
+        when(deadlines.findLiveByClient(TENANT, acme.getId())).thenReturn(List.of(have));
+        when(batches.save(any())).thenAnswer(i -> i.getArgument(0));
+        BatchDetail d = service.preview(TENANT, "DEADLINES", "d.csv", csv("client,type,due,description\n"
+                + "Acme,annual return,31/01/2027,Annual return\n"
+                + "Acme,VAT return,2027-02-28,VAT\n"
+                + "Acme,VAT return,2027-02-28,VAT\n"
+                + "Nobody,VAT return,2027-02-28,\n"
+                + "Acme,VAT return,soon,\n"), ME);
+        assertThat(d.batch().okRows() == 1).isTrue();
+        assertThat(d.batch().duplicateRows() == 2).isTrue();
+        assertThat(d.batch().rejectedRows() == 2).isTrue();
+        verify(deadlines, never()).save(any());
+    }
+
+    @Test
+    void committedDeadlinesAreCreatedAsPlainPendingOnes() {
+        ComplianceClient acme = ComplianceClient.create(TENANT, "Acme", null, null, null, null, ME);
+        existing(acme);
+        when(deadlines.findLiveByClient(TENANT, acme.getId())).thenReturn(List.of());
+        when(deadlines.save(any())).thenAnswer(i -> i.getArgument(0));
+        ComplianceImportBatch b = ComplianceImportBatch.preview(TENANT, "DEADLINES", "d.csv", 1, 0, 0, ME);
+        ComplianceImportRow ok = ComplianceImportRow.of(TENANT, b.getId(), 2, List.of("Acme", "VAT_RETURN", "2027-02-28", "VAT"), "OK", null);
+        when(batches.findOne(TENANT, b.getId())).thenReturn(Optional.of(b));
+        when(rows.findForBatch(TENANT, b.getId())).thenReturn(List.of(ok));
+        when(batches.save(any())).thenAnswer(i -> i.getArgument(0));
+        service.commit(TENANT, b.getId(), ME, TODAY);
+        verify(deadlines).save(any(ClientComplianceDeadline.class));
+        assertThat(b.getImportedRows() == 1).isTrue();
     }
 }

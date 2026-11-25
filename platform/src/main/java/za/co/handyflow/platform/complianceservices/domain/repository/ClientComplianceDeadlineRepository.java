@@ -24,4 +24,7 @@ public interface ClientComplianceDeadlineRepository extends JpaRepository<Client
 
     @Query("SELECT d FROM ClientComplianceDeadline d WHERE d.tenantId.value = :#{#tenantId.value} AND d.status = 'PENDING' AND d.dueDate <= :cutoff ORDER BY d.dueDate")
     List<ClientComplianceDeadline> findPendingDueBy(@Param("tenantId") TenantId tenantId, @Param("cutoff") java.time.LocalDate cutoff);
+
+    @Query("SELECT d FROM ClientComplianceDeadline d WHERE d.tenantId.value = :#{#tenantId.value} AND d.clientId = :clientId AND d.status <> 'CANCELLED'")
+    List<ClientComplianceDeadline> findLiveByClient(@Param("tenantId") TenantId tenantId, @Param("clientId") UUID clientId);
 }

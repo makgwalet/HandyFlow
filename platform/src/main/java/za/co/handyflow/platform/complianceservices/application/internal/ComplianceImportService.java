@@ -18,7 +18,7 @@ import java.util.*;
 import java.util.function.Supplier;
 
 /**
- * Bringing in clients and registrations from a CSV file. A preview checks every row and changes nothing. A commit, by an administrator, creates only the rows
+ * Bringing in clients, registrations and deadlines from a CSV file. A preview checks every row and changes nothing. A commit, by an administrator, creates only the rows
  * that still pass. Nothing existing is overwritten: a match is set aside as a duplicate. Registrations that are already past their expiry date come in as expired.
  */
 @Service
@@ -31,10 +31,11 @@ public class ComplianceImportService {
     private final ComplianceImportRowRepository rows;
     private final ComplianceClientRepository clients;
     private final ClientComplianceRegistrationRepository registrations;
+    private final ClientComplianceDeadlineRepository deadlines;
 
     @Transactional
     public BatchDetail preview(TenantId tenantId, String kind, String fileName, byte[] bytes, UUID by) {
-        if (!ImportRules.CLIENTS.equals(kind) && !ImportRules.REGISTRATIONS.equals(kind)) throw bad("Choose clients or registrations");
+        if (!ImportRules.CLIENTS.equals(kind) && !ImportRules.REGISTRATIONS.equals(kind) && !ImportRules.DEADLINES.equals(kind)) throw bad("Choose clients, registrations or deadlines");
         if (bytes == null || bytes.length == 0) throw bad("The file is empty");
         if (bytes.length > ImportRules.MAX_BYTES) throw bad("The file is larger than " + ImportRules.MAX_BYTES / 1_000_000 + " MB");
         if (fileName == null || !fileName.toLowerCase().endsWith(".csv")) throw bad("Save the spreadsheet as a CSV file and upload that");
@@ -71,7 +72,11 @@ public class ComplianceImportService {
                 if (ImportRules.DUPLICATE.equals(v.status)) dup++; else rej++;
                 continue;
             }
-            UUID target = ImportRules.CLIENTS.equals(b.getKind()) ? createClient(tenantId, v.fields, by) : createRegistration(tenantId, v, by, today);
+            UUID target = switch (b.getKind()) {
+                case ImportRules.CLIENTS -> createClient(tenantId, v.fields, by);
+                case ImportRules.DEADLINES -> createDeadline(tenantId, v, by);
+                default -> createRegistration(tenantId, v, by, today);
+            };
             r.imported(target);
             imported++;
         }
@@ -110,6 +115,11 @@ public class ComplianceImportService {
         ClientComplianceRegistration r = ClientComplianceRegistration.create(tenantId, v.clientId, f.get(1).toUpperCase(), f.get(2), blankNull(f.get(3)), issued, expiry, blankNull(f.get(6)), by);
         if (expiry != null && expiry.isBefore(today)) r.markExpired();
         return registrations.save(r).getId();
+    }
+
+    private UUID createDeadline(TenantId tenantId, Verdict v, UUID by) {
+        List<String> f = v.fields;
+        return deadlines.save(ClientComplianceDeadline.create(tenantId, v.clientId, null, f.get(1), blankNull(f.get(3)), ImportRules.date(f.get(2)), by)).getId();
     }
 
     private static String blankNull(String s) { return s == null || s.isBlank() ? null : s; }
@@ -151,6 +161,7 @@ public class ComplianceImportService {
         private final Set<String> seen = new HashSet<>();
         private final TenantId tenantId;
         private final Map<UUID, Set<String>> existingRegs = new HashMap<>();
+        private final Map<UUID, Set<String>> existingDeadlines = new HashMap<>();
 
         Lookup(TenantId tenantId, String kind) {
             this.tenantId = tenantId;
@@ -166,13 +177,27 @@ public class ComplianceImportService {
                 if (!seen.add(key)) return new Verdict(ImportRules.DUPLICATE, "This name appears earlier in the file", f, null);
                 return new Verdict(ImportRules.OK, null, f, null);
             }
-            String p = ImportRules.registrationProblem(f);
+            boolean dl = ImportRules.DEADLINES.equals(kind);
+            String p = dl ? ImportRules.deadlineProblem(f) : ImportRules.registrationProblem(f);
             if (p != null) return new Verdict(ImportRules.REJECTED, p, f, null);
             List<ComplianceClient> found = byName.getOrDefault(ImportRules.nameKey(f.get(0)), List.of());
             if (found.isEmpty()) return new Verdict(ImportRules.REJECTED, "No client has this name. Import the client first, or correct the name", f, null);
             if (found.size() > 1) return new Verdict(ImportRules.REJECTED, "More than one client has this name", f, null);
             ComplianceClient c = found.get(0);
             if (!"ACTIVE".equals(c.getStatus())) return new Verdict(ImportRules.REJECTED, "This client is inactive", f, null);
+            if (dl) {
+                List<String> d = ImportRules.isoDeadline(f);
+                String dk = ImportRules.deadlineKey(ImportRules.nameKey(f.get(0)), d.get(1), d.get(2), d.get(3));
+                Set<String> mine = existingDeadlines.computeIfAbsent(c.getId(), id -> {
+                    Set<String> s = new HashSet<>();
+                    for (ClientComplianceDeadline x : deadlines.findLiveByClient(tenantId, id))
+                        s.add(ImportRules.deadlineKey(ImportRules.nameKey(f.get(0)), x.getDeadlineType(), x.getDueDate().toString(), x.getDescription()));
+                    return s;
+                });
+                if (mine.contains(dk)) return new Verdict(ImportRules.DUPLICATE, "This deadline already exists for the client", d, c.getId());
+                if (!seen.add(dk)) return new Verdict(ImportRules.DUPLICATE, "This deadline appears earlier in the file", d, c.getId());
+                return new Verdict(ImportRules.OK, null, d, c.getId());
+            }
             List<String> iso = ImportRules.isoDates(f);
             String key = ImportRules.registrationKey(ImportRules.nameKey(f.get(0)), iso);
             Set<String> have = existingRegs.computeIfAbsent(c.getId(), id -> {

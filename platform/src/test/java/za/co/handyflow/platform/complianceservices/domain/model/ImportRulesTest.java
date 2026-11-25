@@ -98,4 +98,18 @@ class ImportRulesTest {
         assertThatThrownBy(() -> bad.imported(UUID.randomUUID())).isInstanceOf(IllegalStateException.class);
         assertThatThrownBy(() -> bad.setAside("DUPLICATE", "x")).isInstanceOf(IllegalStateException.class);
     }
+
+    @Test
+    void deadlineRowChecksAndStoredForm() {
+        assertThat(ImportRules.deadlineProblem(List.of("Acme", "VAT return", "2027-02-28", "")) == null).isTrue();
+        assertThat(ImportRules.deadlineProblem(List.of("", "VAT return", "2027-02-28", "")) != null).isTrue();
+        assertThat(ImportRules.deadlineProblem(List.of("Acme", "", "2027-02-28", "")) != null).isTrue();
+        assertThat(ImportRules.deadlineProblem(List.of("Acme", "VAT return", "", "")) != null).isTrue();
+        assertThat(ImportRules.deadlineProblem(List.of("Acme", "VAT return", "31-31-2027", "")) != null).isTrue();
+        List<String> iso = ImportRules.isoDeadline(List.of("Acme", "vat return", "28/02/2027", "x"));
+        assertThat(iso.get(1).equals("VAT_RETURN") && iso.get(2).equals("2027-02-28")).isTrue();
+        int[] pos = ImportRules.mapHeader("DEADLINES", List.of("Client Name", "Deadline Type", "Due Date"));
+        assertThat(pos[0] == 0 && pos[1] == 1 && pos[2] == 2 && pos[3] == -1).isTrue();
+        assertThatThrownBy(() -> ImportRules.mapHeader("DEADLINES", List.of("Client", "Type"))).isInstanceOf(IllegalArgumentException.class);
+    }
 }
