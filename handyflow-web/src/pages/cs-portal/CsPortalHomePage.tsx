@@ -6,10 +6,11 @@ import { csPortalApi, type CsPortalClient, type CsPortalOverview } from "../../a
 import { usePortalAuthStore } from "../../store/portalAuth.store"
 import { color, space, type } from "../accountant-portal/portal-theme"
 import { Chip, Title, day, empty, errText, greetingName, money, panel, sub, td, th } from "../fm-portal/portalKit"
+import { CsPortalQueries, CsPortalRequests } from "./CsPortalContact"
 import { FREQUENCY, agreementStatus, attention, invoiceStatus, nextBill, quoteStatus } from "./csPortalRules"
 
-type Section = "overview" | "quotes" | "agreements" | "invoices"
-const SECTIONS: [Section, string][] = [["overview", "Overview"], ["quotes", "Quotes"], ["agreements", "Agreements"], ["invoices", "Invoices"]]
+type Section = "overview" | "quotes" | "agreements" | "invoices" | "messages" | "requests"
+const SECTIONS: [Section, string][] = [["overview", "Overview"], ["quotes", "Quotes"], ["agreements", "Agreements"], ["invoices", "Invoices"], ["messages", "Messages"], ["requests", "Documents requested"]]
 const todayIso = () => new Date().toISOString().slice(0, 10)
 
 export function CsPortalHomePage() {
@@ -73,6 +74,8 @@ export function CsPortalHomePage() {
             </div>
           </>
         )}
+        {clientId && section === "messages" && <CsPortalQueries clientId={clientId} />}
+        {clientId && section === "requests" && <CsPortalRequests clientId={clientId} />}
         {data && section === "quotes" && (
           <>
             <Title text="Quotes" note="Quotes your practice has sent you. To accept or decline one, please contact them." />

@@ -7,7 +7,7 @@ import { useState } from "react"
 import { useParams, useNavigate, useSearchParams } from "react-router-dom"
 import { useQuery } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
-import { ArrowLeft, Building2, ShieldCheck, FileText, CalendarClock, Briefcase, ListChecks, IdCard, Users, Scale, Gauge, LifeBuoy, Receipt, FileSignature, KeyRound, Gavel, ClipboardCheck } from "lucide-react"
+import { ArrowLeft, Building2, ShieldCheck, FileText, CalendarClock, Briefcase, ListChecks, IdCard, Users, Scale, Gauge, LifeBuoy, Receipt, FileSignature, KeyRound, Gavel, ClipboardCheck, MessageSquare } from "lucide-react"
 import ClientProfileTab from "./ClientProfileTab"
 import ClientPartiesTab from "./ClientPartiesTab"
 import ClientObligationsTab from "./ClientObligationsTab"
@@ -17,6 +17,7 @@ import ClientAgreementsTab from "./ClientAgreementsTab"
 import ClientPortalTab from "./ClientPortalTab"
 import ClientRegulatoryTab from "./ClientRegulatoryTab"
 import ClientQualityTab from "./ClientQualityTab"
+import ClientRequestsTab from "./ClientRequestsTab"
 import ClientAssessmentsTab from "./ClientAssessmentsTab"
 import ClientRegistrationsTab from "./ClientRegistrationsTab"
 import ClientDocumentsTab from "./ClientDocumentsTab"
@@ -30,7 +31,7 @@ interface Client {
   mandateNotes: string | null; status: string
 }
 
-type Tab = "profile" | "parties" | "obligations" | "assessments" | "cases" | "quotes" | "agreements" | "portal" | "regulatory" | "quality" | "registrations" | "documents" | "deadlines" | "tenders" | "requirements"
+type Tab = "profile" | "parties" | "obligations" | "assessments" | "cases" | "quotes" | "agreements" | "portal" | "regulatory" | "quality" | "requests" | "registrations" | "documents" | "deadlines" | "tenders" | "requirements"
 
 const TABS: { id: Tab; label: string; icon: React.ElementType }[] = [
   { id: "profile",       label: "Profile",       icon: IdCard        },
@@ -42,6 +43,7 @@ const TABS: { id: Tab; label: string; icon: React.ElementType }[] = [
   { id: "agreements",    label: "Agreements",    icon: FileSignature },
   { id: "regulatory",    label: "Regulatory",    icon: Gavel         },
   { id: "quality",       label: "Quality",       icon: ClipboardCheck },
+  { id: "requests",      label: "Requests",      icon: MessageSquare },
   { id: "portal",        label: "Portal access", icon: KeyRound      },
   { id: "registrations", label: "Registrations", icon: ShieldCheck   },
   { id: "documents",     label: "Documents",     icon: FileText      },
@@ -129,6 +131,7 @@ export default function ClientDetailPage() {
         {tab === "agreements"    && <ClientAgreementsTab clientId={clientId} />}
         {tab === "regulatory"    && <ClientRegulatoryTab clientId={clientId} />}
         {tab === "quality"       && <ClientQualityTab clientId={clientId} />}
+        {tab === "requests"      && <ClientRequestsTab clientId={clientId} />}
         {tab === "portal"        && <ClientPortalTab clientId={clientId} />}
         {tab === "registrations" && <ClientRegistrationsTab clientId={clientId} />}
         {tab === "documents"     && <ClientDocumentsTab clientId={clientId} />}
