@@ -27,6 +27,7 @@ import { COMPLIANCE_SERVICES_SECTIONS } from "../../navigation/moduleSections"
 import ServiceCatalogue from "./ServiceCatalogue"
 import PriceBook from "./PriceBook"
 import QuotesPage from "./QuotesPage"
+import AgreementsPage from "./AgreementsPage"
 import ObligationCatalogue from "./ObligationCatalogue"
 import WorkQueue from "./WorkQueue"
 
@@ -200,6 +201,7 @@ export default function ComplianceServicesPage() {
           case "services": return <ServiceCatalogue />
           case "pricebook": return <PriceBook />
           case "quotes": return <QuotesPage />
+          case "agreements": return <AgreementsPage />
           default: return null
         }
       }}>
