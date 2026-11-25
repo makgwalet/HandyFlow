@@ -59,12 +59,12 @@ public final class AccreditationDtos {
                             UUID actedBy, Instant actedAt) {
     }
 
-    public record ScopeRequest(@NotNull UUID siteId, UUID courseId, @NotBlank String programmeTitle,
+    public record ScopeRequest(@NotNull UUID siteId, UUID courseId, UUID programmeId, @NotBlank String programmeTitle,
                                String qualificationRef, Integer nqfLevel, Integer credits, LocalDate validFrom,
                                LocalDate validTo, String notes) {
     }
 
-    public record ScopeView(UUID id, UUID accreditationId, UUID siteId, String siteName, UUID courseId,
+    public record ScopeView(UUID id, UUID accreditationId, UUID siteId, String siteName, UUID courseId, UUID programmeId,
                             String programmeTitle, String qualificationRef, Integer nqfLevel, Integer credits,
                             LocalDate validFrom, LocalDate validTo, String notes, String status,
                             String withdrawnReason, Instant withdrawnAt) {

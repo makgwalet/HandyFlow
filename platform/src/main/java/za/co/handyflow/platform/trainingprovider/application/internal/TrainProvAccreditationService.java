@@ -37,6 +37,8 @@ public class TrainProvAccreditationService {
     private final TrainProvAccreditationScopeRepository scopes;
     private final TrainProvAccreditationEventRepository events;
     private final TrainProvCourseRepository courses;
+    private final TrainProvProgrammeRepository programmes;
+    private final TrainProvProgrammeOfferingRepository offerings;
 
     // ---- authorities -------------------------------------------------------
 
@@ -104,6 +106,10 @@ public class TrainProvAccreditationService {
         long live = scopes.countLiveForSite(t, id);
         if (live > 0) {
             throw conflict("This site is still named in " + live + " live approval scope(s). Withdraw those first", "TP_SITE_IN_USE");
+        }
+        long offered = offerings.countLiveForSite(t, id);
+        if (offered > 0) {
+            throw conflict("This site still has " + offered + " programme offering(s). Withdraw those first", "TP_SITE_IN_USE");
         }
         guard(() -> { s.retire(reason, by); return null; });
         return siteView(sites.save(s));
@@ -203,12 +209,15 @@ public class TrainProvAccreditationService {
         if (r.courseId() != null) {
             courses.findActiveById(t, r.courseId()).orElseThrow(() -> new ResourceNotFoundException("TrainProvCourse", r.courseId().toString()));
         }
+        if (r.programmeId() != null) {
+            programmes.findForTenant(t, r.programmeId()).orElseThrow(() -> new ResourceNotFoundException("TrainProvProgramme", r.programmeId().toString()));
+        }
         String ref = r.qualificationRef() == null || r.qualificationRef().isBlank() ? null : r.qualificationRef().trim();
         if (scopes.liveDuplicate(t, accreditationId, r.siteId(), r.programmeTitle().trim(), ref)) {
             throw conflict("That programme is already in this approval at that site", "TP_SCOPE_DUPLICATE");
         }
         TrainProvAccreditationScope sc = guard(() -> TrainProvAccreditationScope.create(t, accreditationId, r.siteId(),
-                r.courseId(), r.programmeTitle(), r.qualificationRef(), r.nqfLevel(), r.credits(), r.validFrom(),
+                r.courseId(), r.programmeId(), r.programmeTitle(), r.qualificationRef(), r.nqfLevel(), r.credits(), r.validFrom(),
                 r.validTo(), r.notes(), by));
         scopes.save(sc);
         return scopeView(sc, s.getName());
@@ -230,7 +239,15 @@ public class TrainProvAccreditationService {
     public CoverageView coverage(TenantId t, UUID courseId, UUID siteId, LocalDate day) {
         courses.findActiveById(t, courseId).orElseThrow(() -> new ResourceNotFoundException("TrainProvCourse", courseId.toString()));
         site(t, siteId);
-        List<TrainProvAccreditationScope> found = scopes.findForCourse(t, courseId);
+        return evaluate(t, scopes.findForCourse(t, courseId), courseId, siteId, day);
+    }
+
+    /** The same check for a catalogue programme: scopes that name the programme, or the course it is linked to. */
+    public CoverageView programmeCoverage(TenantId t, UUID programmeId, UUID courseId, UUID siteId, LocalDate day) {
+        return evaluate(t, scopes.findForProgramme(t, programmeId, courseId), programmeId, siteId, day);
+    }
+
+    private CoverageView evaluate(TenantId t, List<TrainProvAccreditationScope> found, UUID subjectId, UUID siteId, LocalDate day) {
         Map<UUID, TrainProvAccreditation> byId = accreditations.findAllById(
                 found.stream().map(TrainProvAccreditationScope::getAccreditationId).collect(Collectors.toSet()))
                 .stream().filter(a -> a.getTenantId().equals(t.getValue()))
@@ -243,7 +260,7 @@ public class TrainProvAccreditationService {
                             sc.getValidFrom(), sc.getValidTo(), sc.getSiteId());
                 }).toList();
         AccreditationRules.Coverage c = AccreditationRules.best(facts, siteId, day);
-        return new CoverageView(courseId, siteId, day, c.outcome().name(), c.covered(), c.message());
+        return new CoverageView(subjectId, siteId, day, c.outcome().name(), c.covered(), c.message());
     }
 
     // ---- helpers -----------------------------------------------------------
@@ -291,7 +308,7 @@ public class TrainProvAccreditationService {
     }
 
     private static ScopeView scopeView(TrainProvAccreditationScope s, String siteName) {
-        return new ScopeView(s.getId(), s.getAccreditationId(), s.getSiteId(), siteName, s.getCourseId(), s.getProgrammeTitle(),
+        return new ScopeView(s.getId(), s.getAccreditationId(), s.getSiteId(), siteName, s.getCourseId(), s.getProgrammeId(), s.getProgrammeTitle(),
                 s.getQualificationRef(), s.getNqfLevel(), s.getCredits(), s.getValidFrom(), s.getValidTo(), s.getNotes(),
                 s.getStatus(), s.getWithdrawnReason(), s.getWithdrawnAt());
     }

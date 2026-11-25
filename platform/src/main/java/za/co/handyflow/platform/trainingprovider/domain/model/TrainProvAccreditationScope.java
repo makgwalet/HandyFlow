@@ -27,6 +27,8 @@ public class TrainProvAccreditationScope {
     private UUID siteId;
     @Column(name = "course_id")
     private UUID courseId;
+    @Column(name = "programme_id")
+    private UUID programmeId;
     @Column(name = "programme_title", nullable = false)
     private String programmeTitle;
     @Column(name = "qualification_ref")
@@ -56,7 +58,7 @@ public class TrainProvAccreditationScope {
     @Version
     private Long version;
 
-    public static TrainProvAccreditationScope create(TenantId tenantId, UUID accreditationId, UUID siteId, UUID courseId,
+    public static TrainProvAccreditationScope create(TenantId tenantId, UUID accreditationId, UUID siteId, UUID courseId, UUID programmeId,
                                                      String programmeTitle, String qualificationRef, Integer nqfLevel,
                                                      Integer credits, LocalDate validFrom, LocalDate validTo, String notes, UUID by) {
         if (programmeTitle == null || programmeTitle.isBlank()) {
@@ -76,6 +78,7 @@ public class TrainProvAccreditationScope {
         s.accreditationId = accreditationId;
         s.siteId = siteId;
         s.courseId = courseId;
+        s.programmeId = programmeId;
         s.programmeTitle = programmeTitle.trim();
         s.qualificationRef = qualificationRef == null || qualificationRef.isBlank() ? null : qualificationRef.trim();
         s.nqfLevel = nqfLevel;

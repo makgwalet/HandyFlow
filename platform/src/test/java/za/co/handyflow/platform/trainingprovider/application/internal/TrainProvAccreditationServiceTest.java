@@ -35,6 +35,8 @@ class TrainProvAccreditationServiceTest {
     @Mock TrainProvAccreditationScopeRepository scopes;
     @Mock TrainProvAccreditationEventRepository events;
     @Mock TrainProvCourseRepository courses;
+    @Mock TrainProvProgrammeRepository programmes;
+    @Mock TrainProvProgrammeOfferingRepository offerings;
     @InjectMocks TrainProvAccreditationService service;
 
     private TrainProvAccreditation underReview() {
@@ -122,7 +124,7 @@ class TrainProvAccreditationServiceTest {
         when(sites.findForTenant(TENANT, site.getId())).thenReturn(Optional.of(site));
 
         assertThatThrownBy(() -> service.addScope(TENANT, a.getId(),
-                new ScopeRequest(site.getId(), null, "TEST programme", null, null, null, null, null, null), MAKER))
+                new ScopeRequest(site.getId(), null, null, "TEST programme", null, null, null, null, null, null), MAKER))
                 .isInstanceOf(HandyFlowException.class);
         verify(scopes, never()).save(any());
     }

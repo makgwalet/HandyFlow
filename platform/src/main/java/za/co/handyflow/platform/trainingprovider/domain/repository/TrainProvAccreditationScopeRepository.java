@@ -20,6 +20,9 @@ public interface TrainProvAccreditationScopeRepository extends JpaRepository<Tra
     @Query("SELECT s FROM TrainProvAccreditationScope s WHERE s.tenantId = :#{#tenantId.value} AND s.courseId = :courseId")
     List<TrainProvAccreditationScope> findForCourse(TenantId tenantId, UUID courseId);
 
+    @Query("SELECT s FROM TrainProvAccreditationScope s WHERE s.tenantId = :#{#tenantId.value} AND (s.programmeId = :programmeId OR (:courseId IS NOT NULL AND s.courseId = :courseId))")
+    List<TrainProvAccreditationScope> findForProgramme(TenantId tenantId, UUID programmeId, UUID courseId);
+
     @Query("""
         SELECT COUNT(s) > 0 FROM TrainProvAccreditationScope s
         WHERE s.tenantId = :#{#tenantId.value} AND s.accreditationId = :accreditationId AND s.siteId = :siteId
