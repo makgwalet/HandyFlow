@@ -38,6 +38,8 @@ class CompliancePortalContactServiceTest {
     @Mock ComplianceDocumentRequestRepository requests;
     @Mock PortalUserRepository portalUsers;
     @Mock ClientComplianceDocumentService documents;
+    @Mock ComplianceContactNotifier notifier;
+    @Mock ComplianceClientRepository clients;
     @InjectMocks CompliancePortalContactService service;
 
     @Test
@@ -57,6 +59,7 @@ class CompliancePortalContactServiceTest {
         assertThat(d.query().subject().equals("Subject")).isTrue();
         verify(queries).save(any(CompliancePortalQuery.class));
         verify(messages).save(any(CompliancePortalMessage.class));
+        verify(notifier).clientWrote(eq(TENANT), any(CompliancePortalQuery.class), any(), eq(true));
     }
 
     @Test

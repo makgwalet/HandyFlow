@@ -34,6 +34,8 @@ public class CompliancePortalContactService {
     private final ComplianceDocumentRequestRepository requests;
     private final PortalUserRepository portalUsers;
     private final ClientComplianceDocumentService documents;
+    private final ComplianceContactNotifier notifier;
+    private final ComplianceClientRepository clients;
 
     @Transactional(readOnly = true)
     public List<PortalQuery> list(UUID portalUserId, UUID clientId) {
@@ -59,6 +61,7 @@ public class CompliancePortalContactService {
         guard(() -> { q.messageAdded("CLIENT"); return null; });
         queries.save(q);
         messages.save(m);
+        notifier.clientWrote(s.tenantId(), q, clientName(s), true);
         return detail(s, q);
     }
 
@@ -70,6 +73,7 @@ public class CompliancePortalContactService {
         guard(() -> { f.query().messageAdded("CLIENT"); return null; });
         messages.save(m);
         queries.save(f.query());
+        notifier.clientWrote(f.scope().tenantId(), f.query(), clientName(f.scope()), false);
         return detail(f.scope(), f.query());
     }
 
@@ -101,10 +105,15 @@ public class CompliancePortalContactService {
             var doc = documents.upload(s.tenantId(), s.clientId(), null, type, null, null, file, portalUserId, name);
             guard(() -> { r.received(doc.id()); return null; });
             requests.save(r);
+            notifier.fileReceived(s.tenantId(), r, clientName(s));
             return new PortalRequest(r.getId(), r.getTitle(), r.getDescription(), r.getDocumentType(), r.getDueDate(), r.getStatus(), r.getRequestedAt(),
                     r.getDueDate() != null && r.getDueDate().isBefore(today));
         }
         throw new ResourceNotFoundException("ComplianceDocumentRequest", requestId.toString());
+    }
+
+    private String clientName(Scope s) {
+        return clients.findByIdForTenant(s.tenantId(), s.clientId()).map(ComplianceClient::getName).orElse("A client");
     }
 
     private record Found(Scope scope, CompliancePortalQuery query) {}

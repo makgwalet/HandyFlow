@@ -124,4 +124,17 @@ class ContactRulesTest {
         r.close(PERSON, "Checked, all good here");
         assertThatThrownBy(() -> r.received(doc)).isInstanceOf(IllegalStateException.class);
     }
+
+    @Test
+    void noticesCarryNoMessageTextOrStaffNames() {
+        String m = ContactNotices.clientWroteMessage("Acme", "VAT\n   question", true);
+        assertThat(m.contains("VAT question")).isTrue();
+        assertThat(ContactNotices.clientWroteTitle("Acme", true).startsWith("New query")).isTrue();
+        assertThat(ContactNotices.clientWroteTitle("Acme", false).startsWith("New message")).isTrue();
+        assertThat(ContactNotices.uploadMessage("Acme", "Bank statements").contains("not been checked")).isTrue();
+        String reply = ContactNotices.replyMessage("x".repeat(500));
+        assertThat(reply.length() < 250).isTrue();
+        assertThat(reply.contains("read it")).isTrue();
+        assertThat(reply.contains("delivered")).isFalse();
+    }
 }

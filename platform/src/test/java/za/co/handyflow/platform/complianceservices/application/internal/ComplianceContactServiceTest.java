@@ -33,6 +33,7 @@ class ComplianceContactServiceTest {
     @Mock CompliancePortalMessageRepository messages;
     @Mock ComplianceDocumentRequestRepository requests;
     @Mock ComplianceClientRepository clients;
+    @Mock ComplianceContactNotifier notifier;
     @InjectMocks ComplianceContactService service;
 
     private ComplianceClient client() {
@@ -51,6 +52,7 @@ class ComplianceContactServiceTest {
         StaffQueryDetail d = service.reply(TENANT, q.getId(), "Thanks", PERSON);
         assertThat(d.query().status().equals("ANSWERED")).isTrue();
         verify(messages).save(any(CompliancePortalMessage.class));
+        verify(notifier).practiceReplied(TENANT, q);
     }
 
     @Test
@@ -60,6 +62,7 @@ class ComplianceContactServiceTest {
         when(queries.findOne(TENANT, q.getId())).thenReturn(Optional.of(q));
         assertThatThrownBy(() -> service.reply(TENANT, q.getId(), "Hi", PERSON)).isInstanceOf(HandyFlowException.class);
         verify(messages, never()).save(any());
+        verifyNoInteractions(notifier);
     }
 
     @Test

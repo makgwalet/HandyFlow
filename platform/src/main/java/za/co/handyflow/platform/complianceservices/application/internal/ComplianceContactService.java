@@ -25,6 +25,7 @@ public class ComplianceContactService {
     private final CompliancePortalMessageRepository messages;
     private final ComplianceDocumentRequestRepository requests;
     private final ComplianceClientRepository clients;
+    private final ComplianceContactNotifier notifier;
 
     @Transactional(readOnly = true)
     public List<StaffQuery> list(TenantId tenantId, String status) {
@@ -57,6 +58,7 @@ public class ComplianceContactService {
         guard(() -> { q.messageAdded("STAFF"); return null; });
         messages.save(m);
         queries.save(q);
+        notifier.practiceReplied(tenantId, q);
         return detail(tenantId, q);
     }
 
