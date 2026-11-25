@@ -13,6 +13,7 @@ import { errText, ghost, input, muted, solid, card, todayIso, unwrap, fmtDate } 
 import { LRN, useActiveProgrammes, useClients, useSites } from "./tpApi"
 import TrainProvLearnerCohortsSection from "./TrainProvLearnerCohorts"
 import TrainProvLearnerAttempts from "./TrainProvLearnerAttempts"
+import TrainProvCompletionPanel from "./TrainProvCompletionPanel"
 
 export function LearnerFormPanel({ initial, onSaved, onCancel }: { initial?: Learner; onSaved: (l: Learner) => void; onCancel: () => void }) {
   const { data: clients = [] } = useClients()
@@ -128,6 +129,7 @@ function EnrolmentCard({ e, canManage, onChanged }: { e: Enrolment; canManage: b
           <Notice text={error} />
         </div>
       )}
+      <TrainProvCompletionPanel enrolmentId={e.id} startDate={e.startDate} />
     </div>
   )
 }
