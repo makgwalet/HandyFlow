@@ -38,3 +38,6 @@ export const LRN = "/api/v1/training-provider"
 export const PRC = "/api/v1/training-provider/practitioners"
 
 export const ASM = "/api/v1/training-provider/assessment-instruments"
+
+export const ATT = "/api/v1/training-provider/assessment-attempts"
+export const MOD = "/api/v1/training-provider"

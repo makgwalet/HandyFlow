@@ -13,6 +13,7 @@ import { Badge, Field, Notice, SubTabs } from "./tpUi"
 import { card, errText, ghost, input, muted, solid, unwrap } from "./tpStyle"
 import { CAT, LRN, PRC, useActiveProgrammes } from "./tpApi"
 import { RegisterPanel, SummaryPanel } from "./TrainProvAttendancePanel"
+import TrainProvAttemptsPanel from "./TrainProvAttemptsPanel"
 
 type ModuleOption = { id: string; title: string }
 type ProgrammeDetail = { versions: { versionNo: number; modules: ModuleOption[] }[] }
@@ -257,10 +258,11 @@ export default function TrainProvCohortDetail({ id, onBack }: { id: string; onBa
           )}
         </div>
       )}
-      <SubTabs tabs={[["people", "Learners & facilitators"], ["timetable", "Timetable"], ["attendance", "Attendance"]]} value={tab} onChange={setTab} />
+      <SubTabs tabs={[["people", "Learners & facilitators"], ["timetable", "Timetable"], ["attendance", "Attendance"], ["assessment", "Assessment"]]} value={tab} onChange={setTab} />
       {tab === "people" && <People detail={data} canManage={canManage} onChanged={refresh} />}
       {tab === "timetable" && <Timetable cohort={c} canManage={canManage} open={open} />}
       {tab === "attendance" && <Attendance cohort={c} />}
+      {tab === "assessment" && <TrainProvAttemptsPanel cohort={c} members={data.members} />}
     </div>
   )
 }
