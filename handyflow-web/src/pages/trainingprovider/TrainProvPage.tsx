@@ -10,6 +10,7 @@
 // components/shell/SectionedModulePage). The client portal lives under
 // /training-provider/portal/* and is routed separately, outside this page.
 import TrainProvDashboard from "./TrainProvDashboard"
+import TrainProvReportingTab from "./TrainProvReportingTab"
 import TrainProvClientsTab from "./TrainProvClientsTab"
 import TrainProvCoursesTab from "./TrainProvCoursesTab"
 import TrainProvSessionsTab from "./TrainProvSessionsTab"
@@ -42,6 +43,7 @@ export default function TrainProvPage() {
           case "practitioners": return <TrainProvPractitionersTab />
           case "cohorts":      return <TrainProvCohortsTab />
           case "assessment":   return <TrainProvAssessmentsTab />
+          case "reporting":    return <TrainProvReportingTab />
           default:             return null
         }
       }} />

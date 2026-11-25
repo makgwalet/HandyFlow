@@ -49,3 +49,5 @@ export const DOC = "/api/v1/training-provider/learner-documents"
 export const LSN = "/api/v1/training-provider"
 
 export const LMS = "/api/v1/training-provider/lms-links"
+
+export const RPT = "/api/v1/training-provider"
