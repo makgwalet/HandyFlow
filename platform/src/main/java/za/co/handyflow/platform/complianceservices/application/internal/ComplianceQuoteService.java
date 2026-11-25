@@ -35,6 +35,7 @@ public class ComplianceQuoteService {
     private final ComplianceQuoteRepository quotes;
     private final ComplianceQuoteLineRepository lines;
     private final ComplianceQuoteAdjustmentRepository adjustments;
+    private final ComplianceApprovalRuleRepository approvalRules;
     private final ComplianceServiceDefinitionRepository services;
     private final ComplianceServiceVersionRepository serviceVersions;
     private final PricingCalculatorService calculator;
@@ -197,7 +198,10 @@ public class ComplianceQuoteService {
         }
         BigDecimal max = discounts.stream().max(Comparator.naturalOrder()).orElse(BigDecimal.ZERO);
         QuoteRules.Totals totals = QuoteRules.sum(priced);
-        guard(() -> { q.applyPricing(totals, QuoteRules.requiredApprover(discounts), max); return null; });
+        String clientRisk = clients.findByIdForTenant(tenantId, q.getClientId()).map(ComplianceClient::getRiskRating).orElse(null);
+        List<ApprovalRules.Rule> active = approvalRules.findActive(tenantId).stream().map(ComplianceApprovalRule::asRule).toList();
+        ApprovalRules.Outcome outcome = ApprovalRules.apply(QuoteRules.requiredApprover(discounts), active, totals.professional(), seen, clientRisk, q.getClientId());
+        guard(() -> { q.applyPricing(totals, outcome.requiredApprover(), max, outcome.basis()); return null; });
     }
 
     /** A service can be quoted only while an approved version of it is in force. */
@@ -241,7 +245,7 @@ public class ComplianceQuoteService {
         return new QuoteView(q.getId(), q.getClientId(), clientName, q.getQuoteNumber(), q.getTitle(), q.effectiveStatus(today), q.getPriceBookVersion(), q.getCurrency(),
                 q.getValidUntil(), q.getNotes(), q.getTerms(), q.getRequiredApprover(), q.getMaxDiscountPct(), q.getProfessional(), q.getDiscountTotal(), q.getDisbursements(),
                 q.getVat(), q.getVatRatePct(), q.getTotal(), q.getCreatedBy(), q.getSubmittedBy(), q.getSubmittedAt(), q.getApprovedBy(), q.getApprovedAt(), q.getApprovalNote(),
-                q.getApprovalExceptionReason(), q.getSentAt(), q.getDecidedBy(), q.getDecidedAt(), q.getDecisionNote(), q.getWithdrawnReason(), q.getCreatedAt(), lineViews);
+                q.getApprovalExceptionReason(), q.getSentAt(), q.getDecidedBy(), q.getDecidedAt(), q.getDecisionNote(), q.getWithdrawnReason(), q.getCreatedAt(), lineViews, q.getApprovalBasis());
     }
 
     // ---- helpers ----

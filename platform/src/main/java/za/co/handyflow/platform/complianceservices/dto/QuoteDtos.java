@@ -45,7 +45,7 @@ public final class QuoteDtos {
                             LocalDate validUntil, String notes, String terms, String requiredApprover, BigDecimal maxDiscountPct, BigDecimal professional,
                             BigDecimal discountTotal, BigDecimal disbursements, BigDecimal vat, BigDecimal vatRatePct, BigDecimal total, UUID createdBy,
                             UUID submittedBy, Instant submittedAt, UUID approvedBy, Instant approvedAt, String approvalNote, String approvalExceptionReason,
-                            Instant sentAt, UUID decidedBy, Instant decidedAt, String decisionNote, String withdrawnReason, Instant createdAt, List<LineView> lines) {}
+                            Instant sentAt, UUID decidedBy, Instant decidedAt, String decisionNote, String withdrawnReason, Instant createdAt, List<LineView> lines, String approvalBasis) {}
 
     public record QuoteSummary(UUID id, UUID clientId, String clientName, String quoteNumber, String title, String status, LocalDate validUntil, BigDecimal total,
                                String requiredApprover, BigDecimal maxDiscountPct, Instant createdAt) {}

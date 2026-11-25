@@ -43,6 +43,7 @@ class ComplianceQuoteServiceTest {
     @Mock ComplianceQuoteRepository quotes;
     @Mock ComplianceQuoteLineRepository lines;
     @Mock ComplianceQuoteAdjustmentRepository adjustments;
+    @Mock ComplianceApprovalRuleRepository approvalRules;
     @Mock ComplianceServiceDefinitionRepository services;
     @Mock ComplianceServiceVersionRepository serviceVersions;
     @Mock PricingCalculatorService calculator;
@@ -55,7 +56,8 @@ class ComplianceQuoteServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new ComplianceQuoteService(clients, quotes, lines, adjustments, services, serviceVersions, calculator, sequences);
+        lenient().when(approvalRules.findActive(any())).thenReturn(List.of());
+        service = new ComplianceQuoteService(clients, quotes, lines, adjustments, approvalRules, services, serviceVersions, calculator, sequences);
         client = ComplianceClient.create(TENANT, "Acme", null, null, null, null, ME);
         book = CompliancePriceBookVersion.draft(TENANT, 1, ME);
         book.edit("2027", null);

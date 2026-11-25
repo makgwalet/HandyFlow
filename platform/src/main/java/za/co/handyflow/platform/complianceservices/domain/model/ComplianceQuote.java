@@ -58,6 +58,9 @@ public class ComplianceQuote {
     @Column(name = "required_approver", nullable = false)
     private String requiredApprover = "CONSULTANT";
 
+    @Column(name = "approval_basis", columnDefinition = "TEXT")
+    private String approvalBasis;
+
     @Column(name = "max_discount_pct", nullable = false, precision = 5, scale = 2)
     private BigDecimal maxDiscountPct = BigDecimal.ZERO;
 
@@ -158,7 +161,9 @@ public class ComplianceQuote {
     }
 
     /** Takes the server's figures. Only a draft is priced. */
-    public void applyPricing(QuoteRules.Totals t, String requiredApprover, BigDecimal maxDiscountPct) {
+    public void applyPricing(QuoteRules.Totals t, String requiredApprover, BigDecimal maxDiscountPct) { applyPricing(t, requiredApprover, maxDiscountPct, null); }
+
+    public void applyPricing(QuoteRules.Totals t, String requiredApprover, BigDecimal maxDiscountPct, String approvalBasis) {
         if (!isDraft()) throw new IllegalStateException("Only a draft can be priced");
         this.professional = t.professional();
         this.discountTotal = t.discount();
@@ -167,6 +172,7 @@ public class ComplianceQuote {
         this.total = t.total();
         this.vatRatePct = t.vatRatePct();
         this.requiredApprover = requiredApprover;
+        this.approvalBasis = approvalBasis;
         this.maxDiscountPct = maxDiscountPct;
         touch();
     }
