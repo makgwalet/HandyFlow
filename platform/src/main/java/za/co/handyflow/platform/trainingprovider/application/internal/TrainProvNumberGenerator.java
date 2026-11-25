@@ -51,6 +51,7 @@ public class TrainProvNumberGenerator {
     private static final String LEARNER_SEQUENCE = "TRAINPROV_LEARNER";
     private static final String LEARNER_ENROLMENT_SEQUENCE = "TRAINPROV_LEARNER_ENROLMENT";
     private static final String PRACTITIONER_SEQUENCE = "TRAINPROV_PRACTITIONER";
+    private static final String COHORT_SEQUENCE = "TRAINPROV_COHORT";
     private static final String DELEGATE_SEQUENCE_PREFIX = "TRAINPROV_DELEGATE:";
 
     private final TenantSequenceService sequenceService;
@@ -92,5 +93,10 @@ public class TrainProvNumberGenerator {
     public String nextPractitionerNumber(TenantId tenantId) {
         long next = sequenceService.nextValue(tenantId, PRACTITIONER_SEQUENCE);
         return "PRC-%05d".formatted(next);
+    }
+
+    public String nextCohortNumber(TenantId tenantId) {
+        long next = sequenceService.nextValue(tenantId, COHORT_SEQUENCE);
+        return "COH-%05d".formatted(next);
     }
 }
