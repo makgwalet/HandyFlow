@@ -1152,7 +1152,7 @@ export const COMPLIANCE_SERVICES_SECTIONS: ModuleSections = {
   icon: Building2,
   defaultSection: 'dashboard',
   groups: [
-    { label: 'Overview', sections: [{ id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard }, { id: 'queue', label: 'Work queue', icon: ListChecks }, { id: 'clients', label: 'Clients', icon: Users }, { id: 'quality', label: 'Quality review', icon: ClipboardCheck }] },
+    { label: 'Overview', sections: [{ id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard }, { id: 'queue', label: 'Work queue', icon: ListChecks }, { id: 'clients', label: 'Clients', icon: Users }, { id: 'quality', label: 'Quality review', icon: ClipboardCheck }, { id: 'reminders', label: 'Daily digest', icon: Bell, anyPermission: ['COMPLIANCE_SERVICES_ADMIN'] }] },
     { label: 'Regulatory', sections: [{ id: 'catalogue', label: 'Obligation catalogue', icon: BookOpen }, { id: 'regulatory', label: 'Regulatory changes', icon: Gavel }] },
     { label: 'Commercial', sections: [{ id: 'services', label: 'Service catalogue', icon: Briefcase }, { id: 'pricebook', label: 'Price book', icon: Receipt }, { id: 'quotes', label: 'Quotes', icon: FileText }, { id: 'agreements', label: 'Agreements', icon: FileSignature }, { id: 'billing', label: 'Billing', icon: CalendarClock }] },
   ],
