@@ -14,6 +14,7 @@ import type { ProgrammeDetail } from "./catalogueRules"
 import { Badge, Notice, SubTabs } from "./tpUi"
 import TrainProvModerationQueue from "./TrainProvModerationQueue"
 import TrainProvCompletionsList from "./TrainProvCompletionsList"
+import TrainProvDocumentsList from "./TrainProvDocumentsList"
 import { card, errText, fmtDate, ghost, input, muted, solid, unwrap } from "./tpStyle"
 import { ASM, CAT, useActiveProgrammes } from "./tpApi"
 
@@ -146,8 +147,8 @@ export default function TrainProvAssessmentsTab() {
   const [section, setSection] = useState("instruments")
   return (
     <div style={{ display: "grid", gap: 12 }}>
-      <SubTabs tabs={[["instruments", "Instruments"], ["moderation", "Moderation queue"], ["completions", "Completions"]]} value={section} onChange={setSection} />
-      {section === "instruments" ? <Instruments /> : section === "moderation" ? <TrainProvModerationQueue /> : <TrainProvCompletionsList />}
+      <SubTabs tabs={[["instruments", "Instruments"], ["moderation", "Moderation queue"], ["completions", "Completions"], ["documents", "Documents"]]} value={section} onChange={setSection} />
+      {section === "instruments" ? <Instruments /> : section === "moderation" ? <TrainProvModerationQueue /> : section === "completions" ? <TrainProvCompletionsList /> : <TrainProvDocumentsList />}
     </div>
   )
 }
