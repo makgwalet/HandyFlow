@@ -25,7 +25,7 @@ interface Quote {
   id: string; clientId: string; quoteNumber: string; title: string | null; status: string; priceBookVersion: number; validUntil: string | null; notes: string | null; terms: string | null
   requiredApprover: string; maxDiscountPct: number; professional: number; discountTotal: number; disbursements: number; vat: number; vatRatePct: number; total: number
   createdBy: string | null; submittedBy: string | null; approvedBy: string | null; approvalNote: string | null; approvalExceptionReason: string | null; sentAt: string | null
-  decisionNote: string | null; withdrawnReason: string | null; lines: QLine[]
+  decisionNote: string | null; withdrawnReason: string | null; lines: QLine[]; approvalBasis?: string | null
 }
 interface BookLine { serviceCode: string; serviceName: string | null; pricingModel: string; hourlyGrade: string | null }
 interface Book { inForce: boolean; versionNumber: number; lines: BookLine[] }
@@ -162,6 +162,7 @@ function QuoteDetail({ clientId, id, canManage, canApprove, userId }: { clientId
               <div style={{ ...row, fontWeight: 700 }}><span>Total</span><span>{formatMoney(q.total)}</span></div>
             </div>
             {q.maxDiscountPct > 0 && <div style={{ fontSize: 12, color: "var(--hf-text-muted)" }}>Largest discount {q.maxDiscountPct}%. {APPROVER_LABELS[q.requiredApprover] ?? q.requiredApprover} (proposed limits, not yet approved policy).</div>}
+            {q.approvalBasis && <div style={{ fontSize: 12, color: "var(--hf-text-muted)" }}>{q.approvalBasis}</div>}
             {q.approvalExceptionReason && <div style={{ fontSize: 12, color: "var(--hf-text-muted)" }}>Approved by the person who wrote it. Reason: {q.approvalExceptionReason}</div>}
             {q.sentAt && <div style={{ fontSize: 12, color: "var(--hf-text-muted)" }}>Marked as sent {q.sentAt.slice(0, 10)}.</div>}
             {q.decisionNote && <div style={{ fontSize: 12, color: "var(--hf-text-muted)" }}>Client's answer: {q.decisionNote}</div>}
