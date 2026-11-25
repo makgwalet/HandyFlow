@@ -23,4 +23,8 @@ public interface ClientComplianceDocumentRepository extends JpaRepository<Client
     @Query("SELECT d FROM ClientComplianceDocument d WHERE d.tenantId.value = :#{#tenantId.value} AND " +
            "(d.status IN ('UPLOADED','UNDER_REVIEW') OR (d.status = 'VERIFIED' AND d.expiryDate IS NOT NULL AND d.expiryDate <= :cutoff))")
     List<ClientComplianceDocument> findNeedingAttention(@Param("tenantId") TenantId tenantId, @Param("cutoff") java.time.LocalDate cutoff);
+
+    /** Documents rejected since the given moment, for spotting clients whose documents keep coming back. */
+    @Query("SELECT d FROM ClientComplianceDocument d WHERE d.tenantId.value = :#{#tenantId.value} AND d.status = 'REJECTED' AND d.rejectedAt >= :since")
+    List<ClientComplianceDocument> findRejectedSince(@Param("tenantId") TenantId tenantId, @Param("since") java.time.Instant since);
 }
