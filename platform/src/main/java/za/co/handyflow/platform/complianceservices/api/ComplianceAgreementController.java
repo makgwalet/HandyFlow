@@ -71,6 +71,21 @@ public class ComplianceAgreementController {
         return ResponseEntity.ok(ApiResponse.success("Draft saved", service.save(TenantContext.getTenantIdAsObject(), clientId, id, request, LocalDate.now())));
     }
 
+    @GetMapping("/agreement-settings")
+    @PreAuthorize(READ)
+    public ResponseEntity<ApiResponse<SettingsView>> settings() {
+        featureGuard.requireModule("complianceservices");
+        return ResponseEntity.ok(ApiResponse.success(service.settings(TenantContext.getTenantIdAsObject())));
+    }
+
+    /** Administrators only: whether the person who drafted an agreement may activate it. */
+    @PutMapping("/agreement-settings")
+    @PreAuthorize("hasAuthority('COMPLIANCE_SERVICES_ADMIN')")
+    public ResponseEntity<ApiResponse<SettingsView>> updateSettings(@Valid @RequestBody SettingsRequest request) {
+        featureGuard.requireModule("complianceservices");
+        return ResponseEntity.ok(ApiResponse.success(service.updateSettings(TenantContext.getTenantIdAsObject(), request, TenantContext.getCurrentUserId())));
+    }
+
     @PostMapping("/clients/{clientId}/agreements/{id}/activate")
     @PreAuthorize(MANAGE)
     public ResponseEntity<ApiResponse<View>> activate(@PathVariable UUID clientId, @PathVariable UUID id, @Valid @RequestBody NoteRequest request) {

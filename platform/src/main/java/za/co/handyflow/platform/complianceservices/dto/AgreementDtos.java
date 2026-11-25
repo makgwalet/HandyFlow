@@ -23,6 +23,10 @@ public final class AgreementDtos {
 
     public record NoteRequest(@Size(max = 2000) String note) {}
 
+    public record SettingsRequest(boolean requireSecondPerson, java.math.BigDecimal minValue) {}
+
+    public record SettingsView(boolean requireSecondPerson, java.math.BigDecimal minValue, java.time.Instant updatedAt) {}
+
     public record ReasonRequest(@Size(max = 2000) String reason) {}
 
     public record EndRequest(LocalDate endDate, @Size(max = 2000) String reason) {}

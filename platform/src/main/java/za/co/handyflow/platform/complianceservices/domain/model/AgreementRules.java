@@ -149,4 +149,15 @@ public final class AgreementRules {
             default -> List.of();
         };
     }
+
+    /**
+     * When the practice has switched the check on, the person who drafted an agreement cannot activate it, once its quoted total reaches the
+     * amount the practice named (or at any amount if none is named). Returns what is wrong, or null.
+     */
+    public static String activationProblem(boolean requireSecondPerson, java.math.BigDecimal minValue, java.math.BigDecimal quotedTotal, java.util.UUID drafter, java.util.UUID activator) {
+        if (!requireSecondPerson) return null;
+        if (minValue != null && (quotedTotal == null || quotedTotal.compareTo(minValue) < 0)) return null;
+        if (drafter != null && drafter.equals(activator)) return "A different person must activate an agreement you drafted";
+        return null;
+    }
 }

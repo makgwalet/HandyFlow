@@ -41,6 +41,7 @@ class ComplianceAgreementServiceTest {
     @Mock ComplianceAgreementRepository agreements;
     @Mock ComplianceAgreementLineRepository lines;
     @Mock TenantSequenceService sequences;
+    @Mock ComplianceAgreementSettingsRepository settings;
 
     private ComplianceAgreementService service;
     private ComplianceClient client;
@@ -150,5 +151,20 @@ class ComplianceAgreementServiceTest {
         View v = service.activate(TENANT, client.getId(), a.getId(), "Signed copy returned by the director", ME, TODAY);
         assertThat(v.status()).isEqualTo("ACTIVE");
         assertThat(v.actions()).containsExactly("suspend", "end");
+    }
+
+    @Test
+    @DisplayName("With the check on, the person who drafted an agreement cannot activate it; someone else can")
+    void secondPersonMustActivate() {
+        UUID other = UUID.fromString("00000000-0000-0000-0000-0000000000c1");
+        ComplianceAgreementSettings on = ComplianceAgreementSettings.blank(TENANT);
+        on.apply(true, null, ME);
+        when(settings.findOne(TENANT)).thenReturn(Optional.of(on));
+        ComplianceAgreement a = ComplianceAgreement.draft(TENANT, client.getId(), accepted.getId(), "CA-000002", BigDecimal.ONE, BigDecimal.ONE, "ZAR",
+                new ComplianceAgreement.Terms("x", TODAY, null, "ONCE", BigDecimal.ONE, TODAY, false, 30, null, null), ME);
+        lenient().when(agreements.findOne(TENANT, a.getId())).thenReturn(Optional.of(a));
+        assertThatThrownBy(() -> service.activate(TENANT, client.getId(), a.getId(), "Signed copy returned by the director", ME, TODAY))
+                .isInstanceOfSatisfying(HandyFlowException.class, e -> assertThat(e.getStatus()).isEqualTo(HttpStatus.CONFLICT));
+        assertThat(service.activate(TENANT, client.getId(), a.getId(), "Signed copy returned by the director", other, TODAY).status()).isEqualTo("ACTIVE");
     }
 }

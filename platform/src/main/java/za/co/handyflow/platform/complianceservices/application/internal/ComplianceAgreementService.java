@@ -32,6 +32,7 @@ public class ComplianceAgreementService {
     private final ComplianceAgreementRepository agreements;
     private final ComplianceAgreementLineRepository lines;
     private final TenantSequenceService sequences;
+    private final ComplianceAgreementSettingsRepository settings;
 
     @Transactional(readOnly = true)
     public List<Summary> listForClient(TenantId tenantId, UUID clientId, LocalDate today) {
@@ -109,7 +110,26 @@ public class ComplianceAgreementService {
 
     @Transactional
     public View activate(TenantId tenantId, UUID clientId, UUID id, String note, UUID by, LocalDate today) {
-        return change(tenantId, clientId, id, today, a -> a.activate(by, note));
+        final ComplianceAgreementSettings s = settings.findOne(tenantId).orElse(null);
+        return change(tenantId, clientId, id, today, a -> {
+            String p = s == null ? null : AgreementRules.activationProblem(s.isRequireSecondPerson(), s.getMinValue(), a.getQuotedTotal(), a.getCreatedBy(), by);
+            if (p != null) throw new IllegalStateException(p);
+            a.activate(by, note);
+        });
+    }
+
+    @Transactional(readOnly = true)
+    public SettingsView settings(TenantId tenantId) {
+        ComplianceAgreementSettings s = settings.findOne(tenantId).orElseGet(() -> ComplianceAgreementSettings.blank(tenantId));
+        return new SettingsView(s.isRequireSecondPerson(), s.getMinValue(), s.getUpdatedAt());
+    }
+
+    @Transactional
+    public SettingsView updateSettings(TenantId tenantId, SettingsRequest r, UUID by) {
+        ComplianceAgreementSettings s = settings.findOne(tenantId).orElseGet(() -> ComplianceAgreementSettings.blank(tenantId));
+        guard(() -> { s.apply(r.requireSecondPerson(), r.minValue(), by); return null; });
+        settings.save(s);
+        return new SettingsView(s.isRequireSecondPerson(), s.getMinValue(), s.getUpdatedAt());
     }
 
     @Transactional

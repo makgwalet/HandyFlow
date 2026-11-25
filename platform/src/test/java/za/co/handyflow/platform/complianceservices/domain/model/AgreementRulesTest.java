@@ -125,4 +125,15 @@ class AgreementRulesTest {
         assertThat(AgreementRules.canEdit("DRAFT")).isTrue();
         assertThat(AgreementRules.canEdit("ACTIVE")).isFalse();
     }
+
+    @Test
+    void secondPersonCheckOnlyBitesWhenSwitchedOnAndAboveTheAmount() {
+        java.util.UUID me = java.util.UUID.randomUUID(), other = java.util.UUID.randomUUID();
+        java.math.BigDecimal ten = java.math.BigDecimal.TEN, hundred = new java.math.BigDecimal("100");
+        assertThat(AgreementRules.activationProblem(false, null, hundred, me, me)).isNull();
+        assertThat(AgreementRules.activationProblem(true, null, hundred, me, me)).isNotNull();
+        assertThat(AgreementRules.activationProblem(true, null, hundred, me, other)).isNull();
+        assertThat(AgreementRules.activationProblem(true, hundred, ten, me, me)).isNull();
+        assertThat(AgreementRules.activationProblem(true, hundred, hundred, me, me)).isNotNull();
+    }
 }
