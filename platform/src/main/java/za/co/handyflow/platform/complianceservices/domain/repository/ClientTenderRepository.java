@@ -8,6 +8,7 @@ import org.springframework.data.repository.query.Param;
 import za.co.handyflow.platform.complianceservices.domain.model.ClientTender;
 import za.co.handyflow.platform.shared.TenantId;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -20,4 +21,7 @@ public interface ClientTenderRepository extends JpaRepository<ClientTender, UUID
            "AND (:status IS NULL OR t.status = :status) ORDER BY t.closingDate ASC NULLS LAST")
     Page<ClientTender> findByClient(@Param("tenantId") TenantId tenantId, @Param("clientId") UUID clientId,
                                     @Param("status") String status, Pageable pageable);
+
+    @Query("SELECT t FROM ClientTender t WHERE t.tenantId.value = :#{#tenantId.value}")
+    List<ClientTender> findAllForTenant(@Param("tenantId") TenantId tenantId);
 }
