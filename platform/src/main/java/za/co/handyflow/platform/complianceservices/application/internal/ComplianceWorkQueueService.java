@@ -26,6 +26,8 @@ public class ComplianceWorkQueueService {
     private final ComplianceObligationVersionRepository versions;
     private final ComplianceAssessmentRepository assessments;
     private final ComplianceCaseRepository cases;
+    private final ComplianceRegChangeRepository regChanges;
+    private final ComplianceRegImpactRepository regImpacts;
 
     @Transactional(readOnly = true)
     public WorkQueueResponse queue(TenantId tenantId, boolean admin, LocalDate today) {
@@ -61,6 +63,17 @@ public class ComplianceWorkQueueService {
         for (ComplianceCase c : cases.findLiveForTenant(tenantId)) {
             if (!names.containsKey(c.getClientId())) continue;
             items.add(WorkQueueRules.caseItem(today, c.getClientId(), names.get(c.getClientId()), c.getTitle(), c.getStatus(), c.getSeverity(), c.getDueDate()));
+        }
+        for (ComplianceRegChange c : regChanges.findAwaitingReview(tenantId)) {
+            items.add(RegulatoryRules.reviewItem(today, c.getTitle(), c.getStatus(), c.getRaisedAt()));
+        }
+        List<ComplianceRegImpact> liveImpacts = regImpacts.findLive(tenantId);
+        Map<UUID, ComplianceRegChange> changeById = liveImpacts.isEmpty() ? Map.of()
+                : regChanges.findByIds(tenantId, liveImpacts.stream().map(ComplianceRegImpact::getChangeId).collect(Collectors.toSet())).stream().collect(Collectors.toMap(ComplianceRegChange::getId, c -> c));
+        for (ComplianceRegImpact i : liveImpacts) {
+            ComplianceRegChange c = changeById.get(i.getChangeId());
+            if (c == null || !names.containsKey(i.getClientId())) continue;
+            items.add(RegulatoryRules.impactItem(today, i.getClientId(), names.get(i.getClientId()), c.getTitle(), i.getStatus(), c.getEffectiveDate()));
         }
 
         List<WorkQueueRules.Item> ordered = WorkQueueRules.order(WorkQueueRules.visibleTo(items.stream().filter(Objects::nonNull).toList(), admin));

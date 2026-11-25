@@ -36,6 +36,8 @@ class ComplianceWorkQueueServiceTest {
     @Mock ComplianceObligationVersionRepository versions;
     @Mock ComplianceAssessmentRepository assessments;
     @Mock ComplianceCaseRepository cases;
+    @Mock ComplianceRegChangeRepository regChanges;
+    @Mock ComplianceRegImpactRepository regImpacts;
 
     private ComplianceWorkQueueService service;
     private ComplianceClient active;
@@ -43,7 +45,7 @@ class ComplianceWorkQueueServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new ComplianceWorkQueueService(clients, deadlines, documents, assignments, obligations, versions, assessments, cases);
+        service = new ComplianceWorkQueueService(clients, deadlines, documents, assignments, obligations, versions, assessments, cases, regChanges, regImpacts);
         active = ComplianceClient.create(TENANT, "Acme", null, null, null, null, USER);
         other = ComplianceClient.create(TENANT, "Other", null, null, null, null, USER);
         when(clients.findAll(eq(TENANT), eq("ACTIVE"), any(Pageable.class))).thenReturn(new PageImpl<>(List.of(active)));
@@ -54,6 +56,8 @@ class ComplianceWorkQueueServiceTest {
         when(versions.findInReview(TENANT)).thenReturn(List.of());
         when(assessments.findDraftsForTenant(TENANT)).thenReturn(List.of());
         when(cases.findLiveForTenant(TENANT)).thenReturn(List.of());
+        when(regChanges.findAwaitingReview(TENANT)).thenReturn(List.of());
+        when(regImpacts.findLive(TENANT)).thenReturn(List.of());
     }
 
     @Test @DisplayName("an overdue deadline of an active client is high, and a deadline of an inactive client is left out")
@@ -97,5 +101,24 @@ class ComplianceWorkQueueServiceTest {
         var q = service.queue(TENANT, true, TODAY);
         assertThat(q.items()).isEmpty();
         assertThat(q.counts().total()).isEqualTo(0);
+    }
+
+    @Test @DisplayName("a change waiting for review is for admins only, and a live impact of an active client shows with the change's date")
+    void regulatory() {
+        var source = UUID.randomUUID();
+        var change = ComplianceRegChange.raise(TENANT, source, "Annual return fee change", null, "AMENDED", null, TODAY.plusDays(5), null, USER, TODAY);
+        when(regChanges.findAwaitingReview(TENANT)).thenReturn(List.of(change));
+        var impact = ComplianceRegImpact.open(TENANT, change.getId(), active.getId(), UUID.randomUUID(), TODAY.plusDays(5));
+        var stranger = ComplianceRegImpact.open(TENANT, change.getId(), other.getId(), UUID.randomUUID(), TODAY.plusDays(5));
+        when(regImpacts.findLive(TENANT)).thenReturn(List.of(impact, stranger));
+        when(regChanges.findByIds(eq(TENANT), any())).thenReturn(List.of(change));
+
+        var staff = service.queue(TENANT, false, TODAY);
+        assertThat(staff.items().stream().filter(i -> i.type().equals("REGULATORY_REVIEW")).count()).isEqualTo(0L);
+        assertThat(staff.items().stream().filter(i -> i.type().equals("REGULATORY_IMPACT")).count()).isEqualTo(1L);
+        assertThat(staff.items().get(0).severity()).isEqualTo("HIGH");
+
+        var admin = service.queue(TENANT, true, TODAY);
+        assertThat(admin.items().stream().filter(i -> i.type().equals("REGULATORY_REVIEW")).count()).isEqualTo(1L);
     }
 }
