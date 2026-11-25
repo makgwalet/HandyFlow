@@ -5,6 +5,10 @@ const item = (over: Partial<QueueItem>): QueueItem => ({ type: "DEADLINE", sever
 
 describe("linkFor", () => {
   it("opens the client on the right tab", () => expect(linkFor(item({}))).toBe("/complianceservices/clients/c1?tab=deadlines"))
+  it("sends regulatory reviews to the regulatory page and impacts to the client tab", () => {
+    expect(linkFor(item({ type: "REGULATORY_REVIEW", clientId: null, tab: "regulatory" }))).toBe("/complianceservices/regulatory")
+    expect(linkFor(item({ type: "REGULATORY_IMPACT", tab: "regulatory" }))).toBe("/complianceservices/clients/c1?tab=regulatory")
+  })
   it("sends catalogue reviews to the catalogue", () => expect(linkFor(item({ type: "CATALOGUE_REVIEW", clientId: null, tab: "catalogue" }))).toBe("/complianceservices/catalogue"))
 })
 

@@ -1153,7 +1153,7 @@ export const COMPLIANCE_SERVICES_SECTIONS: ModuleSections = {
   defaultSection: 'queue',
   groups: [
     { label: 'Overview', sections: [{ id: 'queue', label: 'Work queue', icon: ListChecks }, { id: 'clients', label: 'Clients', icon: Users }] },
-    { label: 'Regulatory', sections: [{ id: 'catalogue', label: 'Obligation catalogue', icon: BookOpen }] },
+    { label: 'Regulatory', sections: [{ id: 'catalogue', label: 'Obligation catalogue', icon: BookOpen }, { id: 'regulatory', label: 'Regulatory changes', icon: Gavel }] },
     { label: 'Commercial', sections: [{ id: 'services', label: 'Service catalogue', icon: Briefcase }, { id: 'pricebook', label: 'Price book', icon: Receipt }, { id: 'quotes', label: 'Quotes', icon: FileText }, { id: 'agreements', label: 'Agreements', icon: FileSignature }, { id: 'billing', label: 'Billing', icon: CalendarClock }] },
   ],
 }

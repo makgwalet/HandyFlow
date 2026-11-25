@@ -29,6 +29,7 @@ import PriceBook from "./PriceBook"
 import QuotesPage from "./QuotesPage"
 import AgreementsPage from "./AgreementsPage"
 import BillingPage from "./BillingPage"
+import RegulatoryPage from "./RegulatoryPage"
 import ObligationCatalogue from "./ObligationCatalogue"
 import WorkQueue from "./WorkQueue"
 
@@ -199,6 +200,7 @@ export default function ComplianceServicesPage() {
           )
           case "queue": return <WorkQueue />
           case "catalogue": return <ObligationCatalogue />
+          case "regulatory": return <RegulatoryPage />
           case "services": return <ServiceCatalogue />
           case "pricebook": return <PriceBook />
           case "quotes": return <QuotesPage />
