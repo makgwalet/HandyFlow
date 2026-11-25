@@ -22,4 +22,11 @@ public interface TrainProvCohortMemberRepository extends JpaRepository<TrainProv
 
     @Query("SELECT COUNT(m) > 0 FROM TrainProvCohortMember m WHERE m.tenantId = :#{#tenantId.value} AND m.enrolmentId = :enrolmentId AND m.status = 'ACTIVE'")
     boolean liveForEnrolment(TenantId tenantId, UUID enrolmentId);
+
+    @Query("""
+        SELECT m FROM TrainProvCohortMember m WHERE m.tenantId = :#{#tenantId.value}
+        AND m.enrolmentId IN (SELECT e.id FROM TrainProvLearnerEnrolment e WHERE e.tenantId = :#{#tenantId.value} AND e.learnerId = :learnerId)
+        ORDER BY m.addedAt DESC
+        """)
+    List<TrainProvCohortMember> findForLearner(TenantId tenantId, UUID learnerId);
 }

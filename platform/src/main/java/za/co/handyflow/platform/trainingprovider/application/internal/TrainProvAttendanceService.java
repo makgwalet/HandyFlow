@@ -27,6 +27,7 @@ import java.util.function.Supplier;
 public class TrainProvAttendanceService {
 
     private static final ZoneId SAST = ZoneId.of("Africa/Johannesburg");
+    private static final String NOTE = "Counts of what was recorded. The rate leaves out excused and unrecorded sessions. It is not a result and does not say a learner is competent.";
 
     private final TrainProvAttendanceRepository attendance;
     private final TrainProvAttendanceEventRepository history;
@@ -35,6 +36,7 @@ public class TrainProvAttendanceService {
     private final TrainProvCohortMemberRepository members;
     private final TrainProvLearnerEnrolmentRepository enrolments;
     private final TrainProvLearnerRepository learners;
+    private final TrainProvProgrammeRepository programmes;
 
     public Register register(TenantId t, UUID slotId, LocalDate today) {
         TrainProvTimetableSlot s = slot(t, slotId);
@@ -112,43 +114,65 @@ public class TrainProvAttendanceService {
 
     public CohortSummary summary(TenantId t, UUID cohortId, LocalDate today) {
         TrainProvCohort c = cohort(t, cohortId);
-        List<TrainProvTimetableSlot> held = slots.findForCohort(t, cohortId).stream()
-                .filter(s -> "SCHEDULED".equals(s.getStatus()) && !s.getSlotDate().isAfter(today)).toList();
-        Map<UUID, TrainProvTimetableSlot> heldById = new HashMap<>();
-        held.forEach(s -> heldById.put(s.getId(), s));
+        List<TrainProvTimetableSlot> held = heldSlots(t, cohortId, today);
         List<TrainProvAttendance> all = attendance.findForCohort(t, cohortId);
         List<SummaryRow> rows = new ArrayList<>();
         for (TrainProvCohortMember m : members.findForCohort(t, cohortId)) {
             if (!"ACTIVE".equals(m.getStatus())) {
                 continue;
             }
-            LocalDate joined = m.getAddedAt().atZone(SAST).toLocalDate();
-            Set<UUID> expectedSlots = new HashSet<>();
-            for (TrainProvTimetableSlot s : held) {
-                if (!s.getSlotDate().isBefore(joined)) {
-                    expectedSlots.add(s.getId());
-                }
-            }
-            int attended = 0;
-            int absent = 0;
-            int excused = 0;
-            for (TrainProvAttendance a : all) {
-                if (a.getMemberId().equals(m.getId()) && expectedSlots.contains(a.getSlotId())) {
-                    if (AttendanceRules.attended(a.getStatus())) {
-                        attended++;
-                    } else if ("ABSENT".equals(a.getStatus())) {
-                        absent++;
-                    } else {
-                        excused++;
-                    }
-                }
-            }
-            AttendanceRules.Summary sum = AttendanceRules.summary(expectedSlots.size(), attended, absent, excused);
+            AttendanceRules.Summary sum = counts(m, held, all);
             Who who = who(t, m);
             rows.add(new SummaryRow(m.getId(), m.getEnrolmentId(), who.enrolmentNo, who.learnerId, who.name, sum.expected(), sum.attended(), sum.absent(),
                     sum.excused(), sum.unrecorded(), sum.ratePercent()));
         }
-        return new CohortSummary(c.getId(), "Counts of what was recorded. The rate leaves out excused and unrecorded sessions. It is not a result and does not say a learner is competent.", rows);
+        return new CohortSummary(c.getId(), NOTE, rows);
+    }
+
+    /** Every cohort a learner has been in, current and past, with counts of what was recorded. Counts only: no result, no completion. */
+    public LearnerCohorts forLearner(TenantId t, UUID learnerId, LocalDate today) {
+        learners.findForTenant(t, learnerId).orElseThrow(() -> new ResourceNotFoundException("TrainProvLearner", learnerId.toString()));
+        List<LearnerCohortRow> rows = new ArrayList<>();
+        for (TrainProvCohortMember m : members.findForLearner(t, learnerId)) {
+            TrainProvCohort c = cohort(t, m.getCohortId());
+            AttendanceRules.Summary sum = counts(m, heldSlots(t, c.getId(), today), attendance.findForCohort(t, c.getId()));
+            String enrolmentNo = enrolments.findForTenant(t, m.getEnrolmentId()).map(TrainProvLearnerEnrolment::getEnrolmentNo).orElse("");
+            String title = programmes.findForTenant(t, c.getProgrammeId()).map(TrainProvProgramme::getTitle).orElse("");
+            rows.add(new LearnerCohortRow(m.getId(), c.getId(), c.getCohortNo(), c.getName(), title, c.getStatus(), m.getStatus(), m.getRemovedReason(), enrolmentNo,
+                    c.getStartDate(), c.getEndDate(), sum.expected(), sum.attended(), sum.absent(), sum.excused(), sum.unrecorded(), sum.ratePercent()));
+        }
+        return new LearnerCohorts(NOTE, rows);
+    }
+
+    private List<TrainProvTimetableSlot> heldSlots(TenantId t, UUID cohortId, LocalDate today) {
+        return slots.findForCohort(t, cohortId).stream().filter(s -> "SCHEDULED".equals(s.getStatus()) && !s.getSlotDate().isAfter(today)).toList();
+    }
+
+    /** Slots held while the learner was in the cohort: from the day they joined, and up to the day they were removed if they were. */
+    private AttendanceRules.Summary counts(TrainProvCohortMember m, List<TrainProvTimetableSlot> held, List<TrainProvAttendance> all) {
+        LocalDate joined = m.getAddedAt().atZone(SAST).toLocalDate();
+        LocalDate left = m.getRemovedAt() == null ? null : m.getRemovedAt().atZone(SAST).toLocalDate();
+        Set<UUID> expectedSlots = new HashSet<>();
+        for (TrainProvTimetableSlot s : held) {
+            if (!s.getSlotDate().isBefore(joined) && (left == null || !s.getSlotDate().isAfter(left))) {
+                expectedSlots.add(s.getId());
+            }
+        }
+        int attended = 0;
+        int absent = 0;
+        int excused = 0;
+        for (TrainProvAttendance a : all) {
+            if (a.getMemberId().equals(m.getId()) && expectedSlots.contains(a.getSlotId())) {
+                if (AttendanceRules.attended(a.getStatus())) {
+                    attended++;
+                } else if ("ABSENT".equals(a.getStatus())) {
+                    absent++;
+                } else {
+                    excused++;
+                }
+            }
+        }
+        return AttendanceRules.summary(expectedSlots.size(), attended, absent, excused);
     }
 
     // ---- lookups ----

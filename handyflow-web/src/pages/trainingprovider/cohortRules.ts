@@ -20,6 +20,11 @@ export type RegisterRow = { memberId: string; enrolmentId: string; enrolmentNo: 
 export type Register = { slotId: string; cohortId: string; cohortName: string; title: string; slotDate: string; startTime: string; endTime: string; slotStatus: string; canRecord: boolean; cannotRecordBecause: string | null; rows: RegisterRow[] }
 export type SummaryRow = { memberId: string; enrolmentId: string; enrolmentNo: string; learnerId: string | null; learnerName: string; expected: number; attended: number; absent: number; excused: number; unrecorded: number; ratePercent: number | null }
 export type CohortSummary = { cohortId: string; note: string; rows: SummaryRow[] }
+export type LearnerCohortRow = {
+  memberId: string; cohortId: string; cohortNo: string; cohortName: string; programmeTitle: string; cohortStatus: string; memberStatus: string; removedReason: string | null
+  enrolmentNo: string; startDate: string; endDate: string | null; expected: number; attended: number; absent: number; excused: number; unrecorded: number; ratePercent: number | null
+}
+export type LearnerCohorts = { note: string; rows: LearnerCohortRow[] }
 export type HistoryLine = { id: string; action: string; fromStatus: string | null; toStatus: string; reason: string | null; actedBy: string; actedAt: string }
 
 export const MIN_REASON = 10
@@ -124,4 +129,11 @@ export const correctionBody = (f: CorrectionForm) => ({ status: f.status, note: 
 export const ATTENDANCE_NOTE = "Counts of what was recorded. The rate leaves out excused and unrecorded sessions. It is not a result and does not say a learner is competent."
 export function rateText(r: Pick<SummaryRow, "ratePercent">): string {
   return r.ratePercent === null ? "no rate yet" : `${r.ratePercent}% of recorded sessions`
+}
+
+/** One line for a learner's cohort: where they are, and counts of what was recorded. Never a result or a completion. */
+export function learnerCohortLine(r: LearnerCohortRow): string {
+  const where = r.memberStatus === "ACTIVE" ? "In the cohort" : `Left the cohort${r.removedReason ? `: ${r.removedReason}` : ""}`
+  const counts = `${r.attended} attended, ${r.absent} absent, ${r.excused} excused, ${r.unrecorded} not recorded of ${r.expected} sessions held`
+  return `${where}. ${counts}, ${rateText(r)}.`
 }

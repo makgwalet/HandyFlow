@@ -11,6 +11,7 @@ import {
 import { Badge, Field, Notice } from "./tpUi"
 import { errText, ghost, input, muted, solid, card, todayIso, unwrap, fmtDate } from "./tpStyle"
 import { LRN, useActiveProgrammes, useClients, useSites } from "./tpApi"
+import TrainProvLearnerCohortsSection from "./TrainProvLearnerCohorts"
 
 export function LearnerFormPanel({ initial, onSaved, onCancel }: { initial?: Learner; onSaved: (l: Learner) => void; onCancel: () => void }) {
   const { data: clients = [] } = useClients()
@@ -216,6 +217,8 @@ export default function TrainProvLearnerDetail({ id, canManage, isAdmin, onBack 
       )}
       <strong>Enrolments</strong>
       {data.enrolments.length === 0 ? <div style={muted}>Not enrolled on anything yet.</div> : data.enrolments.map(e => <EnrolmentCard key={e.id} e={e} canManage={canManage} onChanged={refresh} />)}
+      <strong>Cohorts and attendance</strong>
+      <TrainProvLearnerCohortsSection learnerId={id} />
       <strong>Applications</strong>
       {data.applications.length === 0 ? <div style={muted}>No applications.</div> : data.applications.map(a => <ApplicationCard key={a.id} a={a} canManage={canManage} isAdmin={isAdmin} onChanged={refresh} onEnrol={startEnrol} />)}
     </div>

@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest"
 import {
   attendanceTone, cohortBody, cohortProblem, correctionBody, correctionProblem, emptyCohort, emptySlot, emptyVenue, rateText, registerBody, registerProblem, slotBody, slotProblem,
-  standingWarning, transitionBody, transitionProblem, venueBody, venueProblem,
+  learnerCohortLine, standingWarning, transitionBody, transitionProblem, venueBody, venueProblem,
 } from "./cohortRules"
 
 const cohort = { startDate: "2027-02-01", endDate: "2027-06-30" }
@@ -78,5 +78,19 @@ describe("register", () => {
     expect(rateText({ ratePercent: 75 })).toBe("75% of recorded sessions")
     expect(attendanceTone("ABSENT")).toBe("bad")
     expect(attendanceTone(null)).toBe("neutral")
+  })
+})
+
+describe("learner cohort line", () => {
+  const row = { memberId: "m", cohortId: "c", cohortNo: "COH-1", cohortName: "Feb", programmeTitle: "P", cohortStatus: "RUNNING", memberStatus: "ACTIVE", removedReason: null, enrolmentNo: "ENR-1", startDate: "2027-02-01", endDate: null, expected: 4, attended: 3, absent: 1, excused: 0, unrecorded: 0, ratePercent: 75 }
+  it("states counts and never a result", () => {
+    const line = learnerCohortLine(row)
+    expect(line).toContain("3 attended, 1 absent")
+    expect(line).toContain("75% of recorded sessions")
+    expect(line.toLowerCase()).not.toContain("competent")
+    expect(line.toLowerCase()).not.toContain("complete")
+  })
+  it("says when a learner left and why", () => {
+    expect(learnerCohortLine({ ...row, memberStatus: "REMOVED", removedReason: "Moved to the next intake", ratePercent: null })).toContain("Left the cohort: Moved to the next intake")
   })
 })

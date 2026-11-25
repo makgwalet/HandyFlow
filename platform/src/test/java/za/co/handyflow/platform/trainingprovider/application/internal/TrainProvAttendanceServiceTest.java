@@ -36,6 +36,7 @@ class TrainProvAttendanceServiceTest {
     @Mock TrainProvCohortMemberRepository members;
     @Mock TrainProvLearnerEnrolmentRepository enrolments;
     @Mock TrainProvLearnerRepository learners;
+    @Mock TrainProvProgrammeRepository programmes;
     @InjectMocks TrainProvAttendanceService service;
 
     private final UUID cohortId = UUID.randomUUID();
@@ -160,5 +161,46 @@ class TrainProvAttendanceServiceTest {
         assertThat(row.unrecorded()).isEqualTo(1);
         assertThat(row.ratePercent()).isEqualTo(100);
         assertThat(sum.note()).contains("not a result");
+    }
+
+    @Test
+    void aLearnerPageListsEveryCohortWithCountsAndNeverAResult() {
+        LocalDate far = LocalDate.of(2099, 2, 10);
+        UUID learnerId = UUID.randomUUID();
+        TrainProvLearner learner = mock(TrainProvLearner.class);
+        TrainProvCohort c = mock(TrainProvCohort.class);
+        when(c.getId()).thenReturn(cohortId);
+        when(c.getCohortNo()).thenReturn("COH-00001");
+        when(c.getName()).thenReturn("Feb intake");
+        when(c.getProgrammeId()).thenReturn(UUID.randomUUID());
+        when(c.getStatus()).thenReturn("RUNNING");
+        TrainProvCohortMember active = member();
+        TrainProvCohortMember left = member();
+        left.remove("Moved to the next intake", USER);
+        TrainProvTimetableSlot held = TrainProvTimetableSlot.create(TENANT, cohortId, "Day 1", far.minusDays(1), LocalTime.of(9, 0), LocalTime.of(11, 0), null, null, null, USER);
+        when(learners.findForTenant(TENANT, learnerId)).thenReturn(Optional.of(learner));
+        when(members.findForLearner(TENANT, learnerId)).thenReturn(List.of(active, left));
+        when(cohorts.findForTenant(TENANT, cohortId)).thenReturn(Optional.of(c));
+        when(slots.findForCohort(TENANT, cohortId)).thenReturn(List.of(held));
+        when(attendance.findForCohort(TENANT, cohortId)).thenReturn(List.of(TrainProvAttendance.create(TENANT, held.getId(), active.getId(), "LATE", null, USER)));
+        LearnerCohorts out = service.forLearner(TENANT, learnerId, far);
+        assertThat(out.rows()).hasSize(2);
+        LearnerCohortRow first = out.rows().get(0);
+        assertThat(first.memberStatus()).isEqualTo("ACTIVE");
+        assertThat(first.expected()).isEqualTo(1);
+        assertThat(first.attended()).isEqualTo(1);
+        assertThat(first.ratePercent()).isEqualTo(100);
+        LearnerCohortRow second = out.rows().get(1);
+        assertThat(second.memberStatus()).isEqualTo("REMOVED");
+        assertThat(second.expected()).isZero();
+        assertThat(second.removedReason()).isEqualTo("Moved to the next intake");
+        assertThat(out.note()).contains("not a result");
+    }
+
+    @Test
+    void anUnknownLearnerIsNotFound() {
+        UUID learnerId = UUID.randomUUID();
+        when(learners.findForTenant(TENANT, learnerId)).thenReturn(Optional.empty());
+        assertThatThrownBy(() -> service.forLearner(TENANT, learnerId, DAY)).isInstanceOf(za.co.handyflow.platform.shared.ResourceNotFoundException.class);
     }
 }

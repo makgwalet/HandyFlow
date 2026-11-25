@@ -33,6 +33,7 @@ beforeEach(() => {
   get.mockImplementation((url: string) => {
     let data: unknown = []
     if (url.endsWith("/learners")) data = [learner()]
+    else if (url.endsWith("/learners/l1/cohorts")) data = { note: "Counts of what was recorded. It is not a result.", rows: [{ memberId: "m1", cohortId: "c1", cohortNo: "COH-00001", cohortName: "Feb intake", programmeTitle: "Safety skills", cohortStatus: "RUNNING", memberStatus: "ACTIVE", removedReason: null, enrolmentNo: "ENR-00001", startDate: "2027-02-01", endDate: null, expected: 4, attended: 3, absent: 1, excused: 0, unrecorded: 0, ratePercent: 75 }] }
     else if (url.endsWith("/learners/l1")) data = { learner: learner({ idNumber: "A1234567" }), applications: [application()], enrolments: [enrolment()] }
     else if (url.endsWith("/applications")) data = [application()]
     else if (url.endsWith("/learner-enrolments")) data = [enrolment()]
@@ -70,6 +71,13 @@ describe("learners screen", () => {
     fireEvent.change(screen.getByLabelText("Entry requirements met"), { target: { value: "no" } })
     expect(screen.getByText(/Only an administrator can accept a learner/)).toBeTruthy()
     expect(screen.queryByLabelText("Entry override reason")).toBeNull()
+  })
+  it("shows the learner's cohorts with attendance counts and no result", async () => {
+    wrap(<TrainProvLearnersTab />)
+    fireEvent.click(await screen.findByText("Test Learner"))
+    expect(await screen.findByText("Feb intake")).toBeTruthy()
+    expect(screen.getByText(/3 attended, 1 absent, 0 excused, 0 not recorded of 4 sessions held, 75% of recorded sessions/)).toBeTruthy()
+    expect(screen.getByText(/It is not a result/)).toBeTruthy()
   })
   it("a new learner needs a valid identity before anything is sent", async () => {
     wrap(<TrainProvLearnersTab />)

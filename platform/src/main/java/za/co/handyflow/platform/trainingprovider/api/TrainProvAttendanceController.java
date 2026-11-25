@@ -70,4 +70,11 @@ public class TrainProvAttendanceController {
         featureGuard.requireModule("trainingprovider");
         return ResponseEntity.ok(ApiResponse.success(service.summary(TenantContext.getTenantIdAsObject(), cohortId, today())));
     }
+
+    @GetMapping("/learners/{learnerId}/cohorts")
+    @PreAuthorize(READ)
+    public ResponseEntity<ApiResponse<LearnerCohorts>> learnerCohorts(@PathVariable UUID learnerId) {
+        featureGuard.requireModule("trainingprovider");
+        return ResponseEntity.ok(ApiResponse.success(service.forLearner(TenantContext.getTenantIdAsObject(), learnerId, today())));
+    }
 }

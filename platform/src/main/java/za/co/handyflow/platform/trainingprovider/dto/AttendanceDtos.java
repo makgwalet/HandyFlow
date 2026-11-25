@@ -41,4 +41,12 @@ public final class AttendanceDtos {
 
     public record CohortSummary(UUID cohortId, String note, List<SummaryRow> rows) {
     }
+
+    public record LearnerCohortRow(UUID memberId, UUID cohortId, String cohortNo, String cohortName, String programmeTitle, String cohortStatus,
+                                   String memberStatus, String removedReason, String enrolmentNo, LocalDate startDate, LocalDate endDate, int expected,
+                                   int attended, int absent, int excused, int unrecorded, Integer ratePercent) {
+    }
+
+    public record LearnerCohorts(String note, List<LearnerCohortRow> rows) {
+    }
 }
