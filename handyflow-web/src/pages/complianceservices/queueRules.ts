@@ -10,6 +10,7 @@ export const TYPE_LABELS: Record<string, string> = {
   REGULATORY_REVIEW: "Regulatory changes to review", REGULATORY_IMPACT: "Regulatory changes to deal with",
   QUALITY_REVIEW: "Reviews to finish", QUALITY_REWORK: "Work sent back",
   PORTAL_QUERY: "Client queries", DOCUMENT_REQUEST: "Documents we asked for",
+  PROVIDER_ACCREDITATION: "Provider accreditations", PROVIDER_WORK: "Provider work", PROVIDER_DELIVERABLE: "Provider items to review",
 }
 export const typeLabel = (t: string) => TYPE_LABELS[t] ?? t
 
@@ -19,6 +20,7 @@ export const severityLabel = (s: string) => SEVERITY_LABELS[s] ?? s
 /** Where to go to deal with an item. Catalogue reviews are not about one client. */
 export function linkFor(i: Pick<QueueItem, "clientId" | "tab" | "type">): string {
   if (i.type === "REGULATORY_REVIEW") return "/complianceservices/regulatory"
+  if (i.type.startsWith("PROVIDER_") && !i.clientId) return "/complianceservices/providers"
   if (i.type === "CATALOGUE_REVIEW" || !i.clientId) return "/complianceservices/catalogue"
   return `/complianceservices/clients/${i.clientId}?tab=${i.tab}`
 }

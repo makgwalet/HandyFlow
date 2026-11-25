@@ -34,6 +34,7 @@ import QualityPage from "./QualityPage"
 import RemindersPage from "./RemindersPage"
 import RequestsPage from "./RequestsPage"
 import TimePage from "./TimePage"
+import ProvidersPage from "./ProvidersPage"
 import ProfitabilityPage from "./ProfitabilityPage"
 import PortfolioPage from "./PortfolioPage"
 import DashboardPage from "./DashboardPage"
@@ -212,6 +213,7 @@ export default function ComplianceServicesPage() {
           case "quality": return <QualityPage />
           case "requests": return <RequestsPage />
           case "time": return <TimePage />
+          case "providers": return <ProvidersPage />
           case "profitability": return <ProfitabilityPage />
           case "reminders": return <RemindersPage />
           case "portfolio": return <PortfolioPage />
