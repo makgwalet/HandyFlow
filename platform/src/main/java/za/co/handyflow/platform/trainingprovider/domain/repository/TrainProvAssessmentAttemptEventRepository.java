@@ -1,0 +1,15 @@
+package za.co.handyflow.platform.trainingprovider.domain.repository;
+
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import za.co.handyflow.platform.shared.TenantId;
+import za.co.handyflow.platform.trainingprovider.domain.model.TrainProvAssessmentAttemptEvent;
+
+import java.util.List;
+import java.util.UUID;
+
+public interface TrainProvAssessmentAttemptEventRepository extends JpaRepository<TrainProvAssessmentAttemptEvent, UUID> {
+
+    @Query("SELECT e FROM TrainProvAssessmentAttemptEvent e WHERE e.tenantId = :#{#tenantId.value} AND e.attemptId = :attemptId ORDER BY e.actedAt")
+    List<TrainProvAssessmentAttemptEvent> findForAttempt(TenantId tenantId, UUID attemptId);
+}
