@@ -6,7 +6,7 @@ import { useState } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import { usePermissions } from "../../hooks/usePermission"
-import { batchStatus, columnLabel, discardProblem, fileProblem, kindLabel, KINDS, rowStatus, summary, TEMPLATE, type ImportBatch, type ImportDetail } from "./importRules"
+import { batchStatus, columnLabel, discardProblem, fileProblem, kindLabel, KIND_HELP, KINDS, rowStatus, summary, TEMPLATE, type ImportBatch, type ImportDetail } from "./importRules"
 
 const B = "/api/v1/compliance-services/imports"
 const unwrap = <T,>(r: { data: unknown }): T => ((r.data as { data?: T })?.data ?? r.data) as T
@@ -61,7 +61,7 @@ export default function ImportPage() {
         <div style={{ ...card, display: "grid", gap: 8, background: "var(--hf-surface-muted)" }}>
           <label style={{ fontSize: 12, fontWeight: 600 }}>What is in the file
             <select aria-label="What is in the file" style={input} value={kind} onChange={e => setKind(e.target.value)}>{Object.entries(KINDS).map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select></label>
-          <div style={{ fontSize: 12, color: "var(--hf-text-muted)" }}>The first row names the columns: <code>{TEMPLATE[kind]}</code>. {kind === "CLIENTS" ? "Only the name is required. Registration, tax and other profile details are not imported." : "Client, authority and type are required. The client must already exist and match by name. Dates are yyyy-mm-dd or dd/mm/yyyy."}</div>
+          <div style={{ fontSize: 12, color: "var(--hf-text-muted)" }}>The first row names the columns: <code>{TEMPLATE[kind]}</code>. {KIND_HELP[kind]}</div>
           <input aria-label="CSV file" type="file" accept=".csv,text/csv" onChange={e => setFile(e.target.files?.[0] ?? null)} />
           <div><button style={solid} disabled={busy} onClick={send}>Check the file</button></div>
         </div>

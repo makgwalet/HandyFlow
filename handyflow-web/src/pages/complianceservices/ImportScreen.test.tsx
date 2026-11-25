@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
 import { render, screen, fireEvent, waitFor, cleanup } from "@testing-library/react"
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import ImportPage from "./ImportPage"
-import { discardProblem, fileProblem, summary } from "./importRules"
+import { discardProblem, fileProblem, kindLabel, summary, TEMPLATE } from "./importRules"
 
 const get = vi.fn()
 const post = vi.fn()
@@ -80,5 +80,25 @@ describe("import page", () => {
     fireEvent.click(screen.getByText("Set aside"))
     await waitFor(() => expect(document.body.textContent).toContain("at least 10 characters"))
     expect(post).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe("deadlines import", () => {
+  it("is offered, with its columns and plain wording about what happens", async () => {
+    expect(kindLabel("DEADLINES")).toBe("Deadlines")
+    expect(TEMPLATE.DEADLINES).toBe("client,type,due,description")
+    wrap(<ImportPage />)
+    fireEvent.change(await screen.findByLabelText("What is in the file"), { target: { value: "DEADLINES" } })
+    expect(screen.getByText("client,type,due,description")).toBeTruthy()
+    expect(screen.getByText(/past dates come in as pending/)).toBeTruthy()
+  })
+
+  it("sends the file as deadlines", async () => {
+    post.mockResolvedValue({ data: { data: detail({ kind: "DEADLINES" }) } })
+    wrap(<ImportPage />)
+    fireEvent.change(await screen.findByLabelText("What is in the file"), { target: { value: "DEADLINES" } })
+    chooseFile("deadlines.csv")
+    fireEvent.click(screen.getByText("Check the file"))
+    await waitFor(() => expect(post).toHaveBeenCalledWith("/api/v1/compliance-services/imports/preview?kind=DEADLINES", expect.anything(), expect.anything()))
   })
 })

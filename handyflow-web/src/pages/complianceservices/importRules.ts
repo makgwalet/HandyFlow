@@ -8,7 +8,7 @@ export type ImportRow = { rowNumber: number; fields: string[]; status: string; m
 export type ImportDetail = { batch: ImportBatch; columns: string[]; rows: ImportRow[]; rowsTruncated: boolean }
 
 export const MAX_BYTES = 2_000_000
-export const KINDS: Record<string, string> = { CLIENTS: "Clients", REGISTRATIONS: "Registrations" }
+export const KINDS: Record<string, string> = { CLIENTS: "Clients", REGISTRATIONS: "Registrations", DEADLINES: "Deadlines" }
 export const kindLabel = (k: string) => KINDS[k] ?? k
 
 export const BATCH_STATUS: Record<string, string> = { PREVIEWED: "Checked, not imported", COMMITTED: "Imported", DISCARDED: "Set aside" }
@@ -18,13 +18,20 @@ export const ROW_STATUS: Record<string, string> = { OK: "Ready", DUPLICATE: "Alr
 export const rowStatus = (s: string) => ROW_STATUS[s] ?? s
 
 export const COLUMN_LABELS: Record<string, string> = {
-  name: "Name", email: "Email", phone: "Phone", notes: "Notes", client: "Client", authority: "Authority", type: "Type", number: "Number", issued: "Issued", expiry: "Expires",
+  name: "Name", email: "Email", phone: "Phone", notes: "Notes", client: "Client", authority: "Authority", type: "Type", number: "Number", issued: "Issued", expiry: "Expires", due: "Due", description: "Description",
 }
 export const columnLabel = (c: string) => COLUMN_LABELS[c] ?? c
 
 export const TEMPLATE: Record<string, string> = {
   CLIENTS: "name,email,phone,notes",
   REGISTRATIONS: "client,authority,type,number,issued,expiry,notes",
+  DEADLINES: "client,type,due,description",
+}
+
+export const KIND_HELP: Record<string, string> = {
+  CLIENTS: "Only the name is required. Registration, tax and other profile details are not imported.",
+  REGISTRATIONS: "Client, authority and type are required. The client must already exist and match by name. Dates are yyyy-mm-dd or dd/mm/yyyy.",
+  DEADLINES: "Client, type and due date are required. The client must already exist and match by name. Dates are yyyy-mm-dd or dd/mm/yyyy. Deadlines the client already has are set aside, and past dates come in as pending, so they show as overdue.",
 }
 
 /** What is wrong with the file before it is sent, or null. */
