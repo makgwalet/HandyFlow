@@ -15,6 +15,7 @@ import za.co.handyflow.platform.billing.FeatureGuard;
 import za.co.handyflow.platform.payrollbureau.application.internal.PayEmployeeChangeService;
 import za.co.handyflow.platform.payrollbureau.application.internal.PayGroupService;
 import za.co.handyflow.platform.payrollbureau.dto.PayGroupDtos.*;
+import za.co.handyflow.platform.payrollbureau.dto.PayComponentDtos.*;
 import za.co.handyflow.platform.payrollbureau.application.internal.PayrollBureauService;
 import za.co.handyflow.platform.payrollbureau.dto.*;
 import za.co.handyflow.platform.shared.ApiResponse;
@@ -41,6 +42,7 @@ public class PayrollBureauController {
     private final FeatureGuard featureGuard;
     private final PayEmployeeChangeService changeService;
     private final PayGroupService groupService;
+    private final za.co.handyflow.platform.payrollbureau.application.internal.PayComponentService componentService;
 
     // ── Practice profile ─────────────────────────────────────────────────────
 
@@ -176,6 +178,82 @@ public class PayrollBureauController {
         featureGuard.requireModule("payrollbureau");
         return ResponseEntity.ok(ApiResponse.success(
                 bureauService.getPayslips(TenantContext.getTenantIdAsObject(), payRunId)));
+    }
+
+    @GetMapping("/pay-runs/{payRunId}/payslips/{payslipId}/lines")
+    @PreAuthorize("hasAnyAuthority('PAYROLLBUREAU_READ','PAYROLLBUREAU_MANAGE','PAYROLLBUREAU_ADMIN')")
+    @Operation(summary = "The component lines (overtime, bonus, deductions) a payslip carries")
+    public ResponseEntity<ApiResponse<List<PayslipLineResponse>>> getPayslipLines(
+            @PathVariable UUID payRunId, @PathVariable UUID payslipId) {
+        featureGuard.requireModule("payrollbureau");
+        return ResponseEntity.ok(ApiResponse.success(
+                bureauService.getPayslipLines(TenantContext.getTenantIdAsObject(), payRunId, payslipId)));
+    }
+
+    @GetMapping("/pay-components")
+    @PreAuthorize("hasAnyAuthority('PAYROLLBUREAU_READ','PAYROLLBUREAU_MANAGE','PAYROLLBUREAU_ADMIN')")
+    @Operation(summary = "The component catalogue (the standard set is made on first use)")
+    public ResponseEntity<ApiResponse<List<PayComponentResponse>>> getPayComponents() {
+        featureGuard.requireModule("payrollbureau");
+        return ResponseEntity.ok(ApiResponse.success(componentService.list(TenantContext.getTenantIdAsObject())));
+    }
+
+    @PostMapping("/pay-components")
+    @PreAuthorize("hasAnyAuthority('PAYROLLBUREAU_MANAGE','PAYROLLBUREAU_ADMIN')")
+    public ResponseEntity<ApiResponse<PayComponentResponse>> createPayComponent(@RequestBody CreatePayComponentRequest req) {
+        featureGuard.requireModule("payrollbureau");
+        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(
+                componentService.create(TenantContext.getTenantIdAsObject(), req)));
+    }
+
+    @PostMapping("/pay-components/{componentId}/archive")
+    @PreAuthorize("hasAnyAuthority('PAYROLLBUREAU_MANAGE','PAYROLLBUREAU_ADMIN')")
+    public ResponseEntity<ApiResponse<PayComponentResponse>> archivePayComponent(@PathVariable UUID componentId) {
+        featureGuard.requireModule("payrollbureau");
+        return ResponseEntity.ok(ApiResponse.success(componentService.archive(TenantContext.getTenantIdAsObject(), componentId)));
+    }
+
+    @GetMapping("/clients/{clientId}/employees/{employeeId}/components")
+    @PreAuthorize("hasAnyAuthority('PAYROLLBUREAU_READ','PAYROLLBUREAU_MANAGE','PAYROLLBUREAU_ADMIN')")
+    @Operation(summary = "What the employee gets or has taken every pay period, beyond salary, travel, pension and medical")
+    public ResponseEntity<ApiResponse<List<EmployeeComponentResponse>>> getEmployeeComponents(
+            @PathVariable UUID clientId, @PathVariable UUID employeeId) {
+        featureGuard.requireModule("payrollbureau");
+        return ResponseEntity.ok(ApiResponse.success(
+                componentService.forEmployee(TenantContext.getTenantIdAsObject(), clientId, employeeId)));
+    }
+
+    @PutMapping("/clients/{clientId}/employees/{employeeId}/components")
+    @PreAuthorize("hasAnyAuthority('PAYROLLBUREAU_MANAGE','PAYROLLBUREAU_ADMIN')")
+    @Operation(summary = "Set a recurring component for an employee (amount 0 or none removes it)")
+    public ResponseEntity<ApiResponse<List<EmployeeComponentResponse>>> setEmployeeComponent(
+            @PathVariable UUID clientId, @PathVariable UUID employeeId, @Valid @RequestBody SetEmployeeComponentRequest req) {
+        featureGuard.requireModule("payrollbureau");
+        return ResponseEntity.ok(ApiResponse.success(
+                componentService.setForEmployee(TenantContext.getTenantIdAsObject(), clientId, employeeId, req)));
+    }
+
+    @GetMapping("/pay-runs/{payRunId}/items")
+    @PreAuthorize("hasAnyAuthority('PAYROLLBUREAU_READ','PAYROLLBUREAU_MANAGE','PAYROLLBUREAU_ADMIN')")
+    public ResponseEntity<ApiResponse<List<RunItemResponse>>> getRunItems(@PathVariable UUID payRunId) {
+        featureGuard.requireModule("payrollbureau");
+        return ResponseEntity.ok(ApiResponse.success(componentService.itemsOfRun(TenantContext.getTenantIdAsObject(), payRunId)));
+    }
+
+    @PutMapping("/pay-runs/{payRunId}/items")
+    @PreAuthorize("hasAnyAuthority('PAYROLLBUREAU_MANAGE','PAYROLLBUREAU_ADMIN')")
+    @Operation(summary = "Add or change a one-off item for an employee in a draft pay run (amount 0 or none removes it)")
+    public ResponseEntity<ApiResponse<List<RunItemResponse>>> setRunItem(
+            @PathVariable UUID payRunId, @Valid @RequestBody SetRunItemRequest req) {
+        featureGuard.requireModule("payrollbureau");
+        return ResponseEntity.ok(ApiResponse.success(componentService.setItem(TenantContext.getTenantIdAsObject(), payRunId, req)));
+    }
+
+    @DeleteMapping("/pay-runs/{payRunId}/items/{itemId}")
+    @PreAuthorize("hasAnyAuthority('PAYROLLBUREAU_MANAGE','PAYROLLBUREAU_ADMIN')")
+    public ResponseEntity<ApiResponse<List<RunItemResponse>>> removeRunItem(@PathVariable UUID payRunId, @PathVariable UUID itemId) {
+        featureGuard.requireModule("payrollbureau");
+        return ResponseEntity.ok(ApiResponse.success(componentService.removeItem(TenantContext.getTenantIdAsObject(), payRunId, itemId)));
     }
 
     @GetMapping("/pay-runs/{payRunId}/payslips/{payslipId}/calculation")

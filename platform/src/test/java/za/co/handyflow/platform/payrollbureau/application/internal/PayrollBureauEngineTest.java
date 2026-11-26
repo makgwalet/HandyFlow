@@ -120,4 +120,44 @@ class PayrollBureauEngineTest {
         engine.freeze(slip, e, engine.requireRules(2027), d("260000"), 52, d("15000"));
         org.mockito.Mockito.verify(slip).recordPeriodic(52, d("2712.00"));
     }
+
+    @Test
+    void aTaxableExtraIsTaxedWithTheMonthsPayAndLeavesTheBaseSalaryShownSeparately() {
+        var e = employee("20000", "0");
+        var extras = new za.co.handyflow.platform.payrollbureau.domain.rules.PayComponentRules.Totals(
+                d("2000"), BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO);
+        var withExtra = engine.calculate(e, engine.requireRules(2027), d("264000"), 12, BigDecimal.ZERO, extras);
+        var without = engine.calculate(e, engine.requireRules(2027), d("240000"), 12, BigDecimal.ZERO);
+        assertEquals(0, d("20000").compareTo(withExtra.monthlySalary()));
+        assertTrue(withExtra.payeAmount().compareTo(without.payeAmount()) > 0);
+        // R22 000 a month is above the UIF ceiling, so UIF is the same either way: R177.12
+        assertEquals(0, d("177.12").compareTo(withExtra.uifEmployee()));
+    }
+
+    @Test
+    void anAfterTaxDeductionAndANonTaxableEarningDoNotChangePaye() {
+        var e = employee("20000", "0");
+        var extras = new za.co.handyflow.platform.payrollbureau.domain.rules.PayComponentRules.Totals(
+                BigDecimal.ZERO, BigDecimal.ZERO, d("500"), d("750"));
+        var r = engine.calculate(e, engine.requireRules(2027), d("240000"), 12, BigDecimal.ZERO, extras);
+        assertEquals(0, d("2115.00").compareTo(r.payeAmount()));
+    }
+
+    @Test
+    void aBonusAddsExtraTaxOnTopOfTheMonthsPaye() {
+        var e = employee("20000", "0");
+        var extras = new za.co.handyflow.platform.payrollbureau.domain.rules.PayComponentRules.Totals(
+                BigDecimal.ZERO, d("10000"), BigDecimal.ZERO, BigDecimal.ZERO);
+        var r = engine.calculate(e, engine.requireRules(2027), d("240000"), 12, BigDecimal.ZERO, extras);
+        assertTrue(r.payeAmount().compareTo(d("2115.00")) > 0);
+    }
+
+    @Test
+    void recurringTaxableExtrasCountTowardsTheAnnualPayroll() {
+        var emp = employee("5000", "0");
+        java.util.UUID id = java.util.UUID.randomUUID();
+        when(emp.getId()).thenReturn(id);
+        when(emp.getPayGroupId()).thenReturn(null);
+        assertEquals(0, d("72000").compareTo(engine.annualPayroll(List.of(emp), g -> 12, java.util.Map.of(id, d("1000")))));
+    }
 }

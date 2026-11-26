@@ -50,6 +50,12 @@ public class PayBureauPayslipPdfGenerator {
     private static final DateTimeFormatter DATE_FMT = DateTimeFormatter.ofPattern("dd MMM yyyy");
 
     public byte[] generate(Payslip payslip, PayEmployee employee, PayRun payRun, PayClient client, byte[] logoBytes) {
+        return generate(payslip, employee, payRun, client, logoBytes, java.util.List.of());
+    }
+
+    /** Component lines (overtime, bonus, reimbursements, loan repayments) are printed under earnings and deductions. */
+    public byte[] generate(Payslip payslip, PayEmployee employee, PayRun payRun, PayClient client, byte[] logoBytes,
+                           java.util.List<za.co.handyflow.platform.payrollbureau.domain.model.PayslipLine> lines) {
         Document doc = new Document(PageSize.A4, 40, 40, 50, 50);
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         try {
@@ -96,6 +102,9 @@ public class PayBureauPayslipPdfGenerator {
             earnings.setWidthPercentage(100);
             addAmountRow(earnings, "Gross Salary", payslip.getGrossSalary());
             addAmountRow(earnings, "Travel Allowance", payslip.getTravelAllowance());
+            for (var l : lines) {
+                if (!"DEDUCTION".equals(l.getRole())) addAmountRow(earnings, l.getName(), l.getAmount());
+            }
             addAmountRow(earnings, "Total Earnings", payslip.getTotalEarnings());
             doc.add(earnings);
             doc.add(new Paragraph(" "));
@@ -108,6 +117,9 @@ public class PayBureauPayslipPdfGenerator {
             addAmountRow(deductions, "UIF (Employee)", payslip.getUifEmployee());
             addAmountRow(deductions, "Medical Aid", payslip.getMedicalAid());
             addAmountRow(deductions, "Pension", payslip.getPension());
+            for (var l : lines) {
+                if ("DEDUCTION".equals(l.getRole())) addAmountRow(deductions, l.getName(), l.getAmount());
+            }
             addAmountRow(deductions, "Total Deductions", payslip.getTotalDeductions());
             doc.add(deductions);
             doc.add(new Paragraph(" "));

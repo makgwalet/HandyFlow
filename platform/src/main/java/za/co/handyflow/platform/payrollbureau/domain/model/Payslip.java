@@ -76,6 +76,8 @@ public class Payslip {
     @Column(name = "input_annual_payroll", precision = 15, scale = 2) private BigDecimal inputAnnualPayroll;
     @Column(name = "uif_base", precision = 15, scale = 2) private BigDecimal uifBase;
     @Column(name = "input_periods_per_year") private Integer inputPeriodsPerYear;
+    @Column(name = "extra_earnings", nullable = false, precision = 15, scale = 2) private BigDecimal extraEarnings = BigDecimal.ZERO;
+    @Column(name = "extra_deductions", nullable = false, precision = 15, scale = 2) private BigDecimal extraDeductions = BigDecimal.ZERO;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
@@ -117,6 +119,18 @@ public class Payslip {
         this.inputDateOfBirth = dateOfBirth;
         this.inputMedicalMembers = medicalMembers;
         this.inputAnnualPayroll = annualPayroll;
+    }
+
+    /**
+     * Pay components (slice 1e): earnings beyond salary and travel (taxable extras, bonus, non-taxable) and after-tax deductions.
+     * Total earnings, total deductions and net pay are worked out again to include them.
+     */
+    public void applyComponents(BigDecimal extraEarnings, BigDecimal extraDeductions) {
+        this.extraEarnings = extraEarnings;
+        this.extraDeductions = extraDeductions;
+        this.totalEarnings = grossSalary.add(travelAllowance).add(extraEarnings);
+        this.totalDeductions = payeAmount.add(uifEmployee).add(medicalAid).add(pension).add(extraDeductions);
+        this.netPay = this.totalEarnings.subtract(this.totalDeductions);
     }
 
     /** Periodic pay (slice 1d): how many periods a year the PAYE was annualised by, and what UIF was charged on. */

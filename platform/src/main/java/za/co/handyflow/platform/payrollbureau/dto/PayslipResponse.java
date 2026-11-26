@@ -8,5 +8,6 @@ public record PayslipResponse(
         BigDecimal grossSalary, BigDecimal travelAllowance, BigDecimal totalEarnings,
         BigDecimal payeAmount, BigDecimal uifEmployee, BigDecimal uifEmployer, BigDecimal sdlAmount,
         BigDecimal medicalAid, BigDecimal pension, BigDecimal totalDeductions, BigDecimal netPay,
-        BigDecimal taxableIncome, int taxYear
+        BigDecimal taxableIncome, int taxYear,
+        BigDecimal extraEarnings, BigDecimal extraDeductions
 ) {}

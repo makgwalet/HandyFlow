@@ -5,6 +5,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 import za.co.handyflow.platform.payrollbureau.domain.model.PayEmployee;
 import za.co.handyflow.platform.payrollbureau.domain.model.Payslip;
+import za.co.handyflow.platform.payrollbureau.domain.rules.PayComponentRules;
 import za.co.handyflow.platform.payrollbureau.domain.rules.RulesFingerprint;
 import za.co.handyflow.platform.shared.HandyFlowException;
 import za.co.handyflow.platform.shared.SarsPayeCalculator;
@@ -61,7 +62,12 @@ public class PayrollBureauEngine {
 
     /** What UIF is charged on for this period's pay: capped at the monthly ceiling, less what earlier runs this month used. */
     public BigDecimal uifBase(PayEmployee employee, StatutoryYearRules rules, int periodsPerYear, BigDecimal uifBaseEarlierThisMonth) {
-        BigDecimal pay = employee.getGrossSalary();
+        return uifBase(employee, rules, periodsPerYear, uifBaseEarlierThisMonth, PayComponentRules.Totals.NONE);
+    }
+
+    public BigDecimal uifBase(PayEmployee employee, StatutoryYearRules rules, int periodsPerYear, BigDecimal uifBaseEarlierThisMonth,
+                              PayComponentRules.Totals extras) {
+        BigDecimal pay = employee.getGrossSalary().add(extras.taxable()).add(extras.bonus());
         return periodsPerYear == 12
                 ? pay.min(rules.uifMonthlyCeiling())
                 : SarsPayeCalculator.uifBase(pay, rules.uifMonthlyCeiling(), uifBaseEarlierThisMonth);
@@ -74,9 +80,15 @@ public class PayrollBureauEngine {
 
     public void freeze(Payslip payslip, PayEmployee employee, StatutoryYearRules rules, BigDecimal annualPayroll,
                        int periodsPerYear, BigDecimal uifBaseEarlierThisMonth) {
+        freeze(payslip, employee, rules, annualPayroll, periodsPerYear, uifBaseEarlierThisMonth, PayComponentRules.Totals.NONE);
+    }
+
+    public void freeze(Payslip payslip, PayEmployee employee, StatutoryYearRules rules, BigDecimal annualPayroll,
+                       int periodsPerYear, BigDecimal uifBaseEarlierThisMonth, PayComponentRules.Totals extras) {
         payslip.freeze(rules.effectiveFrom(), rules.effectiveTo(), RulesFingerprint.of(rules), RulesFingerprint.formulaFor(periodsPerYear),
                 employee.getDateOfBirth(), medicalMembers(employee), annualPayroll);
-        payslip.recordPeriodic(periodsPerYear, uifBase(employee, rules, periodsPerYear, uifBaseEarlierThisMonth));
+        payslip.recordPeriodic(periodsPerYear, uifBase(employee, rules, periodsPerYear, uifBaseEarlierThisMonth, extras));
+        payslip.applyComponents(extras.extraEarnings(), extras.deductions());
     }
 
     /**
@@ -84,10 +96,17 @@ public class PayrollBureauEngine {
      * own pay group. {@code periodsOf} gives that count for a group id (null = the default monthly payroll).
      */
     public BigDecimal annualPayroll(java.util.List<PayEmployee> activeEmployees, java.util.function.Function<java.util.UUID, Integer> periodsOf) {
+        return annualPayroll(activeEmployees, periodsOf, java.util.Map.of());
+    }
+
+    /** As above, adding each employee's recurring taxable extras (per pay period) to their pay. */
+    public BigDecimal annualPayroll(java.util.List<PayEmployee> activeEmployees, java.util.function.Function<java.util.UUID, Integer> periodsOf,
+                                    java.util.Map<java.util.UUID, BigDecimal> recurringTaxablePerPeriod) {
         BigDecimal total = BigDecimal.ZERO;
         for (PayEmployee e : activeEmployees) {
             int periods = e.getPayGroupId() == null ? 12 : periodsOf.apply(e.getPayGroupId());
-            total = total.add(e.getGrossSalary().multiply(BigDecimal.valueOf(periods)));
+            BigDecimal pay = e.getGrossSalary().add(recurringTaxablePerPeriod.getOrDefault(e.getId(), BigDecimal.ZERO));
+            total = total.add(pay.multiply(BigDecimal.valueOf(periods)));
         }
         return total;
     }
@@ -97,24 +116,32 @@ public class PayrollBureauEngine {
         return calculate(employee, rules, annualPayroll, 12, BigDecimal.ZERO);
     }
 
+    public PayrollResult calculate(PayEmployee employee, StatutoryYearRules rules, BigDecimal annualPayroll,
+                                   int periodsPerYear, BigDecimal uifBaseEarlierThisMonth) {
+        return calculate(employee, rules, annualPayroll, periodsPerYear, uifBaseEarlierThisMonth, PayComponentRules.Totals.NONE);
+    }
+
     /**
      * Pay for one period of a pay group. The amounts on the employee are what that employee gets <em>per pay period of their group</em>
      * (a week's pay for a weekly group). {@code uifBaseEarlierThisMonth} is what UIF was already charged on in other runs of the same
      * calendar month; it only matters when there is more than one run a month.
      */
     public PayrollResult calculate(PayEmployee employee, StatutoryYearRules rules, BigDecimal annualPayroll,
-                                   int periodsPerYear, BigDecimal uifBaseEarlierThisMonth) {
+                                   int periodsPerYear, BigDecimal uifBaseEarlierThisMonth, PayComponentRules.Totals extras) {
         int medicalMembers = medicalMembers(employee);
+        // Taxable extras join the period's regular pay (annualised, liable for UIF and SDL); a bonus is taxed by the bonus method.
+        // Non-taxable earnings and after-tax deductions do not touch the tax calculation; the payslip applies them to net pay.
         SarsPayrollResult r = SarsPayeCalculator.calculate(new SarsPayeCalculator.Inputs(
-                employee.getGrossSalary(), employee.getTravelAllowance(), employee.getPensionContribution(),
-                employee.getMedicalAidContribution(), employee.getDateOfBirth(), medicalMembers, annualPayroll),
+                employee.getGrossSalary().add(extras.taxable()), employee.getTravelAllowance(), employee.getPensionContribution(),
+                employee.getMedicalAidContribution(), employee.getDateOfBirth(), medicalMembers, annualPayroll,
+                BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, extras.bonus()),
                 rules, periodsPerYear, uifBaseEarlierThisMonth);
 
         log.debug("Payroll bureau employee={} year={} taxable={} paye={} uif={} sdl={}",
                 employee.getId(), rules.taxYear(), r.taxableIncome(), r.payeAmount(), r.uifEmployee(), r.sdlAmount());
 
         return new PayrollResult(
-                r.grossSalary(), r.travelAllowance(), r.medicalAid(), r.pension(),
+                employee.getGrossSalary(), r.travelAllowance(), r.medicalAid(), r.pension(),
                 r.payeAmount(), r.uifEmployee(), r.uifEmployer(), r.sdlAmount(),
                 r.taxableIncome(), r.taxYear());
     }

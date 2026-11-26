@@ -14,6 +14,7 @@ import za.co.handyflow.platform.accounting.dto.JournalEntryResponse;
 import za.co.handyflow.platform.payrollbureau.domain.model.*;
 import za.co.handyflow.platform.payrollbureau.domain.repository.*;
 import za.co.handyflow.platform.payrollbureau.domain.rules.DeliveryRules;
+import za.co.handyflow.platform.payrollbureau.domain.rules.PayComponentRules;
 import za.co.handyflow.platform.payrollbureau.domain.rules.PayPeriodRules;
 import za.co.handyflow.platform.payrollbureau.dto.*;
 import za.co.handyflow.platform.shared.HandyFlowException;
@@ -74,6 +75,8 @@ public class PayrollBureauService {
     private final PayEmployeeChangeService changeService;
     private final PayslipDeliveryRepository deliveryRepo;
     private final PayGroupService groupService;
+    private final PayComponentService componentService;
+    private final PayslipLineRepository payslipLineRepo;
 
     @Value("${app.frontend.url:http://localhost:5173}")
     private String frontendUrl;
@@ -285,9 +288,19 @@ public class PayrollBureauService {
                 : employeeRepo.findActiveByGroup(run.getPayClientId(), run.getPayGroupId());
         // The SDL threshold looks at the whole client's year, across all its pay groups.
         java.util.Map<UUID, Integer> periodsByGroup = new java.util.HashMap<>();
+        // Pay components (slice 1e): recurring taxable extras count towards the payroll size; one-off items do not.
+        java.util.Map<UUID, List<PayComponentService.PayLine>> componentLines = componentService.linesForRun(tenantId, run);
+        java.util.Map<UUID, java.math.BigDecimal> recurringTaxable = new java.util.HashMap<>();
+        for (var entry : componentLines.entrySet()) {
+            for (var line : entry.getValue()) {
+                if ("RECURRING".equals(line.source()) && PayComponentRules.TAXABLE_EARNING.equals(line.component().getRole())) {
+                    recurringTaxable.merge(entry.getKey(), line.amount(), java.math.BigDecimal::add);
+                }
+            }
+        }
         java.math.BigDecimal annualPayroll = engine.annualPayroll(employeeRepo.findAllActiveByClient(run.getPayClientId()),
                 gid -> periodsByGroup.computeIfAbsent(gid, id -> za.co.handyflow.platform.payrollbureau.domain.rules.PayPeriodRules
-                        .periodsPerYear(groupService.load(tenantId, id).getFrequency())));
+                        .periodsPerYear(groupService.load(tenantId, id).getFrequency())), recurringTaxable);
         java.time.LocalDate monthStart = run.getPayDate().withDayOfMonth(1);
         java.time.LocalDate monthEnd = monthStart.plusMonths(1).minusDays(1);
 
@@ -297,20 +310,26 @@ public class PayrollBureauService {
         for (PayEmployee emp : employees) {
             java.math.BigDecimal uifEarlier = periodsPerYear == 12 ? java.math.BigDecimal.ZERO
                     : payslipRepo.sumUifBaseInMonth(tenantId.getValue(), emp.getId(), run.getId(), monthStart, monthEnd);
-            PayrollBureauEngine.PayrollResult result = engine.calculate(emp, rules, annualPayroll, periodsPerYear, uifEarlier);
+            List<PayComponentService.PayLine> lines = componentLines.getOrDefault(emp.getId(), List.of());
+            PayComponentRules.Totals extras = PayComponentRules.summarise(lines.stream()
+                    .map(l -> new PayComponentRules.Line(l.component().getRole(), l.amount())).toList());
+            PayrollBureauEngine.PayrollResult result = engine.calculate(emp, rules, annualPayroll, periodsPerYear, uifEarlier, extras);
 
             Payslip slip = Payslip.create(tenantId.getValue(), run.getId(), emp.getId(),
                     result.monthlySalary(), result.travelAllowance(), result.payeAmount(),
                     result.uifEmployee(), result.uifEmployer(), result.sdlAmount(),
                     result.medicalAid(), result.pension(), result.taxableIncome(), result.taxYear());
-            engine.freeze(slip, emp, rules, annualPayroll, periodsPerYear, uifEarlier);
+            engine.freeze(slip, emp, rules, annualPayroll, periodsPerYear, uifEarlier, extras);
             payslipRepo.save(slip);
+            for (PayComponentService.PayLine l : lines) {
+                payslipLineRepo.save(PayslipLine.of(tenantId.getValue(), slip.getId(), l.component(), l.source(), l.amount(), l.note()));
+            }
 
-            runGross = runGross.add(result.totalEarnings());
+            runGross = runGross.add(slip.getTotalEarnings());
             runPaye = runPaye.add(result.payeAmount());
             runUif = runUif.add(result.uifEmployee()).add(result.uifEmployer());
             runSdl = runSdl.add(result.sdlAmount());
-            runNet = runNet.add(result.netPay());
+            runNet = runNet.add(slip.getNetPay());
         }
 
         run.complete(runGross, runPaye, runUif, runSdl, runNet, employees.size());
@@ -700,6 +719,20 @@ public class PayrollBureauService {
     }
 
     @Transactional(readOnly = true)
+    public List<za.co.handyflow.platform.payrollbureau.dto.PayComponentDtos.PayslipLineResponse> getPayslipLines(
+            TenantId tenantId, UUID payRunId, UUID payslipId) {
+        payRunRepo.findByTenantAndId(tenantId.getValue(), payRunId)
+                .orElseThrow(() -> new ResourceNotFoundException("PayRun", payRunId.toString()));
+        Payslip p = payslipRepo.findByPayRun(tenantId.getValue(), payRunId).stream()
+                .filter(x -> x.getId().equals(payslipId)).findFirst()
+                .orElseThrow(() -> new ResourceNotFoundException("Payslip", payslipId.toString()));
+        return payslipLineRepo.findByPayslip(tenantId.getValue(), p.getId()).stream()
+                .map(l -> new za.co.handyflow.platform.payrollbureau.dto.PayComponentDtos.PayslipLineResponse(
+                        l.getCode(), l.getName(), l.getRole(), l.getSarsCode(), l.getSource(), l.getAmount(), l.getNote()))
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
     public byte[] generatePayslipPdf(TenantId tenantId, UUID payRunId, UUID payslipId) {
         PayRun run = payRunRepo.findByTenantAndId(tenantId.getValue(), payRunId)
                 .orElseThrow(() -> new ResourceNotFoundException("PayRun", payRunId.toString()));
@@ -709,7 +742,8 @@ public class PayrollBureauService {
                 .orElseThrow(() -> new ResourceNotFoundException("Payslip", payslipId.toString()));
         PayEmployee emp = employeeRepo.findActiveById(tenantId.getValue(), payslip.getPayEmployeeId())
                 .orElseThrow(() -> new ResourceNotFoundException("PayEmployee", payslip.getPayEmployeeId().toString()));
-        return payslipPdfGenerator.generate(payslip, emp, run, client, tryLoadLogoBytes(tenantId, client));
+        return payslipPdfGenerator.generate(payslip, emp, run, client, tryLoadLogoBytes(tenantId, client),
+                payslipLineRepo.findByPayslip(tenantId.getValue(), payslip.getId()));
     }
 
     public record PayslipDeliveryResult(int sent, int skippedNoEmail, List<String> skippedEmployeeNames,
@@ -757,7 +791,8 @@ public class PayrollBureauService {
                 continue;
             }
             try {
-                byte[] pdf = payslipPdfGenerator.generate(p, emp, run, client, logoBytes);
+                byte[] pdf = payslipPdfGenerator.generate(p, emp, run, client, logoBytes,
+                        payslipLineRepo.findByPayslip(tenantId.getValue(), p.getId()));
                 String subject = "Payslip — " + run.getPayRunNumber();
                 String body = "Dear " + emp.getFirstName() + ",\n\nPlease find your payslip for "
                         + run.getPeriodStart() + " to " + run.getPeriodEnd() + " attached.\n\n"
@@ -909,7 +944,8 @@ public class PayrollBureauService {
                 emp != null ? emp.getFullName() : "Unknown", emp != null ? emp.getEmployeeNumber() : "—",
                 p.getGrossSalary(), p.getTravelAllowance(), p.getTotalEarnings(), p.getPayeAmount(),
                 p.getUifEmployee(), p.getUifEmployer(), p.getSdlAmount(), p.getMedicalAid(), p.getPension(),
-                p.getTotalDeductions(), p.getNetPay(), p.getTaxableIncome(), p.getTaxYear());
+                p.getTotalDeductions(), p.getNetPay(), p.getTaxableIncome(), p.getTaxYear(),
+                p.getExtraEarnings(), p.getExtraDeductions());
     }
 
     private PayEmployeeDocumentResponse toDocumentResponse(PayEmployeeDocument d) {
