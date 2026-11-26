@@ -10,22 +10,14 @@
 // than silently unifying them.
 import { useEffect, useState } from "react"
 import { payrollBureauApi } from "../../api/payrollBureau.api"
-import type { PayClient, PayEmployee, PayRun, Payslip, PayDeadline, PayFeeNote, PortalAccessGrant, PayEmployeeChange, EmailResult, PayRunReview } from "../../types/payrollBureau.types"
+import type { PayGroup, PayClient, PayEmployee, PayRun, Payslip, PayDeadline, PayFeeNote, PortalAccessGrant, PayEmployeeChange, EmailResult, PayRunReview } from "../../types/payrollBureau.types"
+import { PayGroupsTab, ComponentsTab, EmployeeComponentsModal, RunItemsModal, PayGroupSelect, GroupPeriodPicker } from "./PayGroupsAndComponents"
 import { required, validateSaId, validateTaxNumber, validateEmail, validatePhone,
   validatePositiveNumber, validateDayOfMonth, type FieldErrors } from "./validation"
+import { StatusBadge, Table, Empty, Modal, Field, FieldError, ErrorBox, ModalActions } from "./ui"
+import { fmtR, fmtD, NAVY, NAVY_TEXT, BORDER, CANVAS, INK, MUTED, FAINT, inputStyle, errorInputStyle, btnPrimary, btnPrimarySmall, btnSecondary, rowStyle, cellStyle } from "./uiStyles"
 
-const fmtR = (n: any) => `R ${Number(n ?? 0).toLocaleString("en-ZA", { minimumFractionDigits: 2 })}`
-const fmtD = (d: any) => (d ? new Date(d).toLocaleDateString("en-ZA", { day: "numeric", month: "short", year: "numeric" }) : "—")
-
-const NAVY = "var(--hf-primary)"
-const NAVY_TEXT = "var(--hf-primary-text)";
-const BORDER = "var(--hf-border)"
-const CANVAS = "var(--hf-surface-muted)"
-const INK = "var(--hf-text)"
-const MUTED = "var(--hf-text-muted)"
-const FAINT = "var(--hf-text-faint)"
-
-type Tab = "employees" | "payruns" | "deadlines" | "feenotes" | "portal"
+type Tab = "employees" | "groups" | "components" | "payruns" | "deadlines" | "feenotes" | "portal"
 
 // Authenticated logo image — a plain <img src=...> can't work here, the
 // logo download endpoint requires a Bearer token and browsers send no
@@ -238,7 +230,7 @@ export function PayrollBureauPage() {
 
             <div style={{ display: "flex", gap: 4, borderBottom: `1px solid ${BORDER}`, marginBottom: 20 }}>
               {([
-                ["employees", "Employees"], ["payruns", "Pay Runs"], ["deadlines", "Deadlines"],
+                ["employees", "Employees"], ["groups", "Pay Groups"], ["components", "Pay Items"], ["payruns", "Pay Runs"], ["deadlines", "Deadlines"],
                 ["feenotes", "Invoices"], ["portal", "Portal Access"],
               ] as [Tab, string][]).map(([id, label]) => (
                 <button key={id} onClick={() => setTab(id)} style={{
@@ -250,6 +242,8 @@ export function PayrollBureauPage() {
             </div>
 
             {tab === "employees" && <EmployeesTab client={selected} />}
+            {tab === "groups" && <PayGroupsTab client={selected} />}
+            {tab === "components" && <ComponentsTab />}
             {tab === "payruns" && <PayRunsTab client={selected} />}
             {tab === "deadlines" && <DeadlinesTab client={selected} />}
             {tab === "feenotes" && <FeeNotesTab client={selected} />}
@@ -470,10 +464,13 @@ function EmployeesTab({ client }: { client: PayClient }) {
   const [showNew, setShowNew] = useState(false)
   const [editing, setEditing] = useState<PayEmployee | null>(null)
   const [docsFor, setDocsFor] = useState<PayEmployee | null>(null)
+  const [itemsFor, setItemsFor] = useState<PayEmployee | null>(null)
+  const [groups, setGroups] = useState<PayGroup[]>([])
 
   const refetch = () => {
     setLoading(true)
     payrollBureauApi.getEmployees(client.id).then(setEmployees).finally(() => setLoading(false))
+    payrollBureauApi.getPayGroups(client.id).then(setGroups).catch(() => setGroups([]))
   }
   useEffect(refetch, [client.id])
 
@@ -483,17 +480,19 @@ function EmployeesTab({ client }: { client: PayClient }) {
         <button onClick={() => setShowNew(true)} style={btnPrimary}>+ Add Employee</button>
       </div>
       {loading ? <Empty text="Loading…" /> : employees.length === 0 ? <Empty text="No employees added yet." /> : (
-        <Table headers={["Employee #", "Name", "Email", "Gross Salary", "Status", ""]}>
+        <Table headers={["Employee #", "Name", "Email", "Gross Salary", "Pay group", "Status", ""]}>
           {employees.map(e => (
             <tr key={e.id} style={rowStyle}>
               <td style={cellStyle}>{e.employeeNumber}</td>
               <td style={cellStyle}>{e.fullName}</td>
               <td style={cellStyle}>{(e as any).email || <span style={{ color: FAINT }}>—</span>}</td>
               <td style={cellStyle}>{fmtR(e.grossSalary)}</td>
+              <td style={cellStyle}><PayGroupSelect clientId={client.id} employee={e} groups={groups} onChanged={refetch} /></td>
               <td style={cellStyle}><StatusBadge status={e.status} />{e.changePending && <span style={{ marginLeft: 6, fontSize: 11, fontWeight: 700, color: "var(--hf-warning-text, #92400e)" }}>Change awaiting approval</span>}</td>
               <td style={cellStyle}>
                 <div style={{ display: "flex", gap: 6 }}>
                   <button onClick={() => setEditing(e)} style={btnSecondary}>Edit</button>
+                  <button onClick={() => setItemsFor(e)} style={btnSecondary}>Pay items</button>
                   <button onClick={() => setDocsFor(e)} style={btnSecondary}>Documents</button>
                 </div>
               </td>
@@ -507,6 +506,7 @@ function EmployeesTab({ client }: { client: PayClient }) {
       {editing && <EditEmployeeModal clientId={client.id} employee={editing} onClose={() => setEditing(null)}
         onSaved={() => { setEditing(null); refetch() }} />}
       {docsFor && <EmployeeDocumentsModal employee={docsFor} onClose={() => setDocsFor(null)} />}
+      {itemsFor && <EmployeeComponentsModal clientId={client.id} employee={itemsFor} onClose={() => setItemsFor(null)} />}
     </div>
   )
 }
@@ -828,6 +828,14 @@ function PayRunsTab({ client }: { client: PayClient }) {
   const [emailingRunId, setEmailingRunId] = useState<string | null>(null)
   const [emailResult, setEmailResult] = useState<EmailResult | null>(null)
   const [review, setReview] = useState<PayRunReview | null>(null)
+  const [itemsRun, setItemsRun] = useState<PayRun | null>(null)
+  const [itemsEmployees, setItemsEmployees] = useState<PayEmployee[]>([])
+  const [runGroups, setRunGroups] = useState<PayGroup[]>([])
+  useEffect(() => { payrollBureauApi.getPayGroups(client.id).then(setRunGroups).catch(() => setRunGroups([])) }, [client.id])
+  const openItems = async (run: PayRun) => {
+    try { setItemsEmployees(await payrollBureauApi.getEmployees(client.id)); setItemsRun(run) }
+    catch { alert("Failed to load the employees") }
+  }
   const handleReview = async (id: string) => {
     try { setReview(await payrollBureauApi.getPayRunReview(id)) }
     catch { alert("Failed to load the checks for this pay run") }
@@ -945,6 +953,7 @@ function PayRunsTab({ client }: { client: PayClient }) {
                 <div>
                   <div style={{ fontWeight: 700, fontSize: 13.5, color: INK }}>
                     {r.payRunNumber} — {fmtD(r.periodStart)} to {fmtD(r.periodEnd)}
+                    {r.payGroupId && <span style={{ fontWeight: 500, color: MUTED }}> · {runGroups.find(g => g.id === r.payGroupId)?.name ?? "Pay group"}</span>}
                   </div>
                   <div style={{ fontSize: 11.5, color: FAINT, marginTop: 2 }}>
                     Pay date {fmtD(r.payDate)}{r.status !== "DRAFT" && ` · ${r.employeeCount} employees · Net ${fmtR(r.totalNet)}`}
@@ -960,6 +969,9 @@ function PayRunsTab({ client }: { client: PayClient }) {
                     <button onClick={e => { e.stopPropagation(); handleReview(r.id) }} style={btnSecondary}>
                       {r.status === "DRAFT" ? "Check" : "Compare"}
                     </button>
+                  )}
+                  {r.status === "DRAFT" && (
+                    <button onClick={e => { e.stopPropagation(); openItems(r) }} style={btnSecondary}>Items</button>
                   )}
                   {r.status === "DRAFT" && (
                     <button onClick={e => { e.stopPropagation(); handleProcess(r.id) }} disabled={processingId === r.id}
@@ -1027,6 +1039,7 @@ function PayRunsTab({ client }: { client: PayClient }) {
           onClose={() => setGeneratingFeeNoteFor(null)}
           onGenerated={() => setGeneratingFeeNoteFor(null)} />
       )}
+      {itemsRun && <RunItemsModal run={itemsRun} employees={itemsEmployees} onClose={() => setItemsRun(null)} />}
       {review && (
         <Modal title={review.status === "DRAFT" ? "Checks before calculating" : `Compared with ${review.previousRunNumber ?? "the previous run"}`}
           onClose={() => setReview(null)}>
@@ -1113,11 +1126,14 @@ function NewPayRunModal({ clientId, onClose, onCreated }: { clientId: string; on
   const [payDate, setPayDate] = useState(lastOfMonth)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState("")
+  const [groups, setGroups] = useState<PayGroup[]>([])
+  const [groupId, setGroupId] = useState("")
+  useEffect(() => { payrollBureauApi.getPayGroups(clientId).then(setGroups).catch(() => setGroups([])) }, [clientId])
 
   const submit = async () => {
     setSaving(true); setError("")
     try {
-      await payrollBureauApi.createPayRun(clientId, { periodStart, periodEnd, payDate })
+      await payrollBureauApi.createPayRun(clientId, { periodStart, periodEnd, payDate, payGroupId: groupId || undefined })
       onCreated()
     } catch (e: any) {
       setError(e.response?.data?.message ?? "Failed to create pay run")
@@ -1126,6 +1142,10 @@ function NewPayRunModal({ clientId, onClose, onCreated }: { clientId: string; on
 
   return (
     <Modal title="New Pay Run" onClose={onClose}>
+      <GroupPeriodPicker groups={groups} value={groupId} onPick={(id, p) => {
+        setGroupId(id)
+        if (p) { setPeriodStart(p.start); setPeriodEnd(p.end); setPayDate(p.payDate) }
+      }} />
       <Field label="Period start"><input type="date" value={periodStart} onChange={e => setPeriodStart(e.target.value)} style={inputStyle} /></Field>
       <Field label="Period end"><input type="date" value={periodEnd} min={periodStart} onChange={e => setPeriodEnd(e.target.value)} style={inputStyle} /></Field>
       <Field label="Pay date"><input type="date" value={payDate} onChange={e => setPayDate(e.target.value)} style={inputStyle} /></Field>
@@ -1354,83 +1374,3 @@ function PortalAccessTab({ client }: { client: PayClient }) {
   )
 }
 
-// ── Shared small components ──────────────────────────────────────────────────
-
-function StatusBadge({ status }: { status: string }) {
-  const tones: Record<string, { c: string; bg: string }> = {
-    ACTIVE: { c: "var(--hf-success-text-strong)", bg: "var(--hf-success-soft-strong)" }, FINALISED: { c: "var(--hf-success-text-strong)", bg: "var(--hf-success-soft-strong)" },
-    PAID: { c: "var(--hf-success-text-strong)", bg: "var(--hf-success-soft-strong)" }, FILED: { c: "var(--hf-success-text-strong)", bg: "var(--hf-success-soft-strong)" },
-    DRAFT: { c: "var(--hf-text-muted)", bg: "var(--hf-surface-sunken)" }, CALCULATED: { c: "var(--hf-info-text)", bg: "var(--hf-info-soft)" },
-    APPROVED: { c: "var(--hf-warning-text)", bg: "var(--hf-warning-soft)" }, REVERSED: { c: "var(--hf-danger-text, #b91c1c)", bg: "var(--hf-danger-soft, #fef2f2)" }, PENDING: { c: "var(--hf-warning-text)", bg: "var(--hf-warning-soft)" },
-    SENT: { c: "var(--hf-info-text)", bg: "var(--hf-info-soft)" }, PARTIAL: { c: "var(--hf-info-text)", bg: "var(--hf-info-soft)" },
-    OVERDUE: { c: "var(--hf-danger-text)", bg: "var(--hf-danger-soft)" }, OFFBOARDED: { c: "var(--hf-text-muted)", bg: "var(--hf-surface-sunken)" },
-    TERMINATED: { c: "var(--hf-text-muted)", bg: "var(--hf-surface-sunken)" }, REVOKED: { c: "var(--hf-danger-text)", bg: "var(--hf-danger-soft)" },
-  }
-  const t = tones[status] ?? tones.DRAFT
-  return <span style={{ background: t.bg, color: t.c, padding: "2px 8px", borderRadius: 20, fontSize: 10.5, fontWeight: 700 }}>{status}</span>
-}
-
-function Table({ headers, children }: { headers: string[]; children: React.ReactNode }) {
-  return (
-    <table style={{ width: "100%", borderCollapse: "collapse" as const, background: "var(--hf-surface)", border: `1px solid ${BORDER}`, borderRadius: 8, overflow: "hidden" }}>
-      <thead>
-        <tr style={{ background: CANVAS }}>
-          {headers.map(h => <th key={h} style={{ textAlign: "left" as const, padding: "8px 12px", fontSize: 11, fontWeight: 600, color: MUTED, textTransform: "uppercase" as const, letterSpacing: "0.03em" }}>{h}</th>)}
-        </tr>
-      </thead>
-      <tbody>{children}</tbody>
-    </table>
-  )
-}
-
-function Empty({ text }: { text: string }) {
-  return <div style={{ padding: 32, textAlign: "center" as const, color: FAINT, fontSize: 13 }}>{text}</div>
-}
-
-function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
-  return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }}
-      onClick={onClose}>
-      <div style={{ background: "var(--hf-surface)", borderRadius: 12, padding: 24, width: 460, maxHeight: "85vh", overflowY: "auto" as const, boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}
-        onClick={e => e.stopPropagation()}>
-        <h3 style={{ margin: "0 0 16px", fontSize: 15, fontWeight: 800, color: INK }}>{title}</h3>
-        {children}
-      </div>
-    </div>
-  )
-}
-
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div style={{ marginBottom: 12, flex: 1 }}>
-      <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: MUTED, marginBottom: 4 }}>{label}</label>
-      {children}
-    </div>
-  )
-}
-
-function FieldError({ text }: { text?: string }) {
-  if (!text) return null
-  return <div style={{ fontSize: 11, color: "var(--hf-danger-text)", marginTop: 3 }}>{text}</div>
-}
-
-function ErrorBox({ text }: { text: string }) {
-  return <div style={{ padding: "8px 12px", background: "var(--hf-danger-soft)", border: "1px solid var(--hf-danger-border)", borderRadius: 6, fontSize: 12.5, color: "var(--hf-danger-text)", marginBottom: 12 }}>{text}</div>
-}
-
-function ModalActions({ onClose, onSubmit, saving, submitLabel }: { onClose: () => void; onSubmit: () => void; saving: boolean; submitLabel: string }) {
-  return (
-    <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 4 }}>
-      <button onClick={onClose} style={btnSecondary}>Cancel</button>
-      <button onClick={onSubmit} disabled={saving} style={btnPrimary}>{saving ? "Saving…" : submitLabel}</button>
-    </div>
-  )
-}
-
-const inputStyle: React.CSSProperties = { width: "100%", padding: "8px 10px", border: `1.5px solid ${BORDER}`, borderRadius: 6, fontSize: 13, boxSizing: "border-box" }
-const errorInputStyle: React.CSSProperties = { borderColor: "var(--hf-danger)" }
-const btnPrimary: React.CSSProperties = { padding: "7px 14px", background: NAVY, color: "var(--hf-text-on-solid)", border: "none", borderRadius: 6, fontSize: 12.5, fontWeight: 700, cursor: "pointer" }
-const btnPrimarySmall: React.CSSProperties = { ...btnPrimary, padding: "4px 10px", fontSize: 11.5 }
-const btnSecondary: React.CSSProperties = { padding: "6px 12px", background: "var(--hf-surface)", color: NAVY_TEXT, border: `1px solid ${NAVY}`, borderRadius: 6, fontSize: 12, fontWeight: 700, cursor: "pointer" }
-const rowStyle: React.CSSProperties = { borderTop: `1px solid ${BORDER}` }
-const cellStyle: React.CSSProperties = { padding: "8px 12px", fontSize: 12.5, color: INK }

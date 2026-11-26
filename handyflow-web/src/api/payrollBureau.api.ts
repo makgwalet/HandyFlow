@@ -12,7 +12,7 @@ import { apiClient } from "./client"
 import type {
   PayEmployeeChange, EmailResult,
   PayClient, PayEmployee, PayRun, Payslip, PayDeadline, PayFeeNote, PortalAccessGrant,
-  PayRunReview, BankFile,
+  PayRunReview, BankFile, PayGroup, NextPeriod, PayComponent, EmployeeComponent, RunItem,
 } from "../types/payrollBureau.types"
 
 interface PageResponse<T> { content: T[]; totalElements: number; totalPages: number; number: number }
@@ -52,10 +52,40 @@ export const payrollBureauApi = {
   // Pay runs
   getPayRuns: (clientId: string, page = 0) =>
     apiClient.get(`/api/v1/payroll-bureau/clients/${clientId}/pay-runs?page=${page}`).then(r => r.data as PageResponse<PayRun>),
-  createPayRun: (clientId: string, body: { periodStart: string; periodEnd: string; payDate: string }) =>
+  createPayRun: (clientId: string, body: { periodStart: string; periodEnd: string; payDate: string; payGroupId?: string }) =>
     apiClient.post(`/api/v1/payroll-bureau/clients/${clientId}/pay-runs`, body).then(r => r.data as PayRun),
   processPayRun: (payRunId: string) =>
     apiClient.post(`/api/v1/payroll-bureau/pay-runs/${payRunId}/process`).then(r => r.data as PayRun),
+  // Pay groups
+  getPayGroups: (clientId: string) =>
+    apiClient.get(`/api/v1/payroll-bureau/clients/${clientId}/pay-groups`).then(r => r.data as PayGroup[]),
+  createPayGroup: (clientId: string, body: { name: string; frequency: string; anchorDate?: string; payLagDays?: number }) =>
+    apiClient.post(`/api/v1/payroll-bureau/clients/${clientId}/pay-groups`, body).then(r => r.data as PayGroup),
+  archivePayGroup: (groupId: string) =>
+    apiClient.post(`/api/v1/payroll-bureau/pay-groups/${groupId}/archive`).then(r => r.data as PayGroup),
+  nextPayPeriod: (groupId: string) =>
+    apiClient.get(`/api/v1/payroll-bureau/pay-groups/${groupId}/next-period`).then(r => r.data as NextPeriod),
+  assignPayGroup: (clientId: string, employeeId: string, payGroupId: string | null) =>
+    apiClient.put(`/api/v1/payroll-bureau/clients/${clientId}/employees/${employeeId}/pay-group`, { payGroupId }).then(r => r.data),
+
+  // Pay components
+  getPayComponents: () =>
+    apiClient.get(`/api/v1/payroll-bureau/pay-components`).then(r => r.data as PayComponent[]),
+  createPayComponent: (body: { code: string; name: string; role: string; sarsCode?: string }) =>
+    apiClient.post(`/api/v1/payroll-bureau/pay-components`, body).then(r => r.data as PayComponent),
+  archivePayComponent: (id: string) =>
+    apiClient.post(`/api/v1/payroll-bureau/pay-components/${id}/archive`).then(r => r.data as PayComponent),
+  getEmployeeComponents: (clientId: string, employeeId: string) =>
+    apiClient.get(`/api/v1/payroll-bureau/clients/${clientId}/employees/${employeeId}/components`).then(r => r.data as EmployeeComponent[]),
+  setEmployeeComponent: (clientId: string, employeeId: string, componentId: string, amount: number) =>
+    apiClient.put(`/api/v1/payroll-bureau/clients/${clientId}/employees/${employeeId}/components`, { componentId, amount }).then(r => r.data as EmployeeComponent[]),
+  getRunItems: (payRunId: string) =>
+    apiClient.get(`/api/v1/payroll-bureau/pay-runs/${payRunId}/items`).then(r => r.data as RunItem[]),
+  setRunItem: (payRunId: string, body: { employeeId: string; componentId: string; amount: number; note?: string }) =>
+    apiClient.put(`/api/v1/payroll-bureau/pay-runs/${payRunId}/items`, body).then(r => r.data as RunItem[]),
+  removeRunItem: (payRunId: string, itemId: string) =>
+    apiClient.delete(`/api/v1/payroll-bureau/pay-runs/${payRunId}/items/${itemId}`).then(r => r.data as RunItem[]),
+
   getBankFiles: (payRunId: string) =>
     apiClient.get(`/api/v1/payroll-bureau/pay-runs/${payRunId}/bank-files`).then(r => r.data as BankFile[]),
   createBankFile: (payRunId: string, reason?: string) =>

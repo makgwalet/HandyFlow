@@ -42,6 +42,7 @@ export interface PayEmployeeChange {
 
 export interface PayEmployee {
   changePending?: boolean
+  payGroupId?: string | null
   id: string
   employeeNumber: string
   firstName: string
@@ -100,6 +101,55 @@ export interface PayRunReview {
   blocking: number
   warnings: number
   findings: PayRunReviewItem[]
+}
+
+export interface PayGroup {
+  id: string
+  name: string
+  frequency: "MONTHLY" | "FORTNIGHTLY" | "WEEKLY"
+  anchorDate: string | null
+  payLagDays: number
+  status: "ACTIVE" | "ARCHIVED"
+  employeeCount: number
+}
+
+export interface NextPeriod {
+  periodStart: string
+  periodEnd: string
+  payDate: string
+  taxYear: number
+}
+
+export type ComponentRole = "TAXABLE_EARNING" | "BONUS" | "NON_TAXABLE_EARNING" | "DEDUCTION"
+
+export interface PayComponent {
+  id: string
+  code: string
+  name: string
+  role: ComponentRole
+  sarsCode: string | null
+  standard: boolean
+  status: "ACTIVE" | "ARCHIVED"
+}
+
+export interface EmployeeComponent {
+  id: string
+  componentId: string
+  code: string
+  name: string
+  role: ComponentRole
+  amount: number
+}
+
+export interface RunItem {
+  id: string
+  payEmployeeId: string
+  componentId: string
+  code: string
+  name: string
+  role: ComponentRole
+  amount: number
+  note: string | null
 }
 
 export interface BankFile {
