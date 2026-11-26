@@ -12,6 +12,7 @@ import {
 import { Badge, SubTabs } from "./tpUi"
 import { card, input, muted, solid, unwrap } from "./tpStyle"
 import { LRN } from "./tpApi"
+import TrainProvFundersList from "./TrainProvFundersList"
 import TrainProvLearnerDetail, { LearnerFormPanel } from "./TrainProvLearnerDetail"
 
 function LearnerList({ canManage, onOpen }: { canManage: boolean; onOpen: (id: string) => void }) {
@@ -102,10 +103,11 @@ export default function TrainProvLearnersTab() {
       <div><h2 style={{ margin: 0, fontSize: 18 }}>Learners</h2>
         <div style={muted}>People the provider trains in its own right, with their applications and enrolments. Entry checks are recorded by a person. An accredited enrolment records what the accreditation check said on the day.</div></div>
       {openId ? <TrainProvLearnerDetail id={openId} canManage={canManage} isAdmin={isAdmin} onBack={() => setOpenId(null)} /> : (<>
-        <SubTabs value={tab} onChange={setTab} tabs={[["learners", "Learners"], ["applications", "Applications"], ["enrolments", "Enrolments"]]} />
+        <SubTabs value={tab} onChange={setTab} tabs={[["learners", "Learners"], ["applications", "Applications"], ["enrolments", "Enrolments"], ["funders", "Funders"]]} />
         {tab === "learners" && <LearnerList canManage={canManage} onOpen={open} />}
         {tab === "applications" && <Applications onOpen={open} />}
         {tab === "enrolments" && <Enrolments onOpen={open} />}
+        {tab === "funders" && <TrainProvFundersList />}
       </>)}
     </div>
   )

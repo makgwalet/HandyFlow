@@ -54,3 +54,4 @@ export const RPT = "/api/v1/training-provider"
 
 export const WPL = "/api/v1/training-provider"
 export const RPL = "/api/v1/training-provider"
+export const FND = "/api/v1/training-provider"
