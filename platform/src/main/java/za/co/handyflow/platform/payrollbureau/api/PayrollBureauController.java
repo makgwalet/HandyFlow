@@ -180,6 +180,14 @@ public class PayrollBureauController {
                 bureauService.getPayslips(TenantContext.getTenantIdAsObject(), payRunId)));
     }
 
+    @GetMapping("/pay-runs/{payRunId}/review")
+    @PreAuthorize("hasAnyAuthority('PAYROLLBUREAU_READ','PAYROLLBUREAU_MANAGE','PAYROLLBUREAU_ADMIN')")
+    @Operation(summary = "Checks before calculating a draft run; comparison with the previous run afterwards")
+    public ResponseEntity<ApiResponse<PayRunReviewResponse>> reviewPayRun(@PathVariable UUID payRunId) {
+        featureGuard.requireModule("payrollbureau");
+        return ResponseEntity.ok(ApiResponse.success(bureauService.reviewPayRun(TenantContext.getTenantIdAsObject(), payRunId)));
+    }
+
     @PostMapping("/pay-runs/{payRunId}/reopen")
     @PreAuthorize("hasAnyAuthority('PAYROLLBUREAU_MANAGE','PAYROLLBUREAU_ADMIN')")
     @Operation(summary = "Send a calculated or approved pay run back to draft so items can change")

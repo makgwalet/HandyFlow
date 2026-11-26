@@ -34,6 +34,8 @@ class PayGroupRunTest {
     @Mock private PayEmployeeRepository employeeRepo;
     @Mock private PayrollBureauEngine engine;
     @Mock private PayGroupService groupService;
+    @Mock private PayComponentService componentService;
+    @Mock private PayslipLineRepository payslipLineRepo;
     @InjectMocks private PayrollBureauService service;
 
     private final UUID clientId = UUID.randomUUID();
@@ -44,19 +46,34 @@ class PayGroupRunTest {
                 LocalDate.of(2027, 3, 1), LocalDate.of(2027, 3, 7), LocalDate.of(2027, 3, 9), 2028);
     }
 
+    private PayEmployee paidEmployee() {
+        PayEmployee e = mock(PayEmployee.class);
+        when(e.getId()).thenReturn(UUID.randomUUID());
+        when(e.getGrossSalary()).thenReturn(new BigDecimal("5000"));
+        return e;
+    }
+
+    private PayrollBureauEngine.PayrollResult someResult() {
+        BigDecimal z = BigDecimal.ZERO;
+        return new PayrollBureauEngine.PayrollResult(new BigDecimal("5000"), z, z, z, new BigDecimal("500"), new BigDecimal("50"),
+                new BigDecimal("50"), z, new BigDecimal("5000"), 2028);
+    }
+
     @Test
-    void aWeeklyGroupsRunIsRefusedUntilPeriodicPayeExists() {
+    void aWeeklyGroupsRunIsCalculatedWithFiftyTwoPeriodsAYear() {
         PayRun run = groupRun();
+        PayEmployee e = paidEmployee();
         when(payRunRepo.findByTenantAndId(TENANT_ID, run.getId())).thenReturn(Optional.of(run));
         when(engine.requireRules(2028)).thenReturn(mock(StatutoryYearRules.class));
         PayGroup g = PayGroup.create(TENANT_ID, clientId, "Factory", "WEEKLY", LocalDate.of(2026, 3, 2), 2);
         when(groupService.load(TENANT, groupId)).thenReturn(g);
+        when(employeeRepo.findActiveByGroup(clientId, groupId)).thenReturn(List.of(e));
+        when(engine.calculate(any(), any(), any(), eq(52), any(), any())).thenReturn(someResult());
 
-        HandyFlowException e = assertThrows(HandyFlowException.class, () -> service.processPayRun(TENANT, run.getId()));
+        service.processPayRun(TENANT, run.getId());
 
-        assertTrue(e.getMessage().contains("cannot be processed yet"));
-        assertEquals("DRAFT", run.getStatus());
-        verify(payslipRepo, never()).save(any());
+        verify(engine).calculate(any(), any(), any(), eq(52), any(), any());
+        assertEquals("CALCULATED", run.getStatus());
     }
 
     @Test
@@ -65,13 +82,12 @@ class PayGroupRunTest {
                 LocalDate.of(2027, 3, 1), LocalDate.of(2027, 3, 31), LocalDate.of(2027, 3, 31), 2027);
         when(payRunRepo.findByTenantAndId(TENANT_ID, run.getId())).thenReturn(Optional.of(run));
         when(engine.requireRules(2027)).thenReturn(mock(StatutoryYearRules.class));
-        when(employeeRepo.findActiveUngrouped(clientId)).thenReturn(List.<PayEmployee>of());
-        when(employeeRepo.sumMonthlyGrossByClient(clientId)).thenReturn(BigDecimal.ZERO);
+        when(employeeRepo.findActiveUngrouped(clientId)).thenReturn(List.of(paidEmployee()));
+        when(engine.calculate(any(), any(), any(), eq(12), any(), any())).thenReturn(someResult());
 
         service.processPayRun(TENANT, run.getId());
 
-        verify(employeeRepo).findActiveUngrouped(clientId);
-        verify(employeeRepo, never()).findActiveByClient(any());
+        verify(employeeRepo, atLeastOnce()).findActiveUngrouped(clientId);
         verify(employeeRepo, never()).findActiveByGroup(any(), any());
     }
 }

@@ -85,6 +85,23 @@ export interface PayRun {
   reversalReason?: string | null
 }
 
+export interface PayRunReviewItem {
+  severity: "BLOCK" | "WARN"
+  code: string
+  employeeId: string | null
+  employeeName: string | null
+  message: string
+}
+
+export interface PayRunReview {
+  payRunId: string
+  status: PayRun["status"]
+  previousRunNumber: string | null
+  blocking: number
+  warnings: number
+  findings: PayRunReviewItem[]
+}
+
 export interface Payslip {
   id: string
   payEmployeeId: string

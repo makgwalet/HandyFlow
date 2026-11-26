@@ -62,6 +62,9 @@ class PayrollBureauSafetyTest {
     void aRunIsNotProcessedWhenTheTaxYearHasNoApprovedRules() {
         PayRun run = draftRun();
         when(payRunRepo.findByTenantAndId(TENANT.getValue(), runId)).thenReturn(Optional.of(run));
+        za.co.handyflow.platform.payrollbureau.domain.model.PayEmployee emp = mock(za.co.handyflow.platform.payrollbureau.domain.model.PayEmployee.class);
+        when(emp.getGrossSalary()).thenReturn(new java.math.BigDecimal("20000"));
+        when(employeeRepo.findActiveUngrouped(run.getPayClientId())).thenReturn(List.of(emp));
         when(engine.requireRules(2027)).thenThrow(new HandyFlowException(
                 "There are no approved statutory rules for tax year 2026/27.", org.springframework.http.HttpStatus.UNPROCESSABLE_ENTITY, "NO_TAX_RULES"));
 
@@ -71,5 +74,36 @@ class PayrollBureauSafetyTest {
         assertThat(run.getStatus()).isEqualTo("DRAFT");
         verify(payslipRepo, never()).save(any());
         verify(payRunRepo, never()).save(any());
+    }
+
+    @Test
+    void aRunWithNoEmployeesIsNotCalculated() {
+        PayRun run = draftRun();
+        when(payRunRepo.findByTenantAndId(TENANT.getValue(), runId)).thenReturn(Optional.of(run));
+        when(employeeRepo.findActiveUngrouped(run.getPayClientId())).thenReturn(List.of());
+
+        assertThatThrownBy(() -> service.processPayRun(TENANT, runId))
+                .isInstanceOf(HandyFlowException.class)
+                .hasMessageContaining("no active employees");
+        assertThat(run.getStatus()).isEqualTo("DRAFT");
+        verify(engine, never()).requireRules(anyInt());
+        verify(payRunRepo, never()).save(any());
+    }
+
+    @Test
+    void aRunOverlappingAnotherRunOfTheSameGroupIsNotCalculated() {
+        PayRun run = draftRun();
+        PayRun other = PayRun.create(TENANT.getValue(), run.getPayClientId(), "PR00000",
+                LocalDate.of(2027, 3, 15), LocalDate.of(2027, 4, 14), LocalDate.of(2027, 4, 14), 2027);
+        za.co.handyflow.platform.payrollbureau.domain.model.PayEmployee emp = mock(za.co.handyflow.platform.payrollbureau.domain.model.PayEmployee.class);
+        when(emp.getGrossSalary()).thenReturn(new java.math.BigDecimal("20000"));
+        when(payRunRepo.findByTenantAndId(TENANT.getValue(), runId)).thenReturn(Optional.of(run));
+        when(employeeRepo.findActiveUngrouped(run.getPayClientId())).thenReturn(List.of(emp));
+        when(payRunRepo.findOverlapping(any(), any(), any(), any(), any())).thenReturn(List.of(other));
+
+        assertThatThrownBy(() -> service.processPayRun(TENANT, runId))
+                .isInstanceOf(HandyFlowException.class)
+                .hasMessageContaining("PR00000");
+        assertThat(run.getStatus()).isEqualTo("DRAFT");
     }
 }

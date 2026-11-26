@@ -12,6 +12,7 @@ import { apiClient } from "./client"
 import type {
   PayEmployeeChange, EmailResult,
   PayClient, PayEmployee, PayRun, Payslip, PayDeadline, PayFeeNote, PortalAccessGrant,
+  PayRunReview,
 } from "../types/payrollBureau.types"
 
 interface PageResponse<T> { content: T[]; totalElements: number; totalPages: number; number: number }
@@ -55,6 +56,8 @@ export const payrollBureauApi = {
     apiClient.post(`/api/v1/payroll-bureau/clients/${clientId}/pay-runs`, body).then(r => r.data as PayRun),
   processPayRun: (payRunId: string) =>
     apiClient.post(`/api/v1/payroll-bureau/pay-runs/${payRunId}/process`).then(r => r.data as PayRun),
+  getPayRunReview: (payRunId: string) =>
+    apiClient.get(`/api/v1/payroll-bureau/pay-runs/${payRunId}/review`).then(r => r.data as PayRunReview),
   reopenPayRun: (payRunId: string) =>
     apiClient.post(`/api/v1/payroll-bureau/pay-runs/${payRunId}/reopen`).then(r => r.data as PayRun),
   approvePayRun: (payRunId: string) =>

@@ -16,6 +16,7 @@ import za.co.handyflow.platform.payrollbureau.domain.repository.*;
 import za.co.handyflow.platform.payrollbureau.domain.rules.DeliveryRules;
 import za.co.handyflow.platform.payrollbureau.domain.rules.PayComponentRules;
 import za.co.handyflow.platform.payrollbureau.domain.rules.RunLifecycleRules;
+import za.co.handyflow.platform.payrollbureau.domain.rules.RunReviewRules;
 import za.co.handyflow.platform.payrollbureau.domain.rules.PayPeriodRules;
 import za.co.handyflow.platform.payrollbureau.dto.*;
 import za.co.handyflow.platform.shared.HandyFlowException;
@@ -274,6 +275,14 @@ public class PayrollBureauService {
                     HttpStatus.BAD_REQUEST, "INVALID_STATUS");
         }
 
+        // Checks that must pass before anyone is paid: no employees, zero pay, an overlapping run (paid twice).
+        List<RunReviewRules.Finding> preflight = preflightFindings(tenantId, run);
+        if (RunReviewRules.blocked(preflight)) {
+            String why = preflight.stream().filter(f -> RunReviewRules.BLOCK.equals(f.severity()))
+                    .map(RunReviewRules.Finding::message).collect(java.util.stream.Collectors.joining(" "));
+            throw new HandyFlowException("This pay run cannot be calculated yet. " + why, HttpStatus.UNPROCESSABLE_ENTITY, "RUN_CHECKS_FAILED");
+        }
+
         // Fail closed: no approved statutory rules for the year means no run, never a zero-PAYE payslip
         // (audit 2026-11-26, D9). The same approved rules HR uses.
         za.co.handyflow.platform.shared.StatutoryYearRules rules = engine.requireRules(run.getTaxYear());
@@ -338,6 +347,62 @@ public class PayrollBureauService {
         log.info("Processed payroll bureau pay run={} employees={} gross={} paye={} net={}",
                 run.getPayRunNumber(), employees.size(), runGross, runPaye, runNet);
         return toPayRunResponse(run);
+    }
+
+    // ── run checks (phase 2) ───────────────────────────────────────────────────
+
+    private List<PayEmployee> employeesOfRun(PayRun run) {
+        return run.getPayGroupId() == null
+                ? employeeRepo.findActiveUngrouped(run.getPayClientId())
+                : employeeRepo.findActiveByGroup(run.getPayClientId(), run.getPayGroupId());
+    }
+
+    private boolean sameGroup(PayRun a, PayRun b) {
+        return java.util.Objects.equals(a.getPayGroupId(), b.getPayGroupId());
+    }
+
+    private List<RunReviewRules.Finding> preflightFindings(TenantId tenantId, PayRun run) {
+        List<RunReviewRules.Facts> facts = employeesOfRun(run).stream()
+                .map(e -> new RunReviewRules.Facts(e.getId(), e.getFullName(), e.getGrossSalary(), e.getIdNumber(),
+                        e.getTaxNumber(), e.getBankAccountNumber(), e.getEmail()))
+                .toList();
+        List<String> overlapping = payRunRepo.findOverlapping(tenantId.getValue(), run.getPayClientId(), run.getId(),
+                        run.getPeriodStart(), run.getPeriodEnd()).stream()
+                .filter(o -> sameGroup(o, run)).map(PayRun::getPayRunNumber).toList();
+        return RunReviewRules.preflight(facts, overlapping);
+    }
+
+    /** Before calculating: what must be fixed and what to look at. After: how the run compares with the previous one. */
+    @Transactional(readOnly = true)
+    public PayRunReviewResponse reviewPayRun(TenantId tenantId, UUID payRunId) {
+        PayRun run = loadRun(tenantId, payRunId);
+        List<RunReviewRules.Finding> findings;
+        String previousNumber = null;
+        if (RunLifecycleRules.DRAFT.equals(run.getStatus())) {
+            findings = preflightFindings(tenantId, run);
+        } else {
+            PayRun previous = payRunRepo.findEarlierWithPayslips(tenantId.getValue(), run.getPayClientId(), run.getPeriodStart()).stream()
+                    .filter(p -> sameGroup(p, run)).findFirst().orElse(null);
+            if (previous == null || RunLifecycleRules.REVERSED.equals(run.getStatus())) {
+                findings = List.of();
+            } else {
+                previousNumber = previous.getPayRunNumber();
+                findings = RunReviewRules.variance(paysOf(tenantId, previous), paysOf(tenantId, run));
+            }
+        }
+        List<PayRunReviewResponse.Item> items = findings.stream()
+                .map(f -> new PayRunReviewResponse.Item(f.severity(), f.code(), f.employeeId(), f.employeeName(), f.message())).toList();
+        long blocking = findings.stream().filter(f -> RunReviewRules.BLOCK.equals(f.severity())).count();
+        return new PayRunReviewResponse(run.getId(), run.getStatus(), previousNumber, (int) blocking, findings.size() - (int) blocking, items);
+    }
+
+    private java.util.Map<UUID, RunReviewRules.Pay> paysOf(TenantId tenantId, PayRun run) {
+        java.util.Map<UUID, RunReviewRules.Pay> out = new java.util.HashMap<>();
+        for (Payslip p : payslipRepo.findByPayRun(tenantId.getValue(), run.getId())) {
+            PayEmployee e = employeeRepo.findById(p.getPayEmployeeId()).orElse(null);
+            out.put(p.getPayEmployeeId(), new RunReviewRules.Pay(e == null ? "Unknown" : e.getFullName(), p.getNetPay()));
+        }
+        return out;
     }
 
     // ── run lifecycle (phase 2) ────────────────────────────────────────────────

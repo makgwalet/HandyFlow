@@ -16,6 +16,25 @@ public interface PayRunRepository extends JpaRepository<PayRun, UUID> {
     @Query("SELECT r FROM PayRun r WHERE r.tenantId = :tenantId AND r.payClientId = :payClientId ORDER BY r.periodStart DESC")
     Page<PayRun> findByClient(@Param("tenantId") UUID tenantId, @Param("payClientId") UUID payClientId, Pageable pageable);
 
+    /** Other runs of this client, not reversed, whose period shares a day with the given one. The caller narrows to the same pay group. */
+    @Query("""
+        SELECT r FROM PayRun r
+        WHERE r.tenantId = :tenantId AND r.payClientId = :payClientId AND r.id <> :excludeId
+          AND r.status <> 'REVERSED' AND r.periodStart <= :periodEnd AND r.periodEnd >= :periodStart
+    """)
+    List<PayRun> findOverlapping(@Param("tenantId") UUID tenantId, @Param("payClientId") UUID payClientId,
+                                 @Param("excludeId") UUID excludeId, @Param("periodStart") java.time.LocalDate periodStart,
+                                 @Param("periodEnd") java.time.LocalDate periodEnd);
+
+    /** Runs of this client that started before the given date and have payslips, newest first. The caller narrows to the same pay group. */
+    @Query("""
+        SELECT r FROM PayRun r
+        WHERE r.tenantId = :tenantId AND r.payClientId = :payClientId AND r.periodStart < :before
+          AND r.status IN ('CALCULATED','APPROVED','FINALISED') ORDER BY r.periodStart DESC
+    """)
+    List<PayRun> findEarlierWithPayslips(@Param("tenantId") UUID tenantId, @Param("payClientId") UUID payClientId,
+                                         @Param("before") java.time.LocalDate before);
+
     @Query("SELECT r FROM PayRun r WHERE r.tenantId = :tenantId AND r.id = :id")
     Optional<PayRun> findByTenantAndId(@Param("tenantId") UUID tenantId, @Param("id") UUID id);
 

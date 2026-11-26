@@ -10,7 +10,7 @@
 // than silently unifying them.
 import { useEffect, useState } from "react"
 import { payrollBureauApi } from "../../api/payrollBureau.api"
-import type { PayClient, PayEmployee, PayRun, Payslip, PayDeadline, PayFeeNote, PortalAccessGrant, PayEmployeeChange, EmailResult } from "../../types/payrollBureau.types"
+import type { PayClient, PayEmployee, PayRun, Payslip, PayDeadline, PayFeeNote, PortalAccessGrant, PayEmployeeChange, EmailResult, PayRunReview } from "../../types/payrollBureau.types"
 import { required, validateSaId, validateTaxNumber, validateEmail, validatePhone,
   validatePositiveNumber, validateDayOfMonth, type FieldErrors } from "./validation"
 
@@ -827,6 +827,11 @@ function PayRunsTab({ client }: { client: PayClient }) {
   const [generatingFeeNoteFor, setGeneratingFeeNoteFor] = useState<PayRun | null>(null)
   const [emailingRunId, setEmailingRunId] = useState<string | null>(null)
   const [emailResult, setEmailResult] = useState<EmailResult | null>(null)
+  const [review, setReview] = useState<PayRunReview | null>(null)
+  const handleReview = async (id: string) => {
+    try { setReview(await payrollBureauApi.getPayRunReview(id)) }
+    catch { alert("Failed to load the checks for this pay run") }
+  }
   const [downloadingId, setDownloadingId] = useState<string | null>(null)
 
   const refetch = () => {
@@ -915,6 +920,11 @@ function PayRunsTab({ client }: { client: PayClient }) {
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                   <StatusBadge status={r.status} />
+                  {r.status !== "REVERSED" && (
+                    <button onClick={e => { e.stopPropagation(); handleReview(r.id) }} style={btnSecondary}>
+                      {r.status === "DRAFT" ? "Check" : "Compare"}
+                    </button>
+                  )}
                   {r.status === "DRAFT" && (
                     <button onClick={e => { e.stopPropagation(); handleProcess(r.id) }} disabled={processingId === r.id}
                       style={btnPrimarySmall}>{processingId === r.id ? "Calculating…" : "Calculate"}</button>
@@ -975,6 +985,26 @@ function PayRunsTab({ client }: { client: PayClient }) {
         <GenerateFeeNoteModal client={client} payRun={generatingFeeNoteFor}
           onClose={() => setGeneratingFeeNoteFor(null)}
           onGenerated={() => setGeneratingFeeNoteFor(null)} />
+      )}
+      {review && (
+        <Modal title={review.status === "DRAFT" ? "Checks before calculating" : `Compared with ${review.previousRunNumber ?? "the previous run"}`}
+          onClose={() => setReview(null)}>
+          {review.findings.length === 0 ? (
+            <p style={{ fontSize: 13.5, color: INK }}>
+              {review.status === "DRAFT" ? "Nothing to fix or look at." : review.previousRunNumber ? "No differences worth flagging." : "There is no earlier run to compare with."}
+            </p>
+          ) : (
+            <ul style={{ margin: 0, paddingLeft: 18, fontSize: 13, color: INK, display: "flex", flexDirection: "column", gap: 6 }}>
+              {review.findings.map((f, i) => (
+                <li key={i}>
+                  <strong style={{ color: f.severity === "BLOCK" ? "var(--hf-danger-text, #b91c1c)" : "var(--hf-warning-text)" }}>
+                    {f.severity === "BLOCK" ? "Must fix: " : "Look at: "}
+                  </strong>{f.message}
+                </li>
+              ))}
+            </ul>
+          )}
+        </Modal>
       )}
       {emailResult && (
         <Modal title="Payslips Sent" onClose={() => setEmailResult(null)}>
