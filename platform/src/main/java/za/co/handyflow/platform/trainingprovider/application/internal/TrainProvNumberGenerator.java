@@ -61,6 +61,7 @@ public class TrainProvNumberGenerator {
     private static final String PLACEMENT_SEQUENCE = "TRAINPROV_PLACEMENT";
     private static final String RPL_SEQUENCE = "TRAINPROV_RPL";
     private static final String FUNDER_SEQUENCE = "TRAINPROV_FUNDER";
+    private static final String LEARNERSHIP_SEQUENCE = "TRAINPROV_LEARNERSHIP";
     private static final String OBLIGATION_SEQUENCE = "TRAINPROV_OBLIGATION";
     private static final String REPORT_PERIOD_SEQUENCE = "TRAINPROV_REPORT_PERIOD";
     private static final String DELEGATE_SEQUENCE_PREFIX = "TRAINPROV_DELEGATE:";
@@ -164,5 +165,10 @@ public class TrainProvNumberGenerator {
     public String nextFunderNumber(TenantId tenantId) {
         long next = sequenceService.nextValue(tenantId, FUNDER_SEQUENCE);
         return "FND-%05d".formatted(next);
+    }
+
+    public String nextLearnershipNumber(TenantId tenantId) {
+        long next = sequenceService.nextValue(tenantId, LEARNERSHIP_SEQUENCE);
+        return "LSH-%05d".formatted(next);
     }
 }
