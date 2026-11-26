@@ -50,4 +50,12 @@ class ProgrammeNeedsRulesTest {
         assertNotNull(ProgrammeNeedsRules.withdrawProblem("short"));
         assertNull(ProgrammeNeedsRules.withdrawProblem("Replaced by a new line"));
     }
+
+    @Test
+    void sessionNotesAreAPromptToCheckNeverAFinding() {
+        assertEquals("Booked for this session: 2; the programme lists 2", ProgrammeNeedsRules.slotNote(ProgrammeNeedsRules.ENOUGH, 2, 2));
+        assertTrue(ProgrammeNeedsRules.slotNote(ProgrammeNeedsRules.SHORT, 3, 1).endsWith("Check the bookings before the session"));
+        assertTrue(ProgrammeNeedsRules.slotNote(ProgrammeNeedsRules.NONE_HELD, 3, 0).startsWith("Nothing is booked for this session"));
+        assertFalse(ProgrammeNeedsRules.slotNote(ProgrammeNeedsRules.SHORT, 3, 1).toLowerCase().contains("complian"));
+    }
 }

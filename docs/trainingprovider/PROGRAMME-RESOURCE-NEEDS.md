@@ -27,3 +27,6 @@ A programme version can list the kinds and quantities of resources the provider 
 ## Not done
 - Per-module needs, and flagging a slot that lacks a needed resource.
 - Checking readiness again when a cohort's learner count changes (it is worked out each time it is opened).
+
+## Per-session prompt (0179)
+On the cohort Timetable, each scheduled session from today on shows "N listed needs are not fully booked for this session. Check the bookings." when the resources booked on that session (same type, name matching the need's words, quantity summed) are fewer than the programme version lists for the cohort's size. It reads `GET /cohorts/{id}/slot-resource-needs`, changes nothing, and is a prompt to check, never a finding about the programme or the session. Released bookings and cancelled or past sessions are ignored.

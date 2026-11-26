@@ -29,4 +29,13 @@ public final class ProgrammeNeedsDtos {
 
     public record CohortReadiness(UUID cohortId, String siteName, long learners, String note, List<ReadinessRow> rows) {
     }
+
+    public record SlotNeedRow(UUID needId, String description, int required, int booked, String status, String note) {
+    }
+
+    public record SlotNeeds(UUID slotId, int notCovered, List<SlotNeedRow> rows) {
+    }
+
+    public record CohortSlotNeeds(UUID cohortId, String note, List<SlotNeeds> slots) {
+    }
 }

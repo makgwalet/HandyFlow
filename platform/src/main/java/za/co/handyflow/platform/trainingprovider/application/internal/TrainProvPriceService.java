@@ -1,6 +1,7 @@
 package za.co.handyflow.platform.trainingprovider.application.internal;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -55,7 +56,13 @@ public class TrainProvPriceService {
                         + "). Withdraw it with a reason first, or start the new fee after it ends", HttpStatus.CONFLICT, "TP_PRICE_OVERLAP");
             }
         }
-        lines.save(p);
+        try {
+            lines.save(p);
+            lines.flush();
+        } catch (DataIntegrityViolationException e) {
+            // The database guard (V945) caught an overlap the check above could not see, for example two people saving at the same moment.
+            throw new HandyFlowException("A fee for this already covers part of that period. Withdraw it with a reason first, or start the new fee after it ends", HttpStatus.CONFLICT, "TP_PRICE_OVERLAP");
+        }
         return view(t, p, today);
     }
 

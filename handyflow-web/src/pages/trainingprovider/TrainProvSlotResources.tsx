@@ -99,7 +99,7 @@ export default function TrainProvSlotResources({ slotId, siteId, canManage }: { 
     queryKey: ["tp-slot-resources", slotId], enabled: open,
     queryFn: async () => unwrap<Booking[]>(await apiClient.get(`${API}/slots/${slotId}`)),
   })
-  const refresh = () => qc.invalidateQueries({ queryKey: ["tp-slot-resources", slotId] })
+  const refresh = () => Promise.all([qc.invalidateQueries({ queryKey: ["tp-slot-resources", slotId] }), qc.invalidateQueries({ queryKey: ["tp-cohort-slot-needs"] })])
   if (!open) return <button style={{ ...ghost, marginTop: 8 }} onClick={() => setOpen(true)}>Resources</button>
   return (
     <div style={{ display: "grid", gap: 8, marginTop: 8, borderTop: "1px solid var(--hf-border)", paddingTop: 8 }}>

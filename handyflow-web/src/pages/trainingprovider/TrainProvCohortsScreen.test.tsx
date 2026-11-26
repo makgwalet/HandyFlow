@@ -91,6 +91,21 @@ describe("cohort screens", () => {
     expect((await screen.findByRole("alert")).textContent).toContain("not checked and in force on this date")
   })
 
+  it("flags a scheduled slot whose listed needs are not fully booked, as a prompt to check", async () => {
+    get.mockImplementation((url: string) => {
+      let data: unknown = []
+      if (url.endsWith("/cohorts")) data = [cohort()]
+      else if (url.endsWith("/cohorts/c1")) data = detail()
+      else if (url.endsWith("/cohorts/c1/timetable")) data = [slot()]
+      else if (url.endsWith("/cohorts/c1/slot-resource-needs")) data = { cohortId: "c1", note: "A prompt to check.", slots: [{ slotId: "t1", notCovered: 2, rows: [] }] }
+      return Promise.resolve({ data: { data } })
+    })
+    wrap(<TrainProvCohortsTab />)
+    fireEvent.click(await screen.findByText("Feb intake"))
+    fireEvent.click(await screen.findByText("Timetable"))
+    expect((await screen.findByRole("status")).textContent).toBe("2 listed needs are not fully booked for this session. Check the bookings.")
+  })
+
   it("takes a register: only marked learners are sent, and an excuse needs a reason", async () => {
     wrap(<TrainProvCohortsTab />)
     fireEvent.click(await screen.findByText("Feb intake"))

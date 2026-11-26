@@ -70,6 +70,14 @@ class TrainProvPriceServiceTest {
     }
 
     @Test
+    void theDatabaseGuardIsReportedAsTheSameConflict() {
+        when(lines.liveForSameFee(TENANT, versionId, null, "TUITION")).thenReturn(List.of());
+        when(lines.save(any(TrainProvPriceLine.class))).thenThrow(new org.springframework.dao.DataIntegrityViolationException("ex_trainprov_price_no_overlap"));
+        assertThatThrownBy(() -> service.create(TENANT, request(TODAY, null), USER, TODAY)).isInstanceOf(HandyFlowException.class)
+                .hasMessageContaining("already covers part of that period");
+    }
+
+    @Test
     void allowsANewFeeThatStartsAfterTheOldOneEnds() {
         TrainProvPriceLine existing = TrainProvPriceLine.create(TENANT, versionId, null, "TUITION", null, new BigDecimal("1400.00"), true, TODAY.minusDays(30), TODAY.minusDays(1), NOTE, USER);
         when(lines.liveForSameFee(TENANT, versionId, null, "TUITION")).thenReturn(List.of(existing));

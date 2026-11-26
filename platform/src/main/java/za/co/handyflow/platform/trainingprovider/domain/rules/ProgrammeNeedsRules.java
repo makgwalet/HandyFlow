@@ -72,4 +72,13 @@ public final class ProgrammeNeedsRules {
             default -> "The site register lists none in service; the programme lists " + required + ". Check before the cohort starts";
         };
     }
+
+    /** Plain words for one session. Always a prompt to check the booking, never a finding. */
+    public static String slotNote(String status, int required, int booked) {
+        return switch (status) {
+            case ENOUGH -> "Booked for this session: " + booked + "; the programme lists " + required;
+            case SHORT -> "Booked for this session: " + booked + "; the programme lists " + required + ". Check the bookings before the session";
+            default -> "Nothing is booked for this session; the programme lists " + required + ". Check the bookings before the session";
+        };
+    }
 }

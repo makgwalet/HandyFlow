@@ -11,6 +11,7 @@ import type { Enrolment } from "./learnerRules"
 import type { Eligible } from "./practitionerRules"
 import { Badge, Field, Notice, SubTabs } from "./tpUi"
 import TrainProvSlotResources from "./TrainProvSlotResources"
+import { slotFlag, type CohortSlotNeeds } from "./programmeNeedsRules"
 import TrainProvCohortReadiness from "./TrainProvCohortReadiness"
 import { card, errText, ghost, input, muted, solid, unwrap } from "./tpStyle"
 import { CAT, LRN, PRC, useActiveProgrammes } from "./tpApi"
@@ -93,7 +94,8 @@ function Timetable({ cohort, canManage, open }: { cohort: Cohort; canManage: boo
   const [reason, setReason] = useState("")
   const [error, setError] = useState("")
   const { data = [], isLoading } = useQuery<Slot[]>({ queryKey: ["tp-timetable", cohort.id], queryFn: async () => unwrap<Slot[]>(await apiClient.get(`${LRN}/cohorts/${cohort.id}/timetable`)) })
-  const refresh = () => { void qc.invalidateQueries({ queryKey: ["tp-timetable", cohort.id] }); void qc.invalidateQueries({ queryKey: ["tp-attendance-summary", cohort.id] }) }
+  const { data: slotNeeds } = useQuery<CohortSlotNeeds>({ queryKey: ["tp-cohort-slot-needs", cohort.id], queryFn: async () => unwrap<CohortSlotNeeds>(await apiClient.get(`${LRN}/cohorts/${cohort.id}/slot-resource-needs`)) })
+  const refresh = () => { void qc.invalidateQueries({ queryKey: ["tp-timetable", cohort.id] }); void qc.invalidateQueries({ queryKey: ["tp-attendance-summary", cohort.id] }); void qc.invalidateQueries({ queryKey: ["tp-cohort-slot-needs", cohort.id] }) }
   const cancel = async (id: string) => {
     const p = reasonProblem(reason); if (p) { setError(p); return }
     try { await apiClient.post(`${LRN}/timetable/${id}/cancel`, { reason: reason.trim() }); setCancelling(null); setReason(""); setError(""); refresh() } catch (e) { setError(errText(e)) }
@@ -118,6 +120,7 @@ function Timetable({ cohort, canManage, open }: { cohort: Cohort; canManage: boo
           {canManage && open && s.status === "SCHEDULED" && cancelling !== s.id && (
             <div style={{ display: "flex", gap: 8, marginTop: 8 }}><button style={ghost} onClick={() => setEditing(s)}>Change</button><button style={ghost} onClick={() => { setCancelling(s.id); setError("") }}>Cancel slot</button></div>
           )}
+          {s.status === "SCHEDULED" && slotFlag(slotNeeds?.slots?.find(x => x.slotId === s.id)) && <div role="status" style={{ fontSize: 12, color: "var(--hf-warning-text-strong)" }}>{slotFlag(slotNeeds?.slots?.find(x => x.slotId === s.id))}</div>}
           {s.status === "SCHEDULED" && <TrainProvSlotResources slotId={s.id} siteId={cohort.siteId} canManage={canManage && open} />}
           {cancelling === s.id && (
             <div style={{ display: "grid", gap: 8, marginTop: 8 }}>

@@ -10,8 +10,11 @@ import za.co.handyflow.platform.billing.FeatureGuard;
 import za.co.handyflow.platform.shared.ApiResponse;
 import za.co.handyflow.platform.shared.TenantContext;
 import za.co.handyflow.platform.trainingprovider.application.internal.TrainProvProgrammeNeedsService;
+import za.co.handyflow.platform.trainingprovider.application.internal.TrainProvSlotNeedsService;
 import za.co.handyflow.platform.trainingprovider.dto.ProgrammeNeedsDtos.*;
 
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.UUID;
 
 @RestController
@@ -24,6 +27,7 @@ public class TrainProvProgrammeNeedsController {
     private static final String MANAGE = "hasAnyAuthority('TRAININGPROVIDER_MANAGE','TRAININGPROVIDER_ADMIN')";
 
     private final TrainProvProgrammeNeedsService service;
+    private final TrainProvSlotNeedsService slotNeedsService;
     private final FeatureGuard featureGuard;
 
     @GetMapping("/catalogue/programme-versions/{versionId}/resource-needs")
@@ -45,6 +49,13 @@ public class TrainProvProgrammeNeedsController {
     public ResponseEntity<ApiResponse<VersionNeeds>> withdraw(@PathVariable UUID needId, @Valid @RequestBody WithdrawRequest r) {
         featureGuard.requireModule("trainingprovider");
         return ResponseEntity.ok(ApiResponse.success("Need withdrawn", service.withdraw(TenantContext.getTenantIdAsObject(), needId, r.reason(), TenantContext.getCurrentUserId())));
+    }
+
+    @GetMapping("/cohorts/{cohortId}/slot-resource-needs")
+    @PreAuthorize(READ)
+    public ResponseEntity<ApiResponse<CohortSlotNeeds>> slotNeeds(@PathVariable UUID cohortId) {
+        featureGuard.requireModule("trainingprovider");
+        return ResponseEntity.ok(ApiResponse.success(slotNeedsService.forCohort(TenantContext.getTenantIdAsObject(), cohortId, LocalDate.now(ZoneId.of("Africa/Johannesburg")))));
     }
 
     @GetMapping("/cohorts/{cohortId}/resource-readiness")

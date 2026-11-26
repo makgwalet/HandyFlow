@@ -11,6 +11,16 @@ export type VersionNeeds = { versionId: string; versionNo: number; versionStatus
 export type ReadinessRow = { needId: string; description: string; resourceType: string; required: number; held: number; status: string; note: string }
 export type CohortReadiness = { cohortId: string; siteName: string; learners: number; note: string; rows: ReadinessRow[] }
 
+export type SlotNeedRow = { needId: string; description: string; required: number; booked: number; status: string; note: string }
+export type SlotNeeds = { slotId: string; notCovered: number; rows: SlotNeedRow[] }
+export type CohortSlotNeeds = { cohortId: string; note: string; slots: SlotNeeds[] }
+
+/** One short line for a session. A prompt to check the bookings, never a finding. */
+export function slotFlag(n: SlotNeeds | undefined): string | null {
+  if (!n || n.notCovered === 0) return null
+  return n.notCovered === 1 ? "1 listed need is not fully booked for this session. Check the bookings." : `${n.notCovered} listed needs are not fully booked for this session. Check the bookings.`
+}
+
 export const MIN_NOTE = 10
 export const NONE_NOTE = "This programme version lists no resource needs. That does not mean none are needed; it means none have been recorded here."
 export const NEEDS_NOTE = "List what the provider says this programme needs, and where that comes from. It is the provider's own list and holds no standard. It can be changed only while the version is a draft."

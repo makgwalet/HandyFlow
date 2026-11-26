@@ -30,3 +30,8 @@ Fees the provider enters for a programme version, optionally for one funder, for
 - Pre-filling the existing invoice generator. It bills by course delegates, not by programme versions, so it needs its own scoping.
 - A database exclusion constraint for overlapping lines (the service enforces it).
 - A second-person check on a new fee.
+
+## Database guard (0179, V945)
+The database also refuses two live lines for the same fee in overlapping periods (same programme version, same funder or both "any funder", same fee type, and for OTHER the same description ignoring case; dates inclusive, empty end date open-ended). Withdrawn lines are not counted. If two people save at the same moment, the second gets the same "already covers part of that period" message. The migration stops with a count if old data already overlaps; withdraw one line of each pair with a reason and run it again.
+
+Resource bookings have no such database constraint on purpose: they depend on quantity, shareability and an administrator's written override, which an exclusion constraint cannot express. They stay guarded by the locked check in the service.

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { emptyNeed, needBody, needLine, needProblem, readinessTone, withdrawProblem } from "./programmeNeedsRules"
+import { emptyNeed, needBody, needLine, needProblem, readinessTone, slotFlag, withdrawProblem } from "./programmeNeedsRules"
 
 const ok = () => ({ ...emptyNeed(), resourceType: "EQUIPMENT", description: "Arc welding machine", sourceNote: "Listed in the programme's own curriculum" })
 
@@ -28,5 +28,17 @@ describe("wording", () => {
     expect(withdrawProblem("short")).toContain("at least 10")
     expect(withdrawProblem("Replaced by a new line")).toBeNull()
     expect(readinessTone("SHORT")).toBe("warn")
+  })
+})
+
+describe("slotFlag", () => {
+  const row = { needId: "n1", description: "Mannequins", required: 2, booked: 0, status: "NONE_HELD", note: "" }
+  it("says nothing when every listed need is booked or nothing is listed", () => {
+    expect(slotFlag(undefined)).toBeNull()
+    expect(slotFlag({ slotId: "s1", notCovered: 0, rows: [] })).toBeNull()
+  })
+  it("prompts a check, in singular and plural, without a verdict", () => {
+    expect(slotFlag({ slotId: "s1", notCovered: 1, rows: [row] })).toBe("1 listed need is not fully booked for this session. Check the bookings.")
+    expect(slotFlag({ slotId: "s1", notCovered: 3, rows: [row] })).toContain("3 listed needs are not fully booked")
   })
 })
