@@ -2,6 +2,7 @@ package za.co.handyflow.platform.payrollbureau.domain.model;
 
 import jakarta.persistence.*;
 import lombok.AccessLevel;
+import za.co.handyflow.platform.payrollbureau.domain.rules.RunLifecycleRules;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
@@ -46,7 +47,7 @@ public class PayRun {
     private int taxYear;
 
     @Column(name = "status", nullable = false)
-    private String status = "DRAFT"; // DRAFT | PROCESSED
+    private String status = "DRAFT"; // DRAFT | CALCULATED | APPROVED | FINALISED | REVERSED
 
     @Column(name = "total_gross", precision = 15, scale = 2)
     private BigDecimal totalGross;
@@ -77,6 +78,15 @@ public class PayRun {
 
     @Version
     private Long version;
+
+    @Column(name = "calculated_by") private UUID calculatedBy;
+    @Column(name = "approved_by") private UUID approvedBy;
+    @Column(name = "approved_at") private Instant approvedAt;
+    @Column(name = "finalised_by") private UUID finalisedBy;
+    @Column(name = "finalised_at") private Instant finalisedAt;
+    @Column(name = "reversed_by") private UUID reversedBy;
+    @Column(name = "reversed_at") private Instant reversedAt;
+    @Column(name = "reversal_reason") private String reversalReason;
 
     @Column(name = "payslips_auto_sent_at")
     private java.time.Instant payslipsAutoSentAt;
@@ -109,12 +119,11 @@ public class PayRun {
         this.payslipsAutoSentAt = java.time.Instant.now();
     }
 
+    /** Calculating a run (phase 2): its payslips exist and it waits for someone else to approve it. */
     public void complete(BigDecimal totalGross, BigDecimal totalPaye, BigDecimal totalUif,
-                         BigDecimal totalSdl, BigDecimal totalNet, int employeeCount) {
-        if (!"DRAFT".equals(this.status)) {
-            throw new IllegalStateException("Only DRAFT pay runs can be processed");
-        }
-        this.status = "PROCESSED";
+                         BigDecimal totalSdl, BigDecimal totalNet, int employeeCount, UUID calculatedBy) {
+        move(RunLifecycleRules.CALCULATED);
+        this.calculatedBy = calculatedBy;
         this.totalGross = totalGross;
         this.totalPaye = totalPaye;
         this.totalUif = totalUif;
@@ -122,5 +131,42 @@ public class PayRun {
         this.totalNet = totalNet;
         this.employeeCount = employeeCount;
         this.processedAt = Instant.now();
+    }
+
+    private void move(String to) {
+        String problem = RunLifecycleRules.transitionProblem(this.status, to);
+        if (problem != null) throw new IllegalStateException(problem);
+        this.status = to;
+    }
+
+    /** Back to a draft so items can change. The payslips are deleted by the caller; nothing has been sent. */
+    public void reopen() {
+        move(RunLifecycleRules.DRAFT);
+        this.totalGross = null; this.totalPaye = null; this.totalUif = null; this.totalSdl = null; this.totalNet = null;
+        this.employeeCount = null; this.processedAt = null; this.calculatedBy = null;
+        this.approvedBy = null; this.approvedAt = null;
+    }
+
+    public void approve(UUID approver) {
+        String problem = RunLifecycleRules.approvalProblem(this.calculatedBy, approver);
+        if (problem != null) throw new IllegalStateException(problem);
+        move(RunLifecycleRules.APPROVED);
+        this.approvedBy = approver;
+        this.approvedAt = Instant.now();
+    }
+
+    public void finalise(UUID by) {
+        move(RunLifecycleRules.FINALISED);
+        this.finalisedBy = by;
+        this.finalisedAt = Instant.now();
+    }
+
+    public void reverse(UUID by, String reason) {
+        String problem = RunLifecycleRules.reversalProblem(reason);
+        if (problem != null) throw new IllegalStateException(problem);
+        move(RunLifecycleRules.REVERSED);
+        this.reversedBy = by;
+        this.reversedAt = Instant.now();
+        this.reversalReason = reason.trim();
     }
 }

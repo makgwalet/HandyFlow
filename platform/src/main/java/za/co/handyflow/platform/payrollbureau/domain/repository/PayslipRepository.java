@@ -10,6 +10,11 @@ import java.util.UUID;
 
 public interface PayslipRepository extends JpaRepository<Payslip, UUID> {
 
+    @org.springframework.data.jpa.repository.Modifying
+    @Query("DELETE FROM Payslip p WHERE p.tenantId = :tenantId AND p.payRunId = :payRunId")
+    void deleteByRun(@Param("tenantId") UUID tenantId, @Param("payRunId") UUID payRunId);
+
+
     /**
      * What UIF was already charged on for this employee in the calendar month of the run being processed: the sum of the
      * recorded UIF bases of their payslips in other processed runs whose pay date falls in the same month.
@@ -17,13 +22,13 @@ public interface PayslipRepository extends JpaRepository<Payslip, UUID> {
     @Query("""
         SELECT COALESCE(SUM(p.uifBase), 0) FROM Payslip p, PayRun r
         WHERE p.payRunId = r.id AND p.tenantId = :tenantId AND p.payEmployeeId = :employeeId
-          AND r.status = 'PROCESSED' AND r.id <> :excludeRunId
-          AND r.payDate >= :monthStart AND r.payDate <= :monthEnd
+          AND r.status IN ('CALCULATED','APPROVED','FINALISED') AND r.id <> :excludeRunId
+          AND r.payDate >= :monthStart AND r.payDate <= :runPayDate
     """)
     java.math.BigDecimal sumUifBaseInMonth(@Param("tenantId") UUID tenantId, @Param("employeeId") UUID employeeId,
                                            @Param("excludeRunId") UUID excludeRunId,
                                            @Param("monthStart") java.time.LocalDate monthStart,
-                                           @Param("monthEnd") java.time.LocalDate monthEnd);
+                                           @Param("runPayDate") java.time.LocalDate runPayDate);
 
 
     @Query("SELECT p FROM Payslip p WHERE p.tenantId = :tenantId AND p.payRunId = :payRunId")

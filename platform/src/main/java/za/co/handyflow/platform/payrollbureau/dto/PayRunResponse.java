@@ -10,5 +10,6 @@ public record PayRunResponse(
         LocalDate payDate, int taxYear, String status,
         BigDecimal totalGross, BigDecimal totalPaye, BigDecimal totalUif,
         BigDecimal totalSdl, BigDecimal totalNet, Integer employeeCount, Instant processedAt,
-        UUID payGroupId
+        UUID payGroupId,
+        UUID calculatedBy, UUID approvedBy, Instant approvedAt, Instant finalisedAt, Instant reversedAt, String reversalReason
 ) {}

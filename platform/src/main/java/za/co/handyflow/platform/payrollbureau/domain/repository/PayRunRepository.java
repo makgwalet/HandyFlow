@@ -25,7 +25,7 @@ public interface PayRunRepository extends JpaRepository<PayRun, UUID> {
     // RecInterviewRepository.findDueForReminder().
     @Query("""
     SELECT r FROM PayRun r
-    WHERE r.status = 'PROCESSED'
+    WHERE r.status = 'FINALISED'
       AND r.payDate <= :today
       AND r.payslipsAutoSentAt IS NULL
     """)

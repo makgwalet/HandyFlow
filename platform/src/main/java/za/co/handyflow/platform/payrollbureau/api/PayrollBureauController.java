@@ -180,6 +180,42 @@ public class PayrollBureauController {
                 bureauService.getPayslips(TenantContext.getTenantIdAsObject(), payRunId)));
     }
 
+    @PostMapping("/pay-runs/{payRunId}/reopen")
+    @PreAuthorize("hasAnyAuthority('PAYROLLBUREAU_MANAGE','PAYROLLBUREAU_ADMIN')")
+    @Operation(summary = "Send a calculated or approved pay run back to draft so items can change")
+    public ResponseEntity<ApiResponse<PayRunResponse>> reopenPayRun(@PathVariable UUID payRunId) {
+        featureGuard.requireModule("payrollbureau");
+        return ResponseEntity.ok(ApiResponse.success("Pay run reopened",
+                bureauService.reopenPayRun(TenantContext.getTenantIdAsObject(), payRunId)));
+    }
+
+    @PostMapping("/pay-runs/{payRunId}/approve")
+    @PreAuthorize("hasAuthority('PAYROLLBUREAU_APPROVE')")
+    @Operation(summary = "Approve a calculated pay run (a different user from the one who calculated it)")
+    public ResponseEntity<ApiResponse<PayRunResponse>> approvePayRun(@PathVariable UUID payRunId) {
+        featureGuard.requireModule("payrollbureau");
+        return ResponseEntity.ok(ApiResponse.success("Pay run approved",
+                bureauService.approvePayRun(TenantContext.getTenantIdAsObject(), payRunId)));
+    }
+
+    @PostMapping("/pay-runs/{payRunId}/finalise")
+    @PreAuthorize("hasAnyAuthority('PAYROLLBUREAU_MANAGE','PAYROLLBUREAU_ADMIN')")
+    @Operation(summary = "Finalise an approved pay run: locks it and lets payslips be sent")
+    public ResponseEntity<ApiResponse<PayRunResponse>> finalisePayRun(@PathVariable UUID payRunId) {
+        featureGuard.requireModule("payrollbureau");
+        return ResponseEntity.ok(ApiResponse.success("Pay run finalised",
+                bureauService.finalisePayRun(TenantContext.getTenantIdAsObject(), payRunId)));
+    }
+
+    @PostMapping("/pay-runs/{payRunId}/reverse")
+    @PreAuthorize("hasAuthority('PAYROLLBUREAU_APPROVE')")
+    @Operation(summary = "Reverse a finalised pay run, with a reason. The run and its payslips stay on record.")
+    public ResponseEntity<ApiResponse<PayRunResponse>> reversePayRun(@PathVariable UUID payRunId, @RequestBody ReversePayRunRequest req) {
+        featureGuard.requireModule("payrollbureau");
+        return ResponseEntity.ok(ApiResponse.success("Pay run reversed",
+                bureauService.reversePayRun(TenantContext.getTenantIdAsObject(), payRunId, req.reason())));
+    }
+
     @GetMapping("/pay-runs/{payRunId}/payslips/{payslipId}/lines")
     @PreAuthorize("hasAnyAuthority('PAYROLLBUREAU_READ','PAYROLLBUREAU_MANAGE','PAYROLLBUREAU_ADMIN')")
     @Operation(summary = "The component lines (overtime, bonus, deductions) a payslip carries")

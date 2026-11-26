@@ -69,7 +69,7 @@ export interface PayRun {
   periodEnd: string
   payDate: string
   taxYear: number
-  status: "DRAFT" | "PROCESSED"
+  status: "DRAFT" | "CALCULATED" | "APPROVED" | "FINALISED" | "REVERSED"
   totalGross: number | null
   totalPaye: number | null
   totalUif: number | null
@@ -77,6 +77,12 @@ export interface PayRun {
   totalNet: number | null
   employeeCount: number | null
   processedAt: string | null
+  calculatedBy?: string | null
+  approvedBy?: string | null
+  approvedAt?: string | null
+  finalisedAt?: string | null
+  reversedAt?: string | null
+  reversalReason?: string | null
 }
 
 export interface Payslip {

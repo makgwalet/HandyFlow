@@ -55,6 +55,14 @@ export const payrollBureauApi = {
     apiClient.post(`/api/v1/payroll-bureau/clients/${clientId}/pay-runs`, body).then(r => r.data as PayRun),
   processPayRun: (payRunId: string) =>
     apiClient.post(`/api/v1/payroll-bureau/pay-runs/${payRunId}/process`).then(r => r.data as PayRun),
+  reopenPayRun: (payRunId: string) =>
+    apiClient.post(`/api/v1/payroll-bureau/pay-runs/${payRunId}/reopen`).then(r => r.data as PayRun),
+  approvePayRun: (payRunId: string) =>
+    apiClient.post(`/api/v1/payroll-bureau/pay-runs/${payRunId}/approve`).then(r => r.data as PayRun),
+  finalisePayRun: (payRunId: string) =>
+    apiClient.post(`/api/v1/payroll-bureau/pay-runs/${payRunId}/finalise`).then(r => r.data as PayRun),
+  reversePayRun: (payRunId: string, reason: string) =>
+    apiClient.post(`/api/v1/payroll-bureau/pay-runs/${payRunId}/reverse`, { reason }).then(r => r.data as PayRun),
   getPayslips: (payRunId: string) =>
     apiClient.get(`/api/v1/payroll-bureau/pay-runs/${payRunId}/payslips`).then(r => r.data as Payslip[]),
 

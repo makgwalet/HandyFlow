@@ -845,10 +845,26 @@ function PayRunsTab({ client }: { client: PayClient }) {
     } finally { setProcessingId(null) }
   }
 
+  // Run lifecycle: calculate -> approve (a different user) -> finalise; a finalised run is only ever reversed.
+  const runStep = async (id: string, step: () => Promise<unknown>, failure: string) => {
+    setProcessingId(id)
+    try {
+      await step()
+      refetch()
+    } catch (e: unknown) {
+      alert((e as { response?: { data?: { message?: string } } }).response?.data?.message ?? failure)
+    } finally { setProcessingId(null) }
+  }
+  const handleReverse = (id: string) => {
+    const reason = window.prompt("Why is this pay run being reversed? The run and its payslips stay on record.")
+    if (!reason || !reason.trim()) return
+    runStep(id, () => payrollBureauApi.reversePayRun(id, reason.trim()), "Failed to reverse pay run")
+  }
+
   const handleExpand = async (run: PayRun) => {
     if (expandedRun === run.id) { setExpandedRun(null); return }
     setExpandedRun(run.id)
-    if (run.status === "PROCESSED") {
+    if (run.status !== "DRAFT") {
       setPayslips(await payrollBureauApi.getPayslips(run.id))
     }
   }
@@ -893,27 +909,42 @@ function PayRunsTab({ client }: { client: PayClient }) {
                     {r.payRunNumber} — {fmtD(r.periodStart)} to {fmtD(r.periodEnd)}
                   </div>
                   <div style={{ fontSize: 11.5, color: FAINT, marginTop: 2 }}>
-                    Pay date {fmtD(r.payDate)}{r.status === "PROCESSED" && ` · ${r.employeeCount} employees · Net ${fmtR(r.totalNet)}`}
+                    Pay date {fmtD(r.payDate)}{r.status !== "DRAFT" && ` · ${r.employeeCount} employees · Net ${fmtR(r.totalNet)}`}
+                    {r.status === "REVERSED" && r.reversalReason && ` · Reversed: ${r.reversalReason}`}
                   </div>
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                   <StatusBadge status={r.status} />
                   {r.status === "DRAFT" && (
                     <button onClick={e => { e.stopPropagation(); handleProcess(r.id) }} disabled={processingId === r.id}
-                      style={btnPrimarySmall}>{processingId === r.id ? "Processing…" : "Process"}</button>
+                      style={btnPrimarySmall}>{processingId === r.id ? "Calculating…" : "Calculate"}</button>
                   )}
-                  {r.status === "PROCESSED" && (
+                  {(r.status === "CALCULATED" || r.status === "APPROVED") && (
+                    <button onClick={e => { e.stopPropagation(); runStep(r.id, () => payrollBureauApi.reopenPayRun(r.id), "Failed to reopen pay run") }}
+                      disabled={processingId === r.id} style={btnSecondary}>Reopen</button>
+                  )}
+                  {r.status === "CALCULATED" && (
+                    <button onClick={e => { e.stopPropagation(); runStep(r.id, () => payrollBureauApi.approvePayRun(r.id), "Failed to approve pay run") }}
+                      disabled={processingId === r.id} style={btnPrimarySmall}>Approve</button>
+                  )}
+                  {r.status === "APPROVED" && (
+                    <button onClick={e => { e.stopPropagation(); runStep(r.id, () => payrollBureauApi.finalisePayRun(r.id), "Failed to finalise pay run") }}
+                      disabled={processingId === r.id} style={btnPrimarySmall}>Finalise</button>
+                  )}
+                  {r.status === "FINALISED" && (
                     <>
                       <button onClick={e => { e.stopPropagation(); handleEmailAll(r.id) }} disabled={emailingRunId === r.id}
                         style={btnPrimarySmall}>{emailingRunId === r.id ? "Sending…" : "Email All Payslips"}</button>
                       <button onClick={e => { e.stopPropagation(); setGeneratingFeeNoteFor(r) }} style={btnPrimarySmall}>
                         Generate Invoice
                       </button>
+                      <button onClick={e => { e.stopPropagation(); handleReverse(r.id) }} disabled={processingId === r.id}
+                        style={btnSecondary}>Reverse</button>
                     </>
                   )}
                 </div>
               </div>
-              {expandedRun === r.id && r.status === "PROCESSED" && (
+              {expandedRun === r.id && r.status !== "DRAFT" && (
                 <div style={{ borderTop: `1px solid ${BORDER}`, padding: 12 }}>
                   <Table headers={["Employee", "Gross", "PAYE", "UIF", "Net Pay", ""]}>
                     {payslips.map(p => (
@@ -1256,9 +1287,10 @@ function PortalAccessTab({ client }: { client: PayClient }) {
 
 function StatusBadge({ status }: { status: string }) {
   const tones: Record<string, { c: string; bg: string }> = {
-    ACTIVE: { c: "var(--hf-success-text-strong)", bg: "var(--hf-success-soft-strong)" }, PROCESSED: { c: "var(--hf-success-text-strong)", bg: "var(--hf-success-soft-strong)" },
+    ACTIVE: { c: "var(--hf-success-text-strong)", bg: "var(--hf-success-soft-strong)" }, FINALISED: { c: "var(--hf-success-text-strong)", bg: "var(--hf-success-soft-strong)" },
     PAID: { c: "var(--hf-success-text-strong)", bg: "var(--hf-success-soft-strong)" }, FILED: { c: "var(--hf-success-text-strong)", bg: "var(--hf-success-soft-strong)" },
-    DRAFT: { c: "var(--hf-text-muted)", bg: "var(--hf-surface-sunken)" }, PENDING: { c: "var(--hf-warning-text)", bg: "var(--hf-warning-soft)" },
+    DRAFT: { c: "var(--hf-text-muted)", bg: "var(--hf-surface-sunken)" }, CALCULATED: { c: "var(--hf-info-text)", bg: "var(--hf-info-soft)" },
+    APPROVED: { c: "var(--hf-warning-text)", bg: "var(--hf-warning-soft)" }, REVERSED: { c: "var(--hf-danger-text, #b91c1c)", bg: "var(--hf-danger-soft, #fef2f2)" }, PENDING: { c: "var(--hf-warning-text)", bg: "var(--hf-warning-soft)" },
     SENT: { c: "var(--hf-info-text)", bg: "var(--hf-info-soft)" }, PARTIAL: { c: "var(--hf-info-text)", bg: "var(--hf-info-soft)" },
     OVERDUE: { c: "var(--hf-danger-text)", bg: "var(--hf-danger-soft)" }, OFFBOARDED: { c: "var(--hf-text-muted)", bg: "var(--hf-surface-sunken)" },
     TERMINATED: { c: "var(--hf-text-muted)", bg: "var(--hf-surface-sunken)" }, REVOKED: { c: "var(--hf-danger-text)", bg: "var(--hf-danger-soft)" },

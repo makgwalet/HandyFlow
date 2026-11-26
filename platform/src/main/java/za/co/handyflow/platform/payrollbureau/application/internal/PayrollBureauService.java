@@ -15,6 +15,7 @@ import za.co.handyflow.platform.payrollbureau.domain.model.*;
 import za.co.handyflow.platform.payrollbureau.domain.repository.*;
 import za.co.handyflow.platform.payrollbureau.domain.rules.DeliveryRules;
 import za.co.handyflow.platform.payrollbureau.domain.rules.PayComponentRules;
+import za.co.handyflow.platform.payrollbureau.domain.rules.RunLifecycleRules;
 import za.co.handyflow.platform.payrollbureau.domain.rules.PayPeriodRules;
 import za.co.handyflow.platform.payrollbureau.dto.*;
 import za.co.handyflow.platform.shared.HandyFlowException;
@@ -302,14 +303,13 @@ public class PayrollBureauService {
                 gid -> periodsByGroup.computeIfAbsent(gid, id -> za.co.handyflow.platform.payrollbureau.domain.rules.PayPeriodRules
                         .periodsPerYear(groupService.load(tenantId, id).getFrequency())), recurringTaxable);
         java.time.LocalDate monthStart = run.getPayDate().withDayOfMonth(1);
-        java.time.LocalDate monthEnd = monthStart.plusMonths(1).minusDays(1);
 
         java.math.BigDecimal runGross = java.math.BigDecimal.ZERO, runPaye = java.math.BigDecimal.ZERO,
                 runUif = java.math.BigDecimal.ZERO, runSdl = java.math.BigDecimal.ZERO, runNet = java.math.BigDecimal.ZERO;
 
         for (PayEmployee emp : employees) {
             java.math.BigDecimal uifEarlier = periodsPerYear == 12 ? java.math.BigDecimal.ZERO
-                    : payslipRepo.sumUifBaseInMonth(tenantId.getValue(), emp.getId(), run.getId(), monthStart, monthEnd);
+                    : payslipRepo.sumUifBaseInMonth(tenantId.getValue(), emp.getId(), run.getId(), monthStart, run.getPayDate());
             List<PayComponentService.PayLine> lines = componentLines.getOrDefault(emp.getId(), List.of());
             PayComponentRules.Totals extras = PayComponentRules.summarise(lines.stream()
                     .map(l -> new PayComponentRules.Line(l.component().getRole(), l.amount())).toList());
@@ -332,11 +332,73 @@ public class PayrollBureauService {
             runNet = runNet.add(slip.getNetPay());
         }
 
-        run.complete(runGross, runPaye, runUif, runSdl, runNet, employees.size());
+        run.complete(runGross, runPaye, runUif, runSdl, runNet, employees.size(), TenantContext.getCurrentUserId());
         payRunRepo.save(run);
 
         log.info("Processed payroll bureau pay run={} employees={} gross={} paye={} net={}",
                 run.getPayRunNumber(), employees.size(), runGross, runPaye, runNet);
+        return toPayRunResponse(run);
+    }
+
+    // ── run lifecycle (phase 2) ────────────────────────────────────────────────
+
+    private PayRun loadRun(TenantId tenantId, UUID payRunId) {
+        return payRunRepo.findByTenantAndId(tenantId.getValue(), payRunId)
+                .orElseThrow(() -> new ResourceNotFoundException("PayRun", payRunId.toString()));
+    }
+
+    private void requireTransition(PayRun run, String to) {
+        String problem = RunLifecycleRules.transitionProblem(run.getStatus(), to);
+        if (problem != null) throw new HandyFlowException(problem, HttpStatus.BAD_REQUEST, "INVALID_STATUS");
+    }
+
+    /** Back to a draft so items can change. Only possible before the run is final, so nothing has been sent. */
+    @Transactional
+    public PayRunResponse reopenPayRun(TenantId tenantId, UUID payRunId) {
+        PayRun run = loadRun(tenantId, payRunId);
+        requireTransition(run, RunLifecycleRules.DRAFT);
+        payslipLineRepo.deleteByRun(tenantId.getValue(), payRunId);
+        payslipRepo.deleteByRun(tenantId.getValue(), payRunId);
+        run.reopen();
+        payRunRepo.save(run);
+        log.info("Payroll bureau pay run reopened run={} by={}", run.getPayRunNumber(), TenantContext.getCurrentUserId());
+        return toPayRunResponse(run);
+    }
+
+    /** A different user from the one who calculated the run approves it. */
+    @Transactional
+    public PayRunResponse approvePayRun(TenantId tenantId, UUID payRunId) {
+        PayRun run = loadRun(tenantId, payRunId);
+        requireTransition(run, RunLifecycleRules.APPROVED);
+        String problem = RunLifecycleRules.approvalProblem(run.getCalculatedBy(), TenantContext.getCurrentUserId());
+        if (problem != null) throw new HandyFlowException(problem, HttpStatus.FORBIDDEN, "SELF_APPROVAL");
+        run.approve(TenantContext.getCurrentUserId());
+        payRunRepo.save(run);
+        log.info("Payroll bureau pay run approved run={} by={}", run.getPayRunNumber(), TenantContext.getCurrentUserId());
+        return toPayRunResponse(run);
+    }
+
+    /** Locks the run. From here its payslips can be sent and it can be billed; it can only be reversed. */
+    @Transactional
+    public PayRunResponse finalisePayRun(TenantId tenantId, UUID payRunId) {
+        PayRun run = loadRun(tenantId, payRunId);
+        requireTransition(run, RunLifecycleRules.FINALISED);
+        run.finalise(TenantContext.getCurrentUserId());
+        payRunRepo.save(run);
+        log.info("Payroll bureau pay run finalised run={} by={}", run.getPayRunNumber(), TenantContext.getCurrentUserId());
+        return toPayRunResponse(run);
+    }
+
+    /** A finalised run is never deleted or edited. Reversing keeps it and its payslips on record, marked reversed. */
+    @Transactional
+    public PayRunResponse reversePayRun(TenantId tenantId, UUID payRunId, String reason) {
+        PayRun run = loadRun(tenantId, payRunId);
+        requireTransition(run, RunLifecycleRules.REVERSED);
+        String problem = RunLifecycleRules.reversalProblem(reason);
+        if (problem != null) throw new HandyFlowException(problem, HttpStatus.BAD_REQUEST, "REASON_REQUIRED");
+        run.reverse(TenantContext.getCurrentUserId(), reason);
+        payRunRepo.save(run);
+        log.warn("Payroll bureau pay run REVERSED run={} by={} reason={}", run.getPayRunNumber(), TenantContext.getCurrentUserId(), reason);
         return toPayRunResponse(run);
     }
 
@@ -448,9 +510,9 @@ public class PayrollBureauService {
         PayClient client = findActiveClient(tenantId, payClientId);
         PayRun run = payRunRepo.findByTenantAndId(tenantId.getValue(), req.payRunId())
                 .orElseThrow(() -> new ResourceNotFoundException("PayRun", req.payRunId().toString()));
-        if (!"PROCESSED".equals(run.getStatus())) {
-            throw new HandyFlowException("Can only bill a PROCESSED pay run — this one is still "
-                    + run.getStatus(), HttpStatus.BAD_REQUEST, "PAYRUN_NOT_PROCESSED");
+        if (!RunLifecycleRules.FINALISED.equals(run.getStatus())) {
+            throw new HandyFlowException("Can only bill a FINALISED pay run — this one is "
+                    + run.getStatus(), HttpStatus.BAD_REQUEST, "PAYRUN_NOT_FINALISED");
         }
         if (!run.getPayClientId().equals(payClientId)) {
             throw new ResourceNotFoundException("PayRun", req.payRunId().toString());
@@ -765,6 +827,10 @@ public class PayrollBureauService {
     public PayslipDeliveryResult emailPayslips(TenantId tenantId, UUID payRunId, boolean resendAll, boolean automatic) {
         PayRun run = payRunRepo.findByTenantAndId(tenantId.getValue(), payRunId)
                 .orElseThrow(() -> new ResourceNotFoundException("PayRun", payRunId.toString()));
+        if (!RunLifecycleRules.payslipsCanBeSent(run.getStatus())) {
+            throw new HandyFlowException("Payslips are sent once the pay run is finalised. This one is " + run.getStatus() + ".",
+                    HttpStatus.BAD_REQUEST, "PAYRUN_NOT_FINALISED");
+        }
         PayClient client = findActiveClient(tenantId, run.getPayClientId());
         byte[] logoBytes = tryLoadLogoBytes(tenantId, client);
         List<Payslip> payslips = payslipRepo.findByPayRun(tenantId.getValue(), payRunId);
@@ -935,7 +1001,8 @@ public class PayrollBureauService {
         return new PayRunResponse(r.getId(), r.getPayRunNumber(), r.getPeriodStart(), r.getPeriodEnd(),
                 r.getPayDate(), r.getTaxYear(), r.getStatus(), r.getTotalGross(), r.getTotalPaye(),
                 r.getTotalUif(), r.getTotalSdl(), r.getTotalNet(), r.getEmployeeCount(), r.getProcessedAt(),
-                r.getPayGroupId());
+                r.getPayGroupId(), r.getCalculatedBy(), r.getApprovedBy(), r.getApprovedAt(), r.getFinalisedAt(),
+                r.getReversedAt(), r.getReversalReason());
     }
 
     private PayslipResponse toPayslipResponse(Payslip p) {
