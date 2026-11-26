@@ -9,6 +9,7 @@ import { COHORT_STATUS, cohortTone, emptyVenue, label, reasonProblem, venueBody,
 import { Badge, Notice, SubTabs } from "./tpUi"
 import { card, errText, ghost, input, muted, solid, todayIso, unwrap } from "./tpStyle"
 import { LRN, useSites } from "./tpApi"
+import TrainProvResourcesPanel from "./TrainProvResourcesPanel"
 import TrainProvCohortDetail, { CohortFormPanel } from "./TrainProvCohortDetail"
 
 function CohortList({ canManage, onOpen }: { canManage: boolean; onOpen: (id: string) => void }) {
@@ -144,10 +145,11 @@ export default function TrainProvCohortsTab() {
   if (openId) return <TrainProvCohortDetail id={openId} onBack={() => setOpenId(null)} />
   return (
     <div style={{ display: "grid", gap: 12 }}>
-      <SubTabs tabs={[["cohorts", "Cohorts"], ["calendar", "Calendar"], ["venues", "Venues"]]} value={tab} onChange={setTab} />
+      <SubTabs tabs={[["cohorts", "Cohorts"], ["calendar", "Calendar"], ["venues", "Venues"], ["resources", "Resources"]]} value={tab} onChange={setTab} />
       {tab === "cohorts" && <CohortList canManage={canManage} onOpen={setOpenId} />}
       {tab === "calendar" && <Calendar onOpenCohort={setOpenId} />}
       {tab === "venues" && <Venues canManage={canManage} />}
+      {tab === "resources" && <TrainProvResourcesPanel />}
     </div>
   )
 }
