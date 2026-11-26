@@ -13,6 +13,7 @@ import {
 import type { ProgrammeDetail } from "./catalogueRules"
 import { Badge, Notice, SubTabs } from "./tpUi"
 import TrainProvModerationQueue from "./TrainProvModerationQueue"
+import TrainProvSamplingPanel from "./TrainProvSamplingPanel"
 import TrainProvCompletionsList from "./TrainProvCompletionsList"
 import TrainProvDocumentsList from "./TrainProvDocumentsList"
 import TrainProvLessonsTab from "./TrainProvLessonsTab"
@@ -148,8 +149,8 @@ export default function TrainProvAssessmentsTab() {
   const [section, setSection] = useState("instruments")
   return (
     <div style={{ display: "grid", gap: 12 }}>
-      <SubTabs tabs={[["instruments", "Instruments"], ["moderation", "Moderation queue"], ["completions", "Completions"], ["lessons", "Lessons"], ["documents", "Documents"]]} value={section} onChange={setSection} />
-      {section === "instruments" ? <Instruments /> : section === "moderation" ? <TrainProvModerationQueue /> : section === "completions" ? <TrainProvCompletionsList /> : section === "lessons" ? <TrainProvLessonsTab /> : <TrainProvDocumentsList />}
+      <SubTabs tabs={[["instruments", "Instruments"], ["moderation", "Moderation queue"], ["sampling", "Sampling"], ["completions", "Completions"], ["lessons", "Lessons"], ["documents", "Documents"]]} value={section} onChange={setSection} />
+      {section === "instruments" ? <Instruments /> : section === "moderation" ? <TrainProvModerationQueue /> : section === "sampling" ? <TrainProvSamplingPanel /> : section === "completions" ? <TrainProvCompletionsList /> : section === "lessons" ? <TrainProvLessonsTab /> : <TrainProvDocumentsList />}
     </div>
   )
 }
