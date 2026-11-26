@@ -47,6 +47,7 @@ public class PayEmployee {
     private String lastName;
 
     @Column(name = "id_number")
+    @Convert(converter = za.co.handyflow.platform.shared.EncryptedStringConverter.class)
     private String idNumber;
 
     @Column(name = "date_of_birth")
@@ -68,6 +69,7 @@ public class PayEmployee {
     private String email;
 
     @Column(name = "tax_number")
+    @Convert(converter = za.co.handyflow.platform.shared.EncryptedStringConverter.class)
     private String taxNumber;
 
     @Column(name = "phone")
@@ -77,6 +79,7 @@ public class PayEmployee {
     private String bankName;
 
     @Column(name = "bank_account_number")
+    @Convert(converter = za.co.handyflow.platform.shared.EncryptedStringConverter.class)
     private String bankAccountNumber;
 
     @Column(name = "bank_branch_code")

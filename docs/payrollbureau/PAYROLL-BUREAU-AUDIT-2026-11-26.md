@@ -103,3 +103,14 @@ Rules you chose: a new permission `PAYROLLBUREAU_APPROVE` decides; the person wh
 - The daily auto-send job retries a failed payslip up to 3 times, and marks the run done only when nothing retryable is left. Payslips that still fail after 3 attempts stay FAILED for a person to re-send by hand.
 - Dialog "Payslips Sent" shows failed and already-sent counts.
 - Not done: a screen test for the dialog (it sits inside the large page component), and no list of past delivery rows in the UI yet.
+
+## Update: encryption of sensitive employee fields (patch 0183, audit D3)
+Choices: key from app config (the existing `app.security.encryption.key`, AES-256-GCM, `FieldEncryptionService`); existing rows converted by a one-off job.
+- ID number, tax number and bank account number on `pay_employees`, and the two bank-account columns of the change-request history, are stored as `enc1:` + base64 ciphertext through a JPA converter (`EncryptedStringConverter`, reusable for other modules). Columns widened to TEXT by V949.
+- Old plain values keep reading until converted; every save writes the encrypted form.
+- One-off job: set `app.payrollbureau.encrypt-existing=true`, start the app once, check the log line "encryption backfill finished", then set it back to false. It covers all tenants and is safe to run twice.
+- Back up the key before the first deploy. Losing or changing it makes the encrypted values unreadable; there is no key rotation yet (the service's own notes say the same).
+- Encrypted columns cannot be searched or sorted in SQL. Nothing in the module does that today.
+- Staff screens still show the full ID and account number to anyone who can read employees; masking is a separate change.
+- Bank name and branch code are not encrypted.
+- Not done: payslip PDFs and any exports still print the decrypted values as before.

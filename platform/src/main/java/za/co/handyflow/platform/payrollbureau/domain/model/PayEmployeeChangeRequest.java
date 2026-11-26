@@ -36,6 +36,7 @@ public class PayEmployeeChangeRequest {
     @Column(name = "prev_pension") private BigDecimal prevPension;
     @Column(name = "prev_medical_aid") private BigDecimal prevMedicalAid;
     @Column(name = "prev_bank_name") private String prevBankName;
+    @Convert(converter = za.co.handyflow.platform.shared.EncryptedStringConverter.class)
     @Column(name = "prev_bank_account") private String prevBankAccount;
     @Column(name = "prev_bank_branch") private String prevBankBranch;
 
@@ -44,6 +45,7 @@ public class PayEmployeeChangeRequest {
     @Column(name = "new_pension") private BigDecimal newPension;
     @Column(name = "new_medical_aid") private BigDecimal newMedicalAid;
     @Column(name = "new_bank_name") private String newBankName;
+    @Convert(converter = za.co.handyflow.platform.shared.EncryptedStringConverter.class)
     @Column(name = "new_bank_account") private String newBankAccount;
     @Column(name = "new_bank_branch") private String newBankBranch;
 
