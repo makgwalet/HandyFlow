@@ -18,6 +18,7 @@ import za.co.handyflow.platform.payrollbureau.dto.PayGroupDtos.*;
 import za.co.handyflow.platform.payrollbureau.dto.PayComponentDtos.*;
 import za.co.handyflow.platform.payrollbureau.dto.PayBankFileDtos.*;
 import za.co.handyflow.platform.payrollbureau.dto.PayEmp201Dtos.*;
+import za.co.handyflow.platform.payrollbureau.dto.PayEmp501Dtos.*;
 import za.co.handyflow.platform.payrollbureau.application.internal.PayrollBureauService;
 import za.co.handyflow.platform.payrollbureau.dto.*;
 import za.co.handyflow.platform.shared.ApiResponse;
@@ -47,6 +48,7 @@ public class PayrollBureauController {
     private final za.co.handyflow.platform.payrollbureau.application.internal.PayComponentService componentService;
     private final za.co.handyflow.platform.payrollbureau.application.internal.PayrollOutputService outputService;
     private final za.co.handyflow.platform.payrollbureau.application.internal.Emp201Service emp201Service;
+    private final za.co.handyflow.platform.payrollbureau.application.internal.Emp501Service emp501Service;
 
     // ── Practice profile ─────────────────────────────────────────────────────
 
@@ -684,5 +686,25 @@ public class PayrollBureauController {
         featureGuard.requireModule("payrollbureau");
         emp201Service.setEmployeeEti(TenantContext.getTenantIdAsObject(), clientId, employeeId, req);
         return ResponseEntity.ok(ApiResponse.success(null));
+    }
+
+    @GetMapping("/clients/{clientId}/emp501")
+    @PreAuthorize("hasAnyAuthority('PAYROLLBUREAU_READ','PAYROLLBUREAU_MANAGE','PAYROLLBUREAU_ADMIN')")
+    @Operation(summary = "EMP501 reconciliation and tax-certificate figures for INTERIM (March to August) or ANNUAL (March to February), by the year the tax year ends in")
+    public ResponseEntity<ApiResponse<Emp501Response>> emp501(@PathVariable UUID clientId, @RequestParam String period, @RequestParam int taxYear) {
+        featureGuard.requireModule("payrollbureau");
+        return ResponseEntity.ok(ApiResponse.success(emp501Service.build(TenantContext.getTenantIdAsObject(), clientId, period.toUpperCase(), taxYear)));
+    }
+
+    @GetMapping("/clients/{clientId}/emp501/working-paper")
+    @PreAuthorize("hasAuthority('PAYROLLBUREAU_APPROVE')")
+    @Operation(summary = "CSV working paper of the tax-certificate figures (for review; not the SARS submission file)")
+    public ResponseEntity<byte[]> emp501WorkingPaper(@PathVariable UUID clientId, @RequestParam String period, @RequestParam int taxYear) {
+        featureGuard.requireModule("payrollbureau");
+        GeneratedFile f = emp501Service.workingPaper(TenantContext.getTenantIdAsObject(), clientId, period.toUpperCase(), taxYear);
+        return ResponseEntity.ok()
+                .header("Content-Disposition", "attachment; filename=\"" + f.fileName() + "\"")
+                .contentType(org.springframework.http.MediaType.parseMediaType("text/csv; charset=UTF-8"))
+                .body(f.content());
     }
 }
