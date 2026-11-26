@@ -10,7 +10,7 @@
 // than silently unifying them.
 import { useEffect, useState } from "react"
 import { payrollBureauApi } from "../../api/payrollBureau.api"
-import type { PayClient, PayEmployee, PayRun, Payslip, PayDeadline, PayFeeNote, PortalAccessGrant } from "../../types/payrollBureau.types"
+import type { PayClient, PayEmployee, PayRun, Payslip, PayDeadline, PayFeeNote, PortalAccessGrant, PayEmployeeChange } from "../../types/payrollBureau.types"
 import { required, validateSaId, validateTaxNumber, validateEmail, validatePhone,
   validatePositiveNumber, validateDayOfMonth, type FieldErrors } from "./validation"
 
@@ -490,7 +490,7 @@ function EmployeesTab({ client }: { client: PayClient }) {
               <td style={cellStyle}>{e.fullName}</td>
               <td style={cellStyle}>{(e as any).email || <span style={{ color: FAINT }}>—</span>}</td>
               <td style={cellStyle}>{fmtR(e.grossSalary)}</td>
-              <td style={cellStyle}><StatusBadge status={e.status} /></td>
+              <td style={cellStyle}><StatusBadge status={e.status} />{e.changePending && <span style={{ marginLeft: 6, fontSize: 11, fontWeight: 700, color: "var(--hf-warning-text, #92400e)" }}>Change awaiting approval</span>}</td>
               <td style={cellStyle}>
                 <div style={{ display: "flex", gap: 6 }}>
                   <button onClick={() => setEditing(e)} style={btnSecondary}>Edit</button>
@@ -501,11 +501,70 @@ function EmployeesTab({ client }: { client: PayClient }) {
           ))}
         </Table>
       )}
+      <PendingChanges clientId={client.id} refreshKey={employees.length + employees.filter(e => e.changePending).length} onChanged={refetch} />
       {showNew && <NewEmployeeModal clientId={client.id} onClose={() => setShowNew(false)}
         onCreated={() => { setShowNew(false); refetch() }} />}
       {editing && <EditEmployeeModal clientId={client.id} employee={editing} onClose={() => setEditing(null)}
         onSaved={() => { setEditing(null); refetch() }} />}
       {docsFor && <EmployeeDocumentsModal employee={docsFor} onClose={() => setDocsFor(null)} />}
+    </div>
+  )
+}
+
+// Held salary and bank-detail changes. A different user with the approve permission decides each one.
+const CHANGE_FIELDS: [string, keyof PayEmployeeChange, keyof PayEmployeeChange, boolean][] = [
+  ["Gross salary", "prevGrossSalary", "newGrossSalary", true],
+  ["Travel allowance", "prevTravelAllowance", "newTravelAllowance", true],
+  ["Pension", "prevPension", "newPension", true],
+  ["Medical aid", "prevMedicalAid", "newMedicalAid", true],
+  ["Bank", "prevBankName", "newBankName", false],
+  ["Account number", "prevBankAccount", "newBankAccount", false],
+  ["Branch code", "prevBankBranch", "newBankBranch", false],
+]
+const sameValue = (a: unknown, b: unknown, money: boolean) =>
+  money ? Number(a ?? 0) === Number(b ?? 0) : String(a ?? "").trim() === String(b ?? "").trim()
+
+export function PendingChanges({ clientId, refreshKey, onChanged }: { clientId: string; refreshKey: number; onChanged: () => void }) {
+  const [items, setItems] = useState<PayEmployeeChange[]>([])
+  const [error, setError] = useState("")
+  const [busy, setBusy] = useState<string | null>(null)
+
+  const load = () => { payrollBureauApi.getEmployeeChanges(clientId).then(r => setItems(r.filter(c => c.status === "PENDING"))).catch(() => setItems([])) }
+  useEffect(load, [clientId, refreshKey])
+
+  const decide = async (id: string, action: "approve" | "reject" | "cancel") => {
+    setBusy(id); setError("")
+    try {
+      await payrollBureauApi.decideEmployeeChange(id, action)
+      load(); onChanged()
+    } catch (e: unknown) {
+      setError((e as { response?: { data?: { message?: string } } }).response?.data?.message ?? "That did not work. Try again.")
+    } finally { setBusy(null) }
+  }
+
+  if (items.length === 0) return null
+  return (
+    <div role="region" aria-label="Changes awaiting approval" style={{ marginTop: 16, border: `1px solid ${BORDER}`, borderRadius: 8, padding: 12 }}>
+      <div style={{ fontWeight: 700, fontSize: 13, color: INK, marginBottom: 4 }}>Changes awaiting approval</div>
+      <div style={{ fontSize: 12, color: MUTED, marginBottom: 8 }}>
+        Pay and bank-detail changes take effect only after a different user approves them. Payroll keeps using the old details until then.
+      </div>
+      {items.map(c => (
+        <div key={c.id} style={{ borderTop: `1px solid ${BORDER}`, padding: "8px 0" }}>
+          <div style={{ fontWeight: 600, fontSize: 13, color: INK }}>{c.employeeName} <span style={{ fontWeight: 400, color: MUTED }}>asked {fmtD(c.requestedAt)}</span></div>
+          <ul style={{ margin: "4px 0 8px 16px", padding: 0, fontSize: 12.5, color: INK }}>
+            {CHANGE_FIELDS.filter(([, p, n, money]) => !sameValue(c[p], c[n], money)).map(([label, p, n, money]) => (
+              <li key={label}>{label}: {money ? fmtR(c[p]) : String(c[p] || "none")} → <strong>{money ? fmtR(c[n]) : String(c[n] || "none")}</strong></li>
+            ))}
+          </ul>
+          <div style={{ display: "flex", gap: 6 }}>
+            <button disabled={busy === c.id} onClick={() => decide(c.id, "approve")} style={btnPrimarySmall}>Approve</button>
+            <button disabled={busy === c.id} onClick={() => decide(c.id, "reject")} style={btnSecondary}>Reject</button>
+            <button disabled={busy === c.id} onClick={() => decide(c.id, "cancel")} style={btnSecondary}>Cancel my request</button>
+          </div>
+        </div>
+      ))}
+      {error && <div role="alert" style={{ marginTop: 8, fontSize: 12.5, color: "var(--hf-danger-text, #b91c1c)" }}>{error}</div>}
     </div>
   )
 }

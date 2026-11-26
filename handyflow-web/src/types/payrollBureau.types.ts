@@ -19,7 +19,24 @@ export interface PayClient {
   createdAt: string
 }
 
+export interface PayEmployeeChange {
+  id: string
+  payEmployeeId: string
+  employeeName: string
+  status: "PENDING" | "APPROVED" | "REJECTED" | "CANCELLED"
+  prevGrossSalary: number | null; newGrossSalary: number | null
+  prevTravelAllowance: number | null; newTravelAllowance: number | null
+  prevPension: number | null; newPension: number | null
+  prevMedicalAid: number | null; newMedicalAid: number | null
+  prevBankName: string | null; newBankName: string | null
+  prevBankAccount: string | null; newBankAccount: string | null
+  prevBankBranch: string | null; newBankBranch: string | null
+  requestedBy: string | null; requestedAt: string
+  decidedBy: string | null; decidedAt: string | null; decisionNote: string | null
+}
+
 export interface PayEmployee {
+  changePending?: boolean
   id: string
   employeeNumber: string
   firstName: string

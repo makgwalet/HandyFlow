@@ -12,6 +12,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import za.co.handyflow.platform.billing.FeatureGuard;
+import za.co.handyflow.platform.payrollbureau.application.internal.PayEmployeeChangeService;
 import za.co.handyflow.platform.payrollbureau.application.internal.PayrollBureauService;
 import za.co.handyflow.platform.payrollbureau.dto.*;
 import za.co.handyflow.platform.shared.ApiResponse;
@@ -36,6 +37,7 @@ public class PayrollBureauController {
 
     private final PayrollBureauService bureauService;
     private final FeatureGuard featureGuard;
+    private final PayEmployeeChangeService changeService;
 
     // ── Practice profile ─────────────────────────────────────────────────────
 
@@ -202,6 +204,42 @@ public class PayrollBureauController {
         featureGuard.requireModule("payrollbureau");
         return ResponseEntity.ok(ApiResponse.success("Employee updated",
                 bureauService.updateEmployee(TenantContext.getTenantIdAsObject(), clientId, employeeId, req)));
+    }
+
+    @GetMapping("/clients/{clientId}/employee-changes")
+    @PreAuthorize("hasAnyAuthority('PAYROLLBUREAU_READ','PAYROLLBUREAU_MANAGE','PAYROLLBUREAU_ADMIN')")
+    @Operation(summary = "Salary and bank-detail changes for a client, newest first")
+    public ResponseEntity<ApiResponse<List<PayEmployeeChangeResponse>>> getEmployeeChanges(@PathVariable UUID clientId) {
+        featureGuard.requireModule("payrollbureau");
+        return ResponseEntity.ok(ApiResponse.success(
+                changeService.list(TenantContext.getTenantIdAsObject(), clientId)));
+    }
+
+    @PostMapping("/employee-changes/{changeId}/approve")
+    @PreAuthorize("hasAuthority('PAYROLLBUREAU_APPROVE')")
+    @Operation(summary = "Approve a held change; must be a different user from the one who asked for it")
+    public ResponseEntity<ApiResponse<PayEmployeeChangeResponse>> approveEmployeeChange(
+            @PathVariable UUID changeId, @Valid @RequestBody DecideChangeRequest req) {
+        featureGuard.requireModule("payrollbureau");
+        return ResponseEntity.ok(ApiResponse.success("Change approved", changeService.approve(
+                TenantContext.getTenantIdAsObject(), changeId, TenantContext.getCurrentUserId(), req.note())));
+    }
+
+    @PostMapping("/employee-changes/{changeId}/reject")
+    @PreAuthorize("hasAuthority('PAYROLLBUREAU_APPROVE')")
+    public ResponseEntity<ApiResponse<PayEmployeeChangeResponse>> rejectEmployeeChange(
+            @PathVariable UUID changeId, @Valid @RequestBody DecideChangeRequest req) {
+        featureGuard.requireModule("payrollbureau");
+        return ResponseEntity.ok(ApiResponse.success("Change rejected", changeService.reject(
+                TenantContext.getTenantIdAsObject(), changeId, TenantContext.getCurrentUserId(), req.note())));
+    }
+
+    @PostMapping("/employee-changes/{changeId}/cancel")
+    @PreAuthorize("hasAnyAuthority('PAYROLLBUREAU_MANAGE','PAYROLLBUREAU_ADMIN')")
+    public ResponseEntity<ApiResponse<PayEmployeeChangeResponse>> cancelEmployeeChange(@PathVariable UUID changeId) {
+        featureGuard.requireModule("payrollbureau");
+        return ResponseEntity.ok(ApiResponse.success("Change cancelled", changeService.cancel(
+                TenantContext.getTenantIdAsObject(), changeId, TenantContext.getCurrentUserId())));
     }
 
     @PostMapping("/clients/{clientId}/deadlines/generate")

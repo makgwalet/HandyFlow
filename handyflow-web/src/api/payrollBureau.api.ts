@@ -10,6 +10,7 @@
 // adjusting against the real CreatePayEmployeeDocumentRequest.
 import { apiClient } from "./client"
 import type {
+  PayEmployeeChange,
   PayClient, PayEmployee, PayRun, Payslip, PayDeadline, PayFeeNote, PortalAccessGrant,
 } from "../types/payrollBureau.types"
 
@@ -38,6 +39,10 @@ export const payrollBureauApi = {
     apiClient.post(`/api/v1/payroll-bureau/clients/${clientId}/employees`, body).then(r => r.data as PayEmployee),
   updateEmployee: (clientId: string, employeeId: string, body: Partial<PayEmployee>) =>
     apiClient.put(`/api/v1/payroll-bureau/clients/${clientId}/employees/${employeeId}`, body).then(r => r.data as PayEmployee),
+  getEmployeeChanges: (clientId: string) =>
+    apiClient.get(`/api/v1/payroll-bureau/clients/${clientId}/employee-changes`).then(r => r.data as PayEmployeeChange[]),
+  decideEmployeeChange: (changeId: string, action: "approve" | "reject" | "cancel", note?: string) =>
+    apiClient.post(`/api/v1/payroll-bureau/employee-changes/${changeId}/${action}`, action === "cancel" ? undefined : { note }).then(r => r.data as PayEmployeeChange),
   emailPayslips: (payRunId: string) =>
     apiClient.post(`/api/v1/payroll-bureau/pay-runs/${payRunId}/payslips/email`).then(r => r.data as { sent: number; skippedNoEmail: number; skippedEmployeeNames: string[] }),
   downloadPayslipPdf: (payRunId: string, payslipId: string) =>

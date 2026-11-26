@@ -16,6 +16,7 @@ import za.co.handyflow.platform.payrollbureau.domain.repository.*;
 import za.co.handyflow.platform.payrollbureau.dto.*;
 import za.co.handyflow.platform.shared.HandyFlowException;
 import za.co.handyflow.platform.shared.ResourceNotFoundException;
+import za.co.handyflow.platform.shared.TenantContext;
 import za.co.handyflow.platform.shared.TenantId;
 import za.co.handyflow.platform.shared.VatRateProvider;
 
@@ -68,6 +69,7 @@ public class PayrollBureauService {
     // FIX (VAT sweep, module 2): replaces a hardcoded
     // subtotal.multiply(new BigDecimal("0.15")) fallback below.
     private final VatRateProvider vatRateProvider;
+    private final PayEmployeeChangeService changeService;
 
     @Value("${app.frontend.url:http://localhost:5173}")
     private String frontendUrl;
@@ -166,8 +168,9 @@ public class PayrollBureauService {
     @Transactional(readOnly = true)
     public List<PayEmployeeResponse> getEmployees(TenantId tenantId, UUID payClientId) {
         requireClientOwnership(tenantId, payClientId);
+        java.util.Set<UUID> pending = changeService.pendingEmployeeIds(tenantId, payClientId);
         return employeeRepo.findActiveByClient(payClientId).stream()
-                .map(this::toEmployeeResponse).toList();
+                .map(e -> toEmployeeResponse(e, pending.contains(e.getId()))).toList();
     }
 
     @Transactional
@@ -190,7 +193,7 @@ public class PayrollBureauService {
         employeeRepo.save(emp);
         log.info("Payroll bureau employee created tenant={} client={} employee={}",
                 tenantId.getValue(), payClientId, number);
-        return toEmployeeResponse(emp);
+        return toEmployeeResponse(emp, false);
     }
 
 
@@ -633,14 +636,20 @@ public class PayrollBureauService {
         emp.setDateOfBirth(req.dateOfBirth());
         emp.setEmail(req.email());
         emp.setPhone(req.phone());
-        emp.setGrossSalary(req.grossSalary());
-        emp.setTravelAllowance(req.travelAllowance() != null ? req.travelAllowance() : BigDecimal.ZERO);
-        emp.setPensionContribution(req.pensionContribution() != null ? req.pensionContribution() : BigDecimal.ZERO);
-        emp.setMedicalAidContribution(req.medicalAidContribution() != null ? req.medicalAidContribution() : BigDecimal.ZERO);
-        emp.setBankDetails(req.bankName(), req.bankAccountNumber(), req.bankBranchCode());
+        // Pay and bank-detail changes are held until a different user approves
+        // them (audit 2026-11-26, D4). The other fields above apply at once.
+        BigDecimal travel = req.travelAllowance() != null ? req.travelAllowance() : BigDecimal.ZERO;
+        BigDecimal pension = req.pensionContribution() != null ? req.pensionContribution() : BigDecimal.ZERO;
+        BigDecimal medical = req.medicalAidContribution() != null ? req.medicalAidContribution() : BigDecimal.ZERO;
+        boolean held = changeService.touchesControlledFields(emp, req.grossSalary(), travel, pension, medical,
+                req.bankName(), req.bankAccountNumber(), req.bankBranchCode());
+        if (held) {
+            changeService.submit(emp, TenantContext.getCurrentUserId(), req.grossSalary(), travel, pension, medical,
+                    req.bankName(), req.bankAccountNumber(), req.bankBranchCode());
+        }
         employeeRepo.save(emp);
-        log.info("Updated payroll bureau employee={} tenant={}", employeeId, tenantId.getValue());
-        return toEmployeeResponse(emp);
+        log.info("Updated payroll bureau employee={} tenant={} changeHeld={}", employeeId, tenantId.getValue(), held);
+        return toEmployeeResponse(emp, held);
     }
 
     @Transactional(readOnly = true)
@@ -794,13 +803,13 @@ public class PayrollBureauService {
 
 
     //-- Mapper ------------------------------------
-    private PayEmployeeResponse toEmployeeResponse(PayEmployee e) {
+    private PayEmployeeResponse toEmployeeResponse(PayEmployee e, boolean changePending) {
         return new PayEmployeeResponse(e.getId(), e.getEmployeeNumber(), e.getFirstName(), e.getLastName(),
                 e.getFullName(), e.getIdNumber(), e.getTaxNumber(), e.getDateOfBirth(), e.getEmail(), e.getPhone(),
                 e.getGrossSalary(), e.getTravelAllowance(),
                 e.getPensionContribution(), e.getMedicalAidContribution(), e.getBankName(),
                 e.getBankAccountNumber(), e.getBankBranchCode(), e.getStartDate(), e.getEndDate(),
-                e.getStatus(), e.getCreatedAt());
+                e.getStatus(), e.getCreatedAt(), changePending);
     }
 
     private PayRunResponse toPayRunResponse(PayRun r) {

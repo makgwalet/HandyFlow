@@ -86,3 +86,12 @@ Totals: EXISTS 0 (nothing fully meets the plan), DEFECTIVE 3, PARTIAL 7, MISSING
 - D9 fixed for the bureau: processing a run is refused (422 `NO_TAX_TABLES`) when the tax year has no PAYE tables. The shared calculator itself is unchanged because HR uses it too.
 - D11 fixed: `PayRunRepository.findByClient` takes the tenant id.
 - Test: `PayrollBureauSafetyTest` (Mockito, not run in the sandbox).
+
+## Update: held salary and bank-detail changes (patch 0181, audit D4)
+Rules you chose: a new permission `PAYROLLBUREAU_APPROVE` decides; the person who made a change cannot approve or reject it (they can cancel their own request); held fields are gross salary, travel allowance, pension, medical aid, bank name, account number and branch code.
+- Editing an employee still saves ID, tax number, date of birth, email and phone at once. A change to any held field creates a PENDING request (V947, table `pay_employee_change_requests`) and the employee keeps the old values until approval. Payroll runs use the old values meanwhile.
+- One open request per employee (database-enforced). Approval refuses with 409 `CHANGE_STALE` if the employee's held fields changed after the request was made.
+- Endpoints: `GET /clients/{id}/employee-changes`, `POST /employee-changes/{id}/approve|reject` (APPROVE permission), `POST /employee-changes/{id}/cancel` (MANAGE/ADMIN, requester only).
+- V947 grants the new permission to every tenant's ADMIN role. A bureau with one user cannot approve its own changes: give a second user a role with `PAYROLLBUREAU_APPROVE`.
+- Screen: "Change awaiting approval" on the employee row and a "Changes awaiting approval" panel on the Employees tab.
+- Still open: D3 (encryption of ID, tax and bank numbers). The history table keeps bank numbers in plain text too, so D3 must cover it.
