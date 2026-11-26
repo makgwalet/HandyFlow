@@ -31,7 +31,7 @@ The fix is the same one used in every table since V913: `COALESCE(char_length(bt
 | C6 | authorities, sites, accreditations, scopes, qualifications, programmes, modules | Names, titles and codes of at least 2 characters after trimming | Only NOT NULL today, so a space is accepted |
 | C7 | accreditations, qualifications | `accreditation_number`, `official_ref` and `saqa_id` are NULL or non-blank | A blank string is accepted and blocks the unique indexes |
 | C8 | programme_versions, accreditation_events | An override reason, when present, is 10+ characters | Not enforced today |
-| C9 | accreditations, programme_offerings | `submitted_on <= approval_date`; a withdrawal is not before `offered_from` | Not enforced today |
+| C9 | accreditations, programme_offerings | `submitted_on <= approval_date` (enforced by V930); a withdrawal is not before `offered_from` (audit only: it needs `timestamptz::date`, which is not immutable, so it cannot be a CHECK) | Not enforced today |
 | C10 | accreditations | Status REJECTED, SUSPENDED, WITHDRAWN, MORE_INFORMATION_REQUIRED or EXPIRED needs a reason of 10+ characters | The service requires it, the database does not |
 
 Not duplicated, because they are already correct: the status and type enumerations, NQF level 1–10, credits and hours not negative, the date-order checks on accreditations, scopes and qualification registration, the approved-has-number rule, the live-unique indexes, `ck_trainprov_prog_accredited_has_qual`, and `ck_trainprov_progver_approved`.
@@ -56,10 +56,23 @@ Not duplicated, because they are already correct: the status and type enumeratio
 psql -h <host> -U <read-only user> -d <database> -f platform/src/main/resources/db/audit/trainprov_v911_v912_check_audit.sql
 ```
 
-An empty result means no existing row breaks any proposed constraint, and all of them can be added as written. Each row of output is one check with its count. Send me that output and I will build 0163 around it.
+An empty result means no existing row breaks any proposed constraint, and all of them can be added as written. Each row of output is one check with its count. Send me that output and I will build 0163 (done, see below) around it.
 
 ## Checks done for this patch
 
 - The script runs without error on a PostgreSQL 16 with all migrations applied, and returns no rows on clean data.
 - With deliberately invalid rows inserted in a transaction that was rolled back, the script reported C1, C2, C3, C4 and C6 as expected.
 - The Flyway numbers are unchanged (no migration is added).
+
+## 0163: what V930 does
+
+`V930__trainprov_check_hardening.sql` adds C1 to C10 as NULL-safe CHECK constraints (23 constraints; six replace the weak V911/V912 versions, the rest are new). Every one is added `NOT VALID`:
+
+- New rows and changed rows are checked from the moment the migration runs.
+- Existing rows are not examined, rewritten, defaulted or deleted, so the migration cannot fail on old data.
+- A legacy row that already breaks a constraint cannot be updated until it is corrected. This is deliberate: nothing is fixed silently.
+- After you have reviewed the audit output and corrected any violating rows, run `db/audit/trainprov_v911_v912_validate_constraints.sql` one statement at a time. A statement that finds a bad row fails and changes nothing.
+
+Left out because they still need your decision: cross-tenant composite foreign keys, the `effective_from` rule for approved programme versions, the accreditation-events immutability trigger. The withdrawn-before-offered half of C9 stays audit-only (see the table).
+
+Tested on PostgreSQL 16: with violators seeded under the old rules, V930 applies, existing rows are untouched, each new violation is rejected, VALIDATE fails while violators exist and succeeds on a constraint with none.

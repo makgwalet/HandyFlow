@@ -49,7 +49,7 @@ WITH checks AS (
       FROM trainprov_programme_versions WHERE approval_override_reason IS NOT NULL AND char_length(btrim(approval_override_reason)) < 10
     UNION ALL SELECT 'C8', 'trainprov_accreditation_events', 'override_reason shorter than 10 characters', id
       FROM trainprov_accreditation_events WHERE override_reason IS NOT NULL AND char_length(btrim(override_reason)) < 10
-    -- C9: dates must be in order
+    -- C9: dates must be in order (the withdrawn-before-offered check is audit-only: timestamptz::date is not immutable, so V930 cannot enforce it)
     UNION ALL SELECT 'C9', 'trainprov_accreditations', 'submitted_on is after approval_date', id
       FROM trainprov_accreditations WHERE submitted_on IS NOT NULL AND approval_date IS NOT NULL AND submitted_on > approval_date
     UNION ALL SELECT 'C9', 'trainprov_programme_offerings', 'withdrawn before it was offered from', id
