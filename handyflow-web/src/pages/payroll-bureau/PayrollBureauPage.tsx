@@ -1218,7 +1218,7 @@ function DeadlinesTab({ client }: { client: PayClient }) {
         <Table headers={["Type", "Period", "Due Date", "Status", ""]}>
           {deadlines.map(d => (
             <tr key={d.id} style={rowStyle}>
-              <td style={cellStyle}>{d.deadlineType}</td>
+              <td style={cellStyle}>{d.deadlineType === "EMP501_INTERIM" ? "EMP501 interim" : d.deadlineType}</td>
               <td style={cellStyle}>{d.periodMonth ? `${d.periodYear}/${String(d.periodMonth).padStart(2, "0")}` : d.periodYear}</td>
               <td style={cellStyle}>{fmtD(d.adjustedDueDate)}</td>
               <td style={cellStyle}><StatusBadge status={d.status} /></td>

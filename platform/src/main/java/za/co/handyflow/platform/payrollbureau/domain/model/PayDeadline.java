@@ -31,7 +31,7 @@ public class PayDeadline {
     private UUID payClientId;
 
     @Column(name = "deadline_type", nullable = false)
-    private String deadlineType; // EMP201 | EMP501
+    private String deadlineType; // EMP201 | EMP501 | EMP501_INTERIM
 
     @Column(name = "period_year", nullable = false)
     private int periodYear;

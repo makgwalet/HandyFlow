@@ -5,9 +5,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import za.co.handyflow.platform.payrollbureau.domain.model.PayClient;
 import za.co.handyflow.platform.payrollbureau.domain.model.PayDeadline;
+import za.co.handyflow.platform.payrollbureau.domain.rules.DeadlineRules;
 import za.co.handyflow.platform.shared.PublicHolidayRepository;
 
-import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
@@ -34,7 +34,8 @@ import java.util.UUID;
  * RULES (confirmed against accountant.DeadlineEngine's actual
  * implementation, not assumed):
  *   EMP201 — 7th of each month; if weekend/public holiday, prior business day
- *   EMP501 — 31 May annually; same business-day adjustment
+ *   EMP501 — 31 May annually (window 1 April to 31 May); same business-day adjustment
+ *   EMP501_INTERIM — 31 October (window 21 September to 31 October; 2026 dates from SARS notice)
  */
 @Slf4j
 @Component
@@ -60,19 +61,15 @@ public class PayDeadlineEngine {
         LocalDate adjusted = adjustForBusinessDay(raw);
         deadlines.add(PayDeadline.create(tenantId, clientId, "EMP501", year, null, raw, adjusted));
 
+        // EMP501 interim (1 March to 31 August), submission window 21 September to 31 October
+        LocalDate interimRaw = LocalDate.of(year, 10, 31);
+        deadlines.add(PayDeadline.create(tenantId, clientId, "EMP501_INTERIM", year, null, interimRaw, adjustForBusinessDay(interimRaw)));
+
         log.info("Generated {} payroll deadlines for client={} year={}", deadlines.size(), clientId, year);
         return deadlines;
     }
 
     public LocalDate adjustForBusinessDay(LocalDate date) {
-        LocalDate adjusted = date;
-        while (isWeekend(adjusted) || holidayRepo.existsByDate(adjusted)) {
-            adjusted = adjusted.minusDays(1);
-        }
-        return adjusted;
-    }
-
-    private boolean isWeekend(LocalDate date) {
-        return date.getDayOfWeek() == DayOfWeek.SATURDAY || date.getDayOfWeek() == DayOfWeek.SUNDAY;
+        return DeadlineRules.lastBusinessDayOnOrBefore(date, holidayRepo::existsByDate);
     }
 }
