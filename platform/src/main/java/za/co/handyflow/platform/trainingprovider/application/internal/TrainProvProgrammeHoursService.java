@@ -68,7 +68,7 @@ public class TrainProvProgrammeHoursService {
         TrainProvProgrammeVersion v = version(t, versionId);
         guardRun(v::requireDraft);
         TrainProvProgrammeWorkplaceHours h = hours.findLive(t, versionId).orElseThrow(() -> new HandyFlowException("This version records no workplace hours.", HttpStatus.CONFLICT, "TP_PROGRAMME_HOURS_STATE"));
-        guard(() -> h.withdraw(reason, by));
+        guardRun(() -> h.withdraw(reason, by));
         hours.save(h);
         return get(t, versionId);
     }
