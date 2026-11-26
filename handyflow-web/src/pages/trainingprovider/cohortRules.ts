@@ -8,7 +8,7 @@ export type Cohort = {
   members: number; facilitators: number; nextStatuses: string[]
 }
 export type Member = { id: string; enrolmentId: string; enrolmentNo: string; learnerId: string | null; learnerName: string; enrolmentStatus: string; status: string; removedReason: string | null; addedAt: string }
-export type CohortFacilitator = { id: string; practitionerId: string; practitionerNo: string; name: string; appointmentId: string; standing: string; standingNote: string; status: string; removedReason: string | null }
+export type CohortFacilitator = { id: string; practitionerId: string; practitionerNo: string; name: string; appointmentId: string; standing: string; standingNote: string; status: string; removedReason: string | null; sitePermission?: string; sitePermissionNote?: string }
 export type CohortEvent = { id: string; action: string; note: string | null; actedBy: string; actedAt: string }
 export type CohortDetail = { cohort: Cohort; members: Member[]; facilitators: CohortFacilitator[]; history: CohortEvent[] }
 export type Slot = {

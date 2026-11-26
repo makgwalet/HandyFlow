@@ -188,6 +188,7 @@ function People({ detail, canManage, onChanged }: { detail: CohortDetail; canMan
           <div key={f.id} style={card}>
             <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}><div><strong>{f.name}</strong><div style={muted}>{f.practitionerNo}</div></div><Badge text={f.status === "ACTIVE" ? "Assigned" : "Removed"} tone={f.status === "ACTIVE" ? "good" : "neutral"} /></div>
             {f.status === "ACTIVE" && f.standing !== "VERIFIED_IN_FORCE" && <div role="alert" style={{ fontSize: 12, color: "var(--hf-warning-text-strong)" }}>Appointment today: {f.standingNote}</div>}
+            {f.status === "ACTIVE" && f.sitePermission && f.sitePermission !== "COVERED" && <div role="alert" style={{ fontSize: 12, color: "var(--hf-warning-text-strong)" }}>{f.sitePermissionNote}. This is a prompt to check, not a block.</div>}
             {f.removedReason && <div style={muted}>Removed: {f.removedReason}</div>}
             {f.status === "ACTIVE" && removeBox("cohort-facilitators", f.id)}
           </div>

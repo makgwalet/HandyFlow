@@ -47,6 +47,7 @@ class TrainProvCohortServiceTest {
     @Mock TrainProvLearnerRepository learners;
     @Mock TrainProvPractitionerRepository practitioners;
     @Mock TrainProvPractitionerAppointmentRepository appointments;
+    @Mock TrainProvSitePermissionRepository sitePermissions;
     @Mock TrainProvNumberGenerator numbers;
     @InjectMocks TrainProvCohortService service;
 

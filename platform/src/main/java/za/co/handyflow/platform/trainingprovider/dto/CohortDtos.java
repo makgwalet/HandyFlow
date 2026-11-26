@@ -47,7 +47,7 @@ public final class CohortDtos {
     }
 
     public record FacilitatorView(UUID id, UUID practitionerId, String practitionerNo, String name, UUID appointmentId, String standing,
-                                  String standingNote, String status, String removedReason) {
+                                  String standingNote, String status, String removedReason, String sitePermission, String sitePermissionNote) {
     }
 
     public record EventView(UUID id, String action, String note, UUID actedBy, Instant actedAt) {

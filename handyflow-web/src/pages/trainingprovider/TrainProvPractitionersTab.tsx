@@ -9,6 +9,7 @@ import { EMPLOYMENT, ROLES, label, type Eligible, type Practitioner } from "./pr
 import { Badge, SubTabs } from "./tpUi"
 import { card, input, muted, solid, todayIso, unwrap } from "./tpStyle"
 import { PRC, useActiveProgrammes } from "./tpApi"
+import TrainProvSitePermissionsPanel from "./TrainProvSitePermissionsPanel"
 import TrainProvPractitionerDetail, { PersonFormPanel } from "./TrainProvPractitionerDetail"
 
 function People({ canManage, onOpen }: { canManage: boolean; onOpen: (id: string) => void }) {
@@ -74,8 +75,8 @@ export default function TrainProvPractitionersTab() {
   if (openId) return <TrainProvPractitionerDetail id={openId} onBack={() => setOpenId(null)} />
   return (
     <div style={{ display: "grid", gap: 12 }}>
-      <SubTabs tabs={[["people", "People"], ["eligible", "Who can be used"]]} value={tab} onChange={setTab} />
-      {tab === "people" ? <People canManage={canManage} onOpen={setOpenId} /> : <EligibleList />}
+      <SubTabs tabs={[["people", "People"], ["eligible", "Who can be used"], ["sites", "Site permissions"]]} value={tab} onChange={setTab} />
+      {tab === "people" ? <People canManage={canManage} onOpen={setOpenId} /> : tab === "sites" ? <TrainProvSitePermissionsPanel /> : <EligibleList />}
     </div>
   )
 }

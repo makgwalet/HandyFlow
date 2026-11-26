@@ -12,6 +12,7 @@ import za.co.handyflow.platform.trainingprovider.domain.repository.*;
 import za.co.handyflow.platform.trainingprovider.domain.rules.CatalogueRules;
 import za.co.handyflow.platform.trainingprovider.domain.rules.CohortRules;
 import za.co.handyflow.platform.trainingprovider.domain.rules.PractitionerRules;
+import za.co.handyflow.platform.trainingprovider.domain.rules.SitePermissionRules;
 import za.co.handyflow.platform.trainingprovider.dto.CohortDtos.*;
 
 import java.time.LocalDate;
@@ -45,6 +46,7 @@ public class TrainProvCohortService {
     private final TrainProvLearnerRepository learners;
     private final TrainProvPractitionerRepository practitioners;
     private final TrainProvPractitionerAppointmentRepository appointments;
+    private final TrainProvSitePermissionRepository sitePermissions;
     private final TrainProvNumberGenerator numbers;
 
     // ---- venues ----
@@ -193,7 +195,8 @@ public class TrainProvCohortService {
                     ? "This person has no facilitator appointment for the programme" : problem, HttpStatus.CONFLICT, "TP_COHORT_STATE");
         }
         facilitators.save(TrainProvCohortFacilitator.create(t, cohortId, p.getId(), appt.get().getId(), by));
-        events.save(TrainProvCohortEvent.of(t, cohortId, "FACILITATOR_ASSIGNED", p.fullName(), by));
+        String cover = sitePermissionCover(t, p.getId(), c.getSiteId(), c.getProgrammeId(), c.getStartDate() != null && c.getStartDate().isAfter(today) ? c.getStartDate() : today);
+        events.save(TrainProvCohortEvent.of(t, cohortId, "FACILITATOR_ASSIGNED", p.fullName() + (SitePermissionRules.COVERED.equals(cover) ? "" : ". Note: " + SitePermissionRules.note(cover)), by));
         return detail(t, cohortId, today);
     }
 
@@ -262,8 +265,15 @@ public class TrainProvCohortService {
     private FacilitatorView facilitatorView(TenantId t, TrainProvCohortFacilitator f, LocalDate today) {
         TrainProvPractitioner p = practitioners.findForTenant(t, f.getPractitionerId()).orElse(null);
         PractitionerRules.Standing s = appointments.findForTenant(t, f.getAppointmentId()).map(a -> a.standingOn(today)).orElse(PractitionerRules.Standing.NOT_VERIFIED);
+        TrainProvCohort c = cohorts.findForTenant(t, f.getCohortId()).orElse(null);
+        String cover = c == null ? SitePermissionRules.NOT_RECORDED : sitePermissionCover(t, f.getPractitionerId(), c.getSiteId(), c.getProgrammeId(), today);
         return new FacilitatorView(f.getId(), f.getPractitionerId(), p == null ? "" : p.getPractitionerNo(), p == null ? "" : p.fullName(), f.getAppointmentId(),
-                s.name(), s.note(), f.getStatus(), f.getRemovedReason());
+                s.name(), s.note(), f.getStatus(), f.getRemovedReason(), cover, SitePermissionRules.note(cover));
+    }
+
+    /** Whether a site permission is recorded for the person as facilitator at the cohort's site. A prompt to look, never a block. */
+    private String sitePermissionCover(TenantId t, UUID practitionerId, UUID siteId, UUID programmeId, LocalDate day) {
+        return SitePermissionRules.coverOn(sitePermissions.liveFor(t, practitionerId, siteId, PractitionerRules.FACILITATOR).stream().map(TrainProvSitePermission::asRule).toList(), programmeId, day);
     }
 
     private TrainProvVenue venue(TenantId t, UUID id) {
