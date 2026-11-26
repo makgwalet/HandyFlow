@@ -95,3 +95,11 @@ Rules you chose: a new permission `PAYROLLBUREAU_APPROVE` decides; the person wh
 - V947 grants the new permission to every tenant's ADMIN role. A bureau with one user cannot approve its own changes: give a second user a role with `PAYROLLBUREAU_APPROVE`.
 - Screen: "Change awaiting approval" on the employee row and a "Changes awaiting approval" panel on the Employees tab.
 - Still open: D3 (encryption of ID, tax and bank numbers). The history table keeps bank numbers in plain text too, so D3 must cover it.
+
+## Update: payslip delivery tracking (patch 0182, audit D10)
+- V948 adds `pay_payslip_deliveries`: one row per payslip with status SENT, FAILED or NO_EMAIL, the address used, attempt count and last error.
+- Emailing a run now sends only payslips not yet SENT, so clicking again is safe and retries just the failures. `?resendAll=true` sends to everyone again.
+- One failed email no longer stops the rest. The result lists failed employees.
+- The daily auto-send job retries a failed payslip up to 3 times, and marks the run done only when nothing retryable is left. Payslips that still fail after 3 attempts stay FAILED for a person to re-send by hand.
+- Dialog "Payslips Sent" shows failed and already-sent counts.
+- Not done: a screen test for the dialog (it sits inside the large page component), and no list of past delivery rows in the UI yet.

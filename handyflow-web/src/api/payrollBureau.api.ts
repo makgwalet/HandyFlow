@@ -10,7 +10,7 @@
 // adjusting against the real CreatePayEmployeeDocumentRequest.
 import { apiClient } from "./client"
 import type {
-  PayEmployeeChange,
+  PayEmployeeChange, EmailResult,
   PayClient, PayEmployee, PayRun, Payslip, PayDeadline, PayFeeNote, PortalAccessGrant,
 } from "../types/payrollBureau.types"
 
@@ -44,7 +44,7 @@ export const payrollBureauApi = {
   decideEmployeeChange: (changeId: string, action: "approve" | "reject" | "cancel", note?: string) =>
     apiClient.post(`/api/v1/payroll-bureau/employee-changes/${changeId}/${action}`, action === "cancel" ? undefined : { note }).then(r => r.data as PayEmployeeChange),
   emailPayslips: (payRunId: string) =>
-    apiClient.post(`/api/v1/payroll-bureau/pay-runs/${payRunId}/payslips/email`).then(r => r.data as { sent: number; skippedNoEmail: number; skippedEmployeeNames: string[] }),
+    apiClient.post(`/api/v1/payroll-bureau/pay-runs/${payRunId}/payslips/email`).then(r => r.data as EmailResult),
   downloadPayslipPdf: (payRunId: string, payslipId: string) =>
     apiClient.get(`/api/v1/payroll-bureau/pay-runs/${payRunId}/payslips/${payslipId}/pdf`, { responseType: "blob" }).then(r => r.data as Blob),
 

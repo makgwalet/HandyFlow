@@ -7,6 +7,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 import za.co.handyflow.platform.payrollbureau.domain.model.PayRun;
 import za.co.handyflow.platform.payrollbureau.domain.repository.PayRunRepository;
+import za.co.handyflow.platform.payrollbureau.domain.rules.DeliveryRules;
 import za.co.handyflow.platform.shared.TenantId;
 
 import java.time.LocalDate;
@@ -69,10 +70,14 @@ public class PayrollBureauAutoSendScheduler {
                 // send attempt itself blew up (e.g. a DB error), in
                 // which case we deliberately do NOT mark it auto-sent,
                 // so tomorrow's run picks it up and retries.
-                bureauService.emailPayslips(TenantId.of(run.getTenantId()), run.getId());
-                run.markPayslipsAutoSent();
-                payRunRepo.save(run);
-                sent++;
+                var result = bureauService.emailPayslips(TenantId.of(run.getTenantId()), run.getId(), false, true);
+                // Failures that can still be retried leave the run unmarked, so tomorrow's job
+                // tries only those payslips again (audit D10).
+                if (DeliveryRules.runIsSettled(result.stillRetryable())) {
+                    run.markPayslipsAutoSent();
+                    payRunRepo.save(run);
+                    sent++;
+                }
             } catch (Exception e) {
                 log.error("Auto-send failed for pay run={} tenant={}: {}",
                         run.getId(), run.getTenantId(), e.getMessage(), e);

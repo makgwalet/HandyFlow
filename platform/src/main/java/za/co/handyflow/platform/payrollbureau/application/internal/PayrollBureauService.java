@@ -13,6 +13,7 @@ import za.co.handyflow.platform.accounting.dto.CreateJournalEntryRequest;
 import za.co.handyflow.platform.accounting.dto.JournalEntryResponse;
 import za.co.handyflow.platform.payrollbureau.domain.model.*;
 import za.co.handyflow.platform.payrollbureau.domain.repository.*;
+import za.co.handyflow.platform.payrollbureau.domain.rules.DeliveryRules;
 import za.co.handyflow.platform.payrollbureau.dto.*;
 import za.co.handyflow.platform.shared.HandyFlowException;
 import za.co.handyflow.platform.shared.ResourceNotFoundException;
@@ -70,6 +71,7 @@ public class PayrollBureauService {
     // subtotal.multiply(new BigDecimal("0.15")) fallback below.
     private final VatRateProvider vatRateProvider;
     private final PayEmployeeChangeService changeService;
+    private final PayslipDeliveryRepository deliveryRepo;
 
     @Value("${app.frontend.url:http://localhost:5173}")
     private String frontendUrl;
@@ -665,40 +667,77 @@ public class PayrollBureauService {
         return payslipPdfGenerator.generate(payslip, emp, run, client, tryLoadLogoBytes(tenantId, client));
     }
 
-    public record PayslipDeliveryResult(int sent, int skippedNoEmail, List<String> skippedEmployeeNames) {}
+    public record PayslipDeliveryResult(int sent, int skippedNoEmail, List<String> skippedEmployeeNames,
+                                        int failed, List<String> failedEmployeeNames, int alreadySent,
+                                        int stillRetryable) {}
 
-    @Transactional(readOnly = true)
+    /** Sends every payslip not yet sent. Anything already SENT is skipped, so it is safe to click again. */
+    @Transactional
     public PayslipDeliveryResult emailPayslips(TenantId tenantId, UUID payRunId) {
+        return emailPayslips(tenantId, payRunId, false, false);
+    }
+
+    /**
+     * @param resendAll  send again even to payslips already SENT (a person asked for it)
+     * @param automatic  true from the daily job, which stops retrying a payslip after
+     *                   {@link DeliveryRules#MAX_AUTO_ATTEMPTS} failed attempts
+     */
+    @Transactional
+    public PayslipDeliveryResult emailPayslips(TenantId tenantId, UUID payRunId, boolean resendAll, boolean automatic) {
         PayRun run = payRunRepo.findByTenantAndId(tenantId.getValue(), payRunId)
                 .orElseThrow(() -> new ResourceNotFoundException("PayRun", payRunId.toString()));
         PayClient client = findActiveClient(tenantId, run.getPayClientId());
-        // FIX: logoBytes was referenced inside the loop below but never
-        // actually declared anywhere in this method — the exact
-        // "Cannot resolve symbol 'logoBytes'" compile error. Loaded once
-        // here, outside the loop, since it's the same file for every
-        // employee in this run — no reason to hit EvidenceFacade.download()
-        // once per employee for identical bytes.
         byte[] logoBytes = tryLoadLogoBytes(tenantId, client);
         List<Payslip> payslips = payslipRepo.findByPayRun(tenantId.getValue(), payRunId);
+        java.util.Map<UUID, PayslipDelivery> records = new java.util.HashMap<>();
+        for (PayslipDelivery d : deliveryRepo.findByRun(tenantId.getValue(), payRunId)) records.put(d.getPayslipId(), d);
 
-        int sent = 0;
+        int sent = 0, alreadySent = 0, stillRetryable = 0;
         List<String> skipped = new ArrayList<>();
+        List<String> failedNames = new ArrayList<>();
         for (Payslip p : payslips) {
+            PayslipDelivery rec = records.get(p.getId());
+            if (!DeliveryRules.shouldSend(rec == null ? null : rec.getStatus(), rec == null ? 0 : rec.getAttempts(),
+                    resendAll, automatic)) {
+                if (rec != null && "SENT".equals(rec.getStatus())) alreadySent++;
+                else if (rec != null && "FAILED".equals(rec.getStatus())) failedNames.add(nameOf(tenantId, p));
+                continue;
+            }
+            if (rec == null) rec = PayslipDelivery.forPayslip(tenantId.getValue(), p);
             PayEmployee emp = employeeRepo.findActiveById(tenantId.getValue(), p.getPayEmployeeId()).orElse(null);
             if (emp == null || emp.getEmail() == null || emp.getEmail().isBlank()) {
                 skipped.add(emp != null ? emp.getFirstName() + " " + emp.getLastName() : "Unknown");
+                rec.noEmail();
+                deliveryRepo.save(rec);
                 continue;
             }
-            byte[] pdf = payslipPdfGenerator.generate(p, emp, run, client, logoBytes);
-            String subject = "Payslip — " + run.getPayRunNumber();
-            String body = "Dear " + emp.getFirstName() + ",\n\nPlease find your payslip for "
-                    + run.getPeriodStart() + " to " + run.getPeriodEnd() + " attached.\n\n"
-                    + "Net pay: R " + p.getNetPay().setScale(2, java.math.RoundingMode.HALF_UP);
-            emailService.sendWithAttachment(emp.getEmail(), subject, body, "payslip.pdf", pdf);
-            sent++;
+            try {
+                byte[] pdf = payslipPdfGenerator.generate(p, emp, run, client, logoBytes);
+                String subject = "Payslip — " + run.getPayRunNumber();
+                String body = "Dear " + emp.getFirstName() + ",\n\nPlease find your payslip for "
+                        + run.getPeriodStart() + " to " + run.getPeriodEnd() + " attached.\n\n"
+                        + "Net pay: R " + p.getNetPay().setScale(2, java.math.RoundingMode.HALF_UP);
+                emailService.sendWithAttachment(emp.getEmail(), subject, body, "payslip.pdf", pdf);
+                rec.sent(emp.getEmail());
+                sent++;
+            } catch (Exception e) {
+                rec.failed(emp.getEmail(), e.getMessage());
+                failedNames.add(emp.getFirstName() + " " + emp.getLastName());
+                if (rec.getAttempts() < DeliveryRules.MAX_AUTO_ATTEMPTS) stillRetryable++;
+                log.warn("Payslip email failed run={} employee={} attempt={}: {}",
+                        payRunId, emp.getId(), rec.getAttempts(), e.getMessage());
+            }
+            deliveryRepo.save(rec);
         }
-        log.info("Payslip email delivery run={} sent={} skipped={}", payRunId, sent, skipped.size());
-        return new PayslipDeliveryResult(sent, skipped.size(), skipped);
+        log.info("Payslip email delivery run={} sent={} alreadySent={} failed={} noEmail={}",
+                payRunId, sent, alreadySent, failedNames.size(), skipped.size());
+        return new PayslipDeliveryResult(sent, skipped.size(), skipped, failedNames.size(), failedNames,
+                alreadySent, stillRetryable);
+    }
+
+    private String nameOf(TenantId tenantId, Payslip p) {
+        return employeeRepo.findActiveById(tenantId.getValue(), p.getPayEmployeeId())
+                .map(e -> e.getFirstName() + " " + e.getLastName()).orElse("Unknown");
     }
 
     // Third real EvidenceFacade consumer — same shape as Recruitment

@@ -10,7 +10,7 @@
 // than silently unifying them.
 import { useEffect, useState } from "react"
 import { payrollBureauApi } from "../../api/payrollBureau.api"
-import type { PayClient, PayEmployee, PayRun, Payslip, PayDeadline, PayFeeNote, PortalAccessGrant, PayEmployeeChange } from "../../types/payrollBureau.types"
+import type { PayClient, PayEmployee, PayRun, Payslip, PayDeadline, PayFeeNote, PortalAccessGrant, PayEmployeeChange, EmailResult } from "../../types/payrollBureau.types"
 import { required, validateSaId, validateTaxNumber, validateEmail, validatePhone,
   validatePositiveNumber, validateDayOfMonth, type FieldErrors } from "./validation"
 
@@ -826,7 +826,7 @@ function PayRunsTab({ client }: { client: PayClient }) {
   const [processingId, setProcessingId] = useState<string | null>(null)
   const [generatingFeeNoteFor, setGeneratingFeeNoteFor] = useState<PayRun | null>(null)
   const [emailingRunId, setEmailingRunId] = useState<string | null>(null)
-  const [emailResult, setEmailResult] = useState<{ sent: number; skippedNoEmail: number; skippedEmployeeNames: string[] } | null>(null)
+  const [emailResult, setEmailResult] = useState<EmailResult | null>(null)
   const [downloadingId, setDownloadingId] = useState<string | null>(null)
 
   const refetch = () => {
@@ -949,7 +949,14 @@ function PayRunsTab({ client }: { client: PayClient }) {
         <Modal title="Payslips Sent" onClose={() => setEmailResult(null)}>
           <p style={{ fontSize: 13.5, color: INK, marginBottom: 10 }}>
             <strong>{emailResult.sent}</strong> payslip{emailResult.sent !== 1 ? "s" : ""} emailed successfully.
+            {(emailResult.alreadySent ?? 0) > 0 && <> {emailResult.alreadySent} had already been sent and {emailResult.alreadySent === 1 ? "was" : "were"} not sent again.</>}
           </p>
+          {(emailResult.failed ?? 0) > 0 && (
+            <div role="alert" style={{ background: "var(--hf-danger-soft, #fef2f2)", border: "1px solid var(--hf-danger-border, #fecaca)", borderRadius: 6, padding: 12, marginBottom: 10, fontSize: 12.5, color: "var(--hf-danger-text, #b91c1c)" }}>
+              <strong>{emailResult.failed}</strong> payslip{emailResult.failed !== 1 ? "s" : ""} could not be sent
+              ({(emailResult.failedEmployeeNames ?? []).join(", ")}). Click "Email all" again to retry only those.
+            </div>
+          )}
           {emailResult.skippedNoEmail > 0 && (
             <div style={{ background: "var(--hf-warning-soft)", border: "1px solid var(--hf-warning-border)", borderRadius: 6, padding: 12, fontSize: 12.5, color: "var(--hf-warning-text-deep)" }}>
               <strong>{emailResult.skippedNoEmail}</strong> employee{emailResult.skippedNoEmail !== 1 ? "s have" : " has"} no email on file

@@ -19,6 +19,11 @@ export interface PayClient {
   createdAt: string
 }
 
+export interface EmailResult {
+  sent: number; skippedNoEmail: number; skippedEmployeeNames: string[]
+  failed?: number; failedEmployeeNames?: string[]; alreadySent?: number
+}
+
 export interface PayEmployeeChange {
   id: string
   payEmployeeId: string

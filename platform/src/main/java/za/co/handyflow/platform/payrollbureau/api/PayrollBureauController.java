@@ -189,11 +189,12 @@ public class PayrollBureauController {
 
     @PostMapping("/pay-runs/{payRunId}/payslips/email")
     @PreAuthorize("hasAnyAuthority('PAYROLLBUREAU_MANAGE','PAYROLLBUREAU_ADMIN')")
-    @Operation(summary = "Email every payslip in this run to employees who have an email on file")
-    public ResponseEntity<ApiResponse<PayrollBureauService.PayslipDeliveryResult>> emailPayslips(@PathVariable UUID payRunId) {
+    @Operation(summary = "Email payslips not yet sent (resendAll=true sends to everyone again); each result is recorded per employee")
+    public ResponseEntity<ApiResponse<PayrollBureauService.PayslipDeliveryResult>> emailPayslips(@PathVariable UUID payRunId,
+            @RequestParam(defaultValue = "false") boolean resendAll) {
         featureGuard.requireModule("payrollbureau");
         return ResponseEntity.ok(ApiResponse.success(
-                bureauService.emailPayslips(TenantContext.getTenantIdAsObject(), payRunId)));
+                bureauService.emailPayslips(TenantContext.getTenantIdAsObject(), payRunId, resendAll, false)));
     }
 
     @PutMapping("/clients/{clientId}/employees/{employeeId}")
