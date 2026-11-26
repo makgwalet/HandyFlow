@@ -13,8 +13,11 @@ import za.co.handyflow.platform.trainingprovider.domain.rules.PractitionerRules;
 import za.co.handyflow.platform.trainingprovider.domain.rules.TimetableRules;
 import za.co.handyflow.platform.trainingprovider.dto.TimetableDtos.*;
 
+import java.time.Instant;
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.TreeSet;
 import java.util.UUID;
 import java.util.function.Supplier;
 
@@ -23,7 +26,10 @@ import java.util.function.Supplier;
  * places at once, the cohort cannot be in two places at once, and the facilitator must be assigned to the cohort and have an appointment
  * that is checked and in force on the slot's own date. Slots are cancelled with a reason, never deleted.
  *
- * The clash checks run in the service, so two requests at the same instant could both pass. The table is not yet protected against that.
+ * Clashes are found on real moments in time (a start and end with a time zone), for the venue, the facilitator, the cohort and every learner
+ * in the cohort. A clash is refused unless an administrator approves it with a written reason; each approved clash is kept as an override
+ * record. Before checking, the request waits for any other booking in progress for the same venue, person, cohort or learner, so two
+ * requests cannot both pass. The table itself is not yet protected by a database exclusion constraint.
  */
 @Service
 @RequiredArgsConstructor
@@ -38,6 +44,8 @@ public class TrainProvTimetableService {
     private final TrainProvProgrammeModuleRepository modules;
     private final TrainProvPractitionerRepository practitioners;
     private final TrainProvPractitionerAppointmentRepository appointments;
+    private final TrainProvTimetableOverrideRepository overrides;
+    private final TrainProvLearnerRepository learners;
 
     public List<SlotView> forCohort(TenantId t, UUID cohortId) {
         TrainProvCohort c = cohort(t, cohortId);
@@ -54,29 +62,58 @@ public class TrainProvTimetableService {
         return slots.window(t, from, to, venueId, practitionerId, cohortId).stream().<SlotView>map(s -> view(t, s, null)).toList();
     }
 
-    @Transactional
     public SlotView add(TenantId t, UUID cohortId, SlotRequest r, UUID by) {
+        return add(t, cohortId, r, by, false);
+    }
+
+    /** mayApprove is true only for a caller with administrator authority; it is what lets overrideReason book over a clash. */
+    @Transactional
+    public SlotView add(TenantId t, UUID cohortId, SlotRequest r, UUID by, boolean mayApprove) {
         TrainProvCohort c = cohort(t, cohortId);
-        check(t, c, r, null);
+        Plan plan = plan(t, c, r, null, TimetableRules.DEFAULT_ZONE);
         TrainProvTimetableSlot s = guard(() -> TrainProvTimetableSlot.create(t, cohortId, r.title(), r.slotDate(), r.startTime(), r.endTime(),
-                r.moduleId(), r.venueId(), r.practitionerId(), by));
+                r.moduleId(), r.venueId(), r.practitionerId(), plan.zone(), by));
         slots.save(s);
+        recordOverrides(t, c, s, plan, r.overrideReason(), by, mayApprove);
         events.save(TrainProvCohortEvent.of(t, cohortId, "SLOT_ADDED", describe(s), by));
         return view(t, s, c.getName());
     }
 
-    @Transactional
     public SlotView change(TenantId t, UUID slotId, SlotRequest r, UUID by) {
+        return change(t, slotId, r, by, false);
+    }
+
+    @Transactional
+    public SlotView change(TenantId t, UUID slotId, SlotRequest r, UUID by, boolean mayApprove) {
         TrainProvTimetableSlot s = slot(t, slotId);
         if (!"SCHEDULED".equals(s.getStatus())) {
             throw new HandyFlowException("A cancelled slot cannot be changed", HttpStatus.CONFLICT, "TP_TIMETABLE_STATE");
         }
         TrainProvCohort c = cohort(t, s.getCohortId());
-        check(t, c, r, s.getId());
-        guard(() -> { s.change(r.title(), r.slotDate(), r.startTime(), r.endTime(), r.moduleId(), r.venueId(), r.practitionerId()); return null; });
+        Plan plan = plan(t, c, r, s.getId(), s.getTimeZone());
+        guard(() -> { s.change(r.title(), r.slotDate(), r.startTime(), r.endTime(), r.moduleId(), r.venueId(), r.practitionerId(), plan.zone()); return null; });
         slots.save(s);
+        recordOverrides(t, c, s, plan, r.overrideReason(), by, mayApprove);
         events.save(TrainProvCohortEvent.of(t, c.getId(), "SLOT_CHANGED", describe(s), by));
         return view(t, s, c.getName());
+    }
+
+    /** What would clash if this slot were booked, without booking it. slotId, when given, is the slot being changed. */
+    @Transactional
+    public ClashCheck check(TenantId t, UUID cohortId, SlotRequest r, UUID slotId) {
+        TrainProvCohort c = cohort(t, cohortId);
+        String zone = slotId == null ? TimetableRules.DEFAULT_ZONE : slot(t, slotId).getTimeZone();
+        Plan plan = plan(t, c, r, slotId, zone);
+        List<ClashView> views = plan.found().stream().map(Found::clash)
+                .map(k -> new ClashView(k.resourceType(), k.resourceId(), k.resourceLabel(), k.otherSlotId(), k.otherCohortId(), k.message())).toList();
+        return new ClashCheck(views.isEmpty(), views);
+    }
+
+    public List<OverrideView> overridesFor(TenantId t, UUID slotId) {
+        slot(t, slotId);
+        return overrides.findForSlot(t, slotId).stream().map(o -> new OverrideView(o.getId(), o.getSlotId(), o.getResourceType(), o.getResourceId(),
+                o.getResourceLabel(), o.getClashingSlotId(), o.getSlotStartsAt(), o.getSlotEndsAt(), o.getClashStartsAt(), o.getClashEndsAt(),
+                o.getReason(), o.getApprovedBy(), o.getApprovedAt())).toList();
     }
 
     @Transactional
@@ -91,8 +128,25 @@ public class TrainProvTimetableService {
 
     // ---- checks ----
 
-    private void check(TenantId t, TrainProvCohort c, SlotRequest r, UUID selfId) {
+    private record Found(TimetableRules.Clash clash, TrainProvTimetableSlot other) {
+    }
+
+    /** The moments the slot would occupy, the zone it was read in, and every clash it would cause. Throws for anything that is not a clash. */
+    private record Plan(String zone, Instant from, Instant to, List<Found> found) {
+    }
+
+    private Plan plan(TenantId t, TrainProvCohort c, SlotRequest r, UUID selfId, String defaultZone) {
         refuse(TimetableRules.slotProblem(r.title(), r.slotDate(), r.startTime(), r.endTime(), c.getStatus(), c.getStartDate(), c.getEndDate()));
+        String zone = r.timeZone() == null || r.timeZone().isBlank() ? defaultZone : r.timeZone().trim();
+        String zoneProblem = TimetableRules.zoneProblem(zone);
+        if (zoneProblem != null) {
+            throw new HandyFlowException(zoneProblem, HttpStatus.BAD_REQUEST, "TP_TIMETABLE_INVALID");
+        }
+        Instant from = TimetableRules.instant(r.slotDate(), r.startTime(), zone);
+        Instant to = TimetableRules.instant(r.slotDate(), r.endTime(), zone);
+        if (!to.isAfter(from)) {
+            throw new HandyFlowException("The end time must be after the start time", HttpStatus.BAD_REQUEST, "TP_TIMETABLE_INVALID");
+        }
         if (r.moduleId() != null) {
             TrainProvProgrammeModule m = modules.findForTenant(t, r.moduleId())
                     .orElseThrow(() -> new ResourceNotFoundException("TrainProvProgrammeModule", r.moduleId().toString()));
@@ -100,35 +154,92 @@ public class TrainProvTimetableService {
                 throw new HandyFlowException("That module belongs to a different version of the programme", HttpStatus.CONFLICT, "TP_TIMETABLE_STATE");
             }
         }
+        TrainProvVenue venue = null;
         if (r.venueId() != null) {
-            TrainProvVenue v = venues.findForTenant(t, r.venueId()).orElseThrow(() -> new ResourceNotFoundException("TrainProvVenue", r.venueId().toString()));
-            refuse(TimetableRules.venueProblem("ACTIVE".equals(v.getStatus()), v.getSiteId(), c.getSiteId(), v.getCapacity(), members.countActive(t, c.getId())));
-            for (TrainProvTimetableSlot other : slots.liveForVenueOn(t, v.getId(), r.slotDate())) {
-                if (!other.getId().equals(selfId) && TimetableRules.overlaps(r.startTime(), r.endTime(), other.getStartTime(), other.getEndTime())) {
-                    throw new HandyFlowException(v.getName() + " is already booked from " + other.getStartTime() + " to " + other.getEndTime() + " on " + r.slotDate(),
-                            HttpStatus.CONFLICT, "TP_TIMETABLE_CLASH");
-                }
-            }
+            venue = venues.findForTenant(t, r.venueId()).orElseThrow(() -> new ResourceNotFoundException("TrainProvVenue", r.venueId().toString()));
+            refuse(TimetableRules.venueProblem("ACTIVE".equals(venue.getStatus()), venue.getSiteId(), c.getSiteId(), venue.getCapacity(), members.countActive(t, c.getId())));
         }
+        TrainProvPractitioner person = null;
         if (r.practitionerId() != null) {
             TrainProvCohortFacilitator f = facilitators.findLive(t, c.getId(), r.practitionerId()).orElse(null);
             PractitionerRules.Standing standing = f == null ? PractitionerRules.Standing.NOT_VERIFIED
                     : appointments.findForTenant(t, f.getAppointmentId()).map(a -> a.standingOn(r.slotDate())).orElse(PractitionerRules.Standing.NOT_VERIFIED);
             refuse(TimetableRules.facilitatorProblem(f != null, standing, r.slotDate()));
-            for (TrainProvTimetableSlot other : slots.liveForPractitionerOn(t, r.practitionerId(), r.slotDate())) {
-                if (!other.getId().equals(selfId) && TimetableRules.overlaps(r.startTime(), r.endTime(), other.getStartTime(), other.getEndTime())) {
-                    throw new HandyFlowException("That facilitator is already teaching from " + other.getStartTime() + " to " + other.getEndTime() + " on " + r.slotDate(),
-                            HttpStatus.CONFLICT, "TP_TIMETABLE_CLASH");
+            person = practitioners.findForTenant(t, r.practitionerId()).orElse(null);
+        }
+        List<UUID> learnerIds = slots.activeLearnerIds(t, c.getId());
+        lockAll(t, c.getId(), r.venueId(), r.practitionerId(), learnerIds);
+
+        List<Found> found = new ArrayList<>();
+        if (venue != null) {
+            for (TrainProvTimetableSlot other : slots.liveForVenueBetween(t, venue.getId(), from, to)) {
+                if (!other.getId().equals(selfId)) {
+                    found.add(new Found(new TimetableRules.Clash(TimetableRules.VENUE, venue.getId(), venue.getName(), other.getId(), other.getCohortId(),
+                            venue.getName() + " is already booked from " + other.getStartTime() + " to " + other.getEndTime() + " on " + other.getSlotDate()), other));
                 }
             }
         }
-        for (TrainProvTimetableSlot other : slots.findForCohort(t, c.getId())) {
-            if (!other.getId().equals(selfId) && "SCHEDULED".equals(other.getStatus()) && other.getSlotDate().equals(r.slotDate())
-                    && TimetableRules.overlaps(r.startTime(), r.endTime(), other.getStartTime(), other.getEndTime())) {
-                throw new HandyFlowException("The cohort already has \"" + other.getTitle() + "\" from " + other.getStartTime() + " to " + other.getEndTime() + " that day",
-                        HttpStatus.CONFLICT, "TP_TIMETABLE_CLASH");
+        if (r.practitionerId() != null) {
+            String who = person == null ? "Facilitator" : person.fullName();
+            for (TrainProvTimetableSlot other : slots.liveForPractitionerBetween(t, r.practitionerId(), from, to)) {
+                if (!other.getId().equals(selfId)) {
+                    found.add(new Found(new TimetableRules.Clash(TimetableRules.PRACTITIONER, r.practitionerId(), who, other.getId(), other.getCohortId(),
+                            "That facilitator is already teaching from " + other.getStartTime() + " to " + other.getEndTime() + " on " + other.getSlotDate()), other));
+                }
             }
         }
+        for (TrainProvTimetableSlot other : slots.liveForCohortBetween(t, c.getId(), from, to)) {
+            if (!other.getId().equals(selfId)) {
+                found.add(new Found(new TimetableRules.Clash(TimetableRules.COHORT, c.getId(), c.getName(), other.getId(), other.getCohortId(),
+                        "The cohort already has \"" + other.getTitle() + "\" from " + other.getStartTime() + " to " + other.getEndTime() + " that day"), other));
+            }
+        }
+        if (!learnerIds.isEmpty()) {
+            for (Object[] row : slots.otherSlotsOfLearners(t, c.getId(), learnerIds, from, to)) {
+                TrainProvTimetableSlot other = (TrainProvTimetableSlot) row[0];
+                UUID learnerId = (UUID) row[1];
+                String name = learners.findForTenant(t, learnerId).map(l -> l.getFirstNames() + " " + l.getSurname()).orElse("A learner");
+                String otherCohort = cohorts.findForTenant(t, other.getCohortId()).map(TrainProvCohort::getName).orElse("another cohort");
+                found.add(new Found(new TimetableRules.Clash(TimetableRules.LEARNER, learnerId, name, other.getId(), other.getCohortId(),
+                        name + " is also in " + otherCohort + ", which has \"" + other.getTitle() + "\" from " + other.getStartTime() + " to "
+                                + other.getEndTime() + " on " + other.getSlotDate()), other));
+            }
+        }
+        return new Plan(zone, from, to, found);
+    }
+
+    /** Locks in a fixed order so two bookings that share several things cannot wait on each other. */
+    private void lockAll(TenantId t, UUID cohortId, UUID venueId, UUID practitionerId, List<UUID> learnerIds) {
+        TreeSet<String> keys = new TreeSet<>();
+        String prefix = "trainprov-timetable:" + t.getValue() + ":";
+        keys.add(prefix + "C:" + cohortId);
+        if (venueId != null) {
+            keys.add(prefix + "V:" + venueId);
+        }
+        if (practitionerId != null) {
+            keys.add(prefix + "P:" + practitionerId);
+        }
+        learnerIds.forEach(id -> keys.add(prefix + "L:" + id));
+        keys.forEach(slots::lock);
+    }
+
+    /** Refuses unless there are no clashes or an administrator approved them with a reason; then keeps one record per clash. */
+    private void recordOverrides(TenantId t, TrainProvCohort c, TrainProvTimetableSlot s, Plan plan, String reason, UUID by, boolean mayApprove) {
+        if (plan.found().isEmpty()) {
+            return;
+        }
+        List<TimetableRules.Clash> clashes = plan.found().stream().map(Found::clash).toList();
+        String problem = TimetableRules.overrideProblem(clashes, reason, mayApprove);
+        if (problem != null) {
+            boolean denied = TimetableRules.reasonOk(reason) && !mayApprove;
+            throw new HandyFlowException(problem, denied ? HttpStatus.FORBIDDEN : HttpStatus.CONFLICT,
+                    denied ? "TP_TIMETABLE_OVERRIDE_DENIED" : "TP_TIMETABLE_CLASH");
+        }
+        for (Found f : plan.found()) {
+            overrides.save(guard(() -> TrainProvTimetableOverride.of(t, s, f.clash(), f.other(), reason, by)));
+        }
+        events.save(TrainProvCohortEvent.of(t, c.getId(), "SLOT_OVERRIDE", describe(s) + " booked over " + plan.found().size() + " clash(es) with approval: "
+                + reason.trim(), by));
     }
 
     private static void refuse(String problem) {
@@ -154,7 +265,8 @@ public class TrainProvTimetableService {
             standingNote = st.note();
         }
         return new SlotView(s.getId(), s.getCohortId(), cName, s.getSlotDate(), s.getStartTime(), s.getEndTime(), s.getTitle(), s.getModuleId(), moduleTitle,
-                s.getVenueId(), venueName, s.getPractitionerId(), person, standingName, standingNote, s.getStatus(), s.getCancelledReason());
+                s.getVenueId(), venueName, s.getPractitionerId(), person, standingName, standingNote, s.getStatus(), s.getCancelledReason(),
+                s.getTimeZone(), s.getStartsAt(), s.getEndsAt(), overrides.countForSlot(t, s.getId()));
     }
 
     private static String describe(TrainProvTimetableSlot s) {

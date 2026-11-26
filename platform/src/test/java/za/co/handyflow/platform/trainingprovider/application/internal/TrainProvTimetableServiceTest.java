@@ -45,6 +45,8 @@ class TrainProvTimetableServiceTest {
     @Mock TrainProvProgrammeModuleRepository modules;
     @Mock TrainProvPractitionerRepository practitioners;
     @Mock TrainProvPractitionerAppointmentRepository appointments;
+    @Mock TrainProvTimetableOverrideRepository overrides;
+    @Mock TrainProvLearnerRepository learners;
     @InjectMocks TrainProvTimetableService service;
 
     private TrainProvCohort cohort() {
@@ -103,15 +105,15 @@ class TrainProvTimetableServiceTest {
     }
 
     @Test
-    void aVenueAlreadyBookedAtThatTimeIsRefusedButBackToBackIsFine() {
+    void aVenueAlreadyBookedAtThatTimeIsRefusedAndAFreeOneIsAccepted() {
         TrainProvCohort c = cohort();
         TrainProvVenue v = venue(SITE, "ACTIVE");
         when(cohorts.findForTenant(TENANT, c.getId())).thenReturn(Optional.of(c));
         when(venues.findForTenant(TENANT, v.getId())).thenReturn(Optional.of(v));
-        when(slots.liveForVenueOn(TENANT, v.getId(), DAY)).thenReturn(List.of(existing(UUID.randomUUID(), v.getId(), null, LocalTime.of(10, 0), LocalTime.of(12, 0))));
+        when(slots.liveForVenueBetween(eq(TENANT), eq(v.getId()), any(), any())).thenReturn(List.of(existing(UUID.randomUUID(), v.getId(), null, LocalTime.of(10, 0), LocalTime.of(12, 0))));
         assertThatThrownBy(() -> service.add(TENANT, c.getId(), request(v.getId(), null), USER))
                 .isInstanceOf(HandyFlowException.class).hasMessageContaining("already booked");
-        when(slots.liveForVenueOn(TENANT, v.getId(), DAY)).thenReturn(List.of(existing(UUID.randomUUID(), v.getId(), null, ELEVEN, LocalTime.of(13, 0))));
+        when(slots.liveForVenueBetween(eq(TENANT), eq(v.getId()), any(), any())).thenReturn(List.of());
         service.add(TENANT, c.getId(), request(v.getId(), null), USER);
         verify(slots, times(1)).save(any(TrainProvTimetableSlot.class));
     }
@@ -158,7 +160,7 @@ class TrainProvTimetableServiceTest {
         when(cohorts.findForTenant(TENANT, c.getId())).thenReturn(Optional.of(c));
         when(facilitators.findLive(TENANT, c.getId(), p.getId())).thenReturn(Optional.of(f));
         when(appointments.findForTenant(TENANT, a.getId())).thenReturn(Optional.of(a));
-        when(slots.liveForPractitionerOn(TENANT, p.getId(), DAY)).thenReturn(List.of(existing(UUID.randomUUID(), null, p.getId(), LocalTime.of(8, 0), LocalTime.of(10, 0))));
+        when(slots.liveForPractitionerBetween(eq(TENANT), eq(p.getId()), any(), any())).thenReturn(List.of(existing(UUID.randomUUID(), null, p.getId(), LocalTime.of(8, 0), LocalTime.of(10, 0))));
         assertThatThrownBy(() -> service.add(TENANT, c.getId(), request(null, p.getId()), USER))
                 .isInstanceOf(HandyFlowException.class).hasMessageContaining("already teaching");
     }
@@ -167,7 +169,7 @@ class TrainProvTimetableServiceTest {
     void theCohortCannotBeInTwoPlacesAtOnce() {
         TrainProvCohort c = cohort();
         when(cohorts.findForTenant(TENANT, c.getId())).thenReturn(Optional.of(c));
-        when(slots.findForCohort(TENANT, c.getId())).thenReturn(List.of(existing(c.getId(), null, null, LocalTime.of(10, 0), LocalTime.of(12, 0))));
+        when(slots.liveForCohortBetween(eq(TENANT), eq(c.getId()), any(), any())).thenReturn(List.of(existing(c.getId(), null, null, LocalTime.of(10, 0), LocalTime.of(12, 0))));
         assertThatThrownBy(() -> service.add(TENANT, c.getId(), request(null, null), USER))
                 .isInstanceOf(HandyFlowException.class).hasMessageContaining("already has");
     }
@@ -180,8 +182,8 @@ class TrainProvTimetableServiceTest {
         when(slots.findForTenant(TENANT, s.getId())).thenReturn(Optional.of(s));
         when(cohorts.findForTenant(TENANT, c.getId())).thenReturn(Optional.of(c));
         when(venues.findForTenant(TENANT, v.getId())).thenReturn(Optional.of(v));
-        when(slots.liveForVenueOn(TENANT, v.getId(), DAY)).thenReturn(List.of(s));
-        when(slots.findForCohort(TENANT, c.getId())).thenReturn(List.of(s));
+        when(slots.liveForVenueBetween(eq(TENANT), eq(v.getId()), any(), any())).thenReturn(List.of(s));
+        when(slots.liveForCohortBetween(eq(TENANT), eq(c.getId()), any(), any())).thenReturn(List.of(s));
         service.change(TENANT, s.getId(), new SlotRequest("Module 1 revised", DAY, NINE, LocalTime.of(12, 0), null, v.getId(), null), USER);
         assertThat(s.getTitle()).isEqualTo("Module 1 revised");
         assertThat(s.getEndTime()).isEqualTo(LocalTime.of(12, 0));
@@ -204,5 +206,105 @@ class TrainProvTimetableServiceTest {
     void theWindowNeedsSensibleDates() {
         assertThatThrownBy(() -> service.window(TENANT, DAY, DAY.minusDays(1), null, null, null)).isInstanceOf(HandyFlowException.class);
         assertThatThrownBy(() -> service.window(TENANT, DAY, DAY.plusDays(400), null, null, null)).isInstanceOf(HandyFlowException.class);
+    }
+
+    private TrainProvTimetableSlot venueClash(TrainProvVenue v) {
+        return existing(UUID.randomUUID(), v.getId(), null, LocalTime.of(10, 0), LocalTime.of(12, 0));
+    }
+
+    private SlotRequest overriding(UUID venue, String reason) {
+        return new SlotRequest("Module 1", DAY, NINE, ELEVEN, null, venue, null, null, reason);
+    }
+
+    @Test
+    void aClashIsRefusedWithoutAReasonEvenForAnAdministrator() {
+        TrainProvCohort c = cohort();
+        TrainProvVenue v = venue(SITE, "ACTIVE");
+        when(cohorts.findForTenant(TENANT, c.getId())).thenReturn(Optional.of(c));
+        when(venues.findForTenant(TENANT, v.getId())).thenReturn(Optional.of(v));
+        when(slots.liveForVenueBetween(eq(TENANT), eq(v.getId()), any(), any())).thenReturn(List.of(venueClash(v)));
+        assertThatThrownBy(() -> service.add(TENANT, c.getId(), overriding(v.getId(), "short"), USER, true))
+                .isInstanceOf(HandyFlowException.class).hasMessageContaining("written reason");
+        verify(overrides, never()).save(any());
+    }
+
+    @Test
+    void aClashWithAReasonIsRefusedForSomeoneWhoCannotApprove() {
+        TrainProvCohort c = cohort();
+        TrainProvVenue v = venue(SITE, "ACTIVE");
+        when(cohorts.findForTenant(TENANT, c.getId())).thenReturn(Optional.of(c));
+        when(venues.findForTenant(TENANT, v.getId())).thenReturn(Optional.of(v));
+        when(slots.liveForVenueBetween(eq(TENANT), eq(v.getId()), any(), any())).thenReturn(List.of(venueClash(v)));
+        assertThatThrownBy(() -> service.add(TENANT, c.getId(), overriding(v.getId(), "The room is large enough for both groups"), USER, false))
+                .isInstanceOf(HandyFlowException.class).hasMessageContaining("Only an administrator")
+                .satisfies(e -> assertThat(((HandyFlowException) e).getStatus()).isEqualTo(org.springframework.http.HttpStatus.FORBIDDEN));
+        verify(overrides, never()).save(any());
+    }
+
+    @Test
+    void anAdministratorCanBookOverAClashWithAReasonAndItIsRecorded() {
+        TrainProvCohort c = cohort();
+        TrainProvVenue v = venue(SITE, "ACTIVE");
+        TrainProvTimetableSlot other = venueClash(v);
+        when(cohorts.findForTenant(TENANT, c.getId())).thenReturn(Optional.of(c));
+        when(venues.findForTenant(TENANT, v.getId())).thenReturn(Optional.of(v));
+        when(slots.liveForVenueBetween(eq(TENANT), eq(v.getId()), any(), any())).thenReturn(List.of(other));
+        service.add(TENANT, c.getId(), overriding(v.getId(), "The room is large enough for both groups"), USER, true);
+        org.mockito.ArgumentCaptor<TrainProvTimetableOverride> o = org.mockito.ArgumentCaptor.forClass(TrainProvTimetableOverride.class);
+        verify(overrides).save(o.capture());
+        assertThat(o.getValue().getResourceType()).isEqualTo("VENUE");
+        assertThat(o.getValue().getClashingSlotId()).isEqualTo(other.getId());
+        assertThat(o.getValue().getApprovedBy()).isEqualTo(USER);
+        assertThat(o.getValue().getReason()).contains("large enough");
+        verify(slots).save(any(TrainProvTimetableSlot.class));
+    }
+
+    @Test
+    void aLearnerInTwoCohortsAtOnceIsAClash() {
+        TrainProvCohort c = cohort();
+        UUID learnerId = UUID.randomUUID();
+        TrainProvTimetableSlot other = existing(UUID.randomUUID(), null, null, LocalTime.of(10, 0), LocalTime.of(12, 0));
+        when(cohorts.findForTenant(TENANT, c.getId())).thenReturn(Optional.of(c));
+        when(slots.activeLearnerIds(TENANT, c.getId())).thenReturn(List.of(learnerId));
+        when(slots.otherSlotsOfLearners(eq(TENANT), eq(c.getId()), any(), any(), any())).thenReturn(java.util.Collections.singletonList(new Object[]{other, learnerId}));
+        assertThatThrownBy(() -> service.add(TENANT, c.getId(), request(null, null), USER, true))
+                .isInstanceOf(HandyFlowException.class).hasMessageContaining("is also in");
+        verify(slots, never()).save(any());
+    }
+
+    @Test
+    void theCheckListsClashesWithoutBookingAnything() {
+        TrainProvCohort c = cohort();
+        TrainProvVenue v = venue(SITE, "ACTIVE");
+        when(cohorts.findForTenant(TENANT, c.getId())).thenReturn(Optional.of(c));
+        when(venues.findForTenant(TENANT, v.getId())).thenReturn(Optional.of(v));
+        when(slots.liveForVenueBetween(eq(TENANT), eq(v.getId()), any(), any())).thenReturn(List.of(venueClash(v)));
+        ClashCheck check = service.check(TENANT, c.getId(), request(v.getId(), null), null);
+        assertThat(check.clear()).isFalse();
+        assertThat(check.clashes()).hasSize(1);
+        assertThat(check.clashes().get(0).resourceType()).isEqualTo("VENUE");
+        verify(slots, never()).save(any());
+        verify(overrides, never()).save(any());
+    }
+
+    @Test
+    void theSameClockTimeInAnotherZoneIsADifferentMoment() {
+        TrainProvCohort c = cohort();
+        when(cohorts.findForTenant(TENANT, c.getId())).thenReturn(Optional.of(c));
+        SlotView v = service.add(TENANT, c.getId(), new SlotRequest("Module 1", DAY, NINE, ELEVEN, null, null, null, "UTC", null), USER);
+        assertThat(v.timeZone()).isEqualTo("UTC");
+        assertThat(v.startsAt()).isEqualTo(DAY.atTime(NINE).atZone(java.time.ZoneId.of("UTC")).toInstant());
+        assertThatThrownBy(() -> service.add(TENANT, c.getId(), new SlotRequest("Module 1", DAY, NINE, ELEVEN, null, null, null, "Mars/Olympus", null), USER))
+                .isInstanceOf(HandyFlowException.class).hasMessageContaining("time zone");
+    }
+
+    @Test
+    void everyCheckTakesTheBookingLocksFirst() {
+        TrainProvCohort c = cohort();
+        TrainProvVenue v = venue(SITE, "ACTIVE");
+        when(cohorts.findForTenant(TENANT, c.getId())).thenReturn(Optional.of(c));
+        when(venues.findForTenant(TENANT, v.getId())).thenReturn(Optional.of(v));
+        service.add(TENANT, c.getId(), request(v.getId(), null), USER);
+        verify(slots, times(2)).lock(any());
     }
 }

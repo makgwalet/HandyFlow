@@ -59,4 +59,50 @@ class TimetableRulesTest {
             }
         }
     }
+
+    private static final java.time.LocalDate D = java.time.LocalDate.of(2027, 3, 1);
+
+    @Test
+    void instantsDependOnTheZone() {
+        java.time.Instant jhb = TimetableRules.instant(D, NINE, "Africa/Johannesburg");
+        java.time.Instant utc = TimetableRules.instant(D, NINE, "UTC");
+        assertEquals(java.time.Duration.ofHours(2), java.time.Duration.between(jhb, utc));
+    }
+
+    @Test
+    void overlapOnRealMomentsAcrossZones() {
+        java.time.Instant aStart = TimetableRules.instant(D, NINE, "Africa/Johannesburg");
+        java.time.Instant aEnd = TimetableRules.instant(D, ELEVEN, "Africa/Johannesburg");
+        // 08:00-10:00 UTC is 10:00-12:00 in Johannesburg, so it starts exactly when 09:00-11:00 is half done
+        assertTrue(TimetableRules.overlaps(aStart, aEnd, TimetableRules.instant(D, LocalTime.of(8, 0), "UTC"), TimetableRules.instant(D, LocalTime.of(10, 0), "UTC")));
+        // 09:00-11:00 UTC is 11:00-13:00 in Johannesburg: back to back, no clash
+        assertFalse(TimetableRules.overlaps(aStart, aEnd, TimetableRules.instant(D, NINE, "UTC"), TimetableRules.instant(D, ELEVEN, "UTC")));
+    }
+
+    @Test
+    void zonesMustExist() {
+        assertNull(TimetableRules.zoneProblem("Africa/Johannesburg"));
+        assertNotNull(TimetableRules.zoneProblem(null));
+        assertNotNull(TimetableRules.zoneProblem(" "));
+        assertNotNull(TimetableRules.zoneProblem("Mars/Olympus"));
+    }
+
+    private static TimetableRules.Clash clash(String message) {
+        return new TimetableRules.Clash(TimetableRules.VENUE, java.util.UUID.randomUUID(), "Room 1", java.util.UUID.randomUUID(), java.util.UUID.randomUUID(), message);
+    }
+
+    @Test
+    void noClashNeedsNoOverride() {
+        assertNull(TimetableRules.overrideProblem(java.util.List.of(), null, false));
+        assertNull(TimetableRules.overrideProblem(null, null, false));
+    }
+
+    @Test
+    void aClashNeedsAReasonAndAnApprover() {
+        java.util.List<TimetableRules.Clash> clashes = java.util.List.of(clash("Room 1 is booked"), clash("Thandi is in another cohort"));
+        assertTrue(TimetableRules.overrideProblem(clashes, null, true).contains("Room 1 is booked; Thandi is in another cohort"));
+        assertNotNull(TimetableRules.overrideProblem(clashes, "too short", true));
+        assertTrue(TimetableRules.overrideProblem(clashes, "Both groups fit in the hall", false).contains("Only an administrator"));
+        assertNull(TimetableRules.overrideProblem(clashes, "Both groups fit in the hall", true));
+    }
 }

@@ -6,6 +6,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 import za.co.handyflow.platform.billing.FeatureGuard;
 import za.co.handyflow.platform.shared.ApiResponse;
@@ -26,6 +27,8 @@ public class TrainProvTimetableController {
 
     private static final String READ = "hasAnyAuthority('TRAININGPROVIDER_READ','TRAININGPROVIDER_MANAGE','TRAININGPROVIDER_ADMIN')";
     private static final String MANAGE = "hasAnyAuthority('TRAININGPROVIDER_MANAGE','TRAININGPROVIDER_ADMIN')";
+
+    private static final String ADMIN_AUTHORITY = "TRAININGPROVIDER_ADMIN";
 
     private final TrainProvTimetableService service;
     private final FeatureGuard featureGuard;
@@ -49,16 +52,30 @@ public class TrainProvTimetableController {
 
     @PostMapping("/cohorts/{cohortId}/timetable")
     @PreAuthorize(MANAGE)
-    public ResponseEntity<ApiResponse<SlotView>> add(@PathVariable UUID cohortId, @Valid @RequestBody SlotRequest r) {
+    public ResponseEntity<ApiResponse<SlotView>> add(@PathVariable UUID cohortId, @Valid @RequestBody SlotRequest r, Authentication auth) {
         featureGuard.requireModule("trainingprovider");
-        return ResponseEntity.ok(ApiResponse.success("Slot added", service.add(TenantContext.getTenantIdAsObject(), cohortId, r, TenantContext.getCurrentUserId())));
+        return ResponseEntity.ok(ApiResponse.success("Slot added", service.add(TenantContext.getTenantIdAsObject(), cohortId, r, TenantContext.getCurrentUserId(), isAdmin(auth))));
+    }
+
+    @PostMapping("/cohorts/{cohortId}/timetable/check")
+    @PreAuthorize(MANAGE)
+    public ResponseEntity<ApiResponse<ClashCheck>> check(@PathVariable UUID cohortId, @RequestParam(required = false) UUID slotId, @Valid @RequestBody SlotRequest r) {
+        featureGuard.requireModule("trainingprovider");
+        return ResponseEntity.ok(ApiResponse.success(service.check(TenantContext.getTenantIdAsObject(), cohortId, r, slotId)));
+    }
+
+    @GetMapping("/timetable/{slotId}/overrides")
+    @PreAuthorize(READ)
+    public ResponseEntity<ApiResponse<List<OverrideView>>> overrides(@PathVariable UUID slotId) {
+        featureGuard.requireModule("trainingprovider");
+        return ResponseEntity.ok(ApiResponse.success(service.overridesFor(TenantContext.getTenantIdAsObject(), slotId)));
     }
 
     @PutMapping("/timetable/{slotId}")
     @PreAuthorize(MANAGE)
-    public ResponseEntity<ApiResponse<SlotView>> change(@PathVariable UUID slotId, @Valid @RequestBody SlotRequest r) {
+    public ResponseEntity<ApiResponse<SlotView>> change(@PathVariable UUID slotId, @Valid @RequestBody SlotRequest r, Authentication auth) {
         featureGuard.requireModule("trainingprovider");
-        return ResponseEntity.ok(ApiResponse.success("Slot updated", service.change(TenantContext.getTenantIdAsObject(), slotId, r, TenantContext.getCurrentUserId())));
+        return ResponseEntity.ok(ApiResponse.success("Slot updated", service.change(TenantContext.getTenantIdAsObject(), slotId, r, TenantContext.getCurrentUserId(), isAdmin(auth))));
     }
 
     @PostMapping("/timetable/{slotId}/cancel")
@@ -66,5 +83,9 @@ public class TrainProvTimetableController {
     public ResponseEntity<ApiResponse<SlotView>> cancel(@PathVariable UUID slotId, @Valid @RequestBody Reason r) {
         featureGuard.requireModule("trainingprovider");
         return ResponseEntity.ok(ApiResponse.success("Slot cancelled", service.cancel(TenantContext.getTenantIdAsObject(), slotId, r.reason(), TenantContext.getCurrentUserId())));
+    }
+
+    private static boolean isAdmin(Authentication auth) {
+        return auth != null && auth.getAuthorities().stream().anyMatch(a -> ADMIN_AUTHORITY.equals(a.getAuthority()));
     }
 }

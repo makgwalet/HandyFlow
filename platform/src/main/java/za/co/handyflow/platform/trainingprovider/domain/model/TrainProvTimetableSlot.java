@@ -6,6 +6,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import za.co.handyflow.platform.shared.TenantId;
 import za.co.handyflow.platform.trainingprovider.domain.rules.CohortRules;
+import za.co.handyflow.platform.trainingprovider.domain.rules.TimetableRules;
 
 import java.time.Instant;
 import java.time.LocalDate;
@@ -30,6 +31,12 @@ public class TrainProvTimetableSlot {
     private LocalTime startTime;
     @Column(name = "end_time", nullable = false)
     private LocalTime endTime;
+    @Column(name = "time_zone", nullable = false)
+    private String timeZone = TimetableRules.DEFAULT_ZONE;
+    @Column(name = "starts_at", nullable = false)
+    private Instant startsAt;
+    @Column(name = "ends_at", nullable = false)
+    private Instant endsAt;
     @Column(nullable = false)
     private String title;
     @Column(name = "module_id")
@@ -57,26 +64,45 @@ public class TrainProvTimetableSlot {
 
     public static TrainProvTimetableSlot create(TenantId t, UUID cohortId, String title, LocalDate date, LocalTime start, LocalTime end,
                                                 UUID moduleId, UUID venueId, UUID practitionerId, UUID by) {
+        return create(t, cohortId, title, date, start, end, moduleId, venueId, practitionerId, null, by);
+    }
+
+    /** timeZone is an IANA zone id such as Africa/Johannesburg; blank means the default. */
+    public static TrainProvTimetableSlot create(TenantId t, UUID cohortId, String title, LocalDate date, LocalTime start, LocalTime end,
+                                                UUID moduleId, UUID venueId, UUID practitionerId, String timeZone, UUID by) {
         TrainProvTimetableSlot s = new TrainProvTimetableSlot();
         s.tenantId = t.getValue();
         s.cohortId = cohortId;
         s.createdBy = by;
         s.createdAt = Instant.now();
-        s.set(title, date, start, end, moduleId, venueId, practitionerId);
+        s.set(title, date, start, end, moduleId, venueId, practitionerId, timeZone);
         return s;
     }
 
     public void change(String title, LocalDate date, LocalTime start, LocalTime end, UUID moduleId, UUID venueId, UUID practitionerId) {
+        change(title, date, start, end, moduleId, venueId, practitionerId, null);
+    }
+
+    /** A blank timeZone keeps the zone the slot already has. */
+    public void change(String title, LocalDate date, LocalTime start, LocalTime end, UUID moduleId, UUID venueId, UUID practitionerId, String timeZone) {
         if (!"SCHEDULED".equals(status)) {
             throw new IllegalStateException("A cancelled slot cannot be changed");
         }
-        set(title, date, start, end, moduleId, venueId, practitionerId);
+        set(title, date, start, end, moduleId, venueId, practitionerId, timeZone);
     }
 
-    private void set(String title, LocalDate date, LocalTime start, LocalTime end, UUID moduleId, UUID venueId, UUID practitionerId) {
+    private void set(String title, LocalDate date, LocalTime start, LocalTime end, UUID moduleId, UUID venueId, UUID practitionerId, String zone) {
         if (title == null || title.trim().length() < 2 || date == null || start == null || end == null || !end.isAfter(start)) {
             throw new IllegalArgumentException("Give the slot a title, a date and an end time after the start time");
         }
+        String zoneId = zone == null || zone.isBlank() ? this.timeZone : zone.trim();
+        String zoneProblem = TimetableRules.zoneProblem(zoneId);
+        if (zoneProblem != null) {
+            throw new IllegalArgumentException(zoneProblem);
+        }
+        this.timeZone = zoneId;
+        this.startsAt = TimetableRules.instant(date, start, zoneId);
+        this.endsAt = TimetableRules.instant(date, end, zoneId);
         this.title = title.trim();
         this.slotDate = date;
         this.startTime = start;
