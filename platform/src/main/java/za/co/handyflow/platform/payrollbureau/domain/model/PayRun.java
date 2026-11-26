@@ -72,6 +72,9 @@ public class PayRun {
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
+    @Version
+    private Long version;
+
     @Column(name = "payslips_auto_sent_at")
     private java.time.Instant payslipsAutoSentAt;
 

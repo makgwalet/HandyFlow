@@ -13,8 +13,8 @@ import java.util.UUID;
 
 public interface PayRunRepository extends JpaRepository<PayRun, UUID> {
 
-    @Query("SELECT r FROM PayRun r WHERE r.payClientId = :payClientId ORDER BY r.periodStart DESC")
-    Page<PayRun> findByClient(@Param("payClientId") UUID payClientId, Pageable pageable);
+    @Query("SELECT r FROM PayRun r WHERE r.tenantId = :tenantId AND r.payClientId = :payClientId ORDER BY r.periodStart DESC")
+    Page<PayRun> findByClient(@Param("tenantId") UUID tenantId, @Param("payClientId") UUID payClientId, Pageable pageable);
 
     @Query("SELECT r FROM PayRun r WHERE r.tenantId = :tenantId AND r.id = :id")
     Optional<PayRun> findByTenantAndId(@Param("tenantId") UUID tenantId, @Param("id") UUID id);

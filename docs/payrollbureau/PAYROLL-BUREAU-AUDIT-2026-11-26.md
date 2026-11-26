@@ -79,3 +79,10 @@ Totals: EXISTS 0 (nothing fully meets the plan), DEFECTIVE 3, PARTIAL 7, MISSING
 4. Employee self-service (plan recommends client portal first, employee portal later).
 5. SARS filing (plan recommends validated exports and guided filing first).
 6. Shared calculation engine with HR & Payroll (plan recommends shared statutory capability, separate module workflows).
+
+## Update: safety fixes applied (patch 0180)
+- D1 fixed: `getPayslips` now loads the run through the tenant-scoped lookup first, and `PayslipRepository.findByPayRun` takes the tenant id.
+- D2 fixed: `PayRun` has `@Version` and V946 adds `pay_runs.version` plus a unique index on (pay_run_id, pay_employee_id). V946 stops with a clear message if duplicate payslips already exist.
+- D9 fixed for the bureau: processing a run is refused (422 `NO_TAX_TABLES`) when the tax year has no PAYE tables. The shared calculator itself is unchanged because HR uses it too.
+- D11 fixed: `PayRunRepository.findByClient` takes the tenant id.
+- Test: `PayrollBureauSafetyTest` (Mockito, not run in the sandbox).

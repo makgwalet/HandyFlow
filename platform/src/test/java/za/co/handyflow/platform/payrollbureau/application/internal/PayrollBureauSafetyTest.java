@@ -1,0 +1,74 @@
+package za.co.handyflow.platform.payrollbureau.application.internal;
+
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import za.co.handyflow.platform.payrollbureau.domain.model.PayRun;
+import za.co.handyflow.platform.payrollbureau.domain.repository.*;
+import za.co.handyflow.platform.shared.HandyFlowException;
+import za.co.handyflow.platform.shared.ResourceNotFoundException;
+import za.co.handyflow.platform.shared.TenantId;
+
+import java.time.LocalDate;
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.*;
+
+/** Payroll Bureau safety fixes, audit 2026-11-26 (D1, D9, D11). */
+@ExtendWith(MockitoExtension.class)
+class PayrollBureauSafetyTest {
+
+    private static final TenantId TENANT = TenantId.of(UUID.fromString("00000000-0000-0000-0000-0000000000b1"));
+
+    @Mock private PayRunRepository payRunRepo;
+    @Mock private PayslipRepository payslipRepo;
+    @Mock private PayEmployeeRepository employeeRepo;
+    @Mock private PayrollBureauEngine engine;
+    @InjectMocks private PayrollBureauService service;
+
+    private final UUID runId = UUID.randomUUID();
+
+    private PayRun draftRun() {
+        return PayRun.create(TENANT.getValue(), UUID.randomUUID(), "PR00001",
+                LocalDate.of(2027, 3, 1), LocalDate.of(2027, 3, 31), LocalDate.of(2027, 3, 31), 2027);
+    }
+
+    @Test
+    void payslipsOfAnotherTenantsRunAreNotFound() {
+        when(payRunRepo.findByTenantAndId(TENANT.getValue(), runId)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.getPayslips(TENANT, runId))
+                .isInstanceOf(ResourceNotFoundException.class);
+        verify(payslipRepo, never()).findByPayRun(any(), any());
+    }
+
+    @Test
+    void payslipsAreReadWithTheTenantFilter() {
+        when(payRunRepo.findByTenantAndId(TENANT.getValue(), runId)).thenReturn(Optional.of(draftRun()));
+        when(payslipRepo.findByPayRun(TENANT.getValue(), runId)).thenReturn(List.of());
+
+        assertThat(service.getPayslips(TENANT, runId)).isEmpty();
+        verify(payslipRepo).findByPayRun(TENANT.getValue(), runId);
+    }
+
+    @Test
+    void aRunIsNotProcessedWhenTheTaxYearHasNoTaxTables() {
+        PayRun run = draftRun();
+        when(payRunRepo.findByTenantAndId(TENANT.getValue(), runId)).thenReturn(Optional.of(run));
+        when(engine.hasTaxTables(2027)).thenReturn(false);
+
+        assertThatThrownBy(() -> service.processPayRun(TENANT, runId))
+                .isInstanceOf(HandyFlowException.class)
+                .hasMessageContaining("2027");
+        assertThat(run.getStatus()).isEqualTo("DRAFT");
+        verify(payslipRepo, never()).save(any());
+        verify(payRunRepo, never()).save(any());
+    }
+}

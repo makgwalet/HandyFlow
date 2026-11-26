@@ -197,14 +197,14 @@ public class PayrollBureauService {
     @Transactional(readOnly = true)
     public Page<PayRunResponse> getPayRuns(TenantId tenantId, UUID payClientId, Pageable pageable) {
         requireClientOwnership(tenantId, payClientId);
-        return payRunRepo.findByClient(payClientId, pageable).map(this::toPayRunResponse);
+        return payRunRepo.findByClient(tenantId.getValue(), payClientId, pageable).map(this::toPayRunResponse);
     }
 
     @Transactional
     public PayRunResponse createPayRun(TenantId tenantId, UUID payClientId, CreatePayRunRequest req) {
         requireClientOwnership(tenantId, payClientId);
 
-        boolean overlaps = payRunRepo.findByClient(payClientId, Pageable.unpaged()).stream()
+        boolean overlaps = payRunRepo.findByClient(tenantId.getValue(), payClientId, Pageable.unpaged()).stream()
                 .anyMatch(existing -> !existing.getPeriodEnd().isBefore(req.periodStart())
                         && !existing.getPeriodStart().isAfter(req.periodEnd()));
         if (overlaps) {
@@ -246,6 +246,13 @@ public class PayrollBureauService {
                     HttpStatus.BAD_REQUEST, "INVALID_STATUS");
         }
 
+        // Fail closed: with no tax tables the calculator returns zero PAYE and
+        // the run would complete with wrong payslips (audit 2026-11-26, D9).
+        if (!engine.hasTaxTables(run.getTaxYear())) {
+            throw new HandyFlowException("No PAYE tax tables are loaded for tax year " + run.getTaxYear()
+                    + ". Load them before processing this pay run.", HttpStatus.UNPROCESSABLE_ENTITY, "NO_TAX_TABLES");
+        }
+
         List<PayEmployee> employees = employeeRepo.findActiveByClient(run.getPayClientId());
         java.math.BigDecimal annualPayroll = employeeRepo.sumMonthlyGrossByClient(run.getPayClientId())
                 .multiply(java.math.BigDecimal.valueOf(12));
@@ -279,12 +286,11 @@ public class PayrollBureauService {
 
     @Transactional(readOnly = true)
     public List<PayslipResponse> getPayslips(TenantId tenantId, UUID payRunId) {
-        // requireClientOwnership check omitted here deliberately simplified —
-        // add a payRun-ownership check (payRunRepo.findByTenantAndId already
-        // scopes by tenant) before returning payslips in the real
-        // implementation; shown abbreviated here since the pattern is
-        // identical to processPayRun()'s own lookup above.
-        return payslipRepo.findByPayRun(payRunId).stream().map(this::toPayslipResponse).toList();
+        // The run must belong to the caller's tenant, and the payslip query is
+        // tenant-scoped as well (audit 2026-11-26, D1).
+        payRunRepo.findByTenantAndId(tenantId.getValue(), payRunId)
+                .orElseThrow(() -> new ResourceNotFoundException("PayRun", payRunId.toString()));
+        return payslipRepo.findByPayRun(tenantId.getValue(), payRunId).stream().map(this::toPayslipResponse).toList();
     }
 
     /**
@@ -664,7 +670,7 @@ public class PayrollBureauService {
         // employee in this run — no reason to hit EvidenceFacade.download()
         // once per employee for identical bytes.
         byte[] logoBytes = tryLoadLogoBytes(tenantId, client);
-        List<Payslip> payslips = payslipRepo.findByPayRun(payRunId);
+        List<Payslip> payslips = payslipRepo.findByPayRun(tenantId.getValue(), payRunId);
 
         int sent = 0;
         List<String> skipped = new ArrayList<>();

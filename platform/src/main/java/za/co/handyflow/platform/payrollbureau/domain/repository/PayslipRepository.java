@@ -10,6 +10,6 @@ import java.util.UUID;
 
 public interface PayslipRepository extends JpaRepository<Payslip, UUID> {
 
-    @Query("SELECT p FROM Payslip p WHERE p.payRunId = :payRunId")
-    List<Payslip> findByPayRun(@Param("payRunId") UUID payRunId);
+    @Query("SELECT p FROM Payslip p WHERE p.tenantId = :tenantId AND p.payRunId = :payRunId")
+    List<Payslip> findByPayRun(@Param("tenantId") UUID tenantId, @Param("payRunId") UUID payRunId);
 }

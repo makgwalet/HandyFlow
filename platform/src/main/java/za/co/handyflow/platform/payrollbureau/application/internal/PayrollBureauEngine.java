@@ -35,8 +35,10 @@ import java.math.BigDecimal;
 public class PayrollBureauEngine {
 
     private final SarsPayrollCalculator calculator;
+    private final SarsTaxTableRepository taxTableRepo;
 
     public PayrollBureauEngine(SarsTaxTableRepository taxTableRepo, SarsTaxRebateRepository taxRebateRepo) {
+        this.taxTableRepo = taxTableRepo;
         this.calculator = new SarsPayrollCalculator(taxTableRepo, taxRebateRepo);
     }
 
@@ -55,6 +57,11 @@ public class PayrollBureauEngine {
             return totalEarnings().subtract(payeAmount).subtract(uifEmployee)
                     .subtract(medicalAid).subtract(pension);
         }
+    }
+
+    /** False when the tax year has no PAYE brackets loaded; the calculator would then return zero PAYE. */
+    public boolean hasTaxTables(int taxYear) {
+        return !taxTableRepo.findByTaxYear(taxYear).isEmpty();
     }
 
     public PayrollResult calculate(PayEmployee employee, int taxYear, BigDecimal annualPayroll) {
