@@ -97,6 +97,17 @@ public class PayClient {
         this.updatedAt = Instant.now();
     }
 
+    @Column(name = "eti_claimable", nullable = false) private boolean etiClaimable;
+    @Column(name = "eti_claimable_note") private String etiClaimableNote;
+    @Column(name = "eti_claimable_set_by") private java.util.UUID etiClaimableSetBy;
+    @Column(name = "eti_claimable_set_at") private Instant etiClaimableSetAt;
+
+    public void setEtiClaimable(boolean claimable, String note, java.util.UUID by) {
+        this.etiClaimable = claimable; this.etiClaimableNote = note;
+        this.etiClaimableSetBy = by; this.etiClaimableSetAt = Instant.now();
+        this.updatedAt = Instant.now();
+    }
+
     @Version
     private Long version;
 

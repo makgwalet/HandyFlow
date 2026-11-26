@@ -106,6 +106,18 @@ public class PayEmployee {
     @Column(name = "deleted_at")
     private Instant deletedAt;
 
+    @Column(name = "eti_id_kind") private String etiIdKind; // null = work out from the ID number
+    @Column(name = "domestic_worker", nullable = false) private boolean domesticWorker;
+    @Column(name = "connected_person", nullable = false) private boolean connectedPerson;
+    @Column(name = "below_minimum_wage", nullable = false) private boolean belowMinimumWage;
+    @Column(name = "eti_months_prior", nullable = false) private int etiMonthsPrior;
+
+    public void setEtiFacts(String idKind, boolean domestic, boolean connected, boolean belowMinimum, int monthsPrior) {
+        this.etiIdKind = idKind; this.domesticWorker = domestic; this.connectedPerson = connected;
+        this.belowMinimumWage = belowMinimum; this.etiMonthsPrior = monthsPrior;
+        this.updatedAt = Instant.now();
+    }
+
     public static PayEmployee create(UUID tenantId, UUID payClientId, String employeeNumber,
                                      String firstName, String lastName, LocalDate startDate,
                                      BigDecimal grossSalary) {

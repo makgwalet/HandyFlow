@@ -64,7 +64,7 @@ public class PayDeadlineEngine {
         return deadlines;
     }
 
-    LocalDate adjustForBusinessDay(LocalDate date) {
+    public LocalDate adjustForBusinessDay(LocalDate date) {
         LocalDate adjusted = date;
         while (isWeekend(adjusted) || holidayRepo.existsByDate(adjusted)) {
             adjusted = adjusted.minusDays(1);

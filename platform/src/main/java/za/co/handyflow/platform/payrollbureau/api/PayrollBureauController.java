@@ -17,6 +17,7 @@ import za.co.handyflow.platform.payrollbureau.application.internal.PayGroupServi
 import za.co.handyflow.platform.payrollbureau.dto.PayGroupDtos.*;
 import za.co.handyflow.platform.payrollbureau.dto.PayComponentDtos.*;
 import za.co.handyflow.platform.payrollbureau.dto.PayBankFileDtos.*;
+import za.co.handyflow.platform.payrollbureau.dto.PayEmp201Dtos.*;
 import za.co.handyflow.platform.payrollbureau.application.internal.PayrollBureauService;
 import za.co.handyflow.platform.payrollbureau.dto.*;
 import za.co.handyflow.platform.shared.ApiResponse;
@@ -45,6 +46,7 @@ public class PayrollBureauController {
     private final PayGroupService groupService;
     private final za.co.handyflow.platform.payrollbureau.application.internal.PayComponentService componentService;
     private final za.co.handyflow.platform.payrollbureau.application.internal.PayrollOutputService outputService;
+    private final za.co.handyflow.platform.payrollbureau.application.internal.Emp201Service emp201Service;
 
     // ── Practice profile ─────────────────────────────────────────────────────
 
@@ -627,4 +629,60 @@ public class PayrollBureauController {
         return ResponseEntity.ok().contentType(MediaType.parseMediaType(logo.contentType())).body(logo.content());
     }
 
+
+    // ── SARS: EMP201 monthly figures and ETI (phase 4) ──────────────────────────────
+
+    @GetMapping("/clients/{clientId}/emp201")
+    @PreAuthorize("hasAnyAuthority('PAYROLLBUREAU_READ','PAYROLLBUREAU_MANAGE','PAYROLLBUREAU_ADMIN')")
+    @Operation(summary = "EMP201 returns for a tax year (March to February), given as the year it ends in")
+    public ResponseEntity<ApiResponse<List<Emp201Response>>> listEmp201(@PathVariable UUID clientId, @RequestParam int taxYear) {
+        featureGuard.requireModule("payrollbureau");
+        return ResponseEntity.ok(ApiResponse.success(emp201Service.list(TenantContext.getTenantIdAsObject(), clientId, taxYear)));
+    }
+
+    @GetMapping("/clients/{clientId}/emp201/{month}")
+    @PreAuthorize("hasAnyAuthority('PAYROLLBUREAU_READ','PAYROLLBUREAU_MANAGE','PAYROLLBUREAU_ADMIN')")
+    public ResponseEntity<ApiResponse<Emp201Response>> getEmp201(@PathVariable UUID clientId, @PathVariable String month) {
+        featureGuard.requireModule("payrollbureau");
+        return ResponseEntity.ok(ApiResponse.success(
+                emp201Service.get(TenantContext.getTenantIdAsObject(), clientId, java.time.YearMonth.parse(month))));
+    }
+
+    @PostMapping("/clients/{clientId}/emp201/{month}/prepare")
+    @PreAuthorize("hasAnyAuthority('PAYROLLBUREAU_MANAGE','PAYROLLBUREAU_ADMIN')")
+    @Operation(summary = "Work out (or re-work) the EMP201 figures and ETI for a month from the finalised runs paid in it")
+    public ResponseEntity<ApiResponse<Emp201Response>> prepareEmp201(@PathVariable UUID clientId, @PathVariable String month) {
+        featureGuard.requireModule("payrollbureau");
+        return ResponseEntity.ok(ApiResponse.success(
+                emp201Service.prepare(TenantContext.getTenantIdAsObject(), clientId, java.time.YearMonth.parse(month))));
+    }
+
+    @PostMapping("/clients/{clientId}/emp201/{month}/file")
+    @PreAuthorize("hasAuthority('PAYROLLBUREAU_APPROVE')")
+    @Operation(summary = "Record that the EMP201 was filed on SARS eFiling, with the reference. The figures are then fixed.")
+    public ResponseEntity<ApiResponse<Emp201Response>> fileEmp201(@PathVariable UUID clientId, @PathVariable String month,
+                                                                 @RequestBody(required = false) FileEmp201Request req) {
+        featureGuard.requireModule("payrollbureau");
+        return ResponseEntity.ok(ApiResponse.success(emp201Service.markFiled(TenantContext.getTenantIdAsObject(), clientId,
+                java.time.YearMonth.parse(month), req == null ? null : req.reference())));
+    }
+
+    @PutMapping("/clients/{clientId}/eti-claim")
+    @PreAuthorize("hasAuthority('PAYROLLBUREAU_APPROVE')")
+    @Operation(summary = "Mark whether this client is allowed to claim ETI (their SARS returns and debt are in order)")
+    public ResponseEntity<ApiResponse<Void>> setEtiClaim(@PathVariable UUID clientId, @RequestBody EtiClaimRequest req) {
+        featureGuard.requireModule("payrollbureau");
+        emp201Service.setClientEtiClaim(TenantContext.getTenantIdAsObject(), clientId, req.claimable(), req.note());
+        return ResponseEntity.ok(ApiResponse.success(null));
+    }
+
+    @PutMapping("/clients/{clientId}/employees/{employeeId}/eti")
+    @PreAuthorize("hasAnyAuthority('PAYROLLBUREAU_MANAGE','PAYROLLBUREAU_ADMIN')")
+    @Operation(summary = "Set the facts ETI needs about an employee")
+    public ResponseEntity<ApiResponse<Void>> setEmployeeEti(@PathVariable UUID clientId, @PathVariable UUID employeeId,
+                                                           @RequestBody EmployeeEtiRequest req) {
+        featureGuard.requireModule("payrollbureau");
+        emp201Service.setEmployeeEti(TenantContext.getTenantIdAsObject(), clientId, employeeId, req);
+        return ResponseEntity.ok(ApiResponse.success(null));
+    }
 }

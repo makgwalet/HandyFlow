@@ -38,6 +38,16 @@ public interface PayRunRepository extends JpaRepository<PayRun, UUID> {
     @Query("SELECT r FROM PayRun r WHERE r.tenantId = :tenantId AND r.id = :id")
     Optional<PayRun> findByTenantAndId(@Param("tenantId") UUID tenantId, @Param("id") UUID id);
 
+    /** Finalised runs of a client whose pay date falls in the month (reversed runs are left out). */
+    @Query("""
+        SELECT r FROM PayRun r
+        WHERE r.tenantId = :tenantId AND r.payClientId = :clientId AND r.status = 'FINALISED'
+          AND r.payDate >= :from AND r.payDate <= :to
+        ORDER BY r.payDate ASC, r.periodStart ASC
+    """)
+    List<PayRun> findFinalisedByPayDate(@Param("tenantId") UUID tenantId, @Param("clientId") UUID clientId,
+                                        @Param("from") java.time.LocalDate from, @Param("to") java.time.LocalDate to);
+
     // Cross-tenant by design — schedulers have no TenantContext to read
     // from (they run outside any HTTP request). Same shape as
     // ApBillRepository.findDueSoonAcrossTenants() and
