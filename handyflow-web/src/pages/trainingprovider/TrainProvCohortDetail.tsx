@@ -11,6 +11,7 @@ import type { Enrolment } from "./learnerRules"
 import type { Eligible } from "./practitionerRules"
 import { Badge, Field, Notice, SubTabs } from "./tpUi"
 import TrainProvSlotResources from "./TrainProvSlotResources"
+import TrainProvCohortReadiness from "./TrainProvCohortReadiness"
 import { card, errText, ghost, input, muted, solid, unwrap } from "./tpStyle"
 import { CAT, LRN, PRC, useActiveProgrammes } from "./tpApi"
 import { RegisterPanel, SummaryPanel } from "./TrainProvAttendancePanel"
@@ -99,6 +100,7 @@ function Timetable({ cohort, canManage, open }: { cohort: Cohort; canManage: boo
   }
   return (
     <div style={{ display: "grid", gap: 8 }}>
+      <TrainProvCohortReadiness cohortId={cohort.id} />
       {canManage && open && !adding && !editing && <div><button style={solid} onClick={() => setAdding(true)}>Add a slot</button></div>}
       {adding && <SlotFormPanel cohort={cohort} onCancel={() => setAdding(false)} onSaved={() => { setAdding(false); refresh() }} />}
       {editing && <SlotFormPanel cohort={cohort} initial={editing} onCancel={() => setEditing(null)} onSaved={() => { setEditing(null); refresh() }} />}
