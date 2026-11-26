@@ -11,5 +11,6 @@ public record PayEmployeeResponse(
         BigDecimal grossSalary, BigDecimal travelAllowance,
         BigDecimal pensionContribution, BigDecimal medicalAidContribution,
         String bankName, String bankAccountNumber, String bankBranchCode,
-        LocalDate startDate, LocalDate endDate, String status, Instant createdAt, boolean changePending
+        LocalDate startDate, LocalDate endDate, String status, Instant createdAt, boolean changePending,
+        UUID payGroupId
 ) {}

@@ -14,6 +14,7 @@ import za.co.handyflow.platform.accounting.dto.JournalEntryResponse;
 import za.co.handyflow.platform.payrollbureau.domain.model.*;
 import za.co.handyflow.platform.payrollbureau.domain.repository.*;
 import za.co.handyflow.platform.payrollbureau.domain.rules.DeliveryRules;
+import za.co.handyflow.platform.payrollbureau.domain.rules.PayPeriodRules;
 import za.co.handyflow.platform.payrollbureau.dto.*;
 import za.co.handyflow.platform.shared.HandyFlowException;
 import za.co.handyflow.platform.shared.ResourceNotFoundException;
@@ -72,6 +73,7 @@ public class PayrollBureauService {
     private final VatRateProvider vatRateProvider;
     private final PayEmployeeChangeService changeService;
     private final PayslipDeliveryRepository deliveryRepo;
+    private final PayGroupService groupService;
 
     @Value("${app.frontend.url:http://localhost:5173}")
     private String frontendUrl;
@@ -209,7 +211,13 @@ public class PayrollBureauService {
     public PayRunResponse createPayRun(TenantId tenantId, UUID payClientId, CreatePayRunRequest req) {
         requireClientOwnership(tenantId, payClientId);
 
+        PayGroup group = req.payGroupId() == null ? null : groupService.load(tenantId, req.payGroupId());
+        if (group != null && (!group.getPayClientId().equals(payClientId) || !group.isActive())) {
+            throw new HandyFlowException("That pay group is not available for this client.",
+                    HttpStatus.BAD_REQUEST, "INVALID_PAY_GROUP");
+        }
         boolean overlaps = payRunRepo.findByClient(tenantId.getValue(), payClientId, Pageable.unpaged()).stream()
+                .filter(existing -> java.util.Objects.equals(existing.getPayGroupId(), req.payGroupId()))
                 .anyMatch(existing -> !existing.getPeriodEnd().isBefore(req.periodStart())
                         && !existing.getPeriodStart().isAfter(req.periodEnd()));
         if (overlaps) {
@@ -222,20 +230,31 @@ public class PayrollBureauService {
                     "Period end cannot be before period start", HttpStatus.BAD_REQUEST, "INVALID_PERIOD");
         }
 
-        // SA tax year runs Mar-Feb — same rule as hr.PayrollService.createPayRun()
+        // SA tax year runs Mar-Feb. A run without a group keeps the rule it always had (tax year of the period start,
+        // as the year the period starts in); a group's run takes it from the pay date, the way SARS taxes pay when it is paid.
         int taxYear = req.periodStart().getMonthValue() >= 3
                 ? req.periodStart().getYear() : req.periodStart().getYear() - 1;
+        if (group != null) {
+            String periodProblem = PayPeriodRules.periodProblem(group.getFrequency(), group.getAnchorDate(),
+                    req.periodStart(), req.periodEnd());
+            if (periodProblem != null) throw new HandyFlowException(periodProblem, HttpStatus.BAD_REQUEST, "INVALID_PERIOD");
+            taxYear = PayPeriodRules.taxYearOfPayDate(req.payDate());
+        }
         String number = "PR" + String.format("%05d",
                 sequenceService.nextValue(tenantId, "PAYROLLBUREAU_PAYRUN:" + payClientId));
 
-        if (employeeRepo.findActiveByClient(payClientId).isEmpty()) {
+        List<PayEmployee> eligible = group == null ? employeeRepo.findActiveUngrouped(payClientId)
+                : employeeRepo.findActiveByGroup(payClientId, group.getId());
+        if (eligible.isEmpty()) {
             throw new HandyFlowException(
                     "This client has no active employees — add at least one before creating a pay run",
                     HttpStatus.BAD_REQUEST, "NO_EMPLOYEES");
         }
 
-        PayRun run = PayRun.create(tenantId.getValue(), payClientId, number,
-                req.periodStart(), req.periodEnd(), req.payDate(), taxYear);
+        PayRun run = group == null
+                ? PayRun.create(tenantId.getValue(), payClientId, number, req.periodStart(), req.periodEnd(), req.payDate(), taxYear)
+                : PayRun.createForGroup(tenantId.getValue(), payClientId, group.getId(), number,
+                        req.periodStart(), req.periodEnd(), req.payDate(), taxYear);
         payRunRepo.save(run);
         log.info("Payroll bureau pay run created tenant={} client={} run={}",
                 tenantId.getValue(), payClientId, number);
@@ -255,7 +274,18 @@ public class PayrollBureauService {
         // (audit 2026-11-26, D9). The same approved rules HR uses.
         za.co.handyflow.platform.shared.StatutoryYearRules rules = engine.requireRules(run.getTaxYear());
 
-        List<PayEmployee> employees = employeeRepo.findActiveByClient(run.getPayClientId());
+        if (run.getPayGroupId() != null) {
+            PayGroup group = groupService.load(tenantId, run.getPayGroupId());
+            // The calculator works on a monthly salary. Until periodic PAYE exists (slice 1d), a weekly or fortnightly
+            // run would be taxed wrongly, so it is refused rather than calculated.
+            if (!"MONTHLY".equals(group.getFrequency())) {
+                throw new HandyFlowException("Weekly and fortnightly pay runs cannot be processed yet: periodic PAYE is not built.",
+                        HttpStatus.UNPROCESSABLE_ENTITY, "FREQUENCY_NOT_SUPPORTED");
+            }
+        }
+        List<PayEmployee> employees = run.getPayGroupId() == null
+                ? employeeRepo.findActiveUngrouped(run.getPayClientId())
+                : employeeRepo.findActiveByGroup(run.getPayClientId(), run.getPayGroupId());
         java.math.BigDecimal annualPayroll = employeeRepo.sumMonthlyGrossByClient(run.getPayClientId())
                 .multiply(java.math.BigDecimal.valueOf(12));
 
@@ -859,13 +889,14 @@ public class PayrollBureauService {
                 e.getGrossSalary(), e.getTravelAllowance(),
                 e.getPensionContribution(), e.getMedicalAidContribution(), e.getBankName(),
                 e.getBankAccountNumber(), e.getBankBranchCode(), e.getStartDate(), e.getEndDate(),
-                e.getStatus(), e.getCreatedAt(), changePending);
+                e.getStatus(), e.getCreatedAt(), changePending, e.getPayGroupId());
     }
 
     private PayRunResponse toPayRunResponse(PayRun r) {
         return new PayRunResponse(r.getId(), r.getPayRunNumber(), r.getPeriodStart(), r.getPeriodEnd(),
                 r.getPayDate(), r.getTaxYear(), r.getStatus(), r.getTotalGross(), r.getTotalPaye(),
-                r.getTotalUif(), r.getTotalSdl(), r.getTotalNet(), r.getEmployeeCount(), r.getProcessedAt());
+                r.getTotalUif(), r.getTotalSdl(), r.getTotalNet(), r.getEmployeeCount(), r.getProcessedAt(),
+                r.getPayGroupId());
     }
 
     private PayslipResponse toPayslipResponse(Payslip p) {

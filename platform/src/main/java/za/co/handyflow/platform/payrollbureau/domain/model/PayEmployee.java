@@ -50,6 +50,9 @@ public class PayEmployee {
     @Convert(converter = za.co.handyflow.platform.shared.EncryptedStringConverter.class)
     private String idNumber;
 
+    @Column(name = "pay_group_id")
+    private UUID payGroupId; // null = the client's default (ungrouped) payroll
+
     @Column(name = "date_of_birth")
     private LocalDate dateOfBirth;
 
@@ -131,6 +134,7 @@ public class PayEmployee {
         this.bankName = bankName; this.bankAccountNumber = accNum; this.bankBranchCode = branchCode;
         this.updatedAt = Instant.now();
     }
+    public void assignToGroup(UUID groupId) { this.payGroupId = groupId; this.updatedAt = Instant.now(); }
     public void setGrossSalary(BigDecimal v) { this.grossSalary = v; this.updatedAt = Instant.now(); }
 
     public void terminate(LocalDate endDate) {

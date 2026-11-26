@@ -9,5 +9,6 @@ public record PayRunResponse(
         UUID id, String payRunNumber, LocalDate periodStart, LocalDate periodEnd,
         LocalDate payDate, int taxYear, String status,
         BigDecimal totalGross, BigDecimal totalPaye, BigDecimal totalUif,
-        BigDecimal totalSdl, BigDecimal totalNet, Integer employeeCount, Instant processedAt
+        BigDecimal totalSdl, BigDecimal totalNet, Integer employeeCount, Instant processedAt,
+        UUID payGroupId
 ) {}

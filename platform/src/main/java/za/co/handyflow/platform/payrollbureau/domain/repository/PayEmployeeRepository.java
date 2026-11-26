@@ -21,6 +21,20 @@ public interface PayEmployeeRepository extends JpaRepository<PayEmployee, UUID> 
 
     @Query("""
         SELECT e FROM PayEmployee e
+        WHERE e.payClientId = :payClientId AND e.payGroupId IS NULL AND e.status = 'ACTIVE' AND e.deletedAt IS NULL
+        ORDER BY e.lastName ASC
+    """)
+    List<PayEmployee> findActiveUngrouped(@Param("payClientId") UUID payClientId);
+
+    @Query("""
+        SELECT e FROM PayEmployee e
+        WHERE e.payClientId = :payClientId AND e.payGroupId = :payGroupId AND e.status = 'ACTIVE' AND e.deletedAt IS NULL
+        ORDER BY e.lastName ASC
+    """)
+    List<PayEmployee> findActiveByGroup(@Param("payClientId") UUID payClientId, @Param("payGroupId") UUID payGroupId);
+
+    @Query("""
+        SELECT e FROM PayEmployee e
         WHERE e.tenantId = :tenantId AND e.id = :id AND e.deletedAt IS NULL
     """)
     Optional<PayEmployee> findActiveById(@Param("tenantId") UUID tenantId, @Param("id") UUID id);

@@ -72,6 +72,9 @@ public class PayRun {
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
+    @Column(name = "pay_group_id")
+    private UUID payGroupId; // null = the client's default (ungrouped) payroll
+
     @Version
     private Long version;
 
@@ -90,6 +93,13 @@ public class PayRun {
         r.taxYear = taxYear;
         r.status = "DRAFT";
         r.createdAt = Instant.now();
+        return r;
+    }
+
+    public static PayRun createForGroup(UUID tenantId, UUID payClientId, UUID payGroupId, String payRunNumber,
+                                        LocalDate periodStart, LocalDate periodEnd, LocalDate payDate, int taxYear) {
+        PayRun r = create(tenantId, payClientId, payRunNumber, periodStart, periodEnd, payDate, taxYear);
+        r.payGroupId = payGroupId;
         return r;
     }
 

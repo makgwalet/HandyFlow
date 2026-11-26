@@ -6,5 +6,6 @@ import java.time.LocalDate;
 public record CreatePayRunRequest(
         @NotNull LocalDate periodStart,
         @NotNull LocalDate periodEnd,
-        @NotNull LocalDate payDate
+        @NotNull LocalDate payDate,
+        java.util.UUID payGroupId
 ) {}

@@ -13,6 +13,8 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import za.co.handyflow.platform.billing.FeatureGuard;
 import za.co.handyflow.platform.payrollbureau.application.internal.PayEmployeeChangeService;
+import za.co.handyflow.platform.payrollbureau.application.internal.PayGroupService;
+import za.co.handyflow.platform.payrollbureau.dto.PayGroupDtos.*;
 import za.co.handyflow.platform.payrollbureau.application.internal.PayrollBureauService;
 import za.co.handyflow.platform.payrollbureau.dto.*;
 import za.co.handyflow.platform.shared.ApiResponse;
@@ -38,6 +40,7 @@ public class PayrollBureauController {
     private final PayrollBureauService bureauService;
     private final FeatureGuard featureGuard;
     private final PayEmployeeChangeService changeService;
+    private final PayGroupService groupService;
 
     // ── Practice profile ─────────────────────────────────────────────────────
 
@@ -215,6 +218,49 @@ public class PayrollBureauController {
         featureGuard.requireModule("payrollbureau");
         return ResponseEntity.ok(ApiResponse.success("Employee updated",
                 bureauService.updateEmployee(TenantContext.getTenantIdAsObject(), clientId, employeeId, req)));
+    }
+
+    @GetMapping("/clients/{clientId}/pay-groups")
+    @PreAuthorize("hasAnyAuthority('PAYROLLBUREAU_READ','PAYROLLBUREAU_MANAGE','PAYROLLBUREAU_ADMIN')")
+    public ResponseEntity<ApiResponse<List<PayGroupResponse>>> getPayGroups(@PathVariable UUID clientId) {
+        featureGuard.requireModule("payrollbureau");
+        return ResponseEntity.ok(ApiResponse.success(groupService.list(TenantContext.getTenantIdAsObject(), clientId)));
+    }
+
+    @PostMapping("/clients/{clientId}/pay-groups")
+    @PreAuthorize("hasAnyAuthority('PAYROLLBUREAU_MANAGE','PAYROLLBUREAU_ADMIN')")
+    public ResponseEntity<ApiResponse<PayGroupResponse>> createPayGroup(
+            @PathVariable UUID clientId, @Valid @RequestBody CreatePayGroupRequest req) {
+        featureGuard.requireModule("payrollbureau");
+        return ResponseEntity.ok(ApiResponse.success("Pay group created",
+                groupService.create(TenantContext.getTenantIdAsObject(), clientId, req)));
+    }
+
+    @PostMapping("/pay-groups/{groupId}/archive")
+    @PreAuthorize("hasAnyAuthority('PAYROLLBUREAU_MANAGE','PAYROLLBUREAU_ADMIN')")
+    public ResponseEntity<ApiResponse<PayGroupResponse>> archivePayGroup(@PathVariable UUID groupId) {
+        featureGuard.requireModule("payrollbureau");
+        return ResponseEntity.ok(ApiResponse.success("Pay group archived",
+                groupService.archive(TenantContext.getTenantIdAsObject(), groupId)));
+    }
+
+    @GetMapping("/pay-groups/{groupId}/next-period")
+    @PreAuthorize("hasAnyAuthority('PAYROLLBUREAU_READ','PAYROLLBUREAU_MANAGE','PAYROLLBUREAU_ADMIN')")
+    @Operation(summary = "The next pay period to run for a group, with its pay date and tax year")
+    public ResponseEntity<ApiResponse<NextPeriodResponse>> nextPayPeriod(@PathVariable UUID groupId) {
+        featureGuard.requireModule("payrollbureau");
+        return ResponseEntity.ok(ApiResponse.success(
+                groupService.nextPeriod(TenantContext.getTenantIdAsObject(), groupId, java.time.LocalDate.now())));
+    }
+
+    @PutMapping("/clients/{clientId}/employees/{employeeId}/pay-group")
+    @PreAuthorize("hasAnyAuthority('PAYROLLBUREAU_MANAGE','PAYROLLBUREAU_ADMIN')")
+    @Operation(summary = "Move an employee into a pay group, or back to the default payroll (payGroupId null)")
+    public ResponseEntity<ApiResponse<Void>> assignPayGroup(@PathVariable UUID clientId, @PathVariable UUID employeeId,
+                                                            @RequestBody AssignPayGroupRequest req) {
+        featureGuard.requireModule("payrollbureau");
+        groupService.assignEmployee(TenantContext.getTenantIdAsObject(), clientId, employeeId, req.payGroupId());
+        return ResponseEntity.ok(ApiResponse.success("Pay group updated", null));
     }
 
     @GetMapping("/clients/{clientId}/employee-changes")
