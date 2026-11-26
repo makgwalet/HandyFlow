@@ -102,6 +102,8 @@ public class RateLimitFilter extends OncePerRequestFilter {
             new Limit("fuelportal:login", "/api/v1/fuel/portal/auth/login", 10, 10 * 60 * 1_000L),
             new Limit("trainprovportal:register", "/api/v1/training-provider/portal/auth/register", 5, 60 * 60 * 1_000L),
             new Limit("trainprovportal:login", "/api/v1/training-provider/portal/auth/login", 10, 10 * 60 * 1_000L),
+            new Limit("trainproviderlearner:register", "/api/v1/training-provider/portal/learner/auth/register", 5, 60 * 60 * 1_000L),
+            new Limit("trainproviderlearner:login", "/api/v1/training-provider/portal/learner/auth/login", 10, 10 * 60 * 1_000L),
             new Limit("fmportal:register", "/api/v1/facilitiesmanagement/portal/auth/register", 5, 60 * 60 * 1_000L),
             new Limit("fmportal:login", "/api/v1/facilitiesmanagement/portal/auth/login", 10, 10 * 60 * 1_000L),
             new Limit("csportal:register", "/api/v1/compliance-services/portal/auth/register", 5, 60 * 60 * 1_000L),

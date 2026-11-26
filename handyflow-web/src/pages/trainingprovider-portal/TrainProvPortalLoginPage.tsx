@@ -13,7 +13,7 @@
 // same as every other provider portal in this engagement.
 import { useState } from "react"
 import { useNavigate, Link } from "react-router-dom"
-import { apiClient } from "../../api/client"
+import { trainProvPortalClient } from "../../api/trainProvPortal.client"
 import { usePortalAuthStore } from "../../store/portalAuth.store"
 import { GraduationCap } from "lucide-react"
 
@@ -28,21 +28,16 @@ export function TrainProvPortalLoginPage() {
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
 
-  const applyPortalAuth = (token: string, user: { id: string; email: string; fullName: string }) => {
-    // See this module's sibling portals (Warehousing/Collections Agency) if this line doesn't match your store's real API.
-    (portalAuth as any).login?.(token, user) ?? (portalAuth as any).setAuth?.(token, user)
-  }
-
   const submit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError(null); setLoading(true)
     try {
-      const res = await apiClient.post("/api/v1/training-provider/portal/auth/login", { email, password })
-      const { token, id, email: respEmail, fullName } = res.data
-      applyPortalAuth(token, { id, email: respEmail, fullName })
+      const res = await trainProvPortalClient.post("/api/v1/training-provider/portal/auth/login", { email, password })
+      const { token, portalUserId, email: respEmail, fullName } = res.data
+      portalAuth.setAuth(token, { portalUserId, email: respEmail, fullName })
       navigate("/training-provider/portal")
-    } catch (err: any) {
-      setError(err?.response?.data?.message ?? "Invalid email or password")
+    } catch (err: unknown) {
+      setError((err as { response?: { data?: { message?: string } } })?.response?.data?.message ?? "Invalid email or password")
     } finally {
       setLoading(false)
     }

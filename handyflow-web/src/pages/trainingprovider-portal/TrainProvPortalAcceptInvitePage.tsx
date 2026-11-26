@@ -7,7 +7,7 @@
 // (PortalRegisterRequest{inviteToken, password, fullName}).
 import { useState } from "react"
 import { useNavigate, useSearchParams, Link } from "react-router-dom"
-import { apiClient } from "../../api/client"
+import { trainProvPortalClient } from "../../api/trainProvPortal.client"
 import { usePortalAuthStore } from "../../store/portalAuth.store"
 import { GraduationCap } from "lucide-react"
 
@@ -26,10 +26,6 @@ export function TrainProvPortalAcceptInvitePage() {
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
 
-  const applyPortalAuth = (t: string, user: { id: string; email: string; fullName: string }) => {
-    (portalAuth as any).login?.(t, user) ?? (portalAuth as any).setAuth?.(t, user)
-  }
-
   const submit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError(null)
@@ -37,12 +33,12 @@ export function TrainProvPortalAcceptInvitePage() {
     if (!token) { setError("This invite link is missing its token — please use the link from your invite email"); return }
     setLoading(true)
     try {
-      const res = await apiClient.post("/api/v1/training-provider/portal/auth/register", { inviteToken: token, password, fullName })
-      const { token: authToken, id, email, fullName: respName } = res.data
-      applyPortalAuth(authToken, { id, email, fullName: respName })
+      const res = await trainProvPortalClient.post("/api/v1/training-provider/portal/auth/register", { inviteToken: token, password, fullName })
+      const { token: authToken, portalUserId, email, fullName: respName } = res.data
+      portalAuth.setAuth(authToken, { portalUserId, email, fullName: respName })
       navigate("/training-provider/portal")
-    } catch (err: any) {
-      setError(err?.response?.data?.message ?? "This invite link is invalid or has expired")
+    } catch (err: unknown) {
+      setError((err as { response?: { data?: { message?: string } } })?.response?.data?.message ?? "This invite link is invalid or has expired")
     } finally {
       setLoading(false)
     }

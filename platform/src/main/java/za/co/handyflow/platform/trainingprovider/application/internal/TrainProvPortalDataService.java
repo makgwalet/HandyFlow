@@ -31,23 +31,31 @@ public class TrainProvPortalDataService {
     private final TrainProvCertificateRepository certificateRepo;
     private final TrainProvInvoiceRepository invoiceRepo;
 
-    public List<TrainProvDelegate> getMyDelegates(TenantId tenantId, UUID portalUserId) {
-        UUID clientId = resolveClientId(portalUserId);
+    public List<TrainProvDelegate> getMyDelegates(UUID portalUserId) {
+        TrainProvPortalAccessGrant grant = resolveGrant(portalUserId);
+        TenantId tenantId = TenantId.of(grant.getTenantId());
+        UUID clientId = grant.getClientId();
         return delegateRepo.findAllActiveForClient(tenantId, clientId);
     }
 
-    public Page<TrainProvEnrollment> getMyEnrollments(TenantId tenantId, UUID portalUserId, String status, Pageable pageable) {
-        UUID clientId = resolveClientId(portalUserId);
+    public Page<TrainProvEnrollment> getMyEnrollments(UUID portalUserId, String status, Pageable pageable) {
+        TrainProvPortalAccessGrant grant = resolveGrant(portalUserId);
+        TenantId tenantId = TenantId.of(grant.getTenantId());
+        UUID clientId = grant.getClientId();
         return enrollmentRepo.findAll(tenantId, null, clientId, status, pageable);
     }
 
-    public Page<TrainProvCertificate> getMyCertificates(TenantId tenantId, UUID portalUserId, String status, Pageable pageable) {
-        UUID clientId = resolveClientId(portalUserId);
+    public Page<TrainProvCertificate> getMyCertificates(UUID portalUserId, String status, Pageable pageable) {
+        TrainProvPortalAccessGrant grant = resolveGrant(portalUserId);
+        TenantId tenantId = TenantId.of(grant.getTenantId());
+        UUID clientId = grant.getClientId();
         return certificateRepo.findAll(tenantId, clientId, status, pageable);
     }
 
-    public List<TrainProvInvoice> getMyInvoices(TenantId tenantId, UUID portalUserId) {
-        UUID clientId = resolveClientId(portalUserId);
+    public List<TrainProvInvoice> getMyInvoices(UUID portalUserId) {
+        TrainProvPortalAccessGrant grant = resolveGrant(portalUserId);
+        TenantId tenantId = TenantId.of(grant.getTenantId());
+        UUID clientId = grant.getClientId();
         return invoiceRepo.findAllForClientList(tenantId, clientId);
     }
 
@@ -61,10 +69,9 @@ public class TrainProvPortalDataService {
      * gap: nothing here fabricates access to a client the caller
      * wasn't actually granted.
      */
-    private UUID resolveClientId(UUID portalUserId) {
+    private TrainProvPortalAccessGrant resolveGrant(UUID portalUserId) {
         return grantRepo.findAcceptedByPortalUser(portalUserId).stream()
                 .findFirst()
-                .map(TrainProvPortalAccessGrant::getClientId)
                 .orElseThrow(() -> new HandyFlowException(
                         "No active client access found for this portal account", HttpStatus.FORBIDDEN, "NO_CLIENT_ACCESS"));
     }

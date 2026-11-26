@@ -21,6 +21,9 @@ public interface TrainProvLearnerEnrolmentRepository extends JpaRepository<Train
         """)
     List<TrainProvLearnerEnrolment> search(TenantId tenantId, String status, UUID learnerId, UUID programmeId);
 
+    @Query("SELECT e FROM TrainProvLearnerEnrolment e WHERE e.tenantId = :#{#tenantId.value} AND e.clientId = :clientId ORDER BY e.createdAt DESC")
+    List<TrainProvLearnerEnrolment> forClient(TenantId tenantId, UUID clientId);
+
     @Query("SELECT e FROM TrainProvLearnerEnrolment e WHERE e.tenantId = :#{#tenantId.value} AND e.id = :id")
     Optional<TrainProvLearnerEnrolment> findForTenant(TenantId tenantId, UUID id);
 

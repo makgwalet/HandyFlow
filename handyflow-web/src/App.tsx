@@ -169,6 +169,9 @@ import TrainProvPage from "./pages/trainingprovider/TrainProvPage"
 import { TrainProvPortalAcceptInvitePage } from "./pages/trainingprovider-portal/TrainProvPortalAcceptInvitePage"
 import { TrainProvPortalHomePage } from "./pages/trainingprovider-portal/TrainProvPortalHomePage"
 import { TrainProvPortalLoginPage } from "./pages/trainingprovider-portal/TrainProvPortalLoginPage"
+import { LearnerPortalLoginPage } from "./pages/trainingprovider-portal/LearnerPortalLoginPage"
+import { LearnerPortalAcceptInvitePage } from "./pages/trainingprovider-portal/LearnerPortalAcceptInvitePage"
+import { LearnerPortalHomePage } from "./pages/trainingprovider-portal/LearnerPortalHomePage"
 import AgriculturePage from "./pages/agriculture/AgriculturePage"
 
 const queryClient = new QueryClient({
@@ -203,6 +206,12 @@ function LpPortalProtectedRoute({ children }: { children: React.ReactNode }) {
 function FmPortalProtectedRoute({ children }: { children: React.ReactNode }) {
   const token = usePortalAuthStore(s => s.token)
   if (!token) return <Navigate to="/facilitiesmanagement/portal/login" replace />
+  return <>{children}</>
+}
+
+function TrainProvPortalProtectedRoute({ children, to }: { children: React.ReactNode; to: string }) {
+  const token = usePortalAuthStore(s => s.token)
+  if (!token) return <Navigate to={to} replace />
   return <>{children}</>
 }
 
@@ -346,7 +355,10 @@ export default function App() {
           // matching the exact pattern already used for /warehousing/portal/*):
           <Route path="/training-provider/portal/login" element={<TrainProvPortalLoginPage />} />
           <Route path="/training-provider/portal/auth/accept-invite" element={<TrainProvPortalAcceptInvitePage />} />
-          <Route path="/training-provider/portal" element={<TrainProvPortalHomePage />} /> {/* wrap with the same portal-auth guard used for Warehousing/Collections Agency */}
+          <Route path="/training-provider/portal" element={<TrainProvPortalProtectedRoute to="/training-provider/portal/login"><TrainProvPortalHomePage /></TrainProvPortalProtectedRoute>} />
+          <Route path="/training-provider/portal/learner/login" element={<LearnerPortalLoginPage />} />
+          <Route path="/training-provider/portal/learner/accept-invite" element={<LearnerPortalAcceptInvitePage />} />
+          <Route path="/training-provider/portal/learner/home" element={<TrainProvPortalProtectedRoute to="/training-provider/portal/learner/login"><LearnerPortalHomePage /></TrainProvPortalProtectedRoute>} />
 
           <Route path="/warehousing/portal/login" element={<WhsePortalLoginPage />} />
           <Route path="/warehousing/portal/auth/accept-invite" element={<WhsePortalAcceptInvitePage />} />

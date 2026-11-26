@@ -12,9 +12,9 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 import za.co.handyflow.platform.shared.ApiResponse;
 import za.co.handyflow.platform.shared.HandyFlowException;
-import za.co.handyflow.platform.shared.TenantContext;
-import za.co.handyflow.platform.shared.TenantId;
 import za.co.handyflow.platform.trainingprovider.application.internal.TrainProvPortalDataService;
+import za.co.handyflow.platform.trainingprovider.application.internal.TrainProvPortalReadService;
+import za.co.handyflow.platform.trainingprovider.dto.LearnerPortalDtos.EmployerLearners;
 import za.co.handyflow.platform.trainingprovider.domain.model.TrainProvCertificate;
 import za.co.handyflow.platform.trainingprovider.domain.model.TrainProvDelegate;
 import za.co.handyflow.platform.trainingprovider.domain.model.TrainProvEnrollment;
@@ -43,13 +43,13 @@ import java.util.UUID;
 public class TrainProvPortalDataController {
 
     private final TrainProvPortalDataService portalDataService;
+    private final TrainProvPortalReadService portalReadService;
 
     @GetMapping("/delegates")
     @PreAuthorize("hasAuthority('PORTAL_USER')")
     @Operation(summary = "This client's own delegates")
     public ResponseEntity<ApiResponse<List<DelegateResponse>>> getMyDelegates() {
-        TenantId tenantId = TenantContext.getTenantIdAsObject();
-        List<DelegateResponse> delegates = portalDataService.getMyDelegates(tenantId, getPortalUserId()).stream()
+        List<DelegateResponse> delegates = portalDataService.getMyDelegates(getPortalUserId()).stream()
                 .map(this::toResponse).toList();
         return ResponseEntity.ok(ApiResponse.success(delegates));
     }
@@ -58,27 +58,31 @@ public class TrainProvPortalDataController {
     @PreAuthorize("hasAuthority('PORTAL_USER')")
     public ResponseEntity<ApiResponse<Page<EnrollmentResponse>>> getMyEnrollments(
             @RequestParam(required = false) String status, @PageableDefault(size = 50) Pageable pageable) {
-        TenantId tenantId = TenantContext.getTenantIdAsObject();
         return ResponseEntity.ok(ApiResponse.success(
-                portalDataService.getMyEnrollments(tenantId, getPortalUserId(), status, pageable).map(this::toResponse)));
+                portalDataService.getMyEnrollments(getPortalUserId(), status, pageable).map(this::toResponse)));
     }
 
     @GetMapping("/certificates")
     @PreAuthorize("hasAuthority('PORTAL_USER')")
     public ResponseEntity<ApiResponse<Page<CertificateResponse>>> getMyCertificates(
             @RequestParam(required = false) String status, @PageableDefault(size = 50) Pageable pageable) {
-        TenantId tenantId = TenantContext.getTenantIdAsObject();
         return ResponseEntity.ok(ApiResponse.success(
-                portalDataService.getMyCertificates(tenantId, getPortalUserId(), status, pageable).map(this::toResponse)));
+                portalDataService.getMyCertificates(getPortalUserId(), status, pageable).map(this::toResponse)));
     }
 
     @GetMapping("/invoices")
     @PreAuthorize("hasAuthority('PORTAL_USER')")
     public ResponseEntity<ApiResponse<List<InvoiceResponse>>> getMyInvoices() {
-        TenantId tenantId = TenantContext.getTenantIdAsObject();
-        List<InvoiceResponse> invoices = portalDataService.getMyInvoices(tenantId, getPortalUserId()).stream()
+        List<InvoiceResponse> invoices = portalDataService.getMyInvoices(getPortalUserId()).stream()
                 .map(this::toResponse).toList();
         return ResponseEntity.ok(ApiResponse.success(invoices));
+    }
+
+    /** The employer's learners on programmes: only learners whose consent flag is set, read-only, no scores and no competence wording. */
+    @GetMapping("/programme-learners")
+    @PreAuthorize("hasAuthority('PORTAL_USER')")
+    public ResponseEntity<ApiResponse<EmployerLearners>> getMyProgrammeLearners() {
+        return ResponseEntity.ok(ApiResponse.success(portalReadService.employer(getPortalUserId())));
     }
 
     /** PortalJwtFilter stores the portal user's ID (UUID string) as the Authentication principal — confirmed against AccountantPortalAuthController's own identical helper. */

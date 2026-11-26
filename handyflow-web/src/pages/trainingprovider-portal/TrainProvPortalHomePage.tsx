@@ -15,9 +15,10 @@
 import { useState } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { useNavigate } from "react-router-dom"
-import { GraduationCap, LogOut, Users, ClipboardList, Award, FileText } from "lucide-react"
-import { apiClient } from "../../api/client"
+import { GraduationCap, LogOut, Users, ClipboardList, Award, FileText, UserCheck } from "lucide-react"
+import { trainProvPortalClient } from "../../api/trainProvPortal.client"
 import { usePortalAuthStore } from "../../store/portalAuth.store"
+import TrainProvEmployerLearners from "./TrainProvEmployerLearners"
 
 const ACCENT = "var(--hf-warning-solid-strong)"
 const ACCENT_TEXT = "var(--hf-warning-text-strong)";
@@ -28,41 +29,42 @@ interface EnrollmentResponse { id: string; delegateNameSnapshot: string; status:
 interface CertificateResponse { id: string; delegateNameSnapshot: string; courseTitleSnapshot: string; certificateNumber: string; issueDate: string; expiryDate: string | null; status: string }
 interface InvoiceResponse { id: string; invoiceNumber: string; periodStart: string; periodEnd: string; dueDate: string; total: number; amountPaid: number; balance: number; status: string }
 
-type SubTab = "delegates" | "enrollments" | "certificates" | "invoices"
+type SubTab = "delegates" | "enrollments" | "certificates" | "invoices" | "programmes"
 const SUB_TABS: { key: SubTab; label: string; icon: typeof Users }[] = [
   { key: "delegates", label: "Delegates", icon: Users },
   { key: "enrollments", label: "Enrollments", icon: ClipboardList },
   { key: "certificates", label: "Certificates", icon: Award },
   { key: "invoices", label: "Invoices", icon: FileText },
+  { key: "programmes", label: "Programme learners", icon: UserCheck },
 ]
 
 export function TrainProvPortalHomePage() {
   const navigate = useNavigate()
-  const portalAuth = usePortalAuthStore() as any
+  const portalAuth = usePortalAuthStore()
   const [sub, setSub] = useState<SubTab>("delegates")
 
   const { data: delegates = [], isLoading: delegatesLoading } = useQuery<DelegateResponse[]>({
     queryKey: ["trainprov-portal-delegates"],
-    queryFn: async () => (await apiClient.get("/api/v1/training-provider/portal/me/delegates")).data,
+    queryFn: async () => (await trainProvPortalClient.get("/api/v1/training-provider/portal/me/delegates")).data,
     enabled: sub === "delegates",
   })
   const { data: enrollData, isLoading: enrollLoading } = useQuery<{ content: EnrollmentResponse[] }>({
     queryKey: ["trainprov-portal-enrollments"],
-    queryFn: async () => (await apiClient.get("/api/v1/training-provider/portal/me/enrollments", { params: { size: 100 } })).data,
+    queryFn: async () => (await trainProvPortalClient.get("/api/v1/training-provider/portal/me/enrollments", { params: { size: 100 } })).data,
     enabled: sub === "enrollments",
   })
   const { data: certData, isLoading: certLoading } = useQuery<{ content: CertificateResponse[] }>({
     queryKey: ["trainprov-portal-certificates"],
-    queryFn: async () => (await apiClient.get("/api/v1/training-provider/portal/me/certificates", { params: { size: 100 } })).data,
+    queryFn: async () => (await trainProvPortalClient.get("/api/v1/training-provider/portal/me/certificates", { params: { size: 100 } })).data,
     enabled: sub === "certificates",
   })
   const { data: invoices = [], isLoading: invoicesLoading } = useQuery<InvoiceResponse[]>({
     queryKey: ["trainprov-portal-invoices"],
-    queryFn: async () => (await apiClient.get("/api/v1/training-provider/portal/me/invoices")).data,
+    queryFn: async () => (await trainProvPortalClient.get("/api/v1/training-provider/portal/me/invoices")).data,
     enabled: sub === "invoices",
   })
 
-  const logout = () => { portalAuth.logout?.(); navigate("/training-provider/portal/login") }
+  const logout = () => { portalAuth.logout(); navigate("/training-provider/portal/login") }
 
   return (
     <div style={{ minHeight: "100vh", background: "var(--hf-surface-sunken)", fontFamily: "'Inter', system-ui, sans-serif" }}>
@@ -97,6 +99,8 @@ export function TrainProvPortalHomePage() {
             )
           })}
         </div>
+
+        {sub === "programmes" && <TrainProvEmployerLearners />}
 
         {sub === "delegates" && (
           delegatesLoading ? <p style={{ color: "var(--hf-text-faint)", fontSize: 13 }}>Loading…</p> :
