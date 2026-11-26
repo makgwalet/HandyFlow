@@ -44,6 +44,21 @@ public final class SarsPayeCalculator {
     }
 
     public static SarsPayrollResult calculate(Inputs in, StatutoryYearRules r) {
+        return calculate(in, r, 12, null);
+    }
+
+    /**
+     * Periodic method for a payroll paid {@code periodsPerYear} times a year (12 monthly, 26 fortnightly, 52 weekly), the way SARS's
+     * weekly and fortnightly deduction tables work: the period's pay is annualised by the number of periods, taxed as a year, and a
+     * period's share taken. In this overload {@code in.monthlySalary()} and the other pay amounts are for the period, not the month.
+     * The medical credit and rebates are annual figures and are shared out the same way.
+     * <p>
+     * UIF is a monthly ceiling, so for a payroll that is not monthly the base already counted this calendar month is passed in
+     * ({@code uifBaseAlreadyThisMonth}) and only the room left under the ceiling is used. It is ignored when {@code periodsPerYear} is 12.
+     */
+    public static SarsPayrollResult calculate(Inputs in, StatutoryYearRules r, int periodsPerYear, BigDecimal uifBaseAlreadyThisMonth) {
+        if (periodsPerYear < 1) throw new IllegalArgumentException("periodsPerYear must be at least 1");
+        final BigDecimal periods = BigDecimal.valueOf(periodsPerYear);
         BigDecimal salary = in.monthlySalary();
         BigDecimal travel = nvl(in.travelAllowance());
         BigDecimal pension = nvl(in.pensionContribution());
@@ -53,13 +68,13 @@ public final class SarsPayeCalculator {
         BigDecimal employerRetirement = nvl(in.employerRetirement());
         BigDecimal otherFringe = nvl(in.otherFringe());
 
-        BigDecimal annualGross = salary.multiply(TWELVE);
-        BigDecimal annualTravel = travel.multiply(r.travelTaxablePct()).multiply(TWELVE);
+        BigDecimal annualGross = salary.multiply(periods);
+        BigDecimal annualTravel = travel.multiply(r.travelTaxablePct()).multiply(periods);
         // Employer contributions to a medical scheme or a retirement fund, and other fringe benefits, are taxable benefits: they add to
         // the income tax is worked out on. What the employer pays into a retirement fund counts as the employee's own contribution for
         // the deduction, so it shares the cap with the employee's contribution.
-        BigDecimal annualFringe = employerMedical.add(employerRetirement).add(otherFringe).multiply(TWELVE);
-        BigDecimal annualPension = pension.add(employerRetirement).multiply(TWELVE);
+        BigDecimal annualFringe = employerMedical.add(employerRetirement).add(otherFringe).multiply(periods);
+        BigDecimal annualPension = pension.add(employerRetirement).multiply(periods);
         BigDecimal remuneration = annualGross.add(annualTravel).add(annualFringe);
 
         // Age is taken at the last day of the tax year: someone who turns 65 during the year gets the rebate for the whole year.
@@ -73,7 +88,7 @@ public final class SarsPayeCalculator {
         BigDecimal taxable = taxableOf(remuneration, annualPension, r);
         BigDecimal taxBefore = tax(taxable, r);
         BigDecimal annualPaye = annualPayeOf(taxBefore, primary, secondary, tertiary, annualCredit);
-        BigDecimal paye = annualPaye.divide(TWELVE, 2, RoundingMode.HALF_UP);
+        BigDecimal paye = annualPaye.divide(periods, 2, RoundingMode.HALF_UP);
 
         // A bonus or back pay is not annualised. The tax on it is the extra tax the year bears once it is added to the annualised
         // regular pay (the method SARS prescribes for annual payments), and all of it falls in the month it is paid.
@@ -89,7 +104,7 @@ public final class SarsPayeCalculator {
 
         // A bonus or back pay is remuneration for UIF and SDL in the month it is paid.
         BigDecimal subject = salary.add(irregular);
-        BigDecimal uifBase = subject.min(r.uifMonthlyCeiling());
+        BigDecimal uifBase = periodsPerYear == 12 ? subject.min(r.uifMonthlyCeiling()) : uifBase(subject, r.uifMonthlyCeiling(), uifBaseAlreadyThisMonth);
         BigDecimal uifEmployee = uifBase.multiply(r.uifRateEmployee()).setScale(2, RoundingMode.HALF_UP);
         BigDecimal uifEmployer = uifBase.multiply(r.uifRateEmployer()).setScale(2, RoundingMode.HALF_UP);
 
@@ -99,6 +114,12 @@ public final class SarsPayeCalculator {
 
         return new SarsPayrollResult(salary, travel, medicalAid, pension, paye, uifEmployee, uifEmployer, sdl,
                 taxable, taxBefore, primary, secondary, tertiary, annualCredit, r.taxYear());
+    }
+
+    /** The part of {@code remuneration} that is liable for UIF this period: what is left under the monthly ceiling after what was already counted this month. */
+    public static BigDecimal uifBase(BigDecimal remuneration, BigDecimal monthlyCeiling, BigDecimal alreadyThisMonth) {
+        BigDecimal room = monthlyCeiling.subtract(nvl(alreadyThisMonth)).max(BigDecimal.ZERO);
+        return remuneration.min(room);
     }
 
     /** The income tax is worked out on: the remuneration less the retirement deduction, which is capped at a share of the remuneration. */

@@ -28,6 +28,14 @@ public final class PayPeriodRules {
         return null;
     }
 
+    /** Pay periods in a tax year: the multiplier SARS's periodic method annualises a period's pay with. */
+    public static int periodsPerYear(String frequency) {
+        if ("WEEKLY".equals(frequency)) return 52;
+        if ("FORTNIGHTLY".equals(frequency)) return 26;
+        if ("MONTHLY".equals(frequency)) return 12;
+        throw new IllegalArgumentException("Unknown pay frequency: " + frequency);
+    }
+
     private static int length(String frequency) {
         return "WEEKLY".equals(frequency) ? 7 : 14;
     }

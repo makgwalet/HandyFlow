@@ -74,6 +74,8 @@ public class Payslip {
     @Column(name = "input_date_of_birth") private java.time.LocalDate inputDateOfBirth;
     @Column(name = "input_medical_members") private Integer inputMedicalMembers;
     @Column(name = "input_annual_payroll", precision = 15, scale = 2) private BigDecimal inputAnnualPayroll;
+    @Column(name = "uif_base", precision = 15, scale = 2) private BigDecimal uifBase;
+    @Column(name = "input_periods_per_year") private Integer inputPeriodsPerYear;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
@@ -115,5 +117,11 @@ public class Payslip {
         this.inputDateOfBirth = dateOfBirth;
         this.inputMedicalMembers = medicalMembers;
         this.inputAnnualPayroll = annualPayroll;
+    }
+
+    /** Periodic pay (slice 1d): how many periods a year the PAYE was annualised by, and what UIF was charged on. */
+    public void recordPeriodic(int periodsPerYear, BigDecimal uifBase) {
+        this.inputPeriodsPerYear = periodsPerYear;
+        this.uifBase = uifBase;
     }
 }

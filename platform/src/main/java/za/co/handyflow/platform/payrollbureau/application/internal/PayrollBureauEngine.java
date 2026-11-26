@@ -59,17 +59,56 @@ public class PayrollBureauEngine {
         return medical != null && medical.signum() > 0 ? 1 : 0;
     }
 
-    /** Records on the payslip which rules, formula and inputs produced its figures (slice 1b). */
-    public void freeze(Payslip payslip, PayEmployee employee, StatutoryYearRules rules, BigDecimal annualPayroll) {
-        payslip.freeze(rules.effectiveFrom(), rules.effectiveTo(), RulesFingerprint.of(rules), RulesFingerprint.FORMULA_VERSION,
-                employee.getDateOfBirth(), medicalMembers(employee), annualPayroll);
+    /** What UIF is charged on for this period's pay: capped at the monthly ceiling, less what earlier runs this month used. */
+    public BigDecimal uifBase(PayEmployee employee, StatutoryYearRules rules, int periodsPerYear, BigDecimal uifBaseEarlierThisMonth) {
+        BigDecimal pay = employee.getGrossSalary();
+        return periodsPerYear == 12
+                ? pay.min(rules.uifMonthlyCeiling())
+                : SarsPayeCalculator.uifBase(pay, rules.uifMonthlyCeiling(), uifBaseEarlierThisMonth);
     }
 
+    /** Records on the payslip which rules, formula and inputs produced its figures (slice 1b). */
+    public void freeze(Payslip payslip, PayEmployee employee, StatutoryYearRules rules, BigDecimal annualPayroll) {
+        freeze(payslip, employee, rules, annualPayroll, 12, BigDecimal.ZERO);
+    }
+
+    public void freeze(Payslip payslip, PayEmployee employee, StatutoryYearRules rules, BigDecimal annualPayroll,
+                       int periodsPerYear, BigDecimal uifBaseEarlierThisMonth) {
+        payslip.freeze(rules.effectiveFrom(), rules.effectiveTo(), RulesFingerprint.of(rules), RulesFingerprint.formulaFor(periodsPerYear),
+                employee.getDateOfBirth(), medicalMembers(employee), annualPayroll);
+        payslip.recordPeriodic(periodsPerYear, uifBase(employee, rules, periodsPerYear, uifBaseEarlierThisMonth));
+    }
+
+    /**
+     * The year's payroll size for the SDL threshold: every active employee's pay per period times the periods a year of their
+     * own pay group. {@code periodsOf} gives that count for a group id (null = the default monthly payroll).
+     */
+    public BigDecimal annualPayroll(java.util.List<PayEmployee> activeEmployees, java.util.function.Function<java.util.UUID, Integer> periodsOf) {
+        BigDecimal total = BigDecimal.ZERO;
+        for (PayEmployee e : activeEmployees) {
+            int periods = e.getPayGroupId() == null ? 12 : periodsOf.apply(e.getPayGroupId());
+            total = total.add(e.getGrossSalary().multiply(BigDecimal.valueOf(periods)));
+        }
+        return total;
+    }
+
+    /** Monthly pay: the amounts on the employee are a month's pay. */
     public PayrollResult calculate(PayEmployee employee, StatutoryYearRules rules, BigDecimal annualPayroll) {
+        return calculate(employee, rules, annualPayroll, 12, BigDecimal.ZERO);
+    }
+
+    /**
+     * Pay for one period of a pay group. The amounts on the employee are what that employee gets <em>per pay period of their group</em>
+     * (a week's pay for a weekly group). {@code uifBaseEarlierThisMonth} is what UIF was already charged on in other runs of the same
+     * calendar month; it only matters when there is more than one run a month.
+     */
+    public PayrollResult calculate(PayEmployee employee, StatutoryYearRules rules, BigDecimal annualPayroll,
+                                   int periodsPerYear, BigDecimal uifBaseEarlierThisMonth) {
         int medicalMembers = medicalMembers(employee);
         SarsPayrollResult r = SarsPayeCalculator.calculate(new SarsPayeCalculator.Inputs(
                 employee.getGrossSalary(), employee.getTravelAllowance(), employee.getPensionContribution(),
-                employee.getMedicalAidContribution(), employee.getDateOfBirth(), medicalMembers, annualPayroll), rules);
+                employee.getMedicalAidContribution(), employee.getDateOfBirth(), medicalMembers, annualPayroll),
+                rules, periodsPerYear, uifBaseEarlierThisMonth);
 
         log.debug("Payroll bureau employee={} year={} taxable={} paye={} uif={} sdl={}",
                 employee.getId(), rules.taxYear(), r.taxableIncome(), r.payeAmount(), r.uifEmployee(), r.sdlAmount());

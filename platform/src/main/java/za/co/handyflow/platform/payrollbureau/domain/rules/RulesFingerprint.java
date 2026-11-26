@@ -18,6 +18,13 @@ public final class RulesFingerprint {
     /** Bumped whenever the way the bureau applies the rules changes, so payslips can be told apart by method as well as by figures. */
     public static final String FORMULA_VERSION = "shared-paye-1";
 
+    /** The same rules applied to weekly and fortnightly pay: annualised by 52 or 26, UIF capped per calendar month across runs. */
+    public static final String FORMULA_VERSION_PERIODIC = "shared-paye-periodic-1";
+
+    public static String formulaFor(int periodsPerYear) {
+        return periodsPerYear == 12 ? FORMULA_VERSION : FORMULA_VERSION_PERIODIC;
+    }
+
     private RulesFingerprint() {}
 
     public static String of(StatutoryYearRules r) {

@@ -274,32 +274,36 @@ public class PayrollBureauService {
         // (audit 2026-11-26, D9). The same approved rules HR uses.
         za.co.handyflow.platform.shared.StatutoryYearRules rules = engine.requireRules(run.getTaxYear());
 
+        // Weekly and fortnightly groups are taxed by the periodic method (slice 1d): the employee's amounts are per pay period.
+        int periodsPerYear = 12;
         if (run.getPayGroupId() != null) {
             PayGroup group = groupService.load(tenantId, run.getPayGroupId());
-            // The calculator works on a monthly salary. Until periodic PAYE exists (slice 1d), a weekly or fortnightly
-            // run would be taxed wrongly, so it is refused rather than calculated.
-            if (!"MONTHLY".equals(group.getFrequency())) {
-                throw new HandyFlowException("Weekly and fortnightly pay runs cannot be processed yet: periodic PAYE is not built.",
-                        HttpStatus.UNPROCESSABLE_ENTITY, "FREQUENCY_NOT_SUPPORTED");
-            }
+            periodsPerYear = za.co.handyflow.platform.payrollbureau.domain.rules.PayPeriodRules.periodsPerYear(group.getFrequency());
         }
         List<PayEmployee> employees = run.getPayGroupId() == null
                 ? employeeRepo.findActiveUngrouped(run.getPayClientId())
                 : employeeRepo.findActiveByGroup(run.getPayClientId(), run.getPayGroupId());
-        java.math.BigDecimal annualPayroll = employeeRepo.sumMonthlyGrossByClient(run.getPayClientId())
-                .multiply(java.math.BigDecimal.valueOf(12));
+        // The SDL threshold looks at the whole client's year, across all its pay groups.
+        java.util.Map<UUID, Integer> periodsByGroup = new java.util.HashMap<>();
+        java.math.BigDecimal annualPayroll = engine.annualPayroll(employeeRepo.findAllActiveByClient(run.getPayClientId()),
+                gid -> periodsByGroup.computeIfAbsent(gid, id -> za.co.handyflow.platform.payrollbureau.domain.rules.PayPeriodRules
+                        .periodsPerYear(groupService.load(tenantId, id).getFrequency())));
+        java.time.LocalDate monthStart = run.getPayDate().withDayOfMonth(1);
+        java.time.LocalDate monthEnd = monthStart.plusMonths(1).minusDays(1);
 
         java.math.BigDecimal runGross = java.math.BigDecimal.ZERO, runPaye = java.math.BigDecimal.ZERO,
                 runUif = java.math.BigDecimal.ZERO, runSdl = java.math.BigDecimal.ZERO, runNet = java.math.BigDecimal.ZERO;
 
         for (PayEmployee emp : employees) {
-            PayrollBureauEngine.PayrollResult result = engine.calculate(emp, rules, annualPayroll);
+            java.math.BigDecimal uifEarlier = periodsPerYear == 12 ? java.math.BigDecimal.ZERO
+                    : payslipRepo.sumUifBaseInMonth(tenantId.getValue(), emp.getId(), run.getId(), monthStart, monthEnd);
+            PayrollBureauEngine.PayrollResult result = engine.calculate(emp, rules, annualPayroll, periodsPerYear, uifEarlier);
 
             Payslip slip = Payslip.create(tenantId.getValue(), run.getId(), emp.getId(),
                     result.monthlySalary(), result.travelAllowance(), result.payeAmount(),
                     result.uifEmployee(), result.uifEmployer(), result.sdlAmount(),
                     result.medicalAid(), result.pension(), result.taxableIncome(), result.taxYear());
-            engine.freeze(slip, emp, rules, annualPayroll);
+            engine.freeze(slip, emp, rules, annualPayroll, periodsPerYear, uifEarlier);
             payslipRepo.save(slip);
 
             runGross = runGross.add(result.totalEarnings());

@@ -39,6 +39,12 @@ public interface PayEmployeeRepository extends JpaRepository<PayEmployee, UUID> 
     """)
     Optional<PayEmployee> findActiveById(@Param("tenantId") UUID tenantId, @Param("id") UUID id);
 
+    @Query("""
+        SELECT e FROM PayEmployee e
+        WHERE e.payClientId = :payClientId AND e.status = 'ACTIVE' AND e.deletedAt IS NULL
+    """)
+    List<PayEmployee> findAllActiveByClient(@Param("payClientId") UUID payClientId);
+
     /** Sum of all active employees' annual gross for one client — the SDL threshold check. */
     @Query("""
         SELECT COALESCE(SUM(e.grossSalary), 0) FROM PayEmployee e

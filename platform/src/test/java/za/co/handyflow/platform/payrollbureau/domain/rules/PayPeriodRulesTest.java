@@ -74,4 +74,12 @@ class PayPeriodRulesTest {
         assertEquals(2027, PayPeriodRules.taxYearOfPayDate(LocalDate.of(2027, 2, 28)));
         assertEquals(2028, PayPeriodRules.taxYearOfPayDate(LocalDate.of(2027, 3, 3)));
     }
+
+    @Test
+    void periodsPerYearMatchTheSarsMultipliers() {
+        assertEquals(12, PayPeriodRules.periodsPerYear("MONTHLY"));
+        assertEquals(26, PayPeriodRules.periodsPerYear("FORTNIGHTLY"));
+        assertEquals(52, PayPeriodRules.periodsPerYear("WEEKLY"));
+        assertThrows(IllegalArgumentException.class, () -> PayPeriodRules.periodsPerYear("DAILY"));
+    }
 }

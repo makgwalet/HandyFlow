@@ -89,4 +89,35 @@ class PayrollBureauEngineTest {
         HandyFlowException e = assertThrows(HandyFlowException.class, () -> engine.requireRules(2030));
         assertTrue(e.getMessage().contains("no approved statutory rules"));
     }
+
+    @Test
+    void weeklyPayIsTaxedByThePeriodicMethodAndUifSharesTheMonthlyCeiling() {
+        var e = employee("4991", "0");
+        var first = engine.calculate(e, engine.requireRules(2027), d("259532"), 52, BigDecimal.ZERO);
+        assertEquals(0, d("577.89").compareTo(first.payeAmount()));
+        assertEquals(0, d("49.91").compareTo(first.uifEmployee()));
+        // the fourth week of a month that already used 15 000 of the 17 712 ceiling
+        var fourth = engine.calculate(e, engine.requireRules(2027), d("259532"), 52, d("15000"));
+        assertEquals(0, d("27.12").compareTo(fourth.uifEmployee()));
+        assertEquals(0, d("2712.00").compareTo(engine.uifBase(e, engine.requireRules(2027), 52, d("15000"))));
+    }
+
+    @Test
+    void annualPayrollAddsEachEmployeeAtTheirOwnGroupsPeriods() {
+        var weekly = employee("5000", "0");
+        var monthly = employee("20000", "0");
+        java.util.UUID g = java.util.UUID.randomUUID();
+        when(weekly.getPayGroupId()).thenReturn(g);
+        when(monthly.getPayGroupId()).thenReturn(null);
+        // 5 000 x 52 + 20 000 x 12
+        assertEquals(0, d("500000").compareTo(engine.annualPayroll(List.of(weekly, monthly), id -> 52)));
+    }
+
+    @Test
+    void freezeRecordsThePeriodicFormulaAndTheUifBase() {
+        var e = employee("5000", "0");
+        var slip = org.mockito.Mockito.mock(za.co.handyflow.platform.payrollbureau.domain.model.Payslip.class);
+        engine.freeze(slip, e, engine.requireRules(2027), d("260000"), 52, d("15000"));
+        org.mockito.Mockito.verify(slip).recordPeriodic(52, d("2712.00"));
+    }
 }
