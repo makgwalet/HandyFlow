@@ -19,6 +19,7 @@ import TrainProvProgressPanel from "./TrainProvProgressPanel"
 import TrainProvWorkplacePanel from "./TrainProvWorkplacePanel"
 import TrainProvRplPanel from "./TrainProvRplPanel"
 import TrainProvFundingPanel from "./TrainProvFundingPanel"
+import TrainProvLearnershipPanel from "./TrainProvLearnershipPanel"
 
 export function LearnerFormPanel({ initial, onSaved, onCancel }: { initial?: Learner; onSaved: (l: Learner) => void; onCancel: () => void }) {
   const { data: clients = [] } = useClients()
@@ -136,6 +137,7 @@ function EnrolmentCard({ e, canManage, onChanged }: { e: Enrolment; canManage: b
       )}
       <TrainProvProgressPanel enrolmentId={e.id} startDate={e.startDate} versionId={e.programmeVersionId ?? null} />
       <TrainProvFundingPanel enrolmentId={e.id} enrolmentStatus={e.status} startDate={e.startDate} />
+      <TrainProvLearnershipPanel enrolmentId={e.id} enrolmentStatus={e.status} startDate={e.startDate} />
       <TrainProvWorkplacePanel enrolmentId={e.id} enrolmentStatus={e.status} startDate={e.startDate} />
       <TrainProvRplPanel enrolmentId={e.id} enrolmentStatus={e.status} startDate={e.startDate} programmeId={e.programmeId} versionId={e.programmeVersionId ?? null} />
       <TrainProvCompletionPanel enrolmentId={e.id} startDate={e.startDate} />
