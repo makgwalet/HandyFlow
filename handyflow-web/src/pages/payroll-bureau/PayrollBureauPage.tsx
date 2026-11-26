@@ -11,13 +11,14 @@
 import { useEffect, useState } from "react"
 import { payrollBureauApi } from "../../api/payrollBureau.api"
 import type { PayGroup, PayClient, PayEmployee, PayRun, Payslip, PayDeadline, PayFeeNote, PortalAccessGrant, PayEmployeeChange, EmailResult, PayRunReview } from "../../types/payrollBureau.types"
+import { SarsTab, EmployeeEtiModal } from "./SarsFiling"
 import { PayGroupsTab, ComponentsTab, EmployeeComponentsModal, RunItemsModal, PayGroupSelect, GroupPeriodPicker } from "./PayGroupsAndComponents"
 import { required, validateSaId, validateTaxNumber, validateEmail, validatePhone,
   validatePositiveNumber, validateDayOfMonth, type FieldErrors } from "./validation"
 import { StatusBadge, Table, Empty, Modal, Field, FieldError, ErrorBox, ModalActions } from "./ui"
 import { fmtR, fmtD, NAVY, NAVY_TEXT, BORDER, CANVAS, INK, MUTED, FAINT, inputStyle, errorInputStyle, btnPrimary, btnPrimarySmall, btnSecondary, rowStyle, cellStyle } from "./uiStyles"
 
-type Tab = "employees" | "groups" | "components" | "payruns" | "deadlines" | "feenotes" | "portal"
+type Tab = "employees" | "groups" | "components" | "payruns" | "sars" | "deadlines" | "feenotes" | "portal"
 
 // Authenticated logo image — a plain <img src=...> can't work here, the
 // logo download endpoint requires a Bearer token and browsers send no
@@ -230,7 +231,7 @@ export function PayrollBureauPage() {
 
             <div style={{ display: "flex", gap: 4, borderBottom: `1px solid ${BORDER}`, marginBottom: 20 }}>
               {([
-                ["employees", "Employees"], ["groups", "Pay Groups"], ["components", "Pay Items"], ["payruns", "Pay Runs"], ["deadlines", "Deadlines"],
+                ["employees", "Employees"], ["groups", "Pay Groups"], ["components", "Pay Items"], ["payruns", "Pay Runs"], ["sars", "SARS"], ["deadlines", "Deadlines"],
                 ["feenotes", "Invoices"], ["portal", "Portal Access"],
               ] as [Tab, string][]).map(([id, label]) => (
                 <button key={id} onClick={() => setTab(id)} style={{
@@ -245,6 +246,7 @@ export function PayrollBureauPage() {
             {tab === "groups" && <PayGroupsTab client={selected} />}
             {tab === "components" && <ComponentsTab />}
             {tab === "payruns" && <PayRunsTab client={selected} />}
+            {tab === "sars" && <SarsTab client={selected} />}
             {tab === "deadlines" && <DeadlinesTab client={selected} />}
             {tab === "feenotes" && <FeeNotesTab client={selected} />}
             {tab === "portal" && <PortalAccessTab client={selected} />}
@@ -465,6 +467,7 @@ function EmployeesTab({ client }: { client: PayClient }) {
   const [editing, setEditing] = useState<PayEmployee | null>(null)
   const [docsFor, setDocsFor] = useState<PayEmployee | null>(null)
   const [itemsFor, setItemsFor] = useState<PayEmployee | null>(null)
+  const [etiFor, setEtiFor] = useState<PayEmployee | null>(null)
   const [groups, setGroups] = useState<PayGroup[]>([])
 
   const refetch = () => {
@@ -493,6 +496,7 @@ function EmployeesTab({ client }: { client: PayClient }) {
                 <div style={{ display: "flex", gap: 6 }}>
                   <button onClick={() => setEditing(e)} style={btnSecondary}>Edit</button>
                   <button onClick={() => setItemsFor(e)} style={btnSecondary}>Pay items</button>
+                  <button onClick={() => setEtiFor(e)} style={btnSecondary}>ETI</button>
                   <button onClick={() => setDocsFor(e)} style={btnSecondary}>Documents</button>
                 </div>
               </td>
@@ -506,6 +510,7 @@ function EmployeesTab({ client }: { client: PayClient }) {
       {editing && <EditEmployeeModal clientId={client.id} employee={editing} onClose={() => setEditing(null)}
         onSaved={() => { setEditing(null); refetch() }} />}
       {docsFor && <EmployeeDocumentsModal employee={docsFor} onClose={() => setDocsFor(null)} />}
+      {etiFor && <EmployeeEtiModal clientId={client.id} employee={etiFor} onClose={() => setEtiFor(null)} onSaved={() => { setEtiFor(null); refetch() }} />}
       {itemsFor && <EmployeeComponentsModal clientId={client.id} employee={itemsFor} onClose={() => setItemsFor(null)} />}
     </div>
   )

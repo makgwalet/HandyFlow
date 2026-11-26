@@ -21,5 +21,7 @@ public record PayClientResponse(
         String notes,
         String address,
         boolean hasLogo,
-        Instant createdAt
+        Instant createdAt,
+        boolean etiClaimable,
+        String etiClaimableNote
 ) {}

@@ -13,6 +13,7 @@ import type {
   PayEmployeeChange, EmailResult,
   PayClient, PayEmployee, PayRun, Payslip, PayDeadline, PayFeeNote, PortalAccessGrant,
   PayRunReview, BankFile, PayGroup, NextPeriod, PayComponent, EmployeeComponent, RunItem,
+  Emp201, Emp501,
 } from "../types/payrollBureau.types"
 
 interface PageResponse<T> { content: T[]; totalElements: number; totalPages: number; number: number }
@@ -163,4 +164,22 @@ export const payrollBureauApi = {
     return apiClient.post(`/api/v1/payroll-bureau/employees/${employeeId}/documents`, form,
       { headers: { "Content-Type": "multipart/form-data" } }).then(r => r.data)
   },
+
+  // SARS filing
+  getEmp201s: (clientId: string, taxYear: number) =>
+    apiClient.get(`/api/v1/payroll-bureau/clients/${clientId}/emp201?taxYear=${taxYear}`).then(r => r.data as Emp201[]),
+  getEmp201: (clientId: string, month: string) =>
+    apiClient.get(`/api/v1/payroll-bureau/clients/${clientId}/emp201/${month}`).then(r => r.data as Emp201),
+  prepareEmp201: (clientId: string, month: string) =>
+    apiClient.post(`/api/v1/payroll-bureau/clients/${clientId}/emp201/${month}/prepare`).then(r => r.data as Emp201),
+  fileEmp201: (clientId: string, month: string, reference: string) =>
+    apiClient.post(`/api/v1/payroll-bureau/clients/${clientId}/emp201/${month}/file`, { reference }).then(r => r.data as Emp201),
+  setEtiClaim: (clientId: string, claimable: boolean, note: string) =>
+    apiClient.put(`/api/v1/payroll-bureau/clients/${clientId}/eti-claim`, { claimable, note }).then(r => r.data),
+  setEmployeeEti: (clientId: string, employeeId: string, body: { idKind: string | null; domesticWorker: boolean; connectedPerson: boolean; belowMinimumWage: boolean; monthsPrior: number }) =>
+    apiClient.put(`/api/v1/payroll-bureau/clients/${clientId}/employees/${employeeId}/eti`, body).then(r => r.data),
+  getEmp501: (clientId: string, period: string, taxYear: number) =>
+    apiClient.get(`/api/v1/payroll-bureau/clients/${clientId}/emp501?period=${period}&taxYear=${taxYear}`).then(r => r.data as Emp501),
+  downloadEmp501WorkingPaper: (clientId: string, period: string, taxYear: number) =>
+    apiClient.get(`/api/v1/payroll-bureau/clients/${clientId}/emp501/working-paper?period=${period}&taxYear=${taxYear}`, { responseType: "blob" }).then(r => r.data as Blob),
 }

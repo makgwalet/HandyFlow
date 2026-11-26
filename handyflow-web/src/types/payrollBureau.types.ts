@@ -17,6 +17,8 @@ export interface PayClient {
   status: "ACTIVE" | "OFFBOARDED"
   notes: string | null
   createdAt: string
+  etiClaimable?: boolean
+  etiClaimableNote?: string | null
 }
 
 export interface EmailResult {
@@ -61,9 +63,16 @@ export interface PayEmployee {
   endDate: string | null
   status: "ACTIVE" | "TERMINATED"
   createdAt: string
+  taxNumber?: string | null
+  etiIdKind?: string | null
+  domesticWorker?: boolean
+  connectedPerson?: boolean
+  belowMinimumWage?: boolean
+  etiMonthsPrior?: number
 }
 
 export interface PayRun {
+  payGroupId?: string | null
   id: string
   payRunNumber: string
   periodStart: string
@@ -217,4 +226,26 @@ export interface PortalAccessGrant {
   invitedAt: string
   acceptedAt: string | null
   revokedAt: string | null
+}
+
+// ── SARS filing (phase 4) ──
+export interface EtiLine { employeeId: string; employeeName: string; eligible: boolean; tier: string | null; remuneration: number; incentive: number; reasons: string[] }
+export interface Emp201 {
+  id: string; clientId: string; taxMonth: string; status: "DRAFT" | "FILED"; employeeCount: number
+  totalRemuneration: number; paye: number; uifEmployee: number; uifEmployer: number; sdl: number
+  etiCalculated: number; etiBroughtForward: number; etiUsed: number; etiCarriedForward: number; etiClaimed: boolean
+  totalPayable: number; dueDate: string; runNumbers: string | null; preparedAt: string; filedAt: string | null
+  filingReference: string | null; etiLines: EtiLine[]
+}
+export interface SarsFinding { severity: "BLOCK" | "WARN"; code: string; message: string }
+export interface CertLine { code: string; amount: number }
+export interface TaxCertificate {
+  employeeId: string; employeeName: string; type: string; income: CertLine[]; deductions: CertLine[]
+  nonTaxable3696: number; grossTaxable3699: number; paye4102: number; uif4141: number; sdl4142: number; total4149: number
+  blocked: boolean; findings: SarsFinding[]
+}
+export interface Emp501 {
+  clientId: string; period: string; taxYear: number; from: string; to: string; certificateCount: number
+  balanced: boolean; blocked: boolean; differences: { what: string; emp201: number; certificates: number; difference: number }[]
+  etiUsed: number; etiUnusedAtEnd: number; findings: SarsFinding[]; certificates: TaxCertificate[]
 }

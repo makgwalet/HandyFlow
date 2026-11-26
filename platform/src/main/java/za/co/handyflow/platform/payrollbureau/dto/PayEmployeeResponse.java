@@ -12,5 +12,6 @@ public record PayEmployeeResponse(
         BigDecimal pensionContribution, BigDecimal medicalAidContribution,
         String bankName, String bankAccountNumber, String bankBranchCode,
         LocalDate startDate, LocalDate endDate, String status, Instant createdAt, boolean changePending,
-        UUID payGroupId
+        UUID payGroupId,
+        String etiIdKind, boolean domesticWorker, boolean connectedPerson, boolean belowMinimumWage, int etiMonthsPrior
 ) {}

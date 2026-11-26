@@ -1043,7 +1043,8 @@ public class PayrollBureauService {
                 c.getPayeReference(), c.getUifReference(), c.getSdlReference(),
                 c.getPayFrequency(), c.getPayDay(), c.getContactName(), c.getContactEmail(),
                 c.getContactPhone(), c.getOnboardedAt(), c.getStatus(), c.getNotes(),
-                c.getAddress(), c.getLogoEvidenceId() != null, c.getCreatedAt());
+                c.getAddress(), c.getLogoEvidenceId() != null, c.getCreatedAt(),
+                c.isEtiClaimable(), c.getEtiClaimableNote());
     }
 
     private void requireClientOwnership(TenantId tenantId, UUID payClientId) {
@@ -1059,7 +1060,8 @@ public class PayrollBureauService {
                 e.getGrossSalary(), e.getTravelAllowance(),
                 e.getPensionContribution(), e.getMedicalAidContribution(), e.getBankName(),
                 e.getBankAccountNumber(), e.getBankBranchCode(), e.getStartDate(), e.getEndDate(),
-                e.getStatus(), e.getCreatedAt(), changePending, e.getPayGroupId());
+                e.getStatus(), e.getCreatedAt(), changePending, e.getPayGroupId(),
+                e.getEtiIdKind(), e.isDomesticWorker(), e.isConnectedPerson(), e.isBelowMinimumWage(), e.getEtiMonthsPrior());
     }
 
     private PayRunResponse toPayRunResponse(PayRun r) {
