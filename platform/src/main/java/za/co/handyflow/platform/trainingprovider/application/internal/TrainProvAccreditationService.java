@@ -254,10 +254,10 @@ public class TrainProvAccreditationService {
                 .collect(Collectors.toMap(TrainProvAccreditation::getId, Function.identity()));
         List<AccreditationRules.ScopeFacts> facts = found.stream()
                 .filter(sc -> byId.containsKey(sc.getAccreditationId()))
-                .map(sc -> {
+                .<AccreditationRules.ScopeFacts>map(sc -> {
                     TrainProvAccreditation a = byId.get(sc.getAccreditationId());
                     return new AccreditationRules.ScopeFacts(a.getStatus(), a.getExpiryDate(), sc.getStatus(),
-                            sc.getValidFrom(), sc.getValidTo(), sc.getSiteId());
+                            sc.getValidFrom(), sc.getValidTo(), sc.getSiteId(), a.getCurrency(), a.getEffectiveFrom(), a.getEndedOn());
                 }).toList();
         AccreditationRules.Coverage c = AccreditationRules.best(facts, siteId, day);
         return new CoverageView(subjectId, siteId, day, c.outcome().name(), c.covered(), c.message());

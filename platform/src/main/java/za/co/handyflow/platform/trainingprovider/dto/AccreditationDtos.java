@@ -75,4 +75,34 @@ public final class AccreditationDtos {
 
     public record CoverageView(UUID courseId, UUID siteId, LocalDate on, String outcome, boolean covered, String message) {
     }
+
+    /** The dates the authority gives and where the information came from. */
+    public record FrameworkRequest(LocalDate effectiveFrom, LocalDate reviewDueOn, String sourceType, String sourceReference,
+                                   LocalDate sourceVersionDate, String sourceLocation) {
+    }
+
+    /** Current, transitional or historical. A historical record says when it stopped applying and may name the one that replaced it. */
+    public record CurrencyRequest(@NotBlank String currency, String note, LocalDate endedOn, UUID supersededById) {
+    }
+
+    public record EvidenceRequest(@NotBlank String kind, @NotBlank String description, String reference, LocalDate documentDate, LocalDate receivedOn) {
+    }
+
+    public record EvidenceDecisionRequest(@NotBlank String toStatus, String note) {
+    }
+
+    public record EvidenceView(UUID id, UUID accreditationId, String kind, String description, String reference, LocalDate documentDate,
+                               LocalDate receivedOn, String status, UUID addedBy, Instant addedAt, UUID decidedBy, Instant decidedAt, String decisionNote) {
+    }
+
+    public record FrameworkRow(UUID id, String title, String accreditationNumber, String status, String effectiveStatus, String currency,
+                               String currencyNote, LocalDate endedOn, UUID supersededById, LocalDate effectiveFrom, LocalDate approvalDate,
+                               LocalDate expiryDate, LocalDate reviewDueOn, LocalDate lastVerifiedOn, String sourceType, String sourceReference,
+                               LocalDate sourceVersionDate, String sourceLocation, int liveScopes, int sites, int verifiedEvidence,
+                               int pendingEvidence, List<String> flags) {
+    }
+
+    public record FrameworkAuthority(UUID id, String name, String authorityType, int rank, String status, int liveObligations,
+                                     List<FrameworkRow> accreditations) {
+    }
 }

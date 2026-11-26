@@ -6,6 +6,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import za.co.handyflow.platform.shared.TenantId;
 import za.co.handyflow.platform.trainingprovider.domain.rules.AccreditationRules;
+import za.co.handyflow.platform.trainingprovider.domain.rules.AuthorityFrameworkRules;
 
 import java.time.Instant;
 import java.time.LocalDate;
@@ -50,6 +51,26 @@ public class TrainProvAccreditation {
     private LocalDate lastVerifiedOn;
     @Column(name = "verified_by")
     private UUID verifiedBy;
+    @Column(name = "effective_from")
+    private LocalDate effectiveFrom;
+    @Column(name = "review_due_on")
+    private LocalDate reviewDueOn;
+    @Column(nullable = false)
+    private String currency = "CURRENT";
+    @Column(name = "currency_note")
+    private String currencyNote;
+    @Column(name = "ended_on")
+    private LocalDate endedOn;
+    @Column(name = "superseded_by_id")
+    private UUID supersededById;
+    @Column(name = "source_type")
+    private String sourceType;
+    @Column(name = "source_reference")
+    private String sourceReference;
+    @Column(name = "source_version_date")
+    private LocalDate sourceVersionDate;
+    @Column(name = "source_location")
+    private String sourceLocation;
     @Column(name = "created_by", nullable = false)
     private UUID createdBy;
     @Column(name = "created_at", nullable = false)
@@ -114,6 +135,42 @@ public class TrainProvAccreditation {
         this.verificationSource = source.trim();
         this.lastVerifiedOn = on;
         this.verifiedBy = by;
+        this.updatedAt = Instant.now();
+    }
+
+    /** The dates the authority gives and where they came from. Allowed at any stage: it records what the record says, it does not change the status. */
+    public void setFramework(LocalDate effectiveFrom, LocalDate reviewDueOn, String sourceType, String sourceReference, LocalDate sourceVersionDate,
+                             String sourceLocation, LocalDate today) {
+        if (AccreditationRules.isTerminal(status)) {
+            throw new IllegalStateException("This accreditation is closed");
+        }
+        String p = AuthorityFrameworkRules.datesProblem(effectiveFrom, approvalDate, expiryDate, reviewDueOn);
+        if (p == null) {
+            p = AuthorityFrameworkRules.sourceProblem(sourceType, sourceReference, sourceVersionDate, sourceLocation, today);
+        }
+        if (p != null) {
+            throw new IllegalArgumentException(p);
+        }
+        this.effectiveFrom = effectiveFrom;
+        this.reviewDueOn = reviewDueOn;
+        this.sourceType = blankToNull(sourceType);
+        this.sourceReference = blankToNull(sourceReference);
+        this.sourceVersionDate = sourceVersionDate;
+        this.sourceLocation = blankToNull(sourceLocation);
+        this.updatedAt = Instant.now();
+    }
+
+    /** Marks the record current, transitional or historical. The service has already checked that a record it names as the replacement exists. */
+    public void setCurrency(String currency, String note, LocalDate endedOn, UUID supersededBy, LocalDate today) {
+        String p = AuthorityFrameworkRules.currencyProblem(currency, note, endedOn, supersededBy, id, approvalDate, today);
+        if (p != null) {
+            throw new IllegalArgumentException(p);
+        }
+        boolean current = "CURRENT".equals(currency);
+        this.currency = currency;
+        this.currencyNote = current ? null : note.trim();
+        this.endedOn = "HISTORICAL".equals(currency) ? endedOn : null;
+        this.supersededById = "HISTORICAL".equals(currency) ? supersededBy : null;
         this.updatedAt = Instant.now();
     }
 

@@ -17,7 +17,7 @@ import java.util.UUID;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class TrainProvAuthority {
 
-    public static final Set<String> TYPES = Set.of("QCTO", "SETA", "UMALUSI", "CHE", "PROFESSIONAL_BODY", "OTHER");
+    public static final Set<String> TYPES = Set.of("QCTO", "SETA", "SAQA", "DHET", "UMALUSI", "CHE", "PROFESSIONAL_BODY", "OTHER");
 
     @Id
     private UUID id = UUID.randomUUID();

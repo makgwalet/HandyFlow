@@ -142,7 +142,12 @@ public final class AccreditationRules {
 
     /** One scope row, as the rules need it. */
     public record ScopeFacts(String accreditationStatus, LocalDate accreditationExpiry, String scopeStatus,
-                             LocalDate validFrom, LocalDate validTo, UUID siteId) {
+                             LocalDate validFrom, LocalDate validTo, UUID siteId, String currency, LocalDate effectiveFrom,
+                             LocalDate endedOn) {
+        public ScopeFacts(String accreditationStatus, LocalDate accreditationExpiry, String scopeStatus,
+                          LocalDate validFrom, LocalDate validTo, UUID siteId) {
+            this(accreditationStatus, accreditationExpiry, scopeStatus, validFrom, validTo, siteId, "CURRENT", null, null);
+        }
     }
 
     /**
@@ -160,11 +165,21 @@ public final class AccreditationRules {
         if ((s.validFrom() != null && day.isBefore(s.validFrom())) || (s.validTo() != null && day.isAfter(s.validTo()))) {
             return new Coverage(Outcome.SCOPE_NOT_IN_FORCE, false, "The approval for this programme is not in force on that date");
         }
+        if (s.effectiveFrom() != null && day.isBefore(s.effectiveFrom())) {
+            return new Coverage(Outcome.SCOPE_NOT_IN_FORCE, false, "The approval had not taken effect on that date");
+        }
+        if ("HISTORICAL".equals(s.currency()) && s.endedOn() != null && day.isAfter(s.endedOn())) {
+            return new Coverage(Outcome.SCOPE_NOT_IN_FORCE, false, "This is a historical approval that stopped applying on " + s.endedOn());
+        }
+        boolean transitional = "TRANSITIONAL".equals(s.currency());
         String effective = effectiveStatus(s.accreditationStatus(), s.accreditationExpiry(), day);
         return switch (effective) {
-            case APPROVED -> new Coverage(Outcome.COVERED, true, "Covered by a current approval");
+            case APPROVED -> transitional
+                    ? new Coverage(Outcome.COVERED_WITH_CONDITIONS, true, "Covered under a transitional arrangement. Read the note on the accreditation")
+                    : new Coverage(Outcome.COVERED, true, "Covered by a current approval");
             case CONDITIONAL_APPROVAL -> new Coverage(Outcome.COVERED_WITH_CONDITIONS, true,
-                    "Covered, but the approval has conditions that must be met");
+                    transitional ? "Covered under a transitional arrangement, and the approval has conditions that must be met"
+                            : "Covered, but the approval has conditions that must be met");
             case RENEWAL_PENDING -> new Coverage(Outcome.COVERED_RENEWAL_PENDING, true,
                     "Covered until the current expiry date. A renewal is pending, not yet approved");
             case EXPIRED -> new Coverage(Outcome.EXPIRED, false, "The approval has expired");

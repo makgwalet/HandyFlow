@@ -21,7 +21,7 @@ export const MIN_REASON = 10
 export const MIN_SOURCE = 5
 
 export const AUTHORITY_TYPES: Record<string, string> = {
-  QCTO: "QCTO", SETA: "SETA", UMALUSI: "Umalusi", CHE: "CHE", PROFESSIONAL_BODY: "Professional body", OTHER: "Other",
+  QCTO: "QCTO", SETA: "SETA", SAQA: "SAQA", DHET: "DHET", UMALUSI: "Umalusi", CHE: "CHE", PROFESSIONAL_BODY: "Professional body", OTHER: "Other",
 }
 export const SITE_TYPES: Record<string, string> = {
   CAMPUS: "Campus", DELIVERY_SITE: "Delivery site", ASSESSMENT_CENTRE: "Assessment centre", OTHER: "Other",

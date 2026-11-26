@@ -11,6 +11,7 @@ import { AUTHORITY_TYPES, SITE_TYPES, coverageLabel, nameProblem, reasonProblem,
 import { Badge, Field, Notice, SubTabs } from "./tpUi"
 import { errText, ghost, input, muted, solid, card, unwrap, todayIso } from "./tpStyle"
 import TrainProvAccreditationList from "./TrainProvAccreditationList"
+import TrainProvFrameworkPanel from "./TrainProvFrameworkPanel"
 import { ACC, useAuthorities, useSites } from "./tpApi"
 
 
@@ -179,8 +180,9 @@ export default function TrainProvAccreditationTab() {
     <div style={{ display: "grid", gap: 14 }}>
       <div><h2 style={{ margin: 0, fontSize: 18 }}>Accreditation</h2>
         <div style={muted}>Approvals, scope and history. An approval counts only once an administrator has recorded it with the authority's number and where it was verified.</div></div>
-      <SubTabs value={tab} onChange={setTab} tabs={[["accreditations", "Accreditations"], ["authorities", "Authorities"], ["sites", "Sites"], ["coverage", "Check cover"]]} />
+      <SubTabs value={tab} onChange={setTab} tabs={[["accreditations", "Accreditations"], ["framework", "By authority"], ["authorities", "Authorities"], ["sites", "Sites"], ["coverage", "Check cover"]]} />
       {tab === "accreditations" && <TrainProvAccreditationList canManage={canManage} isAdmin={isAdmin} />}
+      {tab === "framework" && <TrainProvFrameworkPanel canManage={canManage} />}
       {tab === "authorities" && <Authorities canManage={canManage} isAdmin={isAdmin} />}
       {tab === "sites" && <Sites canManage={canManage} isAdmin={isAdmin} />}
       {tab === "coverage" && <CoverageCheck />}
