@@ -7,12 +7,13 @@ export type Placement = {
   endedOn: string | null; cancelReason: string | null; nextStatuses: string[]; confirmedHours: number; unconfirmedHours: number; summary: string
 }
 export type LogEntry = { id: string; placementId: string; logDate: string; hours: number; activity: string; status: string; voidReason: string | null; confirmedOn: string | null; confirmedByName: string | null }
-export type PlacementDetail = { placement: Placement; logs: LogEntry[] }
+export type ProgrammeHoursNote = { hours: number; sourceType: string; sourceReference: string; sourceSection: string; effectiveDate: string; verifiedOn: string; note: string }
+export type PlacementDetail = { placement: Placement; logs: LogEntry[]; programmeHours?: ProgrammeHoursNote | null }
 
 export const MIN_REASON = 10
 export const STATUSES: Record<string, string> = { PLANNED: "Planned", ACTIVE: "Active", COMPLETED: "Completed", CANCELLED: "Cancelled" }
 export const label = (m: Record<string, string>, k: string | null | undefined) => (k ? m[k] ?? k : "—")
-export const WORKPLACE_NOTE = "Hours here are a record of time spent in the workplace. They are not a competency decision, and no required number of hours is held."
+export const WORKPLACE_NOTE = "Hours here are a record of time spent in the workplace. They are not a competency decision. No required number of hours is assumed: a figure appears only where the programme version records it with its source."
 
 export function statusTone(s: string): "good" | "warn" | "bad" | "neutral" {
   return s === "ACTIVE" ? "good" : s === "PLANNED" ? "warn" : "neutral"

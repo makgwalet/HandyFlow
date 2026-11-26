@@ -42,6 +42,10 @@ public final class WorkplaceDtos {
                                 String summary) {
     }
 
-    public record PlacementDetail(PlacementView placement, List<LogView> logs) {
+    /** What the programme version records, with its source, next to the logged hours. Absent when the programme records no workplace hours. */
+    public record ProgrammeHoursNote(BigDecimal hours, String sourceType, String sourceReference, String sourceSection, LocalDate effectiveDate, LocalDate verifiedOn, String note) {
+    }
+
+    public record PlacementDetail(PlacementView placement, List<LogView> logs, ProgrammeHoursNote programmeHours) {
     }
 }

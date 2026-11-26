@@ -4,6 +4,7 @@ import { useState } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import { usePermissions } from "../../hooks/usePermission"
+import { SOURCE_TYPES } from "./programmeHoursRules"
 import {
   STATUSES, WORKPLACE_NOTE, confirmProblem, dayProblem, emptyLog, emptyPlacement, enrolmentOpen, label, logBody, logLine, logProblem, placementBody, placementForm,
   placementProblem, reasonProblem, statusTone, type LogForm, type LogEntry, type Placement, type PlacementDetail, type PlacementForm,
@@ -134,6 +135,7 @@ function PlacementCard({ p, enrolmentStart, onChanged }: { p: Placement; enrolme
       {open && (
         <div style={{ display: "grid", gap: 6 }}>
           <div style={muted}>{WORKPLACE_NOTE}</div>
+          {detail?.programmeHours && <div style={muted}>{detail.programmeHours.note} Source: {label(SOURCE_TYPES, detail.programmeHours.sourceType)}, {detail.programmeHours.sourceReference}, {detail.programmeHours.sourceSection}; checked {detail.programmeHours.verifiedOn}.</div>}
           {!detail ? <div style={muted}>Loading…</div> : detail.logs.length === 0 ? <div style={muted}>No entries yet.</div> : detail.logs.map(l => (
             <div key={l.id} style={{ display: "grid", gap: 4 }}>
               <div style={{ display: "flex", justifyContent: "space-between", gap: 8, flexWrap: "wrap" }}>

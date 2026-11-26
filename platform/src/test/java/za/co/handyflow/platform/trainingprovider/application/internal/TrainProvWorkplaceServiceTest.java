@@ -14,6 +14,7 @@ import za.co.handyflow.platform.trainingprovider.domain.model.TrainProvWorkplace
 import za.co.handyflow.platform.trainingprovider.domain.repository.TrainProvLearnerEnrolmentRepository;
 import za.co.handyflow.platform.trainingprovider.domain.repository.TrainProvLearnerRepository;
 import za.co.handyflow.platform.trainingprovider.domain.repository.TrainProvProgrammeRepository;
+import za.co.handyflow.platform.trainingprovider.domain.repository.TrainProvProgrammeWorkplaceHoursRepository;
 import za.co.handyflow.platform.trainingprovider.domain.repository.TrainProvWorkplaceLogRepository;
 import za.co.handyflow.platform.trainingprovider.domain.repository.TrainProvWorkplacePlacementRepository;
 import za.co.handyflow.platform.trainingprovider.dto.WorkplaceDtos.*;
@@ -42,6 +43,7 @@ class TrainProvWorkplaceServiceTest {
     @Mock TrainProvLearnerEnrolmentRepository enrolments;
     @Mock TrainProvLearnerRepository learners;
     @Mock TrainProvProgrammeRepository programmes;
+    @Mock TrainProvProgrammeWorkplaceHoursRepository programmeHours;
     @Mock TrainProvNumberGenerator numbers;
     @InjectMocks TrainProvWorkplaceService service;
 

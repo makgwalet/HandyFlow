@@ -36,7 +36,7 @@ describe("workplace panel", () => {
     expect(get).not.toHaveBeenCalled()
     fireEvent.click(screen.getByText("Workplace"))
     expect(await screen.findByText(/Acme Stores/)).toBeTruthy()
-    expect(screen.getByText(/not a competency decision, and no required number/)).toBeTruthy()
+    expect(screen.getByText(/not a competency decision\. No required number/)).toBeTruthy()
     expect(screen.getByText(/12 hours logged, 8 confirmed/)).toBeTruthy()
   })
 

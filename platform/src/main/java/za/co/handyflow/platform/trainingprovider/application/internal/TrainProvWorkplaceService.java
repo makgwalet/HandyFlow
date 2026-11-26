@@ -9,13 +9,16 @@ import za.co.handyflow.platform.shared.ResourceNotFoundException;
 import za.co.handyflow.platform.shared.TenantId;
 import za.co.handyflow.platform.trainingprovider.domain.model.TrainProvLearnerEnrolment;
 import za.co.handyflow.platform.trainingprovider.domain.model.TrainProvProgramme;
+import za.co.handyflow.platform.trainingprovider.domain.model.TrainProvProgrammeWorkplaceHours;
 import za.co.handyflow.platform.trainingprovider.domain.model.TrainProvWorkplaceLog;
 import za.co.handyflow.platform.trainingprovider.domain.model.TrainProvWorkplacePlacement;
 import za.co.handyflow.platform.trainingprovider.domain.repository.TrainProvLearnerEnrolmentRepository;
 import za.co.handyflow.platform.trainingprovider.domain.repository.TrainProvLearnerRepository;
 import za.co.handyflow.platform.trainingprovider.domain.repository.TrainProvProgrammeRepository;
+import za.co.handyflow.platform.trainingprovider.domain.repository.TrainProvProgrammeWorkplaceHoursRepository;
 import za.co.handyflow.platform.trainingprovider.domain.repository.TrainProvWorkplaceLogRepository;
 import za.co.handyflow.platform.trainingprovider.domain.repository.TrainProvWorkplacePlacementRepository;
+import za.co.handyflow.platform.trainingprovider.domain.rules.ProgrammeHoursRules;
 import za.co.handyflow.platform.trainingprovider.domain.rules.WorkplaceRules;
 import za.co.handyflow.platform.trainingprovider.dto.WorkplaceDtos.*;
 
@@ -38,6 +41,7 @@ public class TrainProvWorkplaceService {
     private final TrainProvLearnerEnrolmentRepository enrolments;
     private final TrainProvLearnerRepository learners;
     private final TrainProvProgrammeRepository programmes;
+    private final TrainProvProgrammeWorkplaceHoursRepository programmeHours;
     private final TrainProvNumberGenerator numbers;
 
     public List<PlacementView> list(TenantId t, UUID enrolmentId, String status) {
@@ -46,7 +50,11 @@ public class TrainProvWorkplaceService {
 
     public PlacementDetail get(TenantId t, UUID id) {
         TrainProvWorkplacePlacement p = placement(t, id);
-        return new PlacementDetail(view(t, p), logs.forPlacement(t, p.getId()).stream().<LogView>map(TrainProvWorkplaceService::logView).toList());
+        PlacementView pv = view(t, p);
+        ProgrammeHoursNote note = enrolments.findForTenant(t, p.getEnrolmentId()).flatMap(e -> e.getProgrammeVersionId() == null ? java.util.Optional.<TrainProvProgrammeWorkplaceHours>empty()
+                : programmeHours.findLive(t, e.getProgrammeVersionId())).<ProgrammeHoursNote>map(h -> new ProgrammeHoursNote(h.getHours(), h.getSourceType(), h.getSourceReference(),
+                h.getSourceSection(), h.getEffectiveDate(), h.getVerifiedOn(), ProgrammeHoursRules.note(h.getHours(), pv.confirmedHours().add(pv.unconfirmedHours()), pv.confirmedHours()))).orElse(null);
+        return new PlacementDetail(pv, logs.forPlacement(t, p.getId()).stream().<LogView>map(TrainProvWorkplaceService::logView).toList(), note);
     }
 
     @Transactional
