@@ -27,7 +27,7 @@ import java.util.*;
  * when staff have marked the client as allowed to claim. The figures are for keying into SARS eFiling; nothing is submitted.
  */
 @Slf4j
-@Service
+@Service("payBureauEmp201Service")
 @RequiredArgsConstructor
 public class Emp201Service {
 
