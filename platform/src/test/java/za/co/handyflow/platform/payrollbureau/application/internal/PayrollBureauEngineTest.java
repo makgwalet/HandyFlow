@@ -66,6 +66,25 @@ class PayrollBureauEngineTest {
     }
 
     @Test
+    void aPayslipRecordsTheRulesAndInputsItWasCalculatedFrom() {
+        PayEmployee e = employee("20000", "0");
+        var rules = engine.requireRules(2027);
+        var r = engine.calculate(e, rules, d("240000"));
+        var slip = za.co.handyflow.platform.payrollbureau.domain.model.Payslip.create(java.util.UUID.randomUUID(),
+                java.util.UUID.randomUUID(), java.util.UUID.randomUUID(), r.monthlySalary(), r.travelAllowance(), r.payeAmount(),
+                r.uifEmployee(), r.uifEmployer(), r.sdlAmount(), r.medicalAid(), r.pension(), r.taxableIncome(), r.taxYear());
+
+        engine.freeze(slip, e, rules, d("240000"));
+
+        assertEquals(LocalDate.of(2026, 3, 1), slip.getRulesEffectiveFrom());
+        assertEquals(64, slip.getRulesFingerprint().length());
+        assertEquals("shared-paye-1", slip.getFormulaVersion());
+        assertEquals(0, slip.getInputMedicalMembers());
+        assertEquals(0, d("240000").compareTo(slip.getInputAnnualPayroll()));
+        assertThrows(IllegalStateException.class, () -> engine.freeze(slip, e, rules, d("240000")));
+    }
+
+    @Test
     void aYearWithoutApprovedRulesIsRefusedNotCalculatedAsZero() {
         HandyFlowException e = assertThrows(HandyFlowException.class, () -> engine.requireRules(2030));
         assertTrue(e.getMessage().contains("no approved statutory rules"));

@@ -175,6 +175,16 @@ public class PayrollBureauController {
                 bureauService.getPayslips(TenantContext.getTenantIdAsObject(), payRunId)));
     }
 
+    @GetMapping("/pay-runs/{payRunId}/payslips/{payslipId}/calculation")
+    @PreAuthorize("hasAnyAuthority('PAYROLLBUREAU_READ','PAYROLLBUREAU_MANAGE','PAYROLLBUREAU_ADMIN')")
+    @Operation(summary = "The rules, formula and inputs a payslip was calculated from")
+    public ResponseEntity<ApiResponse<PayslipCalculationResponse>> getPayslipCalculation(
+            @PathVariable UUID payRunId, @PathVariable UUID payslipId) {
+        featureGuard.requireModule("payrollbureau");
+        return ResponseEntity.ok(ApiResponse.success(
+                bureauService.getPayslipCalculation(TenantContext.getTenantIdAsObject(), payRunId, payslipId)));
+    }
+
     @GetMapping("/pay-runs/{payRunId}/payslips/{payslipId}/pdf")
     @PreAuthorize("hasAnyAuthority('PAYROLLBUREAU_READ','PAYROLLBUREAU_MANAGE','PAYROLLBUREAU_ADMIN')")
     @Operation(summary = "Download/print a single payslip as PDF — works regardless of whether the employee has an email on file")

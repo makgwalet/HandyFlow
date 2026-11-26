@@ -269,6 +269,7 @@ public class PayrollBureauService {
                     result.monthlySalary(), result.travelAllowance(), result.payeAmount(),
                     result.uifEmployee(), result.uifEmployer(), result.sdlAmount(),
                     result.medicalAid(), result.pension(), result.taxableIncome(), result.taxYear());
+            engine.freeze(slip, emp, rules, annualPayroll);
             payslipRepo.save(slip);
 
             runGross = runGross.add(result.totalEarnings());
@@ -649,6 +650,19 @@ public class PayrollBureauService {
         employeeRepo.save(emp);
         log.info("Updated payroll bureau employee={} tenant={} changeHeld={}", employeeId, tenantId.getValue(), held);
         return toEmployeeResponse(emp, held);
+    }
+
+    @Transactional(readOnly = true)
+    public PayslipCalculationResponse getPayslipCalculation(TenantId tenantId, UUID payRunId, UUID payslipId) {
+        payRunRepo.findByTenantAndId(tenantId.getValue(), payRunId)
+                .orElseThrow(() -> new ResourceNotFoundException("PayRun", payRunId.toString()));
+        Payslip p = payslipRepo.findByPayRun(tenantId.getValue(), payRunId).stream()
+                .filter(x -> x.getId().equals(payslipId)).findFirst()
+                .orElseThrow(() -> new ResourceNotFoundException("Payslip", payslipId.toString()));
+        return new PayslipCalculationResponse(p.getId(), p.getTaxYear(), p.getRulesFingerprint() != null,
+                p.getRulesEffectiveFrom(), p.getRulesEffectiveTo(), p.getRulesFingerprint(), p.getFormulaVersion(),
+                p.getGrossSalary(), p.getTravelAllowance(), p.getPension(), p.getMedicalAid(),
+                p.getInputDateOfBirth(), p.getInputMedicalMembers(), p.getInputAnnualPayroll());
     }
 
     @Transactional(readOnly = true)

@@ -67,6 +67,14 @@ public class Payslip {
     @Column(name = "tax_year")
     private int taxYear;
 
+    @Column(name = "rules_effective_from") private java.time.LocalDate rulesEffectiveFrom;
+    @Column(name = "rules_effective_to") private java.time.LocalDate rulesEffectiveTo;
+    @Column(name = "rules_fingerprint") private String rulesFingerprint;
+    @Column(name = "formula_version") private String formulaVersion;
+    @Column(name = "input_date_of_birth") private java.time.LocalDate inputDateOfBirth;
+    @Column(name = "input_medical_members") private Integer inputMedicalMembers;
+    @Column(name = "input_annual_payroll", precision = 15, scale = 2) private BigDecimal inputAnnualPayroll;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
@@ -94,5 +102,18 @@ public class Payslip {
         p.taxYear = taxYear;
         p.createdAt = Instant.now();
         return p;
+    }
+
+    /** Records what the figures were calculated from. Called once, when the payslip is made. */
+    public void freeze(java.time.LocalDate rulesFrom, java.time.LocalDate rulesTo, String fingerprint, String formula,
+                       java.time.LocalDate dateOfBirth, int medicalMembers, BigDecimal annualPayroll) {
+        if (this.rulesFingerprint != null) throw new IllegalStateException("This payslip's calculation is already recorded");
+        this.rulesEffectiveFrom = rulesFrom;
+        this.rulesEffectiveTo = rulesTo;
+        this.rulesFingerprint = fingerprint;
+        this.formulaVersion = formula;
+        this.inputDateOfBirth = dateOfBirth;
+        this.inputMedicalMembers = medicalMembers;
+        this.inputAnnualPayroll = annualPayroll;
     }
 }

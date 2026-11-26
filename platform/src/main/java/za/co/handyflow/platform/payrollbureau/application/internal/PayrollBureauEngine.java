@@ -4,6 +4,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 import za.co.handyflow.platform.payrollbureau.domain.model.PayEmployee;
+import za.co.handyflow.platform.payrollbureau.domain.model.Payslip;
+import za.co.handyflow.platform.payrollbureau.domain.rules.RulesFingerprint;
 import za.co.handyflow.platform.shared.HandyFlowException;
 import za.co.handyflow.platform.shared.SarsPayeCalculator;
 import za.co.handyflow.platform.shared.SarsPayrollResult;
@@ -51,10 +53,20 @@ public class PayrollBureauEngine {
         }
     }
 
+    /** The bureau does not record medical scheme dependants yet, so the taxpayer's own credit is all it can give. */
+    public int medicalMembers(PayEmployee employee) {
+        BigDecimal medical = employee.getMedicalAidContribution();
+        return medical != null && medical.signum() > 0 ? 1 : 0;
+    }
+
+    /** Records on the payslip which rules, formula and inputs produced its figures (slice 1b). */
+    public void freeze(Payslip payslip, PayEmployee employee, StatutoryYearRules rules, BigDecimal annualPayroll) {
+        payslip.freeze(rules.effectiveFrom(), rules.effectiveTo(), RulesFingerprint.of(rules), RulesFingerprint.FORMULA_VERSION,
+                employee.getDateOfBirth(), medicalMembers(employee), annualPayroll);
+    }
+
     public PayrollResult calculate(PayEmployee employee, StatutoryYearRules rules, BigDecimal annualPayroll) {
-        BigDecimal medical = employee.getMedicalAidContribution() == null ? BigDecimal.ZERO : employee.getMedicalAidContribution();
-        // The bureau does not record medical scheme dependants yet, so the taxpayer's own credit is all it can give.
-        int medicalMembers = medical.signum() > 0 ? 1 : 0;
+        int medicalMembers = medicalMembers(employee);
         SarsPayrollResult r = SarsPayeCalculator.calculate(new SarsPayeCalculator.Inputs(
                 employee.getGrossSalary(), employee.getTravelAllowance(), employee.getPensionContribution(),
                 employee.getMedicalAidContribution(), employee.getDateOfBirth(), medicalMembers, annualPayroll), rules);
