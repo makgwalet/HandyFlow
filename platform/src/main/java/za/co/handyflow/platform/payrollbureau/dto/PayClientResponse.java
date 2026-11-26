@@ -24,5 +24,7 @@ public record PayClientResponse(
         Instant createdAt,
         boolean etiClaimable,
         String etiClaimableNote,
-        boolean clientApprovalRequired
+        boolean clientApprovalRequired,
+        java.math.BigDecimal perEmployeeFee,
+        java.math.BigDecimal minimumFeePerRun
 ) {}

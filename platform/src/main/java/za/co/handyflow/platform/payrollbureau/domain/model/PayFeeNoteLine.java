@@ -32,6 +32,26 @@ public class PayFeeNoteLine {
     @Column(name = "amount", nullable = false, precision = 15, scale = 2)
     private BigDecimal amount;
 
+    @Column(name = "charge_id")
+    private UUID chargeId;
+
+    /** The minimum fee for a run, charged when the per-employee total is below it. */
+    public static PayFeeNoteLine minimumFee(UUID feeNoteId, String payRunNumber, int employeeCount, BigDecimal minimum) {
+        PayFeeNoteLine l = new PayFeeNoteLine();
+        l.feeNoteId = feeNoteId;
+        l.description = "Payroll processing, minimum fee — " + payRunNumber + " (" + employeeCount + " employees)";
+        l.quantity = BigDecimal.ONE; l.unitPrice = minimum; l.amount = minimum;
+        return l;
+    }
+
+    /** A fixed charge from the client's price list. */
+    public static PayFeeNoteLine forCharge(UUID feeNoteId, PayClientCharge charge) {
+        PayFeeNoteLine l = new PayFeeNoteLine();
+        l.feeNoteId = feeNoteId; l.description = charge.getDescription();
+        l.quantity = BigDecimal.ONE; l.unitPrice = charge.getAmount(); l.amount = charge.getAmount(); l.chargeId = charge.getId();
+        return l;
+    }
+
     /** Per-employee payroll processing line — the bureau's actual billing model. */
     public static PayFeeNoteLine forPayRun(UUID feeNoteId, String payRunNumber,
                                            int employeeCount, BigDecimal perEmployeeFee) {

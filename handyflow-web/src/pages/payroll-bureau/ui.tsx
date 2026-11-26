@@ -10,6 +10,7 @@ export function StatusBadge({ status }: { status: string }) {
     CLIENT_APPROVED: { c: "var(--hf-warning-text)", bg: "var(--hf-warning-soft)" }, REVERSED: { c: "var(--hf-danger-text, #b91c1c)", bg: "var(--hf-danger-soft, #fef2f2)" }, PENDING: { c: "var(--hf-warning-text)", bg: "var(--hf-warning-soft)" },
     SENT: { c: "var(--hf-info-text)", bg: "var(--hf-info-soft)" }, PARTIAL: { c: "var(--hf-info-text)", bg: "var(--hf-info-soft)" },
     OVERDUE: { c: "var(--hf-danger-text)", bg: "var(--hf-danger-soft)" }, OFFBOARDED: { c: "var(--hf-text-muted)", bg: "var(--hf-surface-sunken)" },
+    CANCELLED: { c: "var(--hf-text-muted)", bg: "var(--hf-surface-sunken)" },
     TERMINATED: { c: "var(--hf-text-muted)", bg: "var(--hf-surface-sunken)" }, REVOKED: { c: "var(--hf-danger-text)", bg: "var(--hf-danger-soft)" },
   }
   const t = tones[status] ?? tones.DRAFT

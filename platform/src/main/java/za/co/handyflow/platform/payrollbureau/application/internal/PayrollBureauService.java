@@ -14,6 +14,7 @@ import za.co.handyflow.platform.accounting.dto.JournalEntryResponse;
 import za.co.handyflow.platform.payrollbureau.domain.model.*;
 import za.co.handyflow.platform.payrollbureau.domain.repository.*;
 import za.co.handyflow.platform.payrollbureau.domain.rules.DeliveryRules;
+import za.co.handyflow.platform.payrollbureau.domain.rules.FeeRules;
 import za.co.handyflow.platform.payrollbureau.domain.rules.PayComponentRules;
 import za.co.handyflow.platform.payrollbureau.domain.rules.RunLifecycleRules;
 import za.co.handyflow.platform.payrollbureau.domain.rules.RunReviewRules;
@@ -79,6 +80,7 @@ public class PayrollBureauService {
     private final PayGroupService groupService;
     private final PayComponentService componentService;
     private final PayslipLineRepository payslipLineRepo;
+    private final PayClientChargeRepository chargeRepo;
 
     @Value("${app.frontend.url:http://localhost:5173}")
     private String frontendUrl;
@@ -620,9 +622,23 @@ public class PayrollBureauService {
             throw new ResourceNotFoundException("PayRun", req.payRunId().toString());
         }
 
-        java.math.BigDecimal subtotal = client.getPerEmployeeFee()
-                .multiply(java.math.BigDecimal.valueOf(run.getEmployeeCount()))
-                .setScale(2, java.math.RoundingMode.HALF_UP);
+        if (!feeNoteRepo.findActiveByRun(tenantId.getValue(), run.getId()).isEmpty()) {
+            throw new HandyFlowException("This pay run has already been billed. Cancel its fee note first if it has to be billed again.",
+                    HttpStatus.CONFLICT, "FEE_NOTE_EXISTS");
+        }
+
+        int employees = run.getEmployeeCount() == null ? 0 : run.getEmployeeCount();
+        FeeRules.RunFee runFee = FeeRules.runFee(client.getPerEmployeeFee(), employees, client.getMinimumFeePerRun());
+        // Extra fixed charges: per-run ones always, monthly and annual ones once in their period.
+        List<PayClientCharge> dueCharges = new ArrayList<>();
+        for (PayClientCharge c : chargeRepo.findActiveByClient(tenantId.getValue(), payClientId)) {
+            boolean billed = !FeeRules.PER_RUN.equals(c.getBilling()) && feeNoteLineRepo.countChargeBilled(tenantId.getValue(), payClientId, c.getId(),
+                    FeeRules.periodStart(c.getBilling(), req.invoiceDate()), FeeRules.periodEnd(c.getBilling(), req.invoiceDate())) > 0;
+            if (FeeRules.chargeDue(c.getBilling(), billed)) dueCharges.add(c);
+        }
+        java.math.BigDecimal subtotal = runFee.amount();
+        for (PayClientCharge c : dueCharges) subtotal = subtotal.add(c.getAmount());
+        subtotal = subtotal.setScale(2, java.math.RoundingMode.HALF_UP);
         java.math.BigDecimal vatAmount = req.includeVat()
                 ? subtotal.multiply(vatRateProvider.rateFraction()).setScale(2, java.math.RoundingMode.HALF_UP)
                 : java.math.BigDecimal.ZERO;
@@ -631,11 +647,17 @@ public class PayrollBureauService {
                 sequenceService.nextValue(tenantId, "PAYROLLBUREAU_FEENOTE:" + payClientId));
         PayFeeNote feeNote = PayFeeNote.create(tenantId.getValue(), payClientId, invoiceNumber,
                 req.invoiceDate(), req.dueDate(), subtotal, vatAmount);
-        feeNoteRepo.save(feeNote);
+        feeNote.linkToRun(run.getId());
+        try {
+            feeNoteRepo.saveAndFlush(feeNote);
+        } catch (org.springframework.dao.DataIntegrityViolationException e) {
+            throw new HandyFlowException("This pay run has just been billed by someone else.", HttpStatus.CONFLICT, "FEE_NOTE_EXISTS");
+        }
 
-        PayFeeNoteLine line = PayFeeNoteLine.forPayRun(feeNote.getId(), run.getPayRunNumber(),
-                run.getEmployeeCount(), client.getPerEmployeeFee());
-        feeNoteLineRepo.save(line);
+        feeNoteLineRepo.save(runFee.minimumApplied()
+                ? PayFeeNoteLine.minimumFee(feeNote.getId(), run.getPayRunNumber(), employees, runFee.amount())
+                : PayFeeNoteLine.forPayRun(feeNote.getId(), run.getPayRunNumber(), employees, client.getPerEmployeeFee()));
+        for (PayClientCharge c : dueCharges) feeNoteLineRepo.save(PayFeeNoteLine.forCharge(feeNote.getId(), c));
 
         // FIX: backlog 1.6 — was previously nothing here; a whole fee
         // note's worth of revenue never reached the general ledger.
@@ -644,6 +666,44 @@ public class PayrollBureauService {
         log.info("Generated payroll bureau fee note={} client={} payRun={} amount={}",
                 invoiceNumber, payClientId, run.getPayRunNumber(), feeNote.getTotal());
         return toFeeNoteResponse(feeNote);
+    }
+
+    /** Cancels a fee note that has no payments and reverses its ledger entry. Its pay run can then be billed again. */
+    @Transactional
+    public PayFeeNoteResponse cancelFeeNote(TenantId tenantId, UUID feeNoteId, String reason) {
+        PayFeeNote feeNote = feeNoteRepo.findByTenantAndId(tenantId.getValue(), feeNoteId)
+                .orElseThrow(() -> new ResourceNotFoundException("PayFeeNote", feeNoteId.toString()));
+        String problem = FeeRules.cancelProblem(feeNote.getStatus(), feeNote.getAmountPaid(), reason);
+        if (problem != null) throw new HandyFlowException(problem, HttpStatus.BAD_REQUEST, "CANNOT_CANCEL");
+        feeNote.cancel(TenantContext.getCurrentUserId(), reason);
+        feeNoteRepo.save(feeNote);
+        postFeeNoteReversalJournal(tenantId, feeNote);
+        log.warn("Payroll bureau fee note CANCELLED note={} by={} reason={}", feeNote.getInvoiceNumber(), TenantContext.getCurrentUserId(), reason);
+        return toFeeNoteResponse(feeNote);
+    }
+
+    private void postFeeNoteReversalJournal(TenantId tenantId, PayFeeNote feeNote) {
+        try {
+            UUID arAccountId = findAccountByCode(tenantId, AR_ACCOUNT_CODE);
+            UUID revenueAccountId = findAccountByCode(tenantId, REVENUE_ACCOUNT_CODE);
+            boolean hasVat = feeNote.getVatAmount() != null && feeNote.getVatAmount().compareTo(BigDecimal.ZERO) > 0;
+            UUID vatAccountId = hasVat ? findAccountByCode(tenantId, VAT_ACCOUNT_CODE) : null;
+            if (arAccountId == null || revenueAccountId == null || (hasVat && vatAccountId == null)) {
+                log.warn("Chart of Accounts is missing an account for tenant={} — the reversal of feeNote={} was not posted", tenantId, feeNote.getId());
+                return;
+            }
+            List<CreateJournalEntryRequest.JournalLineRequest> lines = new ArrayList<>();
+            lines.add(new CreateJournalEntryRequest.JournalLineRequest(arAccountId, "Cancelled — " + feeNote.getInvoiceNumber(), null, feeNote.getTotal()));
+            lines.add(new CreateJournalEntryRequest.JournalLineRequest(revenueAccountId, "Bureau fee reversed — " + feeNote.getInvoiceNumber(), feeNote.getSubtotal(), null));
+            if (hasVat) {
+                lines.add(new CreateJournalEntryRequest.JournalLineRequest(vatAccountId, "VAT output reversed — " + feeNote.getInvoiceNumber(), feeNote.getVatAmount(), null));
+            }
+            CreateJournalEntryRequest req = new CreateJournalEntryRequest(LocalDate.now(),
+                    "Payroll bureau fee note cancelled: " + feeNote.getInvoiceNumber(), feeNote.getInvoiceNumber(), "MANUAL", lines);
+            accountingFacade.postOnceOrRecord(tenantId, PostingKeys.of("payrollbureau", "fee-note-cancelled", feeNote.getId()), req);
+        } catch (Exception e) {
+            log.error("Failed to post the reversal for feeNote={} tenant={}: {}", feeNote.getId(), tenantId, e.getMessage(), e);
+        }
     }
 
     /**
@@ -1081,7 +1141,8 @@ public class PayrollBureauService {
                 c.getPayFrequency(), c.getPayDay(), c.getContactName(), c.getContactEmail(),
                 c.getContactPhone(), c.getOnboardedAt(), c.getStatus(), c.getNotes(),
                 c.getAddress(), c.getLogoEvidenceId() != null, c.getCreatedAt(),
-                c.isEtiClaimable(), c.getEtiClaimableNote(), c.isClientApprovalRequired());
+                c.isEtiClaimable(), c.getEtiClaimableNote(), c.isClientApprovalRequired(),
+                c.getPerEmployeeFee(), c.getMinimumFeePerRun());
     }
 
     private void requireClientOwnership(TenantId tenantId, UUID payClientId) {
@@ -1128,7 +1189,7 @@ public class PayrollBureauService {
     private PayFeeNoteResponse toFeeNoteResponse(PayFeeNote f) {
         return new PayFeeNoteResponse(f.getId(), f.getInvoiceNumber(), f.getInvoiceDate(), f.getDueDate(),
                 f.getSubtotal(), f.getVatAmount(), f.getTotal(), f.getAmountPaid(), f.balance(),
-                f.getStatus(), f.getSentAt(), f.getPaidAt());
+                f.getStatus(), f.getSentAt(), f.getPaidAt(), f.getPayRunId(), f.getCancelReason());
     }
 
     private PortalAccessGrantResponse toGrantResponse(PayPortalAccessGrant g) {

@@ -18,6 +18,7 @@ import za.co.handyflow.platform.payrollbureau.dto.PayGroupDtos.*;
 import za.co.handyflow.platform.payrollbureau.dto.PayComponentDtos.*;
 import za.co.handyflow.platform.payrollbureau.dto.PayBankFileDtos.*;
 import za.co.handyflow.platform.payrollbureau.dto.PayEmp201Dtos.*;
+import za.co.handyflow.platform.payrollbureau.dto.PayPricingDtos.*;
 import za.co.handyflow.platform.payrollbureau.dto.PayEmp501Dtos.*;
 import za.co.handyflow.platform.payrollbureau.application.internal.PayrollBureauService;
 import za.co.handyflow.platform.payrollbureau.dto.*;
@@ -42,6 +43,7 @@ import java.util.UUID;
 public class PayrollBureauController {
 
     private final PayrollBureauService bureauService;
+    private final za.co.handyflow.platform.payrollbureau.application.internal.PayPricingService pricingService;
     private final FeatureGuard featureGuard;
     private final PayEmployeeChangeService changeService;
     private final PayGroupService groupService;
@@ -560,6 +562,72 @@ public class PayrollBureauController {
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success("Payment recorded",
                 bureauService.recordPayment(TenantContext.getTenantIdAsObject(), id, req,
                         TenantContext.getCurrentUserId(), TenantContext.getCurrentUserName())));
+    }
+
+    @PostMapping("/fee-notes/{id}/cancel")
+    @PreAuthorize("hasAnyAuthority('PAYROLLBUREAU_MANAGE','PAYROLLBUREAU_ADMIN')")
+    @Operation(summary = "Cancel an unpaid fee note and reverse its ledger entry")
+    public ResponseEntity<ApiResponse<PayFeeNoteResponse>> cancelFeeNote(
+            @PathVariable UUID id, @Valid @RequestBody CancelFeeNoteRequest req) {
+        featureGuard.requireModule("payrollbureau");
+        return ResponseEntity.ok(ApiResponse.success("Fee note cancelled",
+                bureauService.cancelFeeNote(TenantContext.getTenantIdAsObject(), id, req.reason())));
+    }
+
+    @GetMapping("/clients/{clientId}/pricing")
+    @PreAuthorize("hasAnyAuthority('PAYROLLBUREAU_READ','PAYROLLBUREAU_MANAGE','PAYROLLBUREAU_ADMIN')")
+    public ResponseEntity<ApiResponse<PricingResponse>> getPricing(@PathVariable UUID clientId) {
+        featureGuard.requireModule("payrollbureau");
+        return ResponseEntity.ok(ApiResponse.success(pricingService.getPricing(TenantContext.getTenantIdAsObject(), clientId)));
+    }
+
+    @PutMapping("/clients/{clientId}/pricing")
+    @PreAuthorize("hasAnyAuthority('PAYROLLBUREAU_MANAGE','PAYROLLBUREAU_ADMIN')")
+    public ResponseEntity<ApiResponse<PricingResponse>> updatePricing(
+            @PathVariable UUID clientId, @Valid @RequestBody UpdatePricingRequest req) {
+        featureGuard.requireModule("payrollbureau");
+        return ResponseEntity.ok(ApiResponse.success("Pricing updated", pricingService.updatePricing(TenantContext.getTenantIdAsObject(), clientId, req)));
+    }
+
+    @PostMapping("/clients/{clientId}/charges")
+    @PreAuthorize("hasAnyAuthority('PAYROLLBUREAU_MANAGE','PAYROLLBUREAU_ADMIN')")
+    public ResponseEntity<ApiResponse<ChargeResponse>> addCharge(
+            @PathVariable UUID clientId, @Valid @RequestBody CreateChargeRequest req) {
+        featureGuard.requireModule("payrollbureau");
+        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success("Charge added",
+                pricingService.addCharge(TenantContext.getTenantIdAsObject(), clientId, req)));
+    }
+
+    @DeleteMapping("/clients/{clientId}/charges/{chargeId}")
+    @PreAuthorize("hasAnyAuthority('PAYROLLBUREAU_MANAGE','PAYROLLBUREAU_ADMIN')")
+    public ResponseEntity<ApiResponse<Void>> archiveCharge(@PathVariable UUID clientId, @PathVariable UUID chargeId) {
+        featureGuard.requireModule("payrollbureau");
+        pricingService.archiveCharge(TenantContext.getTenantIdAsObject(), clientId, chargeId);
+        return ResponseEntity.ok(ApiResponse.success("Charge removed", null));
+    }
+
+    @GetMapping("/cost-per-payslip")
+    @PreAuthorize("hasAnyAuthority('PAYROLLBUREAU_READ','PAYROLLBUREAU_MANAGE','PAYROLLBUREAU_ADMIN')")
+    public ResponseEntity<ApiResponse<CostResponse>> getCost() {
+        featureGuard.requireModule("payrollbureau");
+        return ResponseEntity.ok(ApiResponse.success(pricingService.getCost(TenantContext.getTenantIdAsObject())));
+    }
+
+    @PutMapping("/cost-per-payslip")
+    @PreAuthorize("hasAnyAuthority('PAYROLLBUREAU_ADMIN')")
+    public ResponseEntity<ApiResponse<CostResponse>> updateCost(@Valid @RequestBody UpdateCostRequest req) {
+        featureGuard.requireModule("payrollbureau");
+        return ResponseEntity.ok(ApiResponse.success("Cost updated", pricingService.updateCost(TenantContext.getTenantIdAsObject(), req)));
+    }
+
+    @GetMapping("/profitability")
+    @PreAuthorize("hasAnyAuthority('PAYROLLBUREAU_MANAGE','PAYROLLBUREAU_ADMIN')")
+    @Operation(summary = "Revenue, cost and margin per client for a period")
+    public ResponseEntity<ApiResponse<ProfitabilityResponse>> profitability(
+            @RequestParam @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) java.time.LocalDate from,
+            @RequestParam @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) java.time.LocalDate to) {
+        featureGuard.requireModule("payrollbureau");
+        return ResponseEntity.ok(ApiResponse.success(pricingService.profitability(TenantContext.getTenantIdAsObject(), from, to)));
     }
 
     @PostMapping("/clients/{id}/portal-invites")

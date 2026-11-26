@@ -63,7 +63,7 @@ public class PayrollBureauPortalDataService {
     @Transactional(readOnly = true)
     public Page<PayFeeNoteResponse> getMyFeeNotes(UUID portalUserId, UUID clientId, Pageable pageable) {
         requireAccess(portalUserId, clientId);
-        return feeNoteRepo.findByClient(clientId, pageable).map(this::toFeeNoteResponse);
+        return feeNoteRepo.findByClientForPortal(clientId, pageable).map(this::toFeeNoteResponse);
     }
 
     @Transactional(readOnly = true)
@@ -149,6 +149,6 @@ public class PayrollBureauPortalDataService {
     private PayFeeNoteResponse toFeeNoteResponse(PayFeeNote f) {
         return new PayFeeNoteResponse(f.getId(), f.getInvoiceNumber(), f.getInvoiceDate(), f.getDueDate(),
                 f.getSubtotal(), f.getVatAmount(), f.getTotal(), f.getAmountPaid(), f.balance(),
-                f.getStatus(), f.getSentAt(), f.getPaidAt());
+                f.getStatus(), f.getSentAt(), f.getPaidAt(), null, null);
     }
 }

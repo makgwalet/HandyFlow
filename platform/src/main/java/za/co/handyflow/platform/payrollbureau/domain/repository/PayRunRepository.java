@@ -48,6 +48,10 @@ public interface PayRunRepository extends JpaRepository<PayRun, UUID> {
     List<PayRun> findFinalisedByPayDate(@Param("tenantId") UUID tenantId, @Param("clientId") UUID clientId,
                                         @Param("from") java.time.LocalDate from, @Param("to") java.time.LocalDate to);
 
+    /** Every client's finalised runs paid in the range, for profitability. */
+    @Query("SELECT r FROM PayRun r WHERE r.tenantId = :tenantId AND r.status = 'FINALISED' AND r.payDate >= :from AND r.payDate <= :to")
+    List<PayRun> findFinalisedInRange(@Param("tenantId") UUID tenantId, @Param("from") java.time.LocalDate from, @Param("to") java.time.LocalDate to);
+
     /** The runs a client's portal users may see: those sent to them, approved by them, or finalised. */
     @Query("""
         SELECT r FROM PayRun r

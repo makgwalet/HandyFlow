@@ -59,6 +59,17 @@ public class PayFeeNote {
     @Column(name = "status", nullable = false)
     private String status = "DRAFT"; // DRAFT | SENT | PARTIAL | PAID | OVERDUE
 
+    @Column(name = "pay_run_id") private UUID payRunId;
+    @Column(name = "cancelled_at") private Instant cancelledAt;
+    @Column(name = "cancelled_by") private UUID cancelledBy;
+    @Column(name = "cancel_reason") private String cancelReason;
+
+    public void linkToRun(UUID payRunId) { this.payRunId = payRunId; }
+
+    public void cancel(UUID by, String reason) {
+        this.status = "CANCELLED"; this.cancelledAt = Instant.now(); this.cancelledBy = by; this.cancelReason = reason.trim();
+    }
+
     @Column(name = "sent_at")
     private Instant sentAt;
 
@@ -93,6 +104,7 @@ public class PayFeeNote {
 
     /** Same balance-tracking shape as accountant.FeeNote.recordPayment(). */
     public void recordPayment(BigDecimal amount) {
+        if ("CANCELLED".equals(status)) throw new IllegalStateException("A cancelled fee note cannot take payments");
         this.amountPaid = this.amountPaid.add(amount);
         if (this.amountPaid.compareTo(this.total) >= 0) {
             this.status = "PAID";

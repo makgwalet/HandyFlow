@@ -10,6 +10,7 @@
 // than silently unifying them.
 import { useEffect, useState } from "react"
 import { payrollBureauApi } from "../../api/payrollBureau.api"
+import { PricingSection, CancelFeeNoteModal, ProfitabilityModal } from "./Pricing"
 import type { PayGroup, PayClient, PayEmployee, PayRun, Payslip, PayDeadline, PayFeeNote, PortalAccessGrant, PayEmployeeChange, EmailResult, PayRunReview } from "../../types/payrollBureau.types"
 import { SarsTab, EmployeeEtiModal } from "./SarsFiling"
 import { PayGroupsTab, ComponentsTab, EmployeeComponentsModal, RunItemsModal, PayGroupSelect, GroupPeriodPicker } from "./PayGroupsAndComponents"
@@ -125,6 +126,7 @@ export function PayrollBureauPage() {
   const [showNewClient, setShowNewClient] = useState(false)
   const [showEditClient, setShowEditClient] = useState(false)
   const [showBureauProfile, setShowBureauProfile] = useState(false)
+  const [showProfit, setShowProfit] = useState(false)
   const [archiving, setArchiving] = useState(false)
   const [tab, setTab] = useState<Tab>("employees")
   const [search, setSearch] = useState("")
@@ -157,6 +159,7 @@ export function PayrollBureauPage() {
         <div style={{ padding: 16, borderBottom: `1px solid ${BORDER}`, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <h2 style={{ fontSize: 15, fontWeight: 800, color: INK, margin: 0 }}>Payroll Clients</h2>
           <div style={{ display: "flex", gap: 6 }}>
+            <button onClick={() => setShowProfit(true)} style={btnSecondary}>Profitability</button>
             <button onClick={() => setShowBureauProfile(true)} style={btnSecondary}>Bureau Profile</button>
             <button onClick={() => setShowNewClient(true)}
               style={{ padding: "5px 10px", background: NAVY, color: "var(--hf-text-on-solid)", border: "none", borderRadius: 6, fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
@@ -262,6 +265,7 @@ export function PayrollBureauPage() {
         <EditClientModal client={selected} onClose={() => setShowEditClient(false)}
           onSaved={updated => { setShowEditClient(false); setSelected(updated); refetchClients() }} />
       )}
+      {showProfit && <ProfitabilityModal onClose={() => setShowProfit(false)} />}
       {showBureauProfile && (
         <BureauProfileModal onClose={() => setShowBureauProfile(false)} />
       )}
@@ -1239,6 +1243,7 @@ function FeeNotesTab({ client }: { client: PayClient }) {
   const [feeNotes, setFeeNotes] = useState<PayFeeNote[]>([])
   const [loading, setLoading] = useState(true)
   const [payingNote, setPayingNote] = useState<PayFeeNote | null>(null)
+  const [cancellingNote, setCancellingNote] = useState<PayFeeNote | null>(null)
 
   const refetch = () => {
     setLoading(true)
@@ -1253,6 +1258,7 @@ function FeeNotesTab({ client }: { client: PayClient }) {
 
   return (
     <div>
+      <PricingSection client={client} />
       <p style={{ fontSize: 12.5, color: MUTED, marginBottom: 12 }}>
         Generate invoices from the Pay Runs tab once a run is processed.
       </p>
@@ -1268,7 +1274,10 @@ function FeeNotesTab({ client }: { client: PayClient }) {
               <td style={cellStyle}>
                 <div style={{ display: "flex", gap: 6 }}>
                   {f.status === "DRAFT" && <button onClick={() => handleSend(f.id)} style={btnSecondary}>Send</button>}
-                  {f.status !== "DRAFT" && f.balance > 0 && (
+                  {f.status !== "CANCELLED" && f.amountPaid === 0 && (
+                    <button onClick={() => setCancellingNote(f)} style={btnSecondary}>Cancel</button>
+                  )}
+                  {f.status !== "DRAFT" && f.status !== "CANCELLED" && f.balance > 0 && (
                     <button onClick={() => setPayingNote(f)} style={btnSecondary}>Record Payment</button>
                   )}
                 </div>
@@ -1276,6 +1285,10 @@ function FeeNotesTab({ client }: { client: PayClient }) {
             </tr>
           ))}
         </Table>
+      )}
+      {cancellingNote && (
+        <CancelFeeNoteModal feeNote={cancellingNote} onClose={() => setCancellingNote(null)}
+          onCancelled={() => { setCancellingNote(null); refetch() }} />
       )}
       {payingNote && (
         <RecordPaymentModal feeNote={payingNote} onClose={() => setPayingNote(null)}

@@ -13,7 +13,7 @@ import type {
   PayEmployeeChange, EmailResult,
   PayClient, PayEmployee, PayRun, Payslip, PayDeadline, PayFeeNote, PortalAccessGrant,
   PayRunReview, BankFile, PayGroup, NextPeriod, PayComponent, EmployeeComponent, RunItem,
-  Emp201, Emp501,
+  Emp201, Emp501, PayPricing, PayCharge, Profitability,
 } from "../types/payrollBureau.types"
 
 interface PageResponse<T> { content: T[]; totalElements: number; totalPages: number; number: number }
@@ -186,4 +186,20 @@ export const payrollBureauApi = {
     apiClient.post(`/api/v1/payroll-bureau/pay-runs/${payRunId}/send-to-client`).then(r => r.data as PayRun),
   setClientApproval: (clientId: string, required: boolean) =>
     apiClient.put(`/api/v1/payroll-bureau/clients/${clientId}/client-approval`, { required }).then(r => r.data as PayClient),
+  cancelFeeNote: (feeNoteId: string, reason: string) =>
+    apiClient.post(`/api/v1/payroll-bureau/fee-notes/${feeNoteId}/cancel`, { reason }).then(r => r.data as PayFeeNote),
+  getPricing: (clientId: string) =>
+    apiClient.get(`/api/v1/payroll-bureau/clients/${clientId}/pricing`).then(r => r.data as PayPricing),
+  updatePricing: (clientId: string, body: { perEmployeeFee: number; minimumFee: number }) =>
+    apiClient.put(`/api/v1/payroll-bureau/clients/${clientId}/pricing`, body).then(r => r.data as PayPricing),
+  addCharge: (clientId: string, body: { description: string; amount: number; billing: string }) =>
+    apiClient.post(`/api/v1/payroll-bureau/clients/${clientId}/charges`, body).then(r => r.data as PayCharge),
+  archiveCharge: (clientId: string, chargeId: string) =>
+    apiClient.delete(`/api/v1/payroll-bureau/clients/${clientId}/charges/${chargeId}`).then(() => undefined),
+  getCostPerPayslip: () =>
+    apiClient.get(`/api/v1/payroll-bureau/cost-per-payslip`).then(r => r.data as { costPerPayslip: number }),
+  setCostPerPayslip: (costPerPayslip: number) =>
+    apiClient.put(`/api/v1/payroll-bureau/cost-per-payslip`, { costPerPayslip }).then(r => r.data as { costPerPayslip: number }),
+  getProfitability: (from: string, to: string) =>
+    apiClient.get(`/api/v1/payroll-bureau/profitability?from=${from}&to=${to}`).then(r => r.data as Profitability),
 }

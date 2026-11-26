@@ -97,6 +97,13 @@ public class PayClient {
         this.updatedAt = Instant.now();
     }
 
+    @Column(name = "minimum_fee_per_run", nullable = false, precision = 10, scale = 2)
+    private java.math.BigDecimal minimumFeePerRun = java.math.BigDecimal.ZERO;
+
+    public void setPricing(java.math.BigDecimal perEmployeeFee, java.math.BigDecimal minimumFeePerRun) {
+        this.perEmployeeFee = perEmployeeFee; this.minimumFeePerRun = minimumFeePerRun; this.updatedAt = Instant.now();
+    }
+
     @Column(name = "client_approval_required", nullable = false) private boolean clientApprovalRequired;
 
     public void setClientApprovalRequired(boolean v) { this.clientApprovalRequired = v; this.updatedAt = Instant.now(); }

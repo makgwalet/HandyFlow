@@ -20,6 +20,7 @@ export interface PayClient {
   etiClaimable?: boolean
   etiClaimableNote?: string | null
   clientApprovalRequired?: boolean
+  minimumFeePerRun?: number
 }
 
 export interface EmailResult {
@@ -218,9 +219,11 @@ export interface PayFeeNote {
   total: number
   amountPaid: number
   balance: number
-  status: "DRAFT" | "SENT" | "PARTIAL" | "PAID" | "OVERDUE"
+  status: "DRAFT" | "SENT" | "PARTIAL" | "PAID" | "OVERDUE" | "CANCELLED"
   sentAt: string | null
   paidAt: string | null
+  payRunId?: string | null
+  cancelReason?: string | null
 }
 
 export interface PortalAccessGrant {
@@ -252,4 +255,15 @@ export interface Emp501 {
   clientId: string; period: string; taxYear: number; from: string; to: string; certificateCount: number
   balanced: boolean; blocked: boolean; differences: { what: string; emp201: number; certificates: number; difference: number }[]
   etiUsed: number; etiUnusedAtEnd: number; findings: SarsFinding[]; certificates: TaxCertificate[]
+}
+
+export interface PayCharge { id: string; description: string; amount: number; billing: "PER_RUN" | "MONTHLY" | "ANNUAL" }
+export interface PayPricing { perEmployeeFee: number; minimumFee: number; charges: PayCharge[] }
+export interface ProfitabilityClient {
+  clientId: string; clientName: string; runs: number; payslips: number; revenue: number; cost: number
+  margin: number; marginPercent: number | null; unbilledRuns: number; unbilledEstimate: number
+}
+export interface Profitability {
+  from: string; to: string; costPerPayslip: number; totalRevenue: number; totalCost: number; totalMargin: number
+  totalMarginPercent: number | null; totalUnbilledRuns: number; totalUnbilledEstimate: number; clients: ProfitabilityClient[]
 }

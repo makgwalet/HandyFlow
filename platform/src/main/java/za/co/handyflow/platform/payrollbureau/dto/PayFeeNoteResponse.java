@@ -8,5 +8,6 @@ import java.util.UUID;
 public record PayFeeNoteResponse(
         UUID id, String invoiceNumber, LocalDate invoiceDate, LocalDate dueDate,
         BigDecimal subtotal, BigDecimal vatAmount, BigDecimal total, BigDecimal amountPaid,
-        BigDecimal balance, String status, Instant sentAt, Instant paidAt
+        BigDecimal balance, String status, Instant sentAt, Instant paidAt,
+        UUID payRunId, String cancelReason
 ) {}

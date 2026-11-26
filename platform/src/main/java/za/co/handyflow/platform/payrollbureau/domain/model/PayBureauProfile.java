@@ -44,6 +44,11 @@ public class PayBureauProfile {
     @Column(name = "logo_url")
     private String logoUrl;
 
+    @Column(name = "cost_per_payslip", nullable = false, precision = 10, scale = 2)
+    private java.math.BigDecimal costPerPayslip = java.math.BigDecimal.ZERO;
+
+    public void setCostPerPayslip(java.math.BigDecimal v) { this.costPerPayslip = v; }
+
     @Column(name = "logo_evidence_id") private java.util.UUID logoEvidenceId;
     public java.util.UUID getLogoEvidenceId() { return this.logoEvidenceId; }
 
