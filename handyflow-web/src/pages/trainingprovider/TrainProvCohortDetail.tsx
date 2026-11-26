@@ -10,6 +10,7 @@ import {
 import type { Enrolment } from "./learnerRules"
 import type { Eligible } from "./practitionerRules"
 import { Badge, Field, Notice, SubTabs } from "./tpUi"
+import TrainProvSlotResources from "./TrainProvSlotResources"
 import { card, errText, ghost, input, muted, solid, unwrap } from "./tpStyle"
 import { CAT, LRN, PRC, useActiveProgrammes } from "./tpApi"
 import { RegisterPanel, SummaryPanel } from "./TrainProvAttendancePanel"
@@ -115,6 +116,7 @@ function Timetable({ cohort, canManage, open }: { cohort: Cohort; canManage: boo
           {canManage && open && s.status === "SCHEDULED" && cancelling !== s.id && (
             <div style={{ display: "flex", gap: 8, marginTop: 8 }}><button style={ghost} onClick={() => setEditing(s)}>Change</button><button style={ghost} onClick={() => { setCancelling(s.id); setError("") }}>Cancel slot</button></div>
           )}
+          {s.status === "SCHEDULED" && <TrainProvSlotResources slotId={s.id} siteId={cohort.siteId} canManage={canManage && open} />}
           {cancelling === s.id && (
             <div style={{ display: "grid", gap: 8, marginTop: 8 }}>
               <input aria-label="Reason for cancelling the slot" style={input} placeholder="Why is this slot cancelled?" value={reason} onChange={e => setReason(e.target.value)} />
