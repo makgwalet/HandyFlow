@@ -13,7 +13,9 @@ public final class PractitionerRules {
     public static final String FACILITATOR = "FACILITATOR";
     public static final String ASSESSOR = "ASSESSOR";
     public static final String MODERATOR = "MODERATOR";
-    public static final Set<String> ROLES = Set.of(FACILITATOR, ASSESSOR, MODERATOR);
+    /** Recognition of prior learning is its own role: an ordinary assessor appointment does not authorise it. */
+    public static final String RPL_ASSESSOR = "RPL_ASSESSOR";
+    public static final Set<String> ROLES = Set.of(FACILITATOR, ASSESSOR, MODERATOR, RPL_ASSESSOR);
     public static final Set<String> EMPLOYMENT = Set.of("EMPLOYEE", "CONTRACTOR", "SECONDED");
     public static final int MIN_REASON = 10;
     public static final int MIN_SOURCE = 5;
@@ -44,7 +46,7 @@ public final class PractitionerRules {
     }
 
     public static boolean needsCredential(String role) {
-        return ASSESSOR.equals(role) || MODERATOR.equals(role);
+        return ASSESSOR.equals(role) || MODERATOR.equals(role) || RPL_ASSESSOR.equals(role);
     }
 
     /** What an appointment is worth on a given day. Withdrawal and dates are checked before verification. */

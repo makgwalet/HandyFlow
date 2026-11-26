@@ -76,6 +76,13 @@ public class TrainProvRplController {
         return ResponseEntity.ok(ApiResponse.success("Evidence withdrawn", service.withdrawEvidence(TenantContext.getTenantIdAsObject(), id, r.reason(), TenantContext.getCurrentUserId())));
     }
 
+    @GetMapping("/rpl-applications/{id}/assessor-snapshot")
+    @PreAuthorize(READ)
+    public ResponseEntity<ApiResponse<List<za.co.handyflow.platform.trainingprovider.dto.AttemptDtos.AppointmentSnapshotView>>> assessorSnapshot(@PathVariable UUID id) {
+        featureGuard.requireModule("trainingprovider");
+        return ResponseEntity.ok(ApiResponse.success(service.assessorSnapshot(TenantContext.getTenantIdAsObject(), id)));
+    }
+
     @PostMapping("/rpl-applications/{id}/decide")
     @PreAuthorize(MANAGE)
     public ResponseEntity<ApiResponse<ApplicationView>> decide(@PathVariable UUID id, @Valid @RequestBody DecisionRequest r) {

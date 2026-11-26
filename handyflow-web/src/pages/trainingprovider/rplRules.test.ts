@@ -3,7 +3,7 @@ import { applicationBody, applicationProblem, confirmProblem, decisionBody, deci
 
 const today = "2027-06-10"
 const facts = { liveEvidence: 2, unreviewedEvidence: 0, acceptedEvidence: 1, appliedOn: "2027-06-01" }
-const dec = { ...emptyDecision(today), outcome: "RECOGNISED", basis: "Evidence matches the outcomes", assessorName: "Ms Assessor" }
+const dec = { ...emptyDecision(today), outcome: "RECOGNISED", basis: "Evidence matches the outcomes", assessorId: "x1" }
 
 describe("rpl rules", () => {
   it("checks an application", () => {
@@ -33,7 +33,10 @@ describe("rpl rules", () => {
     expect(decisionProblem(dec, { ...facts, acceptedEvidence: 0 }, today)).toMatch(/accepted evidence/)
     expect(decisionProblem({ ...dec, outcome: "NOT_RECOGNISED" }, { ...facts, acceptedEvidence: 0 }, today)).toBeNull()
     expect(decisionProblem({ ...dec, basis: "short" }, facts, today)).toMatch(/basis/)
-    expect(decisionProblem({ ...dec, assessorName: " " }, facts, today)).toMatch(/assessor/)
+    expect(decisionProblem({ ...dec, assessorId: "" }, facts, today)).toMatch(/Choose the RPL assessor/)
+    expect(decisionProblem(dec, facts, today, false)).toMatch(/no login/)
+    expect(decisionProblem({ ...dec, recordedForAssessor: "Signed sheet handed over" }, facts, today, false)).toBeNull()
+    expect(decisionBody({ ...dec, recordedForAssessor: " " }).recordedForAssessor).toBeNull()
     expect(decisionProblem({ ...dec, decidedOn: "2027-05-31" }, facts, today)).toMatch(/before the application/)
   })
   it("needs a written reason to confirm alone", () => {

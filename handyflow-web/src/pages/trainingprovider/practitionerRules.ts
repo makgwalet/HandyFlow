@@ -12,11 +12,11 @@ export type Appointment = {
   verifiedOn: string | null; status: string; withdrawnReason: string | null; standing: string; standingNote: string; history: AppointmentEvent[]
 }
 export type PractitionerDetail = { practitioner: Practitioner; appointments: Appointment[] }
-export type Eligible = { practitionerId: string; practitionerNo: string; name: string; role: string; appointmentId: string; verifiedOn: string }
+export type Eligible = { practitionerId: string; practitionerNo: string; name: string; role: string; appointmentId: string; verifiedOn: string; hasLogin?: boolean }
 
 export const MIN_REASON = 10
 export const MIN_SOURCE = 5
-export const ROLES: Record<string, string> = { FACILITATOR: "Facilitator", ASSESSOR: "Assessor", MODERATOR: "Moderator" }
+export const ROLES: Record<string, string> = { FACILITATOR: "Facilitator", ASSESSOR: "Assessor", MODERATOR: "Moderator", RPL_ASSESSOR: "RPL assessor" }
 export const EMPLOYMENT: Record<string, string> = { EMPLOYEE: "Employee", CONTRACTOR: "Contractor", SECONDED: "Seconded" }
 export const STANDING: Record<string, string> = {
   VERIFIED_IN_FORCE: "Checked and in force", NOT_VERIFIED: "Not yet checked", NOT_YET_VALID: "Not yet valid", EXPIRED: "Expired", WITHDRAWN: "Withdrawn",

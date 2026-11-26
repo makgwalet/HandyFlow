@@ -7,7 +7,8 @@ export type Evidence = {
 }
 export type Application = {
   id: string; rplNo: string; enrolmentId: string; enrolmentNo: string; learnerName: string | null; programmeTitle: string | null; moduleId: string | null; moduleTitle: string | null
-  claim: string; appliedOn: string; status: string; outcome: string | null; decisionBasis: string | null; assessorName: string | null; decidedOn: string | null
+  claim: string; appliedOn: string; status: string; outcome: string | null; decisionBasis: string | null; assessorName: string | null; assessorId: string | null; legacyAssessorText: boolean; recordedForAssessor: string | null
+  decidedOn: string | null
   singleReason: string | null; confirmedOn: string | null; withdrawReason: string | null; liveEvidence: number; unreviewedEvidence: number; acceptedEvidence: number; stateLabel: string
 }
 export type ApplicationDetail = { application: Application; evidence: Evidence[] }
@@ -59,15 +60,16 @@ export function reviewProblem(review: string, note: string, on: string, received
   return null
 }
 
-export type DecisionForm = { outcome: string; basis: string; assessorName: string; decidedOn: string; confirmAlone: boolean; singleReason: string }
-export const emptyDecision = (today: string): DecisionForm => ({ outcome: "", basis: "", assessorName: "", decidedOn: today, confirmAlone: false, singleReason: "" })
-export function decisionProblem(f: DecisionForm, a: Pick<Application, "liveEvidence" | "unreviewedEvidence" | "acceptedEvidence" | "appliedOn">, today: string): string | null {
+export type DecisionForm = { outcome: string; basis: string; assessorId: string; recordedForAssessor: string; decidedOn: string; confirmAlone: boolean; singleReason: string }
+export const emptyDecision = (today: string): DecisionForm => ({ outcome: "", basis: "", assessorId: "", recordedForAssessor: "", decidedOn: today, confirmAlone: false, singleReason: "" })
+export function decisionProblem(f: DecisionForm, a: Pick<Application, "liveEvidence" | "unreviewedEvidence" | "acceptedEvidence" | "appliedOn">, today: string, assessorHasLogin = true): string | null {
   if (a.liveEvidence === 0) return "There is no evidence on this application yet"
   if (a.unreviewedEvidence > 0) return `${a.unreviewedEvidence} ${a.unreviewedEvidence === 1 ? "piece of evidence has" : "pieces of evidence have"} not been reviewed yet`
   if (!f.outcome) return "Choose recognised, partly recognised or not recognised"
   if (f.outcome !== "NOT_RECOGNISED" && a.acceptedEvidence === 0) return "Recognition needs at least one piece of accepted evidence"
   if (!long(f.basis, 10)) return "Write the basis for the decision, in at least 10 characters"
-  if (!long(f.assessorName, 2)) return "Give the name of the assessor"
+  if (!f.assessorId) return "Choose the RPL assessor"
+  if (!assessorHasLogin && !long(f.recordedForAssessor, 10)) return "This assessor has no login, so the decision is recorded for them. Say how their decision reached you, in at least 10 characters"
   if (!f.decidedOn) return "Enter the day of the decision"
   if (f.decidedOn > today) return "The day cannot be in the future"
   if (f.decidedOn < a.appliedOn) return "The decision cannot be before the application"
@@ -75,7 +77,7 @@ export function decisionProblem(f: DecisionForm, a: Pick<Application, "liveEvide
   return null
 }
 export const decisionBody = (f: DecisionForm) => ({
-  outcome: f.outcome, basis: f.basis.trim(), assessorName: f.assessorName.trim(), decidedOn: f.decidedOn, confirmAlone: f.confirmAlone, singleReason: f.confirmAlone ? f.singleReason.trim() : null,
+  outcome: f.outcome, basis: f.basis.trim(), assessorId: f.assessorId, recordedForAssessor: f.recordedForAssessor.trim() || null, decidedOn: f.decidedOn, confirmAlone: f.confirmAlone, singleReason: f.confirmAlone ? f.singleReason.trim() : null,
 })
 
 export function confirmProblem(on: string, decidedOn: string | null, today: string): string | null {

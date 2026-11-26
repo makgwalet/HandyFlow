@@ -7,22 +7,15 @@ import org.springframework.transaction.annotation.Transactional;
 import za.co.handyflow.platform.shared.HandyFlowException;
 import za.co.handyflow.platform.shared.ResourceNotFoundException;
 import za.co.handyflow.platform.shared.TenantId;
-import za.co.handyflow.platform.trainingprovider.domain.model.TrainProvLearnerEnrolment;
-import za.co.handyflow.platform.trainingprovider.domain.model.TrainProvProgramme;
-import za.co.handyflow.platform.trainingprovider.domain.model.TrainProvProgrammeModule;
-import za.co.handyflow.platform.trainingprovider.domain.model.TrainProvRplApplication;
-import za.co.handyflow.platform.trainingprovider.domain.model.TrainProvRplEvidence;
-import za.co.handyflow.platform.trainingprovider.domain.repository.TrainProvLearnerEnrolmentRepository;
-import za.co.handyflow.platform.trainingprovider.domain.repository.TrainProvLearnerRepository;
-import za.co.handyflow.platform.trainingprovider.domain.repository.TrainProvProgrammeModuleRepository;
-import za.co.handyflow.platform.trainingprovider.domain.repository.TrainProvProgrammeRepository;
-import za.co.handyflow.platform.trainingprovider.domain.repository.TrainProvRplApplicationRepository;
-import za.co.handyflow.platform.trainingprovider.domain.repository.TrainProvRplEvidenceRepository;
+import za.co.handyflow.platform.trainingprovider.domain.model.*;
+import za.co.handyflow.platform.trainingprovider.domain.repository.*;
+import za.co.handyflow.platform.trainingprovider.domain.rules.PractitionerRules;
 import za.co.handyflow.platform.trainingprovider.domain.rules.RplRules;
 import za.co.handyflow.platform.trainingprovider.dto.RplDtos.*;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Supplier;
 
@@ -40,6 +33,10 @@ public class TrainProvRplService {
     private final TrainProvLearnerRepository learners;
     private final TrainProvProgrammeRepository programmes;
     private final TrainProvProgrammeModuleRepository modules;
+    private final TrainProvPractitionerRepository practitioners;
+    private final TrainProvPractitionerAppointmentRepository appointments;
+    private final TrainProvAppointmentSnapshotRepository snapshots;
+    private final TrainProvAuthorityRepository authorities;
     private final TrainProvNumberGenerator numbers;
 
     public List<ApplicationView> list(TenantId t, UUID enrolmentId, String status) {
@@ -115,13 +112,26 @@ public class TrainProvRplService {
                 accepted++;
             }
         }
-        String problem = RplRules.decisionProblem(a.getStatus(), live, unreviewed, accepted, r.outcome(), r.basis(), r.assessorName(), r.decidedOn(), a.getAppliedOn(), today,
+        TrainProvLearnerEnrolment e = enrolment(t, a.getEnrolmentId());
+        TrainProvPractitioner assessor = practitioners.findForTenant(t, r.assessorId())
+                .orElseThrow(() -> new ResourceNotFoundException("TrainProvPractitioner", r.assessorId().toString()));
+        Optional<TrainProvPractitionerAppointment> appt = appointments.findLiveForProgramme(t, e.getProgrammeId(), PractitionerRules.RPL_ASSESSOR).stream()
+                .filter(x -> x.getPractitionerId().equals(assessor.getId())).findFirst();
+        PractitionerRules.Standing standing = appt.<PractitionerRules.Standing>map(x -> x.standingOn(r.decidedOn() == null ? today : r.decidedOn())).orElse(PractitionerRules.Standing.NOT_VERIFIED);
+        String problem = RplRules.decisionProblem(a.getStatus(), live, unreviewed, accepted, r.outcome(), r.basis(), assessor.fullName(), r.decidedOn(), a.getAppliedOn(), today,
                 r.singleReason(), r.confirmAlone());
+        if (problem == null) {
+            problem = RplRules.assessorProblem("ACTIVE".equals(assessor.getStatus()), appt.isPresent(), standing, assessor.getUserId() != null,
+                    assessor.getUserId() != null && !assessor.getUserId().equals(by), r.recordedForAssessor());
+        }
         if (problem != null) {
             throw new HandyFlowException(problem, HttpStatus.CONFLICT, "TP_RPL_STATE");
         }
-        guard(() -> { a.decide(r.outcome(), r.basis(), r.assessorName(), r.decidedOn(), by, r.confirmAlone(), r.singleReason()); return null; });
+        guard(() -> { a.decide(r.outcome(), r.basis(), assessor.fullName(), assessor.getId(), appt.get().getId(), r.recordedForAssessor(), r.decidedOn(), by,
+                r.confirmAlone(), r.singleReason()); return null; });
         applications.save(a);
+        String authority = appt.get().getAuthorityId() == null ? null : authorities.findForTenant(t, appt.get().getAuthorityId()).map(TrainProvAuthority::getName).orElse(null);
+        snapshots.save(TrainProvAppointmentSnapshot.of(t, "RPL", a.getId(), assessor, appt.get(), authority, standing, r.decidedOn(), by));
         return view(t, a);
     }
 
@@ -166,8 +176,20 @@ public class TrainProvRplService {
         String programme = programmes.findForTenant(t, e.getProgrammeId()).map(TrainProvProgramme::getTitle).orElse(null);
         String moduleTitle = a.getModuleId() == null ? null : modules.findForTenant(t, a.getModuleId()).map(TrainProvProgrammeModule::getTitle).orElse(null);
         return new ApplicationView(a.getId(), a.getRplNo(), e.getId(), e.getEnrolmentNo(), learner, programme, a.getModuleId(), moduleTitle, a.getClaim(), a.getAppliedOn(),
-                a.getStatus(), a.getOutcome(), a.getDecisionBasis(), a.getAssessorName(), a.getDecidedOn(), a.getSingleReason(), a.getConfirmedOn(), a.getWithdrawReason(),
+                a.getStatus(), a.getOutcome(), a.getDecisionBasis(), a.getAssessorName(), a.getAssessorId(), a.isLegacyAssessorText(), a.getRecordedForAssessor(), a.getDecidedOn(), a.getSingleReason(), a.getConfirmedOn(), a.getWithdrawReason(),
                 live, unreviewed, accepted, RplRules.stateLabel(a.getStatus(), a.getOutcome(), a.confirmedAlone()));
+    }
+
+    /** Who the assessor was and what their RPL appointment said when the decision was recorded. */
+    public List<za.co.handyflow.platform.trainingprovider.dto.AttemptDtos.AppointmentSnapshotView> assessorSnapshot(TenantId t, UUID id) {
+        TrainProvRplApplication a = application(t, id);
+        return snapshots.findForSubject(t, "RPL", a.getId()).stream().<za.co.handyflow.platform.trainingprovider.dto.AttemptDtos.AppointmentSnapshotView>map(s -> {
+            PractitionerRules.Standing st = s.getStanding() == null ? null : PractitionerRules.Standing.valueOf(s.getStanding());
+            return new za.co.handyflow.platform.trainingprovider.dto.AttemptDtos.AppointmentSnapshotView(s.getId(), s.getSubjectType(), s.getSubjectId(), s.getRole(),
+                    s.getPractitionerId(), s.getPractitionerNo(), s.getFullName(), s.getEmploymentType(), s.isHasLogin(), s.getAppointmentId(), s.getProgrammeId(),
+                    s.getAuthorityId(), s.getAuthorityName(), s.getCredentialRef(), s.getValidFrom(), s.getValidTo(), s.getVerificationSource(), s.getVerifiedOn(),
+                    s.getStanding(), st == null ? "Not captured" : st.note(), s.getStandingOn(), s.isBackfilled(), s.getCapturedAt());
+        }).toList();
     }
 
     private TrainProvRplApplication application(TenantId t, UUID id) {

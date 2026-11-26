@@ -2,7 +2,7 @@
 // Evidence is reviewed piece by piece. A decision needs a written basis and the assessor's name, and a second person confirms it
 // (or the decider confirms alone with a written reason). The result is not a completion and not a certificate.
 import { useState } from "react"
-import { useQuery, useQueryClient } from "@tanstack/react-query"
+import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
 import { usePermissions } from "../../hooks/usePermission"
 import {
@@ -13,11 +13,12 @@ import { enrolmentOpen as workplaceOpen } from "./workplaceRules"
 import type { ProgrammeDetail } from "./catalogueRules"
 import { Badge, Notice } from "./tpUi"
 import { card, errText, fmtDate, ghost, input, muted, solid, todayIso, unwrap } from "./tpStyle"
-import { CAT, RPL } from "./tpApi"
+import { CAT, PRC, RPL } from "./tpApi"
+import type { Eligible } from "./practitionerRules"
 
 type Mode = "" | "evidence" | "decide" | "confirm" | "withdraw" | { review: string } | { dropEvidence: string }
 
-function ApplicationCard({ a, onChanged }: { a: Application; onChanged: () => void }) {
+function ApplicationCard({ a, programmeId, onChanged }: { a: Application; programmeId: string | null; onChanged: () => void }) {
   const qc = useQueryClient()
   const canManage = usePermissions(["TRAININGPROVIDER_MANAGE", "TRAININGPROVIDER_ADMIN"])
   const [open, setOpen] = useState(false)
@@ -34,6 +35,11 @@ function ApplicationCard({ a, onChanged }: { a: Application; onChanged: () => vo
     queryFn: async () => unwrap<ApplicationDetail>(await apiClient.get(`${RPL}/rpl-applications/${a.id}`)),
   })
   const cur = detail?.application ?? a
+  const { data: assessors = [] } = useQuery<Eligible[]>({
+    queryKey: ["tp-eligible-rpl-assessors", programmeId, dec.decidedOn], enabled: mode === "decide" && !!dec.decidedOn && !!programmeId, placeholderData: keepPreviousData,
+    queryFn: async () => unwrap<Eligible[]>(await apiClient.get(`${PRC}/eligible`, { params: { programmeId, role: "RPL_ASSESSOR", on: dec.decidedOn } })),
+  })
+  const chosenAssessor = assessors.find(x => x.practitionerId === dec.assessorId)
   const reset = () => { setMode(""); setText(""); setVerdict(""); setError(""); setDay(todayIso()); setEv(emptyEvidence(todayIso())); setDec(emptyDecision(todayIso())) }
   const refresh = () => { void qc.invalidateQueries({ queryKey: ["tp-rpl", a.id] }); onChanged() }
   const run = async (fn: () => Promise<unknown>) => {
@@ -53,7 +59,7 @@ function ApplicationCard({ a, onChanged }: { a: Application; onChanged: () => vo
     void run(() => apiClient.post(`${RPL}/rpl-evidence/${e.id}/withdraw`, { reason: text.trim() }))
   }
   const decide = () => {
-    const p = decisionProblem(dec, cur, todayIso()); if (p) { setError(p); return }
+    const p = decisionProblem(dec, cur, todayIso(), chosenAssessor ? chosenAssessor.hasLogin !== false : true); if (p) { setError(p); return }
     void run(() => apiClient.post(`${RPL}/rpl-applications/${a.id}/decide`, decisionBody(dec)))
   }
   const confirm = () => {
@@ -77,7 +83,7 @@ function ApplicationCard({ a, onChanged }: { a: Application; onChanged: () => vo
         <Badge text={label(STATUSES, a.status)} tone={statusTone(a.status)} />
       </div>
       <div style={muted}>{cur.stateLabel}</div>
-      {cur.decisionBasis && <div style={muted}>Basis: {cur.decisionBasis} (assessor {cur.assessorName}, {fmtDate(cur.decidedOn)})</div>}
+      {cur.decisionBasis && <div style={muted}>Basis: {cur.decisionBasis} (assessor {cur.assessorName}{cur.legacyAssessorText ? ", typed name, not checked" : ""}, {fmtDate(cur.decidedOn)})</div>}
       {cur.singleReason && <div style={muted}>Confirmed without a second person because: {cur.singleReason}</div>}
       {cur.withdrawReason && <div style={muted}>Withdrawn: {cur.withdrawReason}</div>}
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
@@ -102,7 +108,11 @@ function ApplicationCard({ a, onChanged }: { a: Application; onChanged: () => vo
           <div style={muted}>{cur.liveEvidence} pieces of evidence, {cur.unreviewedEvidence} not yet reviewed, {cur.acceptedEvidence} accepted.</div>
           <select aria-label="Outcome" style={input} value={dec.outcome} onChange={e => setDec({ ...dec, outcome: e.target.value })}><option value="">Outcome…</option>{Object.entries(OUTCOMES).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select>
           <textarea aria-label="Basis for the decision" style={input} placeholder="Basis for the decision" value={dec.basis} onChange={e => setDec({ ...dec, basis: e.target.value })} />
-          <input aria-label="Assessor name" style={input} placeholder="Name of the assessor" value={dec.assessorName} onChange={e => setDec({ ...dec, assessorName: e.target.value })} />
+          <select aria-label="RPL assessor" style={input} value={dec.assessorId} onChange={e => setDec({ ...dec, assessorId: e.target.value })}>
+            <option value="">RPL assessor…</option>{assessors.map(x => <option key={x.practitionerId} value={x.practitionerId}>{x.name} · {x.practitionerNo}</option>)}
+          </select>
+          {assessors.length === 0 && <div style={muted}>No one has a checked, in-force RPL assessor appointment for this programme on that day. An ordinary assessor appointment does not cover RPL.</div>}
+          {chosenAssessor && chosenAssessor.hasLogin === false && <textarea aria-label="How the assessor's decision reached you" style={input} placeholder="This assessor has no login. How did their decision reach you (who gave it, and how)?" value={dec.recordedForAssessor} onChange={e => setDec({ ...dec, recordedForAssessor: e.target.value })} />}
           <input aria-label="Day of the decision" type="date" style={input} value={dec.decidedOn} onChange={e => setDec({ ...dec, decidedOn: e.target.value })} />
           <label style={muted}><input type="checkbox" checked={dec.confirmAlone} onChange={e => setDec({ ...dec, confirmAlone: e.target.checked })} /> Confirm without a second person</label>
           {dec.confirmAlone && <input aria-label="Reason for confirming alone" style={input} placeholder="Why can no second person confirm it?" value={dec.singleReason} onChange={e => setDec({ ...dec, singleReason: e.target.value })} />}
@@ -207,7 +217,7 @@ export default function TrainProvRplPanel({ enrolmentId, enrolmentStatus, startD
     <div style={{ ...card, marginTop: 8, display: "grid", gap: 8 }}>
       <div style={muted}>{RPL_NOTE}</div>
       {apps.length === 0 && <div style={muted}>No RPL applications yet.</div>}
-      {apps.map(a => <ApplicationCard key={a.id} a={a} onChanged={changed} />)}
+      {apps.map(a => <ApplicationCard key={a.id} a={a} programmeId={programmeId} onChanged={changed} />)}
       {adding && <NewApplication enrolmentId={enrolmentId} programmeId={programmeId} versionId={versionId} startDate={startDate} onCancel={() => setAdding(false)} onDone={() => { setAdding(false); changed() }} />}
       {canManage && !adding && (workplaceOpen(enrolmentStatus)
         ? <div><button style={solid} onClick={() => setAdding(true)}>Add an RPL application</button></div>

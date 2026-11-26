@@ -78,4 +78,37 @@ class RplRulesTest {
         assertTrue(RplRules.stateLabel("CONFIRMED", "RECOGNISED", true).contains("written reason"));
         assertTrue(RplRules.stateLabel("DECIDED", "PARTLY_RECOGNISED", false).contains("partly recognised"));
     }
+
+    @Test
+    void anRplAssessorNeedsAnRplAppointmentCheckedAndInForce() {
+        PractitionerRules.Standing ok = PractitionerRules.Standing.VERIFIED_IN_FORCE;
+        assertNull(RplRules.assessorProblem(true, true, ok, true, false, null));
+        assertTrue(RplRules.assessorProblem(true, false, ok, true, false, null).contains("ordinary assessor appointment"));
+        assertNotNull(RplRules.assessorProblem(false, true, ok, true, false, null));
+        for (PractitionerRules.Standing st : PractitionerRules.Standing.values()) {
+            if (st != ok) {
+                assertNotNull(RplRules.assessorProblem(true, true, st, true, false, null));
+            }
+        }
+    }
+
+    @Test
+    void anAssessorLinkedToAnotherUserCannotBeDecidedFor() {
+        assertTrue(RplRules.assessorProblem(true, true, PractitionerRules.Standing.VERIFIED_IN_FORCE, true, true, null).contains("Only the assessor"));
+    }
+
+    @Test
+    void anAssessorWithNoLoginNeedsAWrittenNote() {
+        PractitionerRules.Standing ok = PractitionerRules.Standing.VERIFIED_IN_FORCE;
+        assertNotNull(RplRules.assessorProblem(true, true, ok, false, false, null));
+        assertNotNull(RplRules.assessorProblem(true, true, ok, false, false, "short"));
+        assertNull(RplRules.assessorProblem(true, true, ok, false, false, "Signed decision form handed over"));
+    }
+
+    @Test
+    void rplAssessorIsItsOwnRoleThatNeedsACredential() {
+        assertTrue(PractitionerRules.ROLES.contains("RPL_ASSESSOR"));
+        assertTrue(PractitionerRules.needsCredential("RPL_ASSESSOR"));
+        assertFalse(PractitionerRules.ASSESSOR.equals(PractitionerRules.RPL_ASSESSOR));
+    }
 }

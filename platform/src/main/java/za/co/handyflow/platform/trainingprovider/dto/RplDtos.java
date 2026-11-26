@@ -23,8 +23,11 @@ public final class RplDtos {
     public record ReasonRequest(@NotBlank String reason) {
     }
 
-    public record DecisionRequest(@NotBlank String outcome, @NotBlank String basis, @NotBlank String assessorName, @NotNull LocalDate decidedOn, boolean confirmAlone,
-                                  String singleReason) {
+    public record DecisionRequest(@NotBlank String outcome, @NotBlank String basis, @NotNull UUID assessorId, @NotNull LocalDate decidedOn, boolean confirmAlone,
+                                  String singleReason, String recordedForAssessor) {
+        public DecisionRequest(String outcome, String basis, UUID assessorId, LocalDate decidedOn, boolean confirmAlone, String singleReason) {
+            this(outcome, basis, assessorId, decidedOn, confirmAlone, singleReason, null);
+        }
     }
 
     public record ConfirmRequest(@NotNull LocalDate confirmedOn) {
@@ -35,7 +38,7 @@ public final class RplDtos {
     }
 
     public record ApplicationView(UUID id, String rplNo, UUID enrolmentId, String enrolmentNo, String learnerName, String programmeTitle, UUID moduleId, String moduleTitle,
-                                  String claim, LocalDate appliedOn, String status, String outcome, String decisionBasis, String assessorName, LocalDate decidedOn,
+                                  String claim, LocalDate appliedOn, String status, String outcome, String decisionBasis, String assessorName, UUID assessorId, boolean legacyAssessorText, String recordedForAssessor, LocalDate decidedOn,
                                   String singleReason, LocalDate confirmedOn, String withdrawReason, int liveEvidence, int unreviewedEvidence, int acceptedEvidence,
                                   String stateLabel) {
     }

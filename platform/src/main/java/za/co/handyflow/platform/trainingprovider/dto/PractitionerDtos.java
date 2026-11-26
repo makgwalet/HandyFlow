@@ -49,6 +49,6 @@ public final class PractitionerDtos {
     }
 
     /** Someone with a checked, in-force appointment for the role on the programme on the day asked. */
-    public record EligibleView(UUID practitionerId, String practitionerNo, String name, String role, UUID appointmentId, LocalDate verifiedOn) {
+    public record EligibleView(UUID practitionerId, String practitionerNo, String name, String role, UUID appointmentId, LocalDate verifiedOn, boolean hasLogin) {
     }
 }

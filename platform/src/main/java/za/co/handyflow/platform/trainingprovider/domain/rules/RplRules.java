@@ -112,6 +112,32 @@ public final class RplRules {
         return null;
     }
 
+    /**
+     * Whether this practitioner may decide the application, or why not. They need a checked, in-force RPL assessor appointment for the programme on the
+     * day of the decision (an ordinary assessor appointment is not enough). An assessor linked to a user can only be decided for by that user; one with
+     * no login has the decision recorded for them, with a note on how it reached the person recording it.
+     */
+    public static String assessorProblem(boolean practitionerActive, boolean hasRplAppointment, PractitionerRules.Standing standing, boolean hasLogin,
+                                         boolean linkedToAnotherUser, String recordedForAssessor) {
+        if (!practitionerActive) {
+            return "That person is inactive";
+        }
+        if (!hasRplAppointment) {
+            return "That person has no RPL assessor appointment for this programme. An ordinary assessor appointment does not cover recognition of prior learning";
+        }
+        if (standing != PractitionerRules.Standing.VERIFIED_IN_FORCE) {
+            return "That person's RPL assessor appointment is not checked and in force on the day of the decision (" + standing.note() + ")";
+        }
+        if (linkedToAnotherUser) {
+            return "Only the assessor can record their own RPL decision";
+        }
+        if (!hasLogin && !CohortRules.longEnough(recordedForAssessor, CohortRules.MIN_REASON)) {
+            return "This assessor has no login, so the decision is recorded for them. Say how their decision reached you (who gave it, and how), in at least "
+                    + CohortRules.MIN_REASON + " characters";
+        }
+        return null;
+    }
+
     /** What the decision needs from the evidence: at least one live item, every live item reviewed, and recognition only with accepted evidence. */
     public static String decisionProblem(String status, int liveEvidence, int unreviewed, int accepted, String outcome, String basis, String assessor, LocalDate on,
                                          LocalDate appliedOn, LocalDate today, String singleReason, boolean confirmAlone) {

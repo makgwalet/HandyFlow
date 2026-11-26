@@ -39,6 +39,16 @@ public class TrainProvRplApplication {
     private String decisionBasis;
     @Column(name = "assessor_name")
     private String assessorName;
+    @Column(name = "assessor_id")
+    private UUID assessorId;
+    @Column(name = "assessor_appointment_id")
+    private UUID assessorAppointmentId;
+    /** How the decision reached the person recording it, when the assessor has no login. */
+    @Column(name = "recorded_for_assessor")
+    private String recordedForAssessor;
+    /** True for a decision made before assessors were checked: only a typed name exists. */
+    @Column(name = "legacy_assessor_text", nullable = false)
+    private boolean legacyAssessorText;
     @Column(name = "decided_on")
     private LocalDate decidedOn;
     @Column(name = "decided_by")
@@ -81,7 +91,8 @@ public class TrainProvRplApplication {
     }
 
     /** Records the decision. With confirmAlone the decider's written reason stands in for a second person. */
-    public void decide(String outcome, String basis, String assessor, LocalDate on, UUID by, boolean confirmAlone, String reason) {
+    public void decide(String outcome, String basis, String assessor, UUID assessorId, UUID assessorAppointmentId, String recordedForAssessor, LocalDate on, UUID by,
+                       boolean confirmAlone, String reason) {
         if (!RplRules.OPEN.equals(status)) {
             throw new IllegalStateException("Only an open application can be decided");
         }
@@ -91,6 +102,10 @@ public class TrainProvRplApplication {
         this.outcome = outcome;
         this.decisionBasis = basis.trim();
         this.assessorName = assessor.trim();
+        this.assessorId = assessorId;
+        this.assessorAppointmentId = assessorAppointmentId;
+        this.recordedForAssessor = recordedForAssessor == null || recordedForAssessor.isBlank() ? null : recordedForAssessor.trim();
+        this.legacyAssessorText = false;
         this.decidedOn = on;
         this.decidedBy = by;
         if (confirmAlone) {

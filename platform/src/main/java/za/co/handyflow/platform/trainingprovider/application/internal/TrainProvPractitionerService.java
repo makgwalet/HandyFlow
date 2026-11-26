@@ -147,7 +147,7 @@ public class TrainProvPractitionerService {
                 .<EligibleView>map(a -> {
                     TrainProvPractitioner p = practitioner(t, a.getPractitionerId());
                     return "ACTIVE".equals(p.getStatus())
-                            ? new EligibleView(p.getId(), p.getPractitionerNo(), p.fullName(), a.getRole(), a.getId(), a.getVerifiedOn()) : null;
+                            ? new EligibleView(p.getId(), p.getPractitionerNo(), p.fullName(), a.getRole(), a.getId(), a.getVerifiedOn(), p.getUserId() != null) : null;
                 })
                 .filter(java.util.Objects::nonNull)
                 .sorted(java.util.Comparator.comparing(EligibleView::name))
