@@ -118,4 +118,55 @@ public final class CohortRules {
         }
         return null;
     }
+
+    /** Whether the provider is covered on one day. Comes from the accreditation rules; "covered" is never true for pending or lapsed evidence. */
+    public record Cover(boolean covered, String outcome, String message) {
+    }
+
+    /** What is known about delivering a programme at a site, for a cohort. coverageAtStart and coverageAtEnd are null unless the programme is accredited. */
+    public record DeliveryFacts(boolean programmeActive, boolean siteActive, boolean offeredAtSite, LocalDate offeredFrom,
+                                boolean accredited, Cover coverageAtStart, Cover coverageAtEnd) {
+    }
+
+    /**
+     * Why a cohort cannot be run for this programme at this site on these dates, or null. The programme must be offered at the site
+     * (a live offering), the site and programme must be active, and an accredited programme must be covered by an approval in force
+     * at the site on the first and last day. A draft, submitted, conditional-only-on-paper or lapsed approval is not cover.
+     */
+    public static String deliveryProblem(DeliveryFacts f, LocalDate start, LocalDate end) {
+        if (!f.programmeActive()) {
+            return "The programme is not active";
+        }
+        if (!f.siteActive()) {
+            return "That site is not active";
+        }
+        if (!f.offeredAtSite()) {
+            return "This programme is not offered at that site. Add an offering for it at the site first";
+        }
+        if (f.offeredFrom() != null && start != null && start.isBefore(f.offeredFrom())) {
+            return "The programme is offered at this site from " + f.offeredFrom() + ", which is after the cohort starts on " + start;
+        }
+        if (f.accredited()) {
+            if (f.coverageAtStart() == null || !f.coverageAtStart().covered()) {
+                return "The cohort cannot start on " + start + ": " + (f.coverageAtStart() == null ? "no approval was checked" : f.coverageAtStart().message());
+            }
+            if (end != null && (f.coverageAtEnd() == null || !f.coverageAtEnd().covered())) {
+                return "The cohort cannot run to " + end + ": " + (f.coverageAtEnd() == null ? "no approval was checked" : f.coverageAtEnd().message());
+            }
+        }
+        return null;
+    }
+
+    /** A plain-words caveat when the cohort is allowed but rests on a conditional or renewal-pending approval, otherwise null. */
+    public static String deliveryCaveat(DeliveryFacts f) {
+        if (!f.accredited()) {
+            return null;
+        }
+        for (Cover c : new Cover[]{f.coverageAtStart(), f.coverageAtEnd()}) {
+            if (c != null && c.covered() && ("COVERED_WITH_CONDITIONS".equals(c.outcome()) || "COVERED_RENEWAL_PENDING".equals(c.outcome()))) {
+                return c.message();
+            }
+        }
+        return null;
+    }
 }

@@ -82,4 +82,60 @@ class CohortRulesTest {
         assertNotNull(CohortRules.reasonProblem("short"));
         assertNull(CohortRules.reasonProblem("Moved to the next intake"));
     }
+
+    private static final LocalDate D1 = LocalDate.of(2027, 3, 1);
+    private static final LocalDate D2 = LocalDate.of(2027, 6, 30);
+    private static final CohortRules.Cover COVERED = new CohortRules.Cover(true, "COVERED", "Covered by a current approval");
+    private static final CohortRules.Cover PENDING = new CohortRules.Cover(false, "NOT_APPROVED", "The accreditation is submitted. It is not an approval");
+
+    private static CohortRules.DeliveryFacts facts(boolean offered, LocalDate offeredFrom, boolean accredited, CohortRules.Cover a, CohortRules.Cover b) {
+        return new CohortRules.DeliveryFacts(true, true, offered, offeredFrom, accredited, a, b);
+    }
+
+    @Test
+    void aCohortNeedsALiveOfferingAtTheSite() {
+        assertNotNull(CohortRules.deliveryProblem(facts(false, null, false, null, null), D1, D2));
+        assertNull(CohortRules.deliveryProblem(facts(true, D1.minusDays(10), false, null, null), D1, D2));
+    }
+
+    @Test
+    void theOfferingMustHaveStartedBeforeTheCohort() {
+        assertTrue(CohortRules.deliveryProblem(facts(true, D1.plusDays(1), false, null, null), D1, D2).contains("from " + D1.plusDays(1)));
+        assertNull(CohortRules.deliveryProblem(facts(true, D1, false, null, null), D1, null));
+    }
+
+    @Test
+    void anInactiveProgrammeOrSiteIsRefused() {
+        assertNotNull(CohortRules.deliveryProblem(new CohortRules.DeliveryFacts(false, true, true, null, false, null, null), D1, D2));
+        assertNotNull(CohortRules.deliveryProblem(new CohortRules.DeliveryFacts(true, false, true, null, false, null, null), D1, D2));
+    }
+
+    @Test
+    void anAccreditedProgrammeNeedsCoverOnTheFirstAndLastDay() {
+        assertNull(CohortRules.deliveryProblem(facts(true, null, true, COVERED, COVERED), D1, D2));
+        assertTrue(CohortRules.deliveryProblem(facts(true, null, true, PENDING, COVERED), D1, D2).contains("start"));
+        assertTrue(CohortRules.deliveryProblem(facts(true, null, true, COVERED, PENDING), D1, D2).contains("run to " + D2));
+        assertNull(CohortRules.deliveryProblem(facts(true, null, true, COVERED, null), D1, null));
+    }
+
+    @Test
+    void pendingEvidenceIsNotCoverAndSaysSo() {
+        assertTrue(CohortRules.deliveryProblem(facts(true, null, true, PENDING, null), D1, null).contains("not an approval"));
+    }
+
+    @Test
+    void aNonAccreditedProgrammeIgnoresAccreditation() {
+        assertNull(CohortRules.deliveryProblem(facts(true, null, false, PENDING, PENDING), D1, D2));
+    }
+
+    @Test
+    void conditionalOrRenewalPendingCoverIsAllowedWithACaveat() {
+        CohortRules.Cover cond = new CohortRules.Cover(true, "COVERED_WITH_CONDITIONS", "Covered, but the approval has conditions that must be met");
+        CohortRules.Cover renew = new CohortRules.Cover(true, "COVERED_RENEWAL_PENDING", "Covered until the current expiry date. A renewal is pending, not yet approved");
+        assertNull(CohortRules.deliveryProblem(facts(true, null, true, cond, renew), D1, D2));
+        assertEquals(cond.message(), CohortRules.deliveryCaveat(facts(true, null, true, cond, COVERED)));
+        assertEquals(renew.message(), CohortRules.deliveryCaveat(facts(true, null, true, COVERED, renew)));
+        assertNull(CohortRules.deliveryCaveat(facts(true, null, true, COVERED, COVERED)));
+        assertNull(CohortRules.deliveryCaveat(facts(true, null, false, null, null)));
+    }
 }

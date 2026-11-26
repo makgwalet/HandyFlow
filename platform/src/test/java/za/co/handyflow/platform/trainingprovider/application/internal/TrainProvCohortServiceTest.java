@@ -9,6 +9,7 @@ import za.co.handyflow.platform.shared.HandyFlowException;
 import za.co.handyflow.platform.shared.TenantId;
 import za.co.handyflow.platform.trainingprovider.domain.model.*;
 import za.co.handyflow.platform.trainingprovider.domain.repository.*;
+import za.co.handyflow.platform.trainingprovider.dto.AccreditationDtos.CoverageView;
 import za.co.handyflow.platform.trainingprovider.dto.CohortDtos.*;
 
 import java.time.LocalDate;
@@ -40,6 +41,8 @@ class TrainProvCohortServiceTest {
     @Mock TrainProvProgrammeRepository programmes;
     @Mock TrainProvProgrammeVersionRepository versions;
     @Mock TrainProvDeliverySiteRepository sites;
+    @Mock TrainProvProgrammeOfferingRepository offerings;
+    @Mock TrainProvAccreditationService accreditation;
     @Mock TrainProvLearnerEnrolmentRepository enrolments;
     @Mock TrainProvLearnerRepository learners;
     @Mock TrainProvPractitionerRepository practitioners;
@@ -71,6 +74,7 @@ class TrainProvCohortServiceTest {
         when(versions.findApproved(TENANT, PROGRAMME)).thenReturn(Optional.of(v));
         when(sites.findForTenant(TENANT, SITE)).thenReturn(Optional.of(s));
         when(numbers.nextCohortNumber(TENANT)).thenReturn("COH-00001");
+        stubOffering(true);
         CohortView view = service.create(TENANT, new CohortRequest("Feb intake", PROGRAMME, SITE, TODAY.plusDays(30), null, 20, null), USER);
         assertThat(view.cohortNo()).isEqualTo("COH-00001");
         assertThat(view.status()).isEqualTo("PLANNED");
@@ -140,6 +144,7 @@ class TrainProvCohortServiceTest {
     void cancellingNeedsAReasonAndAFinishedCohortCannotRestart() {
         TrainProvCohort c = cohort();
         when(cohorts.findForTenant(TENANT, c.getId())).thenReturn(Optional.of(c));
+        stubDeliverable();
         assertThatThrownBy(() -> service.transition(TENANT, c.getId(), new CohortTransition("CANCELLED", "short"), USER)).isInstanceOf(HandyFlowException.class);
         service.transition(TENANT, c.getId(), new CohortTransition("RUNNING", null), USER);
         service.transition(TENANT, c.getId(), new CohortTransition("COMPLETED", null), USER);
@@ -202,5 +207,121 @@ class TrainProvCohortServiceTest {
         when(venues.nameTaken(TENANT, SITE, "Room 1")).thenReturn(true);
         assertThatThrownBy(() -> service.createVenue(TENANT, new VenueRequest(SITE, "Room 1", 20, null), USER))
                 .isInstanceOf(HandyFlowException.class).hasMessageContaining("already has a venue");
+    }
+
+    private TrainProvProgramme stubProgramme(String activity) {
+        TrainProvProgramme p = mock(TrainProvProgramme.class);
+        lenient().when(p.getId()).thenReturn(PROGRAMME);
+        lenient().when(p.getStatus()).thenReturn("ACTIVE");
+        lenient().when(p.getTrainingActivity()).thenReturn(activity);
+        lenient().when(programmes.findForTenant(TENANT, PROGRAMME)).thenReturn(Optional.of(p));
+        return p;
+    }
+
+    private void stubSite() {
+        TrainProvDeliverySite s = mock(TrainProvDeliverySite.class);
+        lenient().when(s.getId()).thenReturn(SITE);
+        lenient().when(s.getStatus()).thenReturn("ACTIVE");
+        lenient().when(sites.findForTenant(TENANT, SITE)).thenReturn(Optional.of(s));
+    }
+
+    private void stubOffering(boolean present) {
+        TrainProvProgrammeOffering o = mock(TrainProvProgrammeOffering.class);
+        lenient().when(o.getOfferedFrom()).thenReturn(TODAY.minusDays(90));
+        lenient().when(offerings.findLive(TENANT, PROGRAMME, SITE)).thenReturn(present ? Optional.of(o) : Optional.empty());
+    }
+
+    private void stubDeliverable() {
+        stubProgramme("NON_ACCREDITED");
+        stubSite();
+        stubOffering(true);
+    }
+
+    private void stubCover(LocalDate day, boolean covered, String outcome, String message) {
+        when(accreditation.programmeCoverage(eq(TENANT), eq(PROGRAMME), any(), eq(SITE), eq(day)))
+                .thenReturn(new CoverageView(PROGRAMME, SITE, day, outcome, covered, message));
+    }
+
+    private CohortRequest request(LocalDate start, LocalDate end) {
+        return new CohortRequest("Feb intake", PROGRAMME, SITE, start, end, 20, null);
+    }
+
+    private void stubOpenable(String activity) {
+        TrainProvProgramme p = stubProgramme(activity);
+        TrainProvProgrammeVersion v = mock(TrainProvProgrammeVersion.class);
+        lenient().when(v.getId()).thenReturn(VERSION);
+        lenient().when(versions.findApproved(TENANT, PROGRAMME)).thenReturn(Optional.of(v));
+        stubSite();
+    }
+
+    @Test
+    void aCohortCannotBeOpenedWhereTheProgrammeIsNotOffered() {
+        stubOpenable("NON_ACCREDITED");
+        stubOffering(false);
+        assertThatThrownBy(() -> service.create(TENANT, request(TODAY.plusDays(30), null), USER))
+                .isInstanceOf(HandyFlowException.class).hasMessageContaining("not offered at that site");
+        verify(cohorts, never()).save(any());
+    }
+
+    @Test
+    void anAccreditedCohortNeedsAnApprovalInForceOnItsFirstAndLastDay() {
+        stubOpenable("ACCREDITED");
+        stubOffering(true);
+        LocalDate start = TODAY.plusDays(30);
+        LocalDate end = TODAY.plusDays(120);
+        stubCover(start, true, "COVERED", "Covered by a current approval");
+        stubCover(end, false, "EXPIRED", "The approval has expired");
+        assertThatThrownBy(() -> service.create(TENANT, request(start, end), USER))
+                .isInstanceOf(HandyFlowException.class).hasMessageContaining("cannot run to " + end).hasMessageContaining("expired");
+        verify(cohorts, never()).save(any());
+    }
+
+    @Test
+    void aSubmittedAccreditationDoesNotLetAnAccreditedCohortOpen() {
+        stubOpenable("ACCREDITED");
+        stubOffering(true);
+        LocalDate start = TODAY.plusDays(30);
+        stubCover(start, false, "NOT_APPROVED", "The accreditation is submitted. It is not an approval");
+        assertThatThrownBy(() -> service.create(TENANT, request(start, null), USER))
+                .isInstanceOf(HandyFlowException.class).hasMessageContaining("not an approval");
+        verify(cohorts, never()).save(any());
+    }
+
+    @Test
+    void aConditionalApprovalOpensTheCohortAndTheNoteIsKeptInItsHistory() {
+        stubOpenable("ACCREDITED");
+        stubOffering(true);
+        when(numbers.nextCohortNumber(TENANT)).thenReturn("COH-00002");
+        LocalDate start = TODAY.plusDays(30);
+        stubCover(start, true, "COVERED_WITH_CONDITIONS", "Covered, but the approval has conditions that must be met");
+        service.create(TENANT, request(start, null), USER);
+        org.mockito.ArgumentCaptor<TrainProvCohortEvent> ev = org.mockito.ArgumentCaptor.forClass(TrainProvCohortEvent.class);
+        verify(events).save(ev.capture());
+        assertThat(ev.getValue().getNote()).contains("conditions");
+    }
+
+    @Test
+    void movingTheDatesOfAPlannedCohortIsCheckedAgainAndLeavingThemAloneIsNot() {
+        TrainProvCohort c = cohort();
+        when(cohorts.findForTenant(TENANT, c.getId())).thenReturn(Optional.of(c));
+        stubProgramme("NON_ACCREDITED");
+        stubSite();
+        stubOffering(false);
+        assertThatThrownBy(() -> service.update(TENANT, c.getId(), new CohortUpdate("Feb intake", TODAY.plusDays(45), null, 5, null), USER))
+                .isInstanceOf(HandyFlowException.class).hasMessageContaining("not offered");
+        service.update(TENANT, c.getId(), new CohortUpdate("Renamed", TODAY.plusDays(30), null, 5, null), USER);
+        verify(cohorts).save(c);
+    }
+
+    @Test
+    void aPlannedCohortCannotStartOnceTheOfferingIsWithdrawn() {
+        TrainProvCohort c = cohort();
+        when(cohorts.findForTenant(TENANT, c.getId())).thenReturn(Optional.of(c));
+        stubProgramme("NON_ACCREDITED");
+        stubSite();
+        stubOffering(false);
+        assertThatThrownBy(() -> service.transition(TENANT, c.getId(), new CohortTransition("RUNNING", null), USER))
+                .isInstanceOf(HandyFlowException.class).hasMessageContaining("not offered");
+        assertThat(c.getStatus()).isEqualTo("PLANNED");
     }
 }

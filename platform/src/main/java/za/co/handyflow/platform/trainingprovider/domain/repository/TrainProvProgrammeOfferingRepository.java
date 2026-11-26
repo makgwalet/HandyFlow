@@ -20,6 +20,9 @@ public interface TrainProvProgrammeOfferingRepository extends JpaRepository<Trai
     @Query("SELECT COUNT(o) > 0 FROM TrainProvProgrammeOffering o WHERE o.tenantId = :#{#tenantId.value} AND o.programmeId = :programmeId AND o.siteId = :siteId AND o.status = 'ACTIVE'")
     boolean liveExists(TenantId tenantId, UUID programmeId, UUID siteId);
 
+    @Query("SELECT o FROM TrainProvProgrammeOffering o WHERE o.tenantId = :#{#tenantId.value} AND o.programmeId = :programmeId AND o.siteId = :siteId AND o.status = 'ACTIVE'")
+    Optional<TrainProvProgrammeOffering> findLive(TenantId tenantId, UUID programmeId, UUID siteId);
+
     @Query("SELECT COUNT(o) FROM TrainProvProgrammeOffering o WHERE o.tenantId = :#{#tenantId.value} AND o.programmeId = :programmeId AND o.status = 'ACTIVE'")
     long countLive(TenantId tenantId, UUID programmeId);
 

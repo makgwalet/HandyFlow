@@ -9,19 +9,22 @@ import za.co.handyflow.platform.shared.ResourceNotFoundException;
 import za.co.handyflow.platform.shared.TenantId;
 import za.co.handyflow.platform.trainingprovider.domain.model.*;
 import za.co.handyflow.platform.trainingprovider.domain.repository.*;
+import za.co.handyflow.platform.trainingprovider.domain.rules.CatalogueRules;
 import za.co.handyflow.platform.trainingprovider.domain.rules.CohortRules;
 import za.co.handyflow.platform.trainingprovider.domain.rules.PractitionerRules;
 import za.co.handyflow.platform.trainingprovider.dto.CohortDtos.*;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Supplier;
 
 /**
  * Venues, cohorts, cohort members and cohort facilitators. A cohort is frozen to the approved programme version and the site it was
- * opened on. A facilitator can only be assigned when their appointment for the programme is checked and in force on the day.
+ * opened on. It can only be opened, re-dated or started where the programme is offered at the site and, for an accredited programme, an
+ * approval in force covers that site on its first and last day. Pending or lapsed evidence is not cover. A facilitator can only be assigned when their appointment for the programme is checked and in force on the day.
  * Nothing is deleted: people are removed and cohorts cancelled, each with a reason, and every change is logged.
  */
 @Service
@@ -36,6 +39,8 @@ public class TrainProvCohortService {
     private final TrainProvProgrammeRepository programmes;
     private final TrainProvProgrammeVersionRepository versions;
     private final TrainProvDeliverySiteRepository sites;
+    private final TrainProvProgrammeOfferingRepository offerings;
+    private final TrainProvAccreditationService accreditation;
     private final TrainProvLearnerEnrolmentRepository enrolments;
     private final TrainProvLearnerRepository learners;
     private final TrainProvPractitionerRepository practitioners;
@@ -110,19 +115,24 @@ public class TrainProvCohortService {
         if (!"ACTIVE".equals(site.getStatus())) {
             throw new HandyFlowException("That site is not active", HttpStatus.CONFLICT, "TP_COHORT_STATE");
         }
+        String caveat = requireDeliverable(t, p, site, r.startDate(), r.endDate());
         TrainProvCohort c = guard(() -> TrainProvCohort.create(t, numbers.nextCohortNumber(t), r.name(), p.getId(), version.getId(), site.getId(),
                 r.startDate(), r.endDate(), r.capacity(), r.notes(), by));
         cohorts.save(c);
-        events.save(TrainProvCohortEvent.of(t, c.getId(), "CREATED", "Opened on version " + version.getVersionNo(), by));
+        events.save(TrainProvCohortEvent.of(t, c.getId(), "CREATED", "Opened on version " + version.getVersionNo() + (caveat == null ? "" : ". Note: " + caveat), by));
         return cohortView(t, c);
     }
 
     @Transactional
     public CohortView update(TenantId t, UUID id, CohortUpdate r, UUID by) {
         TrainProvCohort c = cohort(t, id);
+        String caveat = null;
+        if (CohortRules.open(c.getStatus()) && (!Objects.equals(c.getStartDate(), r.startDate()) || !Objects.equals(c.getEndDate(), r.endDate()))) {
+            caveat = requireDeliverable(t, programme(t, c.getProgrammeId()), site(t, c.getSiteId()), r.startDate(), r.endDate());
+        }
         guard(() -> { c.update(r.name(), r.startDate(), r.endDate(), r.capacity(), r.notes(), members.countActive(t, id)); return null; });
         cohorts.save(c);
-        events.save(TrainProvCohortEvent.of(t, id, "CHANGED", null, by));
+        events.save(TrainProvCohortEvent.of(t, id, "CHANGED", caveat == null ? null : "Note: " + caveat, by));
         return cohortView(t, c);
     }
 
@@ -130,6 +140,9 @@ public class TrainProvCohortService {
     public CohortView transition(TenantId t, UUID id, CohortTransition r, UUID by) {
         TrainProvCohort c = cohort(t, id);
         String from = c.getStatus();
+        if (CohortRules.PLANNED.equals(from) && CohortRules.RUNNING.equals(r.toStatus())) {
+            requireDeliverable(t, programme(t, c.getProgrammeId()), site(t, c.getSiteId()), c.getStartDate(), c.getEndDate());
+        }
         guard(() -> { c.moveTo(r.toStatus(), r.reason()); return null; });
         cohorts.save(c);
         events.save(TrainProvCohortEvent.of(t, id, "STATUS", from + " to " + c.getStatus() + (r.reason() == null || r.reason().isBlank() ? "" : ": " + r.reason().trim()), by));
@@ -193,6 +206,34 @@ public class TrainProvCohortService {
         String name = practitioners.findForTenant(t, f.getPractitionerId()).map(TrainProvPractitioner::fullName).orElse("");
         events.save(TrainProvCohortEvent.of(t, f.getCohortId(), "FACILITATOR_REMOVED", name + ": " + reason.trim(), by));
         return detail(t, f.getCohortId(), today);
+    }
+
+    // ---- delivery check ----
+
+    /**
+     * Refuses unless the programme can be delivered at the site for the whole run. Returns a caveat when delivery rests on a conditional
+     * or renewal-pending approval, otherwise null.
+     */
+    private String requireDeliverable(TenantId t, TrainProvProgramme p, TrainProvDeliverySite site, LocalDate start, LocalDate end) {
+        if (start == null) {
+            return null; // the cohort rules ask for the start date first
+        }
+        Optional<TrainProvProgrammeOffering> offering = offerings.findLive(t, p.getId(), site.getId());
+        boolean accredited = CatalogueRules.ACCREDITED.equals(p.getTrainingActivity());
+        CohortRules.Cover atStart = accredited && start != null ? cover(t, p, site.getId(), start) : null;
+        CohortRules.Cover atEnd = accredited && end != null ? cover(t, p, site.getId(), end) : null;
+        CohortRules.DeliveryFacts facts = new CohortRules.DeliveryFacts("ACTIVE".equals(p.getStatus()), "ACTIVE".equals(site.getStatus()),
+                offering.isPresent(), offering.map(TrainProvProgrammeOffering::getOfferedFrom).orElse(null), accredited, atStart, atEnd);
+        String problem = CohortRules.deliveryProblem(facts, start, end);
+        if (problem != null) {
+            throw new HandyFlowException(problem, HttpStatus.CONFLICT, "TP_COHORT_SITE");
+        }
+        return CohortRules.deliveryCaveat(facts);
+    }
+
+    private CohortRules.Cover cover(TenantId t, TrainProvProgramme p, UUID siteId, LocalDate day) {
+        var c = accreditation.programmeCoverage(t, p.getId(), p.getCourseId(), siteId, day);
+        return new CohortRules.Cover(c.covered(), c.outcome(), c.message());
     }
 
     // ---- views and lookups ----
