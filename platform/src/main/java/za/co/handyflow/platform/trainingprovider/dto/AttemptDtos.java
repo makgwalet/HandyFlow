@@ -20,7 +20,18 @@ public final class AttemptDtos {
     public record CorrectMark(BigDecimal mark, @NotBlank String reason) {
     }
 
-    public record DecisionRequest(@NotBlank String decision, @NotBlank String basis) {
+    /** recordedForAssessor is required when the assessor has no login: how their decision reached the person recording it. */
+    public record DecisionRequest(@NotBlank String decision, @NotBlank String basis, String recordedForAssessor) {
+        public DecisionRequest(String decision, String basis) {
+            this(decision, basis, null);
+        }
+    }
+
+    /** Who the practitioner was and what their appointment said when the subject was recorded. standing is null for a backfilled row. */
+    public record AppointmentSnapshotView(UUID id, String subjectType, UUID subjectId, String role, UUID practitionerId, String practitionerNo, String fullName,
+                                          String employmentType, boolean hasLogin, UUID appointmentId, UUID programmeId, UUID authorityId, String authorityName,
+                                          String credentialRef, LocalDate validFrom, LocalDate validTo, String verificationSource, LocalDate verifiedOn,
+                                          String standing, String standingNote, LocalDate standingOn, boolean backfilled, Instant capturedAt) {
     }
 
     public record ReasonRequest(@NotBlank String reason) {

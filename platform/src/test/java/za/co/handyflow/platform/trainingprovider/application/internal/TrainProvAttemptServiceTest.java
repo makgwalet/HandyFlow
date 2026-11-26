@@ -48,6 +48,8 @@ class TrainProvAttemptServiceTest {
     @Mock TrainProvLearnerRepository learners;
     @Mock TrainProvPractitionerRepository practitioners;
     @Mock TrainProvPractitionerAppointmentRepository appointments;
+    @Mock TrainProvAppointmentSnapshotRepository snapshots;
+    @Mock TrainProvAuthorityRepository authorities;
     @Mock TrainProvNumberGenerator numbers;
     @InjectMocks TrainProvAttemptService service;
 
@@ -74,10 +76,14 @@ class TrainProvAttemptServiceTest {
         assessor = mock(TrainProvPractitioner.class);
         lenient().when(assessor.getId()).thenReturn(ASSESSOR);
         lenient().when(assessor.getStatus()).thenReturn("ACTIVE");
-        lenient().when(assessor.getUserId()).thenReturn(null);
+        lenient().when(assessor.getUserId()).thenReturn(USER);
+        lenient().when(assessor.fullName()).thenReturn("Probe Person");
         appointment = mock(TrainProvPractitionerAppointment.class);
         lenient().when(appointment.getId()).thenReturn(APPOINTMENT);
         lenient().when(appointment.getPractitionerId()).thenReturn(ASSESSOR);
+        lenient().when(appointment.getRole()).thenReturn("ASSESSOR");
+        lenient().when(appointment.getProgrammeId()).thenReturn(PROGRAMME);
+        lenient().when(appointments.findForTenant(TENANT, APPOINTMENT)).thenReturn(Optional.of(appointment));
         lenient().when(appointment.standingOn(any())).thenReturn(PractitionerRules.Standing.VERIFIED_IN_FORCE);
         lenient().when(instruments.findForTenant(TENANT, instrument.getId())).thenReturn(Optional.of(instrument));
         lenient().when(members.findForTenant(TENANT, member.getId())).thenReturn(Optional.of(member));
@@ -209,5 +215,73 @@ class TrainProvAttemptServiceTest {
         assertThatThrownBy(() -> service.voidAttempt(TENANT, a.getId(), "short", USER)).isInstanceOf(HandyFlowException.class);
         assertThat(service.voidAttempt(TENANT, a.getId(), "Recorded against the wrong learner", USER).status()).isEqualTo("VOID");
         verify(attempts, never()).delete(any());
+    }
+
+    @Test
+    void recordingKeepsACopyOfTheAssessorAndTheirAppointmentAsTheyStoodOnTheDay() {
+        service.record(TENANT, request(new BigDecimal("32")), USER, TODAY);
+        org.mockito.ArgumentCaptor<TrainProvAppointmentSnapshot> c = org.mockito.ArgumentCaptor.forClass(TrainProvAppointmentSnapshot.class);
+        verify(snapshots).save(c.capture());
+        assertThat(c.getValue().getSubjectType()).isEqualTo("ATTEMPT");
+        assertThat(c.getValue().getFullName()).isEqualTo("Probe Person");
+        assertThat(c.getValue().getAppointmentId()).isEqualTo(APPOINTMENT);
+        assertThat(c.getValue().getStanding()).isEqualTo("VERIFIED_IN_FORCE");
+        assertThat(c.getValue().getStandingOn()).isEqualTo(TODAY);
+        assertThat(c.getValue().isBackfilled()).isFalse();
+    }
+
+    @Test
+    void aDecisionAlsoKeepsACopyAsTheyStoodOnTheDecisionDay() {
+        TrainProvAssessmentAttempt a = stored();
+        service.decide(TENANT, a.getId(), new DecisionRequest("COMPETENT", "Met every criterion on the checklist"), USER, TODAY);
+        org.mockito.ArgumentCaptor<TrainProvAppointmentSnapshot> c = org.mockito.ArgumentCaptor.forClass(TrainProvAppointmentSnapshot.class);
+        verify(snapshots).save(c.capture());
+        assertThat(c.getValue().getSubjectType()).isEqualTo("DECISION");
+        assertThat(c.getValue().getSubjectId()).isEqualTo(a.getId());
+    }
+
+    @Test
+    void anAssessorWithNoLoginNeedsANoteOnHowTheirDecisionReachedUs() {
+        when(assessor.getUserId()).thenReturn(null);
+        TrainProvAssessmentAttempt a = stored();
+        assertThatThrownBy(() -> service.decide(TENANT, a.getId(), new DecisionRequest("COMPETENT", "Met every criterion on the checklist"), USER, TODAY))
+                .isInstanceOf(HandyFlowException.class).hasMessageContaining("no login");
+        verify(decisions, never()).save(any());
+        AttemptView v = service.decide(TENANT, a.getId(), new DecisionRequest("COMPETENT", "Met every criterion on the checklist", "Signed result sheet handed over on 10 March"), USER, TODAY);
+        assertThat(v.decision()).isNotNull();
+        org.mockito.ArgumentCaptor<TrainProvAssessmentDecision> c = org.mockito.ArgumentCaptor.forClass(TrainProvAssessmentDecision.class);
+        verify(decisions).save(c.capture());
+        assertThat(c.getValue().getRecordedForAssessor()).contains("Signed result sheet");
+    }
+
+    @Test
+    void aDecisionIsRefusedWhenTheAppointmentIsNoLongerInForceOnTheDecisionDay() {
+        when(appointment.standingOn(any())).thenReturn(PractitionerRules.Standing.WITHDRAWN);
+        TrainProvAssessmentAttempt a = stored();
+        assertThatThrownBy(() -> service.decide(TENANT, a.getId(), new DecisionRequest("COMPETENT", "Met every criterion on the checklist"), USER, TODAY))
+                .isInstanceOf(HandyFlowException.class).hasMessageContaining("not checked and in force today");
+        verify(decisions, never()).save(any());
+        verify(snapshots, never()).save(any());
+    }
+
+    @Test
+    void aRenewedAppointmentLetsTheDecisionBeMade() {
+        TrainProvPractitionerAppointment renewed = mock(TrainProvPractitionerAppointment.class);
+        when(renewed.getId()).thenReturn(UUID.randomUUID());
+        when(renewed.getPractitionerId()).thenReturn(ASSESSOR);
+        when(renewed.getRole()).thenReturn("ASSESSOR");
+        when(renewed.getProgrammeId()).thenReturn(PROGRAMME);
+        when(renewed.standingOn(any())).thenReturn(PractitionerRules.Standing.VERIFIED_IN_FORCE);
+        when(appointment.standingOn(any())).thenReturn(PractitionerRules.Standing.EXPIRED);
+        when(appointments.findLiveForProgramme(TENANT, PROGRAMME, "ASSESSOR")).thenReturn(List.of(renewed));
+        TrainProvAssessmentAttempt a = stored();
+        assertThat(service.decide(TENANT, a.getId(), new DecisionRequest("COMPETENT", "Met every criterion on the checklist"), USER, TODAY).decision()).isNotNull();
+    }
+
+    @Test
+    void anAssessorsHistoryListsTheirAttempts() {
+        TrainProvAssessmentAttempt a = stored();
+        when(attempts.findForAssessor(TENANT, ASSESSOR)).thenReturn(List.of(a));
+        assertThat(service.forAssessor(TENANT, ASSESSOR)).hasSize(1);
     }
 }

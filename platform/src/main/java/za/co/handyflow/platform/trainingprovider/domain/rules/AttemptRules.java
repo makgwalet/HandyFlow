@@ -123,6 +123,22 @@ public final class AttemptRules {
         return null;
     }
 
+    /**
+     * Whether the assessor may have this decision recorded today, or why not. The appointment must be checked and in force on the day of the
+     * decision, not only on the day of the assessment. An assessor with no login cannot record their own decision, so whoever records it for them
+     * says how it reached them. A login is only a link to a person: it is never what makes someone an authorised assessor.
+     */
+    public static String decisionAuthorityProblem(PractitionerRules.Standing standingOnDecisionDay, boolean assessorHasLogin, String recordedForAssessor) {
+        if (standingOnDecisionDay != PractitionerRules.Standing.VERIFIED_IN_FORCE) {
+            return "The assessor's appointment is not checked and in force today (" + standingOnDecisionDay.note() + "), so the decision cannot be recorded yet";
+        }
+        if (!assessorHasLogin && !CohortRules.longEnough(recordedForAssessor, CohortRules.MIN_REASON)) {
+            return "This assessor has no login, so the decision is recorded for them. Say how their decision reached you (who gave it, and how), in at least "
+                    + CohortRules.MIN_REASON + " characters";
+        }
+        return null;
+    }
+
     public static String voidProblem(String status, String reason) {
         if (VOID.equals(status)) {
             return "This attempt is already void";

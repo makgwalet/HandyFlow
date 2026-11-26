@@ -88,4 +88,21 @@ class AttemptRulesTest {
         assertNotNull(AttemptRules.voidProblem("RECORDED", "short"));
         assertNotNull(AttemptRules.voidProblem("VOID", "Recorded against the wrong learner"));
     }
+
+    @Test
+    void aDecisionNeedsTheAppointmentInForceOnTheDecisionDay() {
+        assertNull(AttemptRules.decisionAuthorityProblem(PractitionerRules.Standing.VERIFIED_IN_FORCE, true, null));
+        for (PractitionerRules.Standing st : PractitionerRules.Standing.values()) {
+            if (st != PractitionerRules.Standing.VERIFIED_IN_FORCE) {
+                assertNotNull(AttemptRules.decisionAuthorityProblem(st, true, null));
+            }
+        }
+    }
+
+    @Test
+    void anAssessorWithNoLoginNeedsAWrittenNote() {
+        assertNotNull(AttemptRules.decisionAuthorityProblem(PractitionerRules.Standing.VERIFIED_IN_FORCE, false, null));
+        assertNotNull(AttemptRules.decisionAuthorityProblem(PractitionerRules.Standing.VERIFIED_IN_FORCE, false, "short"));
+        assertNull(AttemptRules.decisionAuthorityProblem(PractitionerRules.Standing.VERIFIED_IN_FORCE, false, "Signed sheet handed over in person"));
+    }
 }

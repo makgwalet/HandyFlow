@@ -32,8 +32,15 @@ public class TrainProvAssessmentDecision {
     private LocalDate decidedOn;
     @Column(name = "decided_at", nullable = false, updatable = false)
     private Instant decidedAt;
+    /** Set when the assessor has no login and the decision was recorded for them: how it reached the person who recorded it. */
+    @Column(name = "recorded_for_assessor", updatable = false)
+    private String recordedForAssessor;
 
     public static TrainProvAssessmentDecision of(TenantId t, UUID attemptId, String decision, String basis, UUID by, LocalDate today) {
+        return of(t, attemptId, decision, basis, by, today, null);
+    }
+
+    public static TrainProvAssessmentDecision of(TenantId t, UUID attemptId, String decision, String basis, UUID by, LocalDate today, String recordedForAssessor) {
         TrainProvAssessmentDecision d = new TrainProvAssessmentDecision();
         d.tenantId = t.getValue();
         d.attemptId = attemptId;
@@ -42,6 +49,7 @@ public class TrainProvAssessmentDecision {
         d.decidedBy = by;
         d.decidedOn = today;
         d.decidedAt = Instant.now();
+        d.recordedForAssessor = recordedForAssessor == null || recordedForAssessor.isBlank() ? null : recordedForAssessor.trim();
         return d;
     }
 }

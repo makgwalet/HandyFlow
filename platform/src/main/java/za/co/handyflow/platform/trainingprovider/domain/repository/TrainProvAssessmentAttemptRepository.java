@@ -20,6 +20,9 @@ public interface TrainProvAssessmentAttemptRepository extends JpaRepository<Trai
         """)
     List<TrainProvAssessmentAttempt> search(TenantId tenantId, UUID cohortId, UUID instrumentId, UUID enrolmentId);
 
+    @Query("SELECT a FROM TrainProvAssessmentAttempt a WHERE a.tenantId = :#{#tenantId.value} AND a.assessorId = :assessorId ORDER BY a.attemptNo DESC")
+    List<TrainProvAssessmentAttempt> findForAssessor(TenantId tenantId, UUID assessorId);
+
     @Query("SELECT a FROM TrainProvAssessmentAttempt a WHERE a.tenantId = :#{#tenantId.value} AND a.id = :id")
     Optional<TrainProvAssessmentAttempt> findForTenant(TenantId tenantId, UUID id);
 

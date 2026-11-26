@@ -14,6 +14,7 @@ import za.co.handyflow.platform.trainingprovider.domain.rules.PractitionerRules;
 import za.co.handyflow.platform.trainingprovider.dto.AttemptDtos.*;
 
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -41,6 +42,8 @@ public class TrainProvAttemptService {
     private final TrainProvLearnerRepository learners;
     private final TrainProvPractitionerRepository practitioners;
     private final TrainProvPractitionerAppointmentRepository appointments;
+    private final TrainProvAppointmentSnapshotRepository snapshots;
+    private final TrainProvAuthorityRepository authorities;
     private final TrainProvNumberGenerator numbers;
 
     public List<AttemptView> list(TenantId t, UUID cohortId, UUID instrumentId, UUID enrolmentId) {
@@ -81,6 +84,7 @@ public class TrainProvAttemptService {
         TrainProvAssessmentAttempt a = TrainProvAssessmentAttempt.create(t, numbers.nextAttemptNumber(t), i.getId(), m.getId(), c.getId(), m.getEnrolmentId(), seq,
                 r.assessedOn(), p.getId(), appt.get().getId(), r.mark(), r.notes(), by);
         attempts.save(a);
+        snapshots.save(TrainProvAppointmentSnapshot.of(t, "ATTEMPT", a.getId(), p, appt.get(), authorityName(t, appt.get()), standing, r.assessedOn(), by));
         events.save(TrainProvAssessmentAttemptEvent.of(t, a.getId(), "RECORDED", "Attempt " + seq + (r.mark() == null ? "" : ", mark " + r.mark().stripTrailingZeros().toPlainString()), by));
         return view(t, a, null, true);
     }
@@ -110,9 +114,60 @@ public class TrainProvAttemptService {
             throw new HandyFlowException(problem, decided || !AttemptRules.RECORDED.equals(a.getStatus()) || linkedToSomeoneElse ? HttpStatus.CONFLICT : HttpStatus.BAD_REQUEST,
                     decided || !AttemptRules.RECORDED.equals(a.getStatus()) || linkedToSomeoneElse ? "TP_ATTEMPT_STATE" : "TP_ATTEMPT_INVALID");
         }
-        TrainProvAssessmentDecision d = decisions.save(TrainProvAssessmentDecision.of(t, id, r.decision(), r.basis(), by, today));
+        TrainProvPractitionerAppointment appt = currentAppointment(t, a, assessor);
+        PractitionerRules.Standing standing = appt == null ? PractitionerRules.Standing.NOT_VERIFIED : appt.standingOn(today);
+        String authorityProblem = AttemptRules.decisionAuthorityProblem(standing, assessor.getUserId() != null, r.recordedForAssessor());
+        if (authorityProblem != null) {
+            throw new HandyFlowException(authorityProblem, HttpStatus.CONFLICT, "TP_ATTEMPT_STATE");
+        }
+        TrainProvAssessmentDecision d = decisions.save(TrainProvAssessmentDecision.of(t, id, r.decision(), r.basis(), by, today, r.recordedForAssessor()));
+        snapshots.save(TrainProvAppointmentSnapshot.of(t, "DECISION", id, assessor, appt, authorityName(t, appt), standing, today, by));
         events.save(TrainProvAssessmentAttemptEvent.of(t, id, "DECIDED", r.decision().equals(AttemptRules.COMPETENT) ? "Competent" : "Not yet competent", by));
         return view(t, a, d, true);
+    }
+
+    /** Who the assessor was and what their appointment said when the attempt was recorded and when it was decided. */
+    public List<AppointmentSnapshotView> assessorSnapshots(TenantId t, UUID attemptId) {
+        TrainProvAssessmentAttempt a = attempt(t, attemptId);
+        List<TrainProvAppointmentSnapshot> found = new ArrayList<>(snapshots.findForSubject(t, "ATTEMPT", a.getId()));
+        found.addAll(snapshots.findForSubject(t, "DECISION", a.getId()));
+        return found.stream().<AppointmentSnapshotView>map(s -> {
+            PractitionerRules.Standing st = s.getStanding() == null ? null : PractitionerRules.Standing.valueOf(s.getStanding());
+            return new AppointmentSnapshotView(s.getId(), s.getSubjectType(), s.getSubjectId(), s.getRole(), s.getPractitionerId(), s.getPractitionerNo(),
+                    s.getFullName(), s.getEmploymentType(), s.isHasLogin(), s.getAppointmentId(), s.getProgrammeId(), s.getAuthorityId(), s.getAuthorityName(),
+                    s.getCredentialRef(), s.getValidFrom(), s.getValidTo(), s.getVerificationSource(), s.getVerifiedOn(), s.getStanding(),
+                    st == null ? "Copied from the record as it is now. The standing on the day was not captured" : st.note(), s.getStandingOn(),
+                    s.isBackfilled(), s.getCapturedAt());
+        }).toList();
+    }
+
+    /** Every attempt this person assessed, newest first. */
+    public List<AttemptView> forAssessor(TenantId t, UUID practitionerId) {
+        practitioners.findForTenant(t, practitionerId).orElseThrow(() -> new ResourceNotFoundException("TrainProvPractitioner", practitionerId.toString()));
+        List<TrainProvAssessmentAttempt> rows = attempts.findForAssessor(t, practitionerId);
+        Map<UUID, TrainProvAssessmentDecision> byAttempt = rows.isEmpty() ? Map.of() : decisions.findForAttempts(t, rows.stream().map(TrainProvAssessmentAttempt::getId).toList())
+                .stream().collect(java.util.stream.Collectors.toMap(TrainProvAssessmentDecision::getAttemptId, d -> d, (x, y) -> x));
+        return rows.stream().<AttemptView>map(a -> view(t, a, byAttempt.get(a.getId()), false)).toList();
+    }
+
+    /**
+     * The appointment that counts for a decision made now: the assessor's live appointment for the cohort's programme (it may have been renewed
+     * since the assessment), otherwise the one the assessment was made under.
+     */
+    private TrainProvPractitionerAppointment currentAppointment(TenantId t, TrainProvAssessmentAttempt a, TrainProvPractitioner assessor) {
+        TrainProvCohort c = cohorts.findForTenant(t, a.getCohortId()).orElse(null);
+        if (c != null) {
+            Optional<TrainProvPractitionerAppointment> live = appointments.findLiveForProgramme(t, c.getProgrammeId(), "ASSESSOR").stream()
+                    .filter(x -> x.getPractitionerId().equals(assessor.getId())).findFirst();
+            if (live.isPresent()) {
+                return live.get();
+            }
+        }
+        return appointments.findForTenant(t, a.getAppointmentId()).orElse(null);
+    }
+
+    private String authorityName(TenantId t, TrainProvPractitionerAppointment appt) {
+        return appt == null || appt.getAuthorityId() == null ? null : authorities.findForTenant(t, appt.getAuthorityId()).map(TrainProvAuthority::getName).orElse(null);
     }
 
     @Transactional

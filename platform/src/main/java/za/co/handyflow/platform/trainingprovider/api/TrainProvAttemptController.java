@@ -49,6 +49,20 @@ public class TrainProvAttemptController {
         return ResponseEntity.ok(ApiResponse.success(service.get(TenantContext.getTenantIdAsObject(), id)));
     }
 
+    @GetMapping("/{id}/assessor-snapshots")
+    @PreAuthorize(READ)
+    public ResponseEntity<ApiResponse<List<AppointmentSnapshotView>>> assessorSnapshots(@PathVariable UUID id) {
+        featureGuard.requireModule("trainingprovider");
+        return ResponseEntity.ok(ApiResponse.success(service.assessorSnapshots(TenantContext.getTenantIdAsObject(), id)));
+    }
+
+    @GetMapping("/by-assessor/{practitionerId}")
+    @PreAuthorize(READ)
+    public ResponseEntity<ApiResponse<List<AttemptView>>> byAssessor(@PathVariable UUID practitionerId) {
+        featureGuard.requireModule("trainingprovider");
+        return ResponseEntity.ok(ApiResponse.success(service.forAssessor(TenantContext.getTenantIdAsObject(), practitionerId)));
+    }
+
     @PostMapping
     @PreAuthorize(MANAGE)
     public ResponseEntity<ApiResponse<AttemptView>> record(@Valid @RequestBody RecordAttempt r) {
