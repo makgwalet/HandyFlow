@@ -58,6 +58,8 @@ public class TrainProvNumberGenerator {
     private static final String RESOURCE_SEQUENCE = "TRAINPROV_RESOURCE";
     private static final String SAMPLING_RULE_SEQUENCE = "TRAINPROV_SAMPLING_RULE";
     private static final String SAMPLING_DRAW_SEQUENCE = "TRAINPROV_SAMPLING_DRAW";
+    private static final String AUDIT_TEMPLATE_SEQUENCE = "TRAINPROV_AUDIT_TEMPLATE";
+    private static final String AUDIT_SEQUENCE = "TRAINPROV_AUDIT";
     private static final String COMPLETION_SEQUENCE = "TRAINPROV_COMPLETION";
     private static final String DOCUMENT_SEQUENCE = "TRAINPROV_DOCUMENT";
     private static final String LESSON_SEQUENCE = "TRAINPROV_LESSON";
@@ -133,6 +135,16 @@ public class TrainProvNumberGenerator {
     public String nextResourceNumber(TenantId tenantId) {
         long next = sequenceService.nextValue(tenantId, RESOURCE_SEQUENCE);
         return "RES-%05d".formatted(next);
+    }
+
+    public String nextAuditTemplateNumber(TenantId tenantId) {
+        long next = sequenceService.nextValue(tenantId, AUDIT_TEMPLATE_SEQUENCE);
+        return "AUT-%05d".formatted(next);
+    }
+
+    public String nextAuditNumber(TenantId tenantId) {
+        long next = sequenceService.nextValue(tenantId, AUDIT_SEQUENCE);
+        return "AUD-%05d".formatted(next);
     }
 
     public String nextSamplingRuleNumber(TenantId tenantId) {

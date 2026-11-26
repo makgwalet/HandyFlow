@@ -547,6 +547,7 @@ export const TRAINING_PROVIDER_SECTIONS: ModuleSections = {
         { id: 'practitioners', label: 'Facilitators & assessors', icon: UserCheck },
         { id: 'cohorts', label: 'Cohorts & timetable', icon: CalendarRange },
         { id: 'assessment', label: 'Assessment', icon: ClipboardCheck },
+        { id: 'quality', label: 'Quality audits', icon: ListChecks },
         { id: 'reporting', label: 'Reporting', icon: CalendarClock },
       ],
     },
