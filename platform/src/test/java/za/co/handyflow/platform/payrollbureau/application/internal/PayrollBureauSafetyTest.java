@@ -59,10 +59,11 @@ class PayrollBureauSafetyTest {
     }
 
     @Test
-    void aRunIsNotProcessedWhenTheTaxYearHasNoTaxTables() {
+    void aRunIsNotProcessedWhenTheTaxYearHasNoApprovedRules() {
         PayRun run = draftRun();
         when(payRunRepo.findByTenantAndId(TENANT.getValue(), runId)).thenReturn(Optional.of(run));
-        when(engine.hasTaxTables(2027)).thenReturn(false);
+        when(engine.requireRules(2027)).thenThrow(new HandyFlowException(
+                "There are no approved statutory rules for tax year 2026/27.", org.springframework.http.HttpStatus.UNPROCESSABLE_ENTITY, "NO_TAX_RULES"));
 
         assertThatThrownBy(() -> service.processPayRun(TENANT, runId))
                 .isInstanceOf(HandyFlowException.class)

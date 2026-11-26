@@ -23,13 +23,14 @@ import java.util.Optional;
  */
 @Service
 @RequiredArgsConstructor
-public class StatutoryRulesService {
+public class StatutoryRulesService implements za.co.handyflow.platform.shared.StatutoryRulesProvider {
 
     private final HrStatutoryTaxYearRepository years;
     private final SarsTaxTableRepository tables;
     private final SarsTaxRebateRepository rebates;
 
     /** The rules of {@code taxYear}, or a plain 409 explaining why payroll cannot go ahead. */
+    @Override
     @Transactional(readOnly = true)
     public StatutoryYearRules rulesFor(int taxYear) {
         return find(taxYear).orElseThrow(() -> new IllegalStateException(
@@ -37,6 +38,7 @@ public class StatutoryRulesService {
                         + ". Payroll cannot use this period until they are loaded and approved."));
     }
 
+    @Override
     @Transactional(readOnly = true)
     public Optional<StatutoryYearRules> find(int taxYear) {
         HrStatutoryTaxYear y = years.findById(taxYear).orElse(null);

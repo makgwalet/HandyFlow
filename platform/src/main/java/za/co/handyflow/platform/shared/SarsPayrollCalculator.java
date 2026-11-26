@@ -45,6 +45,12 @@ import java.util.List;
  * second, separate behavioural fix beyond what this consolidation item
  * covers, so it's left as-is and simply preserved.
  */
+/**
+ * @deprecated Nothing in the application uses this since payroll bureau moved to {@link SarsPayeCalculator} with the approved
+ *             statutory rules (phase 1, slice 1a, 2026-11-26). It keeps hard-coded rates and year figures. Kept only until its own
+ *             test is retired; do not use it for new work.
+ */
+@Deprecated
 @Slf4j
 public class SarsPayrollCalculator {
 

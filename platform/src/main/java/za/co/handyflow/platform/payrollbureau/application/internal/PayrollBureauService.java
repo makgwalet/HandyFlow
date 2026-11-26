@@ -251,12 +251,9 @@ public class PayrollBureauService {
                     HttpStatus.BAD_REQUEST, "INVALID_STATUS");
         }
 
-        // Fail closed: with no tax tables the calculator returns zero PAYE and
-        // the run would complete with wrong payslips (audit 2026-11-26, D9).
-        if (!engine.hasTaxTables(run.getTaxYear())) {
-            throw new HandyFlowException("No PAYE tax tables are loaded for tax year " + run.getTaxYear()
-                    + ". Load them before processing this pay run.", HttpStatus.UNPROCESSABLE_ENTITY, "NO_TAX_TABLES");
-        }
+        // Fail closed: no approved statutory rules for the year means no run, never a zero-PAYE payslip
+        // (audit 2026-11-26, D9). The same approved rules HR uses.
+        za.co.handyflow.platform.shared.StatutoryYearRules rules = engine.requireRules(run.getTaxYear());
 
         List<PayEmployee> employees = employeeRepo.findActiveByClient(run.getPayClientId());
         java.math.BigDecimal annualPayroll = employeeRepo.sumMonthlyGrossByClient(run.getPayClientId())
@@ -266,7 +263,7 @@ public class PayrollBureauService {
                 runUif = java.math.BigDecimal.ZERO, runSdl = java.math.BigDecimal.ZERO, runNet = java.math.BigDecimal.ZERO;
 
         for (PayEmployee emp : employees) {
-            PayrollBureauEngine.PayrollResult result = engine.calculate(emp, run.getTaxYear(), annualPayroll);
+            PayrollBureauEngine.PayrollResult result = engine.calculate(emp, rules, annualPayroll);
 
             Payslip slip = Payslip.create(tenantId.getValue(), run.getId(), emp.getId(),
                     result.monthlySalary(), result.travelAllowance(), result.payeAmount(),
