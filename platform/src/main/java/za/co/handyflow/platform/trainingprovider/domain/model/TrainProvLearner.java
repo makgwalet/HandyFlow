@@ -55,6 +55,8 @@ public class TrainProvLearner {
     private UUID archivedBy;
     @Column(name = "archived_at")
     private Instant archivedAt;
+    @Column(name = "merged_into_id")
+    private UUID mergedIntoId;
     @Column(name = "created_by", nullable = false)
     private UUID createdBy;
     @Column(name = "created_at", nullable = false)
@@ -132,7 +134,31 @@ public class TrainProvLearner {
         this.updatedAt = this.archivedAt;
     }
 
+    /** Closes this record because the person is held on another learner. The record stays, archived, pointing at the one it was merged into. */
+    public void mergeInto(UUID survivorId, String reason, UUID by) {
+        if (!"ACTIVE".equals(status)) {
+            throw new IllegalStateException("Only a live learner can be merged");
+        }
+        if (survivorId == null || survivorId.equals(id)) {
+            throw new IllegalArgumentException("Choose a different learner to keep");
+        }
+        archive(reason, by);
+        this.mergedIntoId = survivorId;
+    }
+
+    /** Sets or clears the delegate link. The service has already checked it and written the history. */
+    public void relink(UUID delegateId) {
+        if ("ARCHIVED".equals(status)) {
+            throw new IllegalStateException("An archived learner cannot be changed. Restore the learner first");
+        }
+        this.delegateId = delegateId;
+        this.updatedAt = Instant.now();
+    }
+
     public void restore() {
+        if (mergedIntoId != null) {
+            throw new IllegalStateException("This learner was merged into another and cannot be restored");
+        }
         if (!"ARCHIVED".equals(status)) {
             throw new IllegalStateException("Only an archived learner can be restored");
         }

@@ -3,6 +3,7 @@ package za.co.handyflow.platform.trainingprovider.domain.repository;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import za.co.handyflow.platform.shared.TenantId;
 import za.co.handyflow.platform.trainingprovider.domain.model.TrainProvDelegate;
@@ -27,4 +28,7 @@ public interface TrainProvDelegateRepository extends JpaRepository<TrainProvDele
 
     @Query("SELECT d FROM TrainProvDelegate d WHERE d.tenantId = :#{#tenantId.value} AND d.clientId = :clientId AND d.deletedAt IS NULL ORDER BY d.fullName")
     List<TrainProvDelegate> findAllActiveForClient(TenantId tenantId, UUID clientId);
+
+    @Query("SELECT d FROM TrainProvDelegate d WHERE d.tenantId = :#{#tenantId.value} AND d.deletedAt IS NULL ORDER BY d.fullName")
+    List<TrainProvDelegate> findAllActiveForTenant(TenantId tenantId);
 }

@@ -71,7 +71,15 @@ public class TrainProvLearnerController {
     @PreAuthorize(MANAGE)
     public ResponseEntity<ApiResponse<LearnerView>> update(@PathVariable UUID id, @Valid @RequestBody LearnerRequest r) {
         featureGuard.requireModule("trainingprovider");
-        return ResponseEntity.ok(ApiResponse.success("Learner updated", learners.update(TenantContext.getTenantIdAsObject(), id, r, today())));
+        return ResponseEntity.ok(ApiResponse.success("Learner updated", learners.update(TenantContext.getTenantIdAsObject(), id, r, today(), TenantContext.getCurrentUserId())));
+    }
+
+    @PutMapping("/learners/{id}/delegate")
+    @PreAuthorize(MANAGE)
+    public ResponseEntity<ApiResponse<LearnerView>> linkDelegate(@PathVariable UUID id, @RequestBody DelegateLinkRequest r) {
+        featureGuard.requireModule("trainingprovider");
+        return ResponseEntity.ok(ApiResponse.success(r.delegateId() == null ? "Delegate unlinked" : "Delegate linked",
+                learners.linkDelegate(TenantContext.getTenantIdAsObject(), id, r.delegateId(), r.reason(), TenantContext.getCurrentUserId())));
     }
 
     @PostMapping("/learners/{id}/archive")

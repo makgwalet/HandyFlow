@@ -1,6 +1,7 @@
 package za.co.handyflow.platform.trainingprovider.domain.repository;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import za.co.handyflow.platform.shared.TenantId;
 import za.co.handyflow.platform.trainingprovider.domain.model.TrainProvLearnerEnrolment;
@@ -34,4 +35,14 @@ public interface TrainProvLearnerEnrolmentRepository extends JpaRepository<Train
 
     @Query("SELECT COUNT(e) FROM TrainProvLearnerEnrolment e WHERE e.tenantId = :#{#tenantId.value} AND e.programmeId = :programmeId AND e.status IN ('ENROLLED', 'IN_PROGRESS', 'ON_HOLD')")
     long countLiveForProgramme(TenantId tenantId, UUID programmeId);
+
+    @Query("SELECT DISTINCT e.programmeId FROM TrainProvLearnerEnrolment e WHERE e.tenantId = :#{#tenantId.value} AND e.learnerId = :learnerId AND e.status IN ('ENROLLED', 'IN_PROGRESS', 'ON_HOLD')")
+    List<UUID> liveProgrammeIds(TenantId tenantId, UUID learnerId);
+
+    @Query("SELECT COUNT(e) FROM TrainProvLearnerEnrolment e WHERE e.tenantId = :#{#tenantId.value} AND e.learnerId = :learnerId")
+    long countForLearner(TenantId tenantId, UUID learnerId);
+
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("UPDATE TrainProvLearnerEnrolment e SET e.learnerId = :toId, e.version = e.version + 1 WHERE e.tenantId = :#{#tenantId.value} AND e.learnerId = :fromId")
+    int moveLearner(TenantId tenantId, UUID fromId, UUID toId);
 }

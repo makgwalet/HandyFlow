@@ -6,6 +6,7 @@ export type Learner = {
   dateOfBirth: string | null; email: string | null; phone: string | null; address: string | null; province: string | null
   clientId: string | null; clientName: string | null; delegateId: string | null; consentGiven: boolean; consentOn: string | null
   consentNote: string | null; status: string; archivedReason: string | null; liveEnrolments: number
+  mergedIntoId?: string | null; delegateName?: string | null
 }
 export type Application = {
   id: string; learnerId: string; learnerName: string; programmeId: string; programmeTitle: string; siteId: string | null; siteName: string | null
@@ -80,16 +81,18 @@ export function luhnValid(d: string): boolean {
 export type LearnerForm = {
   firstNames: string; surname: string; idType: string; idNumber: string; dateOfBirth: string; email: string; phone: string; address: string
   province: string; clientId: string; consentGiven: boolean; consentOn: string; consentNote: string
+  /** Kept as it is on an edit. The link itself is changed on the learner's page, with a reason. */
+  delegateId: string
 }
 export const emptyLearner: LearnerForm = {
   firstNames: "", surname: "", idType: "SA_ID", idNumber: "", dateOfBirth: "", email: "", phone: "", address: "", province: "", clientId: "",
-  consentGiven: false, consentOn: "", consentNote: "",
+  consentGiven: false, consentOn: "", consentNote: "", delegateId: "",
 }
 export function learnerForm(l: Learner): LearnerForm {
   return {
     firstNames: l.firstNames, surname: l.surname, idType: l.idType, idNumber: l.idNumber ?? "", dateOfBirth: l.dateOfBirth ?? "", email: l.email ?? "",
     phone: l.phone ?? "", address: l.address ?? "", province: l.province ?? "", clientId: l.clientId ?? "", consentGiven: l.consentGiven,
-    consentOn: l.consentOn ?? "", consentNote: l.consentNote ?? "",
+    consentOn: l.consentOn ?? "", consentNote: l.consentNote ?? "", delegateId: l.delegateId ?? "",
   }
 }
 
@@ -117,7 +120,7 @@ export function learnerProblem(f: LearnerForm, today: string): string | null {
 export const learnerBody = (f: LearnerForm) => ({
   firstNames: f.firstNames.trim(), surname: f.surname.trim(), idType: f.idType, idNumber: f.idType === "NONE" ? null : blank(f.idNumber),
   dateOfBirth: f.dateOfBirth || null, email: blank(f.email), phone: blank(f.phone), address: blank(f.address), province: blank(f.province),
-  clientId: f.clientId || null, delegateId: null, consentGiven: f.consentGiven, consentOn: f.consentGiven ? f.consentOn || null : null, consentNote: blank(f.consentNote),
+  clientId: f.clientId || null, delegateId: f.delegateId || null, consentGiven: f.consentGiven, consentOn: f.consentGiven ? f.consentOn || null : null, consentNote: blank(f.consentNote),
 })
 
 export type ApplicationForm = { programmeId: string; siteId: string; preferredStart: string; sourceNote: string }

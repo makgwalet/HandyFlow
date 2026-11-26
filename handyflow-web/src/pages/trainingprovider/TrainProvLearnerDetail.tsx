@@ -20,6 +20,7 @@ import TrainProvWorkplacePanel from "./TrainProvWorkplacePanel"
 import TrainProvRplPanel from "./TrainProvRplPanel"
 import TrainProvFundingPanel from "./TrainProvFundingPanel"
 import TrainProvLearnershipPanel from "./TrainProvLearnershipPanel"
+import TrainProvDelegateLink from "./TrainProvDelegateLink"
 
 export function LearnerFormPanel({ initial, onSaved, onCancel }: { initial?: Learner; onSaved: (l: Learner) => void; onCancel: () => void }) {
   const { data: clients = [] } = useClients()
@@ -184,6 +185,7 @@ export default function TrainProvLearnerDetail({ id, canManage, isAdmin, onBack 
           <div style={muted}>{[l.email, l.phone, l.province, l.clientName ? `Employer or sponsor: ${l.clientName}` : null].filter(Boolean).join(" · ") || "No contact details recorded"}</div>
           <div style={muted}>{l.consentGiven ? `Consent given on ${l.consentOn}${l.consentNote ? ` · ${l.consentNote}` : ""}` : "No consent recorded"}</div>
           {l.archivedReason && <div style={muted}>Archived: {l.archivedReason}</div>}
+          <TrainProvDelegateLink learner={l} canManage={canManage} onChanged={refresh} />
           {canManage && (
             <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
               {!archived && <button style={ghost} onClick={() => { setPanel("edit"); setError("") }}>Edit</button>}

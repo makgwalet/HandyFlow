@@ -15,14 +15,23 @@ public final class LearnerDtos {
 
     public record LearnerRequest(@NotBlank String firstNames, @NotBlank String surname, @NotBlank String idType, String idNumber,
                                  LocalDate dateOfBirth, String email, String phone, String address, String province, UUID clientId,
-                                 UUID delegateId, boolean consentGiven, LocalDate consentOn, String consentNote) {
+                                 UUID delegateId, boolean consentGiven, LocalDate consentOn, String consentNote, String linkReason) {
+        public LearnerRequest(String firstNames, String surname, String idType, String idNumber, LocalDate dateOfBirth, String email, String phone,
+                              String address, String province, UUID clientId, UUID delegateId, boolean consentGiven, LocalDate consentOn,
+                              String consentNote) {
+            this(firstNames, surname, idType, idNumber, dateOfBirth, email, phone, address, province, clientId, delegateId, consentGiven,
+                    consentOn, consentNote, null);
+        }
     }
 
     /** The list shows the identity number masked; the detail shows it in full. */
     public record LearnerView(UUID id, String learnerNo, String firstNames, String surname, String idType, String idNumber,
                               String idNumberMasked, LocalDate dateOfBirth, String email, String phone, String address, String province,
                               UUID clientId, String clientName, UUID delegateId, boolean consentGiven, LocalDate consentOn,
-                              String consentNote, String status, String archivedReason, long liveEnrolments) {
+                              String consentNote, String status, String archivedReason, long liveEnrolments, UUID mergedIntoId, String delegateName) {
+    }
+
+    public record DelegateLinkRequest(UUID delegateId, String reason) {
     }
 
     public record ReasonRequest(@NotBlank String reason) {

@@ -1,6 +1,7 @@
 package za.co.handyflow.platform.trainingprovider.domain.repository;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import za.co.handyflow.platform.shared.TenantId;
 import za.co.handyflow.platform.trainingprovider.domain.model.TrainProvLearner;
@@ -31,4 +32,7 @@ public interface TrainProvLearnerRepository extends JpaRepository<TrainProvLearn
         AND l.idType = :idType AND LOWER(l.idNumber) = LOWER(:idNumber) AND (CAST(:excludeId AS uuid) IS NULL OR l.id <> :excludeId)
         """)
     boolean identityTaken(TenantId tenantId, String idType, String idNumber, UUID excludeId);
+
+    @Query("SELECT l FROM TrainProvLearner l WHERE l.tenantId = :#{#tenantId.value} AND l.delegateId = :delegateId AND l.status = 'ACTIVE'")
+    List<TrainProvLearner> liveForDelegate(TenantId tenantId, UUID delegateId);
 }

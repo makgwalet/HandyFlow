@@ -1,6 +1,7 @@
 package za.co.handyflow.platform.trainingprovider.domain.repository;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import za.co.handyflow.platform.shared.TenantId;
 import za.co.handyflow.platform.trainingprovider.domain.model.TrainProvLearnerApplication;
@@ -29,4 +30,11 @@ public interface TrainProvLearnerApplicationRepository extends JpaRepository<Tra
         AND a.status IN ('RECEIVED', 'UNDER_REVIEW', 'DOCUMENTS_REQUESTED', 'ACCEPTED')
         """)
     boolean openExists(TenantId tenantId, UUID learnerId, UUID programmeId);
+
+    @Query("SELECT DISTINCT a.programmeId FROM TrainProvLearnerApplication a WHERE a.tenantId = :#{#tenantId.value} AND a.learnerId = :learnerId AND a.status IN ('RECEIVED', 'UNDER_REVIEW', 'DOCUMENTS_REQUESTED', 'ACCEPTED')")
+    List<UUID> openProgrammeIds(TenantId tenantId, UUID learnerId);
+
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("UPDATE TrainProvLearnerApplication a SET a.learnerId = :toId, a.version = a.version + 1 WHERE a.tenantId = :#{#tenantId.value} AND a.learnerId = :fromId")
+    int moveLearner(TenantId tenantId, UUID fromId, UUID toId);
 }

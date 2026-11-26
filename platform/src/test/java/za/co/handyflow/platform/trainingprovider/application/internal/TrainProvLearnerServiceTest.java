@@ -33,6 +33,7 @@ class TrainProvLearnerServiceTest {
     @Mock TrainProvDelegateRepository delegates;
     @Mock TrainProvEnrolmentService enrolmentService;
     @Mock TrainProvNumberGenerator numbers;
+    @Mock TrainProvLearnerEventRepository events;
     @InjectMocks TrainProvLearnerService service;
 
     private LearnerRequest request(String idType, String idNumber) {
@@ -115,6 +116,65 @@ class TrainProvLearnerServiceTest {
         TrainProvLearner l = existing();
         l.archive("Left the area for good", USER);
         when(learners.findForTenant(TENANT, l.getId())).thenReturn(Optional.of(l));
-        assertThatThrownBy(() -> service.update(TENANT, l.getId(), request("PASSPORT", "A1234567"), TODAY)).isInstanceOf(HandyFlowException.class);
+        assertThatThrownBy(() -> service.update(TENANT, l.getId(), request("PASSPORT", "A1234567"), TODAY, USER)).isInstanceOf(HandyFlowException.class);
+    }
+
+    private static final UUID DELEGATE = UUID.fromString("00000000-0000-0000-0000-0000000000d1");
+
+    private LearnerRequest withDelegate(UUID delegateId, String idNumber, String linkReason) {
+        return new LearnerRequest("Test", "Learner", idNumber == null ? "NONE" : "PASSPORT", idNumber, null, null, null, null, null, null, delegateId,
+                false, null, null, linkReason);
+    }
+
+    private za.co.handyflow.platform.trainingprovider.domain.model.TrainProvDelegate delegate(String idNumber) {
+        za.co.handyflow.platform.trainingprovider.domain.model.TrainProvDelegate d = mock(za.co.handyflow.platform.trainingprovider.domain.model.TrainProvDelegate.class);
+        lenient().when(d.getIdNumber()).thenReturn(idNumber);
+        return d;
+    }
+
+    @Test
+    void linkingADelegateIsRecordedInTheHistory() {
+        when(numbers.nextLearnerNumber(TENANT)).thenReturn("LRN-00001");
+        when(delegates.findActiveById(TENANT, DELEGATE)).thenReturn(Optional.of(delegate(null)));
+        when(learners.liveForDelegate(TENANT, DELEGATE)).thenReturn(java.util.List.of());
+        service.create(TENANT, withDelegate(DELEGATE, null, null), USER, TODAY);
+        verify(events).save(any(za.co.handyflow.platform.trainingprovider.domain.model.TrainProvLearnerEvent.class));
+    }
+
+    @Test
+    void aDelegateCannotBeLinkedToTwoLiveLearners() {
+        when(delegates.findActiveById(TENANT, DELEGATE)).thenReturn(Optional.of(delegate(null)));
+        when(learners.liveForDelegate(TENANT, DELEGATE)).thenReturn(java.util.List.of(existing()));
+        assertThatThrownBy(() -> service.create(TENANT, withDelegate(DELEGATE, null, null), USER, TODAY))
+                .isInstanceOf(HandyFlowException.class).hasMessageContaining("already linked");
+        verify(learners, never()).save(any());
+    }
+
+    @Test
+    void aDelegateWithADifferentIdentityNumberNeedsAWrittenReason() {
+        when(delegates.findActiveById(TENANT, DELEGATE)).thenReturn(Optional.of(delegate("A9999999")));
+        when(learners.liveForDelegate(TENANT, DELEGATE)).thenReturn(java.util.List.of());
+        assertThatThrownBy(() -> service.create(TENANT, withDelegate(DELEGATE, "A1234567", null), USER, TODAY))
+                .isInstanceOf(HandyFlowException.class).hasMessageContaining("differ");
+    }
+
+    @Test
+    void takingTheLinkOffNeedsAReason() {
+        TrainProvLearner l = existing();
+        l.relink(DELEGATE);
+        when(learners.findForTenant(TENANT, l.getId())).thenReturn(Optional.of(l));
+        assertThatThrownBy(() -> service.update(TENANT, l.getId(), withDelegate(null, "A1234567", "short"), TODAY, USER))
+                .isInstanceOf(HandyFlowException.class).hasMessageContaining("Say why");
+        verify(learners, never()).save(any());
+    }
+
+    @Test
+    void takingTheLinkOffIsRecordedWithItsReason() {
+        TrainProvLearner l = existing();
+        l.relink(DELEGATE);
+        when(learners.findForTenant(TENANT, l.getId())).thenReturn(Optional.of(l));
+        service.update(TENANT, l.getId(), withDelegate(null, "A1234567", "Linked to the wrong delegate record"), TODAY, USER);
+        verify(events).save(any(za.co.handyflow.platform.trainingprovider.domain.model.TrainProvLearnerEvent.class));
+        assertThat(l.getDelegateId()).isNull();
     }
 }
