@@ -12,7 +12,7 @@ import { apiClient } from "./client"
 import type {
   PayEmployeeChange, EmailResult,
   PayClient, PayEmployee, PayRun, Payslip, PayDeadline, PayFeeNote, PortalAccessGrant,
-  PayRunReview,
+  PayRunReview, BankFile,
 } from "../types/payrollBureau.types"
 
 interface PageResponse<T> { content: T[]; totalElements: number; totalPages: number; number: number }
@@ -56,6 +56,14 @@ export const payrollBureauApi = {
     apiClient.post(`/api/v1/payroll-bureau/clients/${clientId}/pay-runs`, body).then(r => r.data as PayRun),
   processPayRun: (payRunId: string) =>
     apiClient.post(`/api/v1/payroll-bureau/pay-runs/${payRunId}/process`).then(r => r.data as PayRun),
+  getBankFiles: (payRunId: string) =>
+    apiClient.get(`/api/v1/payroll-bureau/pay-runs/${payRunId}/bank-files`).then(r => r.data as BankFile[]),
+  createBankFile: (payRunId: string, reason?: string) =>
+    apiClient.post(`/api/v1/payroll-bureau/pay-runs/${payRunId}/bank-files`, { reason }).then(r => r.data as BankFile),
+  downloadBankFile: (payRunId: string, fileId: string) =>
+    apiClient.get(`/api/v1/payroll-bureau/pay-runs/${payRunId}/bank-files/${fileId}/download`, { responseType: "blob" }).then(r => r.data as Blob),
+  downloadJournal: (payRunId: string) =>
+    apiClient.get(`/api/v1/payroll-bureau/pay-runs/${payRunId}/journal`, { responseType: "blob" }).then(r => r.data as Blob),
   getPayRunReview: (payRunId: string) =>
     apiClient.get(`/api/v1/payroll-bureau/pay-runs/${payRunId}/review`).then(r => r.data as PayRunReview),
   reopenPayRun: (payRunId: string) =>

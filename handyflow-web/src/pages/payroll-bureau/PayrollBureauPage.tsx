@@ -860,6 +860,39 @@ function PayRunsTab({ client }: { client: PayClient }) {
       alert((e as { response?: { data?: { message?: string } } }).response?.data?.message ?? failure)
     } finally { setProcessingId(null) }
   }
+  const saveBlob = (blob: Blob, name: string) => {
+    const url = window.URL.createObjectURL(blob)
+    const a = document.createElement("a")
+    a.href = url; a.download = name
+    document.body.appendChild(a); a.click(); a.remove()
+    window.URL.revokeObjectURL(url)
+  }
+  const failure = (e: unknown, fallback: string) =>
+    alert((e as { response?: { data?: { message?: string } } }).response?.data?.message ?? fallback)
+  // Download the run's bank file, making the first one if there is none. A replacement is made only on purpose, with a reason.
+  const handleBankFile = async (run: PayRun, replace: boolean) => {
+    setProcessingId(run.id)
+    try {
+      const files = await payrollBureauApi.getBankFiles(run.id)
+      let file = files.find(f => f.status === "ACTIVE")
+      if (replace || !file) {
+        let reason: string | undefined
+        if (file) {
+          const answer = window.prompt("Why is a new bank file needed? The earlier file will be marked replaced.")
+          if (!answer || !answer.trim()) return
+          reason = answer.trim()
+        }
+        file = await payrollBureauApi.createBankFile(run.id, reason)
+        if (file.excluded.length > 0) alert("Left out of the bank file:\n" + file.excluded.join("\n"))
+      }
+      saveBlob(await payrollBureauApi.downloadBankFile(run.id, file.id), `${run.payRunNumber}-bank-${file.fileNumber}.csv`)
+    } catch (e: unknown) { failure(e, "Failed to make the bank file") }
+    finally { setProcessingId(null) }
+  }
+  const handleJournal = async (run: PayRun) => {
+    try { saveBlob(await payrollBureauApi.downloadJournal(run.id), `${run.payRunNumber}-journal.csv`) }
+    catch (e: unknown) { failure(e, "Failed to make the journal") }
+  }
   const handleReverse = (id: string) => {
     const reason = window.prompt("Why is this pay run being reversed? The run and its payslips stay on record.")
     if (!reason || !reason.trim()) return
@@ -920,6 +953,9 @@ function PayRunsTab({ client }: { client: PayClient }) {
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                   <StatusBadge status={r.status} />
+                  {r.status === "REVERSED" && (
+                    <button onClick={e => { e.stopPropagation(); handleJournal(r) }} style={btnSecondary}>Reversal journal</button>
+                  )}
                   {r.status !== "REVERSED" && (
                     <button onClick={e => { e.stopPropagation(); handleReview(r.id) }} style={btnSecondary}>
                       {r.status === "DRAFT" ? "Check" : "Compare"}
@@ -948,6 +984,11 @@ function PayRunsTab({ client }: { client: PayClient }) {
                       <button onClick={e => { e.stopPropagation(); setGeneratingFeeNoteFor(r) }} style={btnPrimarySmall}>
                         Generate Invoice
                       </button>
+                      <button onClick={e => { e.stopPropagation(); handleBankFile(r, false) }} disabled={processingId === r.id}
+                        style={btnSecondary}>Bank file</button>
+                      <button onClick={e => { e.stopPropagation(); handleBankFile(r, true) }} disabled={processingId === r.id}
+                        style={btnSecondary}>Replace bank file</button>
+                      <button onClick={e => { e.stopPropagation(); handleJournal(r) }} style={btnSecondary}>Journal</button>
                       <button onClick={e => { e.stopPropagation(); handleReverse(r.id) }} disabled={processingId === r.id}
                         style={btnSecondary}>Reverse</button>
                     </>

@@ -16,6 +16,7 @@ import za.co.handyflow.platform.payrollbureau.application.internal.PayEmployeeCh
 import za.co.handyflow.platform.payrollbureau.application.internal.PayGroupService;
 import za.co.handyflow.platform.payrollbureau.dto.PayGroupDtos.*;
 import za.co.handyflow.platform.payrollbureau.dto.PayComponentDtos.*;
+import za.co.handyflow.platform.payrollbureau.dto.PayBankFileDtos.*;
 import za.co.handyflow.platform.payrollbureau.application.internal.PayrollBureauService;
 import za.co.handyflow.platform.payrollbureau.dto.*;
 import za.co.handyflow.platform.shared.ApiResponse;
@@ -43,6 +44,7 @@ public class PayrollBureauController {
     private final PayEmployeeChangeService changeService;
     private final PayGroupService groupService;
     private final za.co.handyflow.platform.payrollbureau.application.internal.PayComponentService componentService;
+    private final za.co.handyflow.platform.payrollbureau.application.internal.PayrollOutputService outputService;
 
     // ── Practice profile ─────────────────────────────────────────────────────
 
@@ -178,6 +180,47 @@ public class PayrollBureauController {
         featureGuard.requireModule("payrollbureau");
         return ResponseEntity.ok(ApiResponse.success(
                 bureauService.getPayslips(TenantContext.getTenantIdAsObject(), payRunId)));
+    }
+
+    @GetMapping("/pay-runs/{payRunId}/bank-files")
+    @PreAuthorize("hasAuthority('PAYROLLBUREAU_APPROVE')")
+    public ResponseEntity<ApiResponse<List<BankFileResponse>>> getBankFiles(@PathVariable UUID payRunId) {
+        featureGuard.requireModule("payrollbureau");
+        return ResponseEntity.ok(ApiResponse.success(outputService.bankFiles(TenantContext.getTenantIdAsObject(), payRunId)));
+    }
+
+    @PostMapping("/pay-runs/{payRunId}/bank-files")
+    @PreAuthorize("hasAuthority('PAYROLLBUREAU_APPROVE')")
+    @Operation(summary = "Make the bank payment file (generic CSV) for a finalised pay run; a replacement needs a reason")
+    public ResponseEntity<ApiResponse<BankFileResponse>> createBankFile(@PathVariable UUID payRunId,
+                                                                       @RequestBody(required = false) CreateBankFileRequest req) {
+        featureGuard.requireModule("payrollbureau");
+        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(
+                outputService.createBankFile(TenantContext.getTenantIdAsObject(), payRunId, req == null ? null : req.reason())));
+    }
+
+    @GetMapping("/pay-runs/{payRunId}/bank-files/{fileId}/download")
+    @PreAuthorize("hasAuthority('PAYROLLBUREAU_APPROVE')")
+    @Operation(summary = "Download a bank file; the download is recorded")
+    public ResponseEntity<byte[]> downloadBankFile(@PathVariable UUID payRunId, @PathVariable UUID fileId) {
+        featureGuard.requireModule("payrollbureau");
+        GeneratedFile f = outputService.downloadBankFile(TenantContext.getTenantIdAsObject(), payRunId, fileId);
+        return ResponseEntity.ok()
+                .header("Content-Disposition", "attachment; filename=\"" + f.fileName() + "\"")
+                .contentType(org.springframework.http.MediaType.parseMediaType("text/csv; charset=UTF-8"))
+                .body(f.content());
+    }
+
+    @GetMapping("/pay-runs/{payRunId}/journal")
+    @PreAuthorize("hasAnyAuthority('PAYROLLBUREAU_READ','PAYROLLBUREAU_MANAGE','PAYROLLBUREAU_ADMIN')")
+    @Operation(summary = "The payroll journal (CSV) of a finalised pay run, or its reversal if the run was reversed")
+    public ResponseEntity<byte[]> downloadJournal(@PathVariable UUID payRunId) {
+        featureGuard.requireModule("payrollbureau");
+        GeneratedFile f = outputService.journal(TenantContext.getTenantIdAsObject(), payRunId);
+        return ResponseEntity.ok()
+                .header("Content-Disposition", "attachment; filename=\"" + f.fileName() + "\"")
+                .contentType(org.springframework.http.MediaType.parseMediaType("text/csv; charset=UTF-8"))
+                .body(f.content());
     }
 
     @GetMapping("/pay-runs/{payRunId}/review")

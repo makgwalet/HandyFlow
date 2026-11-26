@@ -102,6 +102,18 @@ export interface PayRunReview {
   findings: PayRunReviewItem[]
 }
 
+export interface BankFile {
+  id: string
+  fileNumber: number
+  status: "ACTIVE" | "SUPERSEDED"
+  paymentCount: number
+  totalAmount: number
+  excluded: string[]
+  reason: string | null
+  createdAt: string
+  downloads: number
+}
+
 export interface Payslip {
   id: string
   payEmployeeId: string
