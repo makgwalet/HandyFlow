@@ -12,6 +12,7 @@ import { errText, fmtDate, ghost, input, muted, solid, card, unwrap } from "./tp
 import { CAT, useSites } from "./tpApi"
 import TrainProvProgrammeHours from "./TrainProvProgrammeHours"
 import TrainProvProgrammeNeeds from "./TrainProvProgrammeNeeds"
+import TrainProvPriceBook from "./TrainProvPriceBook"
 
 
 export default function TrainProvProgrammeDetail({ id, canManage, isAdmin, onBack }: { id: string; canManage: boolean; isAdmin: boolean; onBack: () => void }) {
@@ -105,6 +106,7 @@ export default function TrainProvProgrammeDetail({ id, canManage, isAdmin, onBac
             {v.approvalOverrideReason && <div style={muted}>Approved without cover because: {v.approvalOverrideReason}</div>}
             <TrainProvProgrammeHours versionId={v.id} canManage={canManage} />
             <TrainProvProgrammeNeeds versionId={v.id} canManage={canManage} />
+            <TrainProvPriceBook versionId={v.id} isAdmin={isAdmin} />
             {panel === `edit:${v.id}` && versionForm}
             {panel === `approve:${v.id}` && (
               <div style={{ display: "grid", gap: 6, marginTop: 8 }}>

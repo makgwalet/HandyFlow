@@ -1,4 +1,5 @@
 // Who is paying for one enrolment. Loads only when opened. No amounts are held, and a link does not mean funding was approved or paid.
+import TrainProvFeeSuggestion from "./TrainProvFeeSuggestion"
 import { useState } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../api/client"
@@ -81,6 +82,7 @@ export default function TrainProvFundingPanel({ enrolmentId, enrolmentStatus, st
         </div>
       )}
       {canManage && !adding && (cancelled ? <div style={muted}>A cancelled enrolment cannot be linked to a funder.</div> : <div><button style={solid} onClick={() => setAdding(true)}>Link a funder</button></div>)}
+      <TrainProvFeeSuggestion enrolmentId={enrolmentId} />
       <div style={muted}>{data ? `Started ${fmtDate(startDate)}` : ""}</div>
       <div><button style={ghost} onClick={() => setOpen(false)}>Hide</button></div>
     </div>
