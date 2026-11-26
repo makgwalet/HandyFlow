@@ -8,6 +8,9 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import za.co.handyflow.platform.payrollbureau.domain.model.PayClient;
+import za.co.handyflow.platform.payrollbureau.domain.model.PayRun;
+import za.co.handyflow.platform.payrollbureau.domain.rules.RunLifecycleRules;
+import za.co.handyflow.platform.shared.TenantId;
 import za.co.handyflow.platform.payrollbureau.domain.model.PayDeadline;
 import za.co.handyflow.platform.payrollbureau.domain.model.PayFeeNote;
 import za.co.handyflow.platform.payrollbureau.domain.model.PayPortalAccessGrant;
@@ -43,6 +46,9 @@ public class PayrollBureauPortalDataService {
     private final PayClientRepository clientRepo;
     private final PayFeeNoteRepository feeNoteRepo;
     private final PayDeadlineRepository deadlineRepo;
+    private final za.co.handyflow.platform.payrollbureau.domain.repository.PayRunRepository payRunRepo;
+    private final za.co.handyflow.platform.payrollbureau.domain.repository.PayslipRepository payslipRepo;
+    private final PayrollBureauService bureauService;
 
     @Transactional(readOnly = true)
     public List<PortalClientSummaryResponse> getMyClients(UUID portalUserId) {
@@ -69,6 +75,69 @@ public class PayrollBureauPortalDataService {
                         d.getPeriodMonth(), d.getAdjustedDueDate(), d.getStatus(), d.getFiledDate(),
                         ChronoUnit.DAYS.between(today, d.getAdjustedDueDate())))
                 .toList();
+    }
+
+    // ── Pay runs: the client's approval and payslips (phase 5) ──────────────────
+
+    @Transactional(readOnly = true)
+    public List<PortalPayRunDtos.PortalPayRun> getMyPayRuns(UUID portalUserId, UUID clientId) {
+        PayPortalAccessGrant grant = requireAccess(portalUserId, clientId);
+        return payRunRepo.findForPortal(grant.getTenantId(), clientId).stream().map(this::toPortalRun).toList();
+    }
+
+    @Transactional(readOnly = true)
+    public PortalPayRunDtos.PortalPayRunDetail getMyPayRun(UUID portalUserId, UUID clientId, UUID payRunId) {
+        PayPortalAccessGrant grant = requireAccess(portalUserId, clientId);
+        PayRun run = loadVisibleRun(grant, clientId, payRunId);
+        TenantId tenant = TenantId.of(grant.getTenantId());
+        return new PortalPayRunDtos.PortalPayRunDetail(toPortalRun(run), bureauService.getPayslips(tenant, payRunId),
+                bureauService.reviewPayRun(tenant, payRunId));
+    }
+
+    @Transactional
+    public PortalPayRunDtos.PortalPayRun approveMyPayRun(UUID portalUserId, UUID clientId, UUID payRunId) {
+        PayPortalAccessGrant grant = requireAccess(portalUserId, clientId);
+        PayRun run = loadVisibleRun(grant, clientId, payRunId);
+        requireTransition(run, RunLifecycleRules.CLIENT_APPROVED);
+        run.clientApprove(portalUserId);
+        payRunRepo.save(run);
+        log.info("Pay run approved by client run={} portalUser={}", run.getPayRunNumber(), portalUserId);
+        return toPortalRun(run);
+    }
+
+    @Transactional
+    public PortalPayRunDtos.PortalPayRun declineMyPayRun(UUID portalUserId, UUID clientId, UUID payRunId, String reason) {
+        PayPortalAccessGrant grant = requireAccess(portalUserId, clientId);
+        PayRun run = loadVisibleRun(grant, clientId, payRunId);
+        String problem = RunLifecycleRules.declineProblem(reason);
+        if (problem != null) throw new HandyFlowException(problem, HttpStatus.BAD_REQUEST, "REASON_REQUIRED");
+        requireTransition(run, RunLifecycleRules.DRAFT);
+        bureauService.deletePayslipsOfRun(TenantId.of(grant.getTenantId()), payRunId);
+        run.clientDecline(reason);
+        payRunRepo.save(run);
+        log.warn("Pay run declined by client run={} portalUser={} reason={}", run.getPayRunNumber(), portalUserId, reason);
+        return toPortalRun(run);
+    }
+
+    private PayRun loadVisibleRun(PayPortalAccessGrant grant, UUID clientId, UUID payRunId) {
+        PayRun run = payRunRepo.findByTenantAndId(grant.getTenantId(), payRunId)
+                .filter(r -> r.getPayClientId().equals(clientId))
+                .orElseThrow(() -> new HandyFlowException("Pay run not found", HttpStatus.NOT_FOUND, "NOT_FOUND"));
+        if (!List.of("AWAITING_CLIENT", "CLIENT_APPROVED", "FINALISED", "REVERSED").contains(run.getStatus())) {
+            throw new HandyFlowException("Pay run not found", HttpStatus.NOT_FOUND, "NOT_FOUND");
+        }
+        return run;
+    }
+
+    private void requireTransition(PayRun run, String to) {
+        String problem = RunLifecycleRules.transitionProblem(run.getStatus(), to);
+        if (problem != null) throw new HandyFlowException(problem, HttpStatus.BAD_REQUEST, "INVALID_STATUS");
+    }
+
+    private PortalPayRunDtos.PortalPayRun toPortalRun(PayRun r) {
+        return new PortalPayRunDtos.PortalPayRun(r.getId(), r.getPayRunNumber(), r.getPeriodStart(), r.getPeriodEnd(), r.getPayDate(),
+                r.getStatus(), r.getTotalGross(), r.getTotalPaye(), r.getTotalUif(), r.getTotalSdl(), r.getTotalNet(),
+                r.getEmployeeCount(), r.getSentToClientAt(), r.getClientApprovedAt(), r.getClientDeclinedAt(), r.getClientDeclineReason());
     }
 
     private PayPortalAccessGrant requireAccess(UUID portalUserId, UUID clientId) {

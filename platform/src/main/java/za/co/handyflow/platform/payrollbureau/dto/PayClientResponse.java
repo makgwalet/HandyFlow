@@ -23,5 +23,6 @@ public record PayClientResponse(
         boolean hasLogo,
         Instant createdAt,
         boolean etiClaimable,
-        String etiClaimableNote
+        String etiClaimableNote,
+        boolean clientApprovalRequired
 ) {}

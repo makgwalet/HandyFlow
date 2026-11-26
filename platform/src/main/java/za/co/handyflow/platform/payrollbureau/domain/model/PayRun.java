@@ -87,6 +87,12 @@ public class PayRun {
     @Column(name = "reversed_by") private UUID reversedBy;
     @Column(name = "reversed_at") private Instant reversedAt;
     @Column(name = "reversal_reason") private String reversalReason;
+    @Column(name = "sent_to_client_at") private Instant sentToClientAt;
+    @Column(name = "sent_to_client_by") private UUID sentToClientBy;
+    @Column(name = "client_approved_by") private UUID clientApprovedBy;
+    @Column(name = "client_approved_at") private Instant clientApprovedAt;
+    @Column(name = "client_declined_at") private Instant clientDeclinedAt;
+    @Column(name = "client_decline_reason") private String clientDeclineReason;
 
     @Column(name = "payslips_auto_sent_at")
     private java.time.Instant payslipsAutoSentAt;
@@ -145,6 +151,24 @@ public class PayRun {
         this.totalGross = null; this.totalPaye = null; this.totalUif = null; this.totalSdl = null; this.totalNet = null;
         this.employeeCount = null; this.processedAt = null; this.calculatedBy = null;
         this.approvedBy = null; this.approvedAt = null;
+        this.sentToClientAt = null; this.sentToClientBy = null; this.clientApprovedBy = null; this.clientApprovedAt = null;
+    }
+
+    public void sendToClient(UUID by) {
+        move(RunLifecycleRules.AWAITING_CLIENT);
+        this.sentToClientAt = Instant.now(); this.sentToClientBy = by;
+        this.clientDeclinedAt = null; this.clientDeclineReason = null;
+    }
+
+    public void clientApprove(UUID portalUser) {
+        move(RunLifecycleRules.CLIENT_APPROVED);
+        this.clientApprovedBy = portalUser; this.clientApprovedAt = Instant.now();
+    }
+
+    /** The client declines: the run goes back to a draft (the caller deletes its payslips) and the reason is kept. */
+    public void clientDecline(String reason) {
+        reopen();
+        this.clientDeclinedAt = Instant.now(); this.clientDeclineReason = reason.trim();
     }
 
     public void approve(UUID approver) {

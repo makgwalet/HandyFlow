@@ -16,6 +16,7 @@ import za.co.handyflow.platform.shared.ApiResponse;
 
 import java.util.List;
 import java.util.UUID;
+import za.co.handyflow.platform.payrollbureau.dto.PortalPayRunDtos;
 
 /**
  * The missing piece — same gap as RecruitmentAgencyPortalDataController
@@ -53,6 +54,31 @@ public class PayrollBureauPortalDataController {
     public ResponseEntity<ApiResponse<List<PayDeadlineResponse>>> getMyDeadlines(@PathVariable UUID clientId) {
         return ResponseEntity.ok(ApiResponse.success(
                 portalDataService.getMyDeadlines(getPortalUserId(), clientId)));
+    }
+
+    @GetMapping("/clients/{clientId}/pay-runs")
+    @Operation(summary = "Pay runs sent to this client for approval, and finalised ones")
+    public ResponseEntity<ApiResponse<List<PortalPayRunDtos.PortalPayRun>>> getMyPayRuns(@PathVariable UUID clientId) {
+        return ResponseEntity.ok(ApiResponse.success(portalDataService.getMyPayRuns(getPortalUserId(), clientId)));
+    }
+
+    @GetMapping("/clients/{clientId}/pay-runs/{payRunId}")
+    @Operation(summary = "One pay run with each employee's payslip figures and the checks against the last run")
+    public ResponseEntity<ApiResponse<PortalPayRunDtos.PortalPayRunDetail>> getMyPayRun(@PathVariable UUID clientId, @PathVariable UUID payRunId) {
+        return ResponseEntity.ok(ApiResponse.success(portalDataService.getMyPayRun(getPortalUserId(), clientId, payRunId)));
+    }
+
+    @PostMapping("/clients/{clientId}/pay-runs/{payRunId}/approve")
+    @Operation(summary = "Approve a pay run that was sent to this client")
+    public ResponseEntity<ApiResponse<PortalPayRunDtos.PortalPayRun>> approveMyPayRun(@PathVariable UUID clientId, @PathVariable UUID payRunId) {
+        return ResponseEntity.ok(ApiResponse.success(portalDataService.approveMyPayRun(getPortalUserId(), clientId, payRunId)));
+    }
+
+    @PostMapping("/clients/{clientId}/pay-runs/{payRunId}/decline")
+    @Operation(summary = "Decline a pay run with a reason; it goes back to the bureau as a draft")
+    public ResponseEntity<ApiResponse<PortalPayRunDtos.PortalPayRun>> declineMyPayRun(@PathVariable UUID clientId, @PathVariable UUID payRunId,
+                                                                                    @RequestBody PortalPayRunDtos.DeclineRequest req) {
+        return ResponseEntity.ok(ApiResponse.success(portalDataService.declineMyPayRun(getPortalUserId(), clientId, payRunId, req == null ? null : req.reason())));
     }
 
     private UUID getPortalUserId() {

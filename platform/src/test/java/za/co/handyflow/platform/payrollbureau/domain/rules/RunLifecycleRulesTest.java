@@ -80,4 +80,38 @@ class RunLifecycleRulesTest {
         assertFalse(RunLifecycleRules.countsTowardsMonth("REVERSED"));
         assertFalse(RunLifecycleRules.countsTowardsMonth("DRAFT"));
     }
+
+    @Test
+    void theClientApprovalPathIsAllowed() {
+        ok("APPROVED", "AWAITING_CLIENT");
+        ok("AWAITING_CLIENT", "CLIENT_APPROVED");
+        ok("CLIENT_APPROVED", "FINALISED");
+        ok("AWAITING_CLIENT", "DRAFT");   // declined, or reopened by the bureau
+        ok("CLIENT_APPROVED", "DRAFT");
+        refused("AWAITING_CLIENT", "FINALISED");
+        refused("CALCULATED", "AWAITING_CLIENT");
+        refused("DRAFT", "CLIENT_APPROVED");
+    }
+
+    @Test
+    void aClientThatApprovesItsOwnRunsCannotBeFinalisedFromTheBureauApprovalAlone() {
+        assertTrue(RunLifecycleRules.finalisationProblem(true, "APPROVED") != null);
+        assertTrue(RunLifecycleRules.finalisationProblem(true, "CLIENT_APPROVED") == null);
+        assertTrue(RunLifecycleRules.finalisationProblem(false, "APPROVED") == null);
+    }
+
+    @Test
+    void decliningNeedsAReasonOfSensibleLength() {
+        assertTrue(RunLifecycleRules.declineProblem(null) != null);
+        assertTrue(RunLifecycleRules.declineProblem("  ") != null);
+        assertTrue(RunLifecycleRules.declineProblem("x".repeat(501)) != null);
+        assertTrue(RunLifecycleRules.declineProblem("Jane's overtime is wrong") == null);
+    }
+
+    @Test
+    void runsWaitingForTheClientStillCountTowardsTheMonth() {
+        assertTrue(RunLifecycleRules.countsTowardsMonth("AWAITING_CLIENT"));
+        assertTrue(RunLifecycleRules.countsTowardsMonth("CLIENT_APPROVED"));
+        assertFalse(RunLifecycleRules.countsTowardsMonth("DRAFT"));
+    }
 }

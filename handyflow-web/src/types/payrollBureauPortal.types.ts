@@ -39,3 +39,20 @@ export interface PortalDeadline {
   status: "PENDING" | "FILED" | "OVERDUE"
   daysUntilDue: number
 }
+
+export interface PortalPayRun {
+  id: string; payRunNumber: string; periodStart: string; periodEnd: string; payDate: string
+  status: "AWAITING_CLIENT" | "CLIENT_APPROVED" | "FINALISED" | "REVERSED"
+  totalGross: number | null; totalPaye: number | null; totalUif: number | null; totalSdl: number | null; totalNet: number | null
+  employeeCount: number | null; sentToClientAt: string | null; clientApprovedAt: string | null
+  clientDeclinedAt: string | null; clientDeclineReason: string | null
+}
+export interface PortalPayslip {
+  id: string; employeeName: string; employeeNumber: string; totalEarnings: number
+  payeAmount: number; uifEmployee: number; totalDeductions: number; netPay: number
+}
+export interface PortalReviewItem { severity: string; code: string; employeeName: string | null; message: string }
+export interface PortalPayRunDetail {
+  run: PortalPayRun; payslips: PortalPayslip[]
+  review: { previousRunNumber: string | null; blocking: number; warnings: number; findings: PortalReviewItem[] }
+}

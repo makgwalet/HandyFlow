@@ -1,6 +1,6 @@
 // src/api/payrollBureauPortal.api.ts
 import { payrollBureauPortalApiClient as apiClient} from "./payrollBureauPortal.client"
-import type { PortalClientSummary, PortalFeeNote, PortalDeadline } from "../types/payrollBureauPortal.types"
+import type { PortalClientSummary, PortalFeeNote, PortalDeadline, PortalPayRun, PortalPayRunDetail } from "../types/payrollBureauPortal.types"
 
 interface PortalAuthResponse { token: string; portalUserId: string; email: string; fullName: string }
 
@@ -27,4 +27,13 @@ export const payrollBureauPortalApi = {
   
   getMyDeadlines: (clientId: string) =>
     apiClient.get(`/api/v1/payroll-bureau/portal/clients/${clientId}/deadlines`).then(res => res.data as PortalDeadline[]),
+
+  getMyPayRuns: (clientId: string) =>
+    apiClient.get(`/api/v1/payroll-bureau/portal/clients/${clientId}/pay-runs`).then(res => res.data as PortalPayRun[]),
+  getMyPayRun: (clientId: string, runId: string) =>
+    apiClient.get(`/api/v1/payroll-bureau/portal/clients/${clientId}/pay-runs/${runId}`).then(res => res.data as PortalPayRunDetail),
+  approvePayRun: (clientId: string, runId: string) =>
+    apiClient.post(`/api/v1/payroll-bureau/portal/clients/${clientId}/pay-runs/${runId}/approve`).then(res => res.data as PortalPayRun),
+  declinePayRun: (clientId: string, runId: string, reason: string) =>
+    apiClient.post(`/api/v1/payroll-bureau/portal/clients/${clientId}/pay-runs/${runId}/decline`, { reason }).then(res => res.data as PortalPayRun),
 }

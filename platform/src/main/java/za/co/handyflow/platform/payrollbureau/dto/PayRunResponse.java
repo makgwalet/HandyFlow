@@ -11,5 +11,6 @@ public record PayRunResponse(
         BigDecimal totalGross, BigDecimal totalPaye, BigDecimal totalUif,
         BigDecimal totalSdl, BigDecimal totalNet, Integer employeeCount, Instant processedAt,
         UUID payGroupId,
-        UUID calculatedBy, UUID approvedBy, Instant approvedAt, Instant finalisedAt, Instant reversedAt, String reversalReason
+        UUID calculatedBy, UUID approvedBy, Instant approvedAt, Instant finalisedAt, Instant reversedAt, String reversalReason,
+        Instant sentToClientAt, Instant clientApprovedAt, Instant clientDeclinedAt, String clientDeclineReason
 ) {}

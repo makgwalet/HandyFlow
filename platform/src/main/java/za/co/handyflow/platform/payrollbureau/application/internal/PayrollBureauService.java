@@ -443,11 +443,48 @@ public class PayrollBureauService {
         return toPayRunResponse(run);
     }
 
+    /** The bureau has approved the run; the client is asked to sign it off. Needs the client to have approval switched on. */
+    /** Removes a run's payslips and their lines, for a run that is going back to a draft. */
+    @Transactional
+    public void deletePayslipsOfRun(TenantId tenantId, UUID payRunId) {
+        payslipLineRepo.deleteByRun(tenantId.getValue(), payRunId);
+        payslipRepo.deleteByRun(tenantId.getValue(), payRunId);
+    }
+
+    @Transactional
+    public PayRunResponse sendToClient(TenantId tenantId, UUID payRunId) {
+        PayRun run = loadRun(tenantId, payRunId);
+        PayClient client = clientRepo.findActiveById(tenantId.getValue(), run.getPayClientId())
+                .orElseThrow(() -> new ResourceNotFoundException("PayClient", run.getPayClientId().toString()));
+        if (!client.isClientApprovalRequired()) {
+            throw new HandyFlowException("This client does not approve its own pay runs. Switch client approval on first, or finalise the run.",
+                    HttpStatus.BAD_REQUEST, "CLIENT_APPROVAL_OFF");
+        }
+        requireTransition(run, RunLifecycleRules.AWAITING_CLIENT);
+        run.sendToClient(TenantContext.getCurrentUserId());
+        payRunRepo.save(run);
+        log.info("Payroll bureau pay run sent to client run={} by={}", run.getPayRunNumber(), TenantContext.getCurrentUserId());
+        return toPayRunResponse(run);
+    }
+
+    @Transactional
+    public PayClientResponse setClientApprovalRequired(TenantId tenantId, UUID clientId, boolean required) {
+        PayClient c = clientRepo.findActiveById(tenantId.getValue(), clientId)
+                .orElseThrow(() -> new ResourceNotFoundException("PayClient", clientId.toString()));
+        c.setClientApprovalRequired(required);
+        clientRepo.save(c);
+        return toClientResponse(c);
+    }
+
     /** Locks the run. From here its payslips can be sent and it can be billed; it can only be reversed. */
     @Transactional
     public PayRunResponse finalisePayRun(TenantId tenantId, UUID payRunId) {
         PayRun run = loadRun(tenantId, payRunId);
         requireTransition(run, RunLifecycleRules.FINALISED);
+        boolean clientApproves = clientRepo.findActiveById(tenantId.getValue(), run.getPayClientId())
+                .map(PayClient::isClientApprovalRequired).orElse(false);
+        String needClient = RunLifecycleRules.finalisationProblem(clientApproves, run.getStatus());
+        if (needClient != null) throw new HandyFlowException(needClient, HttpStatus.BAD_REQUEST, "CLIENT_APPROVAL_REQUIRED");
         run.finalise(TenantContext.getCurrentUserId());
         payRunRepo.save(run);
         log.info("Payroll bureau pay run finalised run={} by={}", run.getPayRunNumber(), TenantContext.getCurrentUserId());
@@ -1044,7 +1081,7 @@ public class PayrollBureauService {
                 c.getPayFrequency(), c.getPayDay(), c.getContactName(), c.getContactEmail(),
                 c.getContactPhone(), c.getOnboardedAt(), c.getStatus(), c.getNotes(),
                 c.getAddress(), c.getLogoEvidenceId() != null, c.getCreatedAt(),
-                c.isEtiClaimable(), c.getEtiClaimableNote());
+                c.isEtiClaimable(), c.getEtiClaimableNote(), c.isClientApprovalRequired());
     }
 
     private void requireClientOwnership(TenantId tenantId, UUID payClientId) {
@@ -1069,7 +1106,8 @@ public class PayrollBureauService {
                 r.getPayDate(), r.getTaxYear(), r.getStatus(), r.getTotalGross(), r.getTotalPaye(),
                 r.getTotalUif(), r.getTotalSdl(), r.getTotalNet(), r.getEmployeeCount(), r.getProcessedAt(),
                 r.getPayGroupId(), r.getCalculatedBy(), r.getApprovedBy(), r.getApprovedAt(), r.getFinalisedAt(),
-                r.getReversedAt(), r.getReversalReason());
+                r.getReversedAt(), r.getReversalReason(),
+                r.getSentToClientAt(), r.getClientApprovedAt(), r.getClientDeclinedAt(), r.getClientDeclineReason());
     }
 
     private PayslipResponse toPayslipResponse(Payslip p) {

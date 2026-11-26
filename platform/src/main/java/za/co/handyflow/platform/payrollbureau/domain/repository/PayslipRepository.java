@@ -22,7 +22,7 @@ public interface PayslipRepository extends JpaRepository<Payslip, UUID> {
     @Query("""
         SELECT COALESCE(SUM(p.uifBase), 0) FROM Payslip p, PayRun r
         WHERE p.payRunId = r.id AND p.tenantId = :tenantId AND p.payEmployeeId = :employeeId
-          AND r.status IN ('CALCULATED','APPROVED','FINALISED') AND r.id <> :excludeRunId
+          AND r.status IN ('CALCULATED','APPROVED','AWAITING_CLIENT','CLIENT_APPROVED','FINALISED') AND r.id <> :excludeRunId
           AND r.payDate >= :monthStart AND r.payDate <= :runPayDate
     """)
     java.math.BigDecimal sumUifBaseInMonth(@Param("tenantId") UUID tenantId, @Param("employeeId") UUID employeeId,

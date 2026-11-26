@@ -836,6 +836,11 @@ function PayRunsTab({ client }: { client: PayClient }) {
   const [itemsRun, setItemsRun] = useState<PayRun | null>(null)
   const [itemsEmployees, setItemsEmployees] = useState<PayEmployee[]>([])
   const [runGroups, setRunGroups] = useState<PayGroup[]>([])
+  const [approvalRequired, setApprovalRequired] = useState(!!client.clientApprovalRequired)
+  const toggleApproval = async (required: boolean) => {
+    try { await payrollBureauApi.setClientApproval(client.id, required); setApprovalRequired(required) }
+    catch (e: unknown) { alert((e as { response?: { data?: { message?: string } } }).response?.data?.message ?? "Failed to change client approval") }
+  }
   useEffect(() => { payrollBureauApi.getPayGroups(client.id).then(setRunGroups).catch(() => setRunGroups([])) }, [client.id])
   const openItems = async (run: PayRun) => {
     try { setItemsEmployees(await payrollBureauApi.getEmployees(client.id)); setItemsRun(run) }
@@ -946,7 +951,11 @@ function PayRunsTab({ client }: { client: PayClient }) {
 
   return (
     <div>
-      <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 12 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+        <label style={{ fontSize: 12.5, color: MUTED, display: "flex", gap: 6, alignItems: "center" }}>
+          <input type="checkbox" checked={approvalRequired} onChange={e => toggleApproval(e.target.checked)} />
+          This client approves its pay runs in the client portal before they are finalised
+        </label>
         <button onClick={() => setShowNew(true)} style={btnPrimary}>+ New Pay Run</button>
       </div>
       {loading ? <Empty text="Loading…" /> : payRuns.length === 0 ? <Empty text="No pay runs yet." /> : (
@@ -963,6 +972,8 @@ function PayRunsTab({ client }: { client: PayClient }) {
                   <div style={{ fontSize: 11.5, color: FAINT, marginTop: 2 }}>
                     Pay date {fmtD(r.payDate)}{r.status !== "DRAFT" && ` · ${r.employeeCount} employees · Net ${fmtR(r.totalNet)}`}
                     {r.status === "REVERSED" && r.reversalReason && ` · Reversed: ${r.reversalReason}`}
+                    {r.status === "AWAITING_CLIENT" && " · Waiting for the client to approve"}
+                    {r.status === "DRAFT" && r.clientDeclineReason && ` · Declined by the client: ${r.clientDeclineReason}`}
                   </div>
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -982,7 +993,7 @@ function PayRunsTab({ client }: { client: PayClient }) {
                     <button onClick={e => { e.stopPropagation(); handleProcess(r.id) }} disabled={processingId === r.id}
                       style={btnPrimarySmall}>{processingId === r.id ? "Calculating…" : "Calculate"}</button>
                   )}
-                  {(r.status === "CALCULATED" || r.status === "APPROVED") && (
+                  {(r.status === "CALCULATED" || r.status === "APPROVED" || r.status === "AWAITING_CLIENT" || r.status === "CLIENT_APPROVED") && (
                     <button onClick={e => { e.stopPropagation(); runStep(r.id, () => payrollBureauApi.reopenPayRun(r.id), "Failed to reopen pay run") }}
                       disabled={processingId === r.id} style={btnSecondary}>Reopen</button>
                   )}
@@ -990,7 +1001,11 @@ function PayRunsTab({ client }: { client: PayClient }) {
                     <button onClick={e => { e.stopPropagation(); runStep(r.id, () => payrollBureauApi.approvePayRun(r.id), "Failed to approve pay run") }}
                       disabled={processingId === r.id} style={btnPrimarySmall}>Approve</button>
                   )}
-                  {r.status === "APPROVED" && (
+                  {r.status === "APPROVED" && approvalRequired && (
+                    <button onClick={e => { e.stopPropagation(); runStep(r.id, () => payrollBureauApi.sendPayRunToClient(r.id), "Failed to send the pay run to the client") }}
+                      disabled={processingId === r.id} style={btnPrimarySmall}>Send to client</button>
+                  )}
+                  {(r.status === "CLIENT_APPROVED" || (r.status === "APPROVED" && !approvalRequired)) && (
                     <button onClick={e => { e.stopPropagation(); runStep(r.id, () => payrollBureauApi.finalisePayRun(r.id), "Failed to finalise pay run") }}
                       disabled={processingId === r.id} style={btnPrimarySmall}>Finalise</button>
                   )}

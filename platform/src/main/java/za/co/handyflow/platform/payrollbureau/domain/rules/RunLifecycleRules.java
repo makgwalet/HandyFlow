@@ -13,13 +13,17 @@ public final class RunLifecycleRules {
     public static final String DRAFT = "DRAFT";
     public static final String CALCULATED = "CALCULATED";
     public static final String APPROVED = "APPROVED";
+    public static final String AWAITING_CLIENT = "AWAITING_CLIENT";
+    public static final String CLIENT_APPROVED = "CLIENT_APPROVED";
     public static final String FINALISED = "FINALISED";
     public static final String REVERSED = "REVERSED";
 
     private static final Map<String, Set<String>> ALLOWED = Map.of(
             DRAFT, Set.of(CALCULATED),
             CALCULATED, Set.of(APPROVED, DRAFT),   // approve, or reopen to change items
-            APPROVED, Set.of(FINALISED, DRAFT),    // finalise, or reopen
+            APPROVED, Set.of(FINALISED, AWAITING_CLIENT, DRAFT),    // finalise, send to the client, or reopen
+            AWAITING_CLIENT, Set.of(CLIENT_APPROVED, DRAFT),        // the client approves, or declines (or the bureau reopens)
+            CLIENT_APPROVED, Set.of(FINALISED, DRAFT),
             FINALISED, Set.of(REVERSED),
             REVERSED, Set.of());
 
@@ -45,6 +49,20 @@ public final class RunLifecycleRules {
         return null;
     }
 
+    /** A client set to need its own approval cannot have a run finalised straight from the bureau's approval. */
+    public static String finalisationProblem(boolean clientApprovalRequired, String status) {
+        if (clientApprovalRequired && APPROVED.equals(status)) {
+            return "This client approves its own pay runs. Send the run to the client and wait for their approval before finalising.";
+        }
+        return null;
+    }
+
+    public static String declineProblem(String reason) {
+        if (reason == null || reason.isBlank()) return "Say why you are declining this pay run.";
+        if (reason.trim().length() > MAX_REASON) return "The reason is at most " + MAX_REASON + " characters.";
+        return null;
+    }
+
     public static String reversalProblem(String reason) {
         if (reason == null || reason.isBlank()) return "Say why this pay run is being reversed.";
         if (reason.trim().length() > MAX_REASON) return "The reason is at most " + MAX_REASON + " characters.";
@@ -58,6 +76,7 @@ public final class RunLifecycleRules {
 
     /** A run whose payslips still count towards what a month has already been charged UIF on. */
     public static boolean countsTowardsMonth(String status) {
-        return CALCULATED.equals(status) || APPROVED.equals(status) || FINALISED.equals(status);
+        return CALCULATED.equals(status) || APPROVED.equals(status) || AWAITING_CLIENT.equals(status)
+                || CLIENT_APPROVED.equals(status) || FINALISED.equals(status);
     }
 }

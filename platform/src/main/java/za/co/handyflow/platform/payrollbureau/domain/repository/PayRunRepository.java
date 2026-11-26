@@ -30,7 +30,7 @@ public interface PayRunRepository extends JpaRepository<PayRun, UUID> {
     @Query("""
         SELECT r FROM PayRun r
         WHERE r.tenantId = :tenantId AND r.payClientId = :payClientId AND r.periodStart < :before
-          AND r.status IN ('CALCULATED','APPROVED','FINALISED') ORDER BY r.periodStart DESC
+          AND r.status IN ('CALCULATED','APPROVED','AWAITING_CLIENT','CLIENT_APPROVED','FINALISED') ORDER BY r.periodStart DESC
     """)
     List<PayRun> findEarlierWithPayslips(@Param("tenantId") UUID tenantId, @Param("payClientId") UUID payClientId,
                                          @Param("before") java.time.LocalDate before);
@@ -47,6 +47,15 @@ public interface PayRunRepository extends JpaRepository<PayRun, UUID> {
     """)
     List<PayRun> findFinalisedByPayDate(@Param("tenantId") UUID tenantId, @Param("clientId") UUID clientId,
                                         @Param("from") java.time.LocalDate from, @Param("to") java.time.LocalDate to);
+
+    /** The runs a client's portal users may see: those sent to them, approved by them, or finalised. */
+    @Query("""
+        SELECT r FROM PayRun r
+        WHERE r.tenantId = :tenantId AND r.payClientId = :clientId
+          AND r.status IN ('AWAITING_CLIENT','CLIENT_APPROVED','FINALISED','REVERSED')
+        ORDER BY r.periodStart DESC
+    """)
+    List<PayRun> findForPortal(@Param("tenantId") UUID tenantId, @Param("clientId") UUID clientId);
 
     // Cross-tenant by design — schedulers have no TenantContext to read
     // from (they run outside any HTTP request). Same shape as

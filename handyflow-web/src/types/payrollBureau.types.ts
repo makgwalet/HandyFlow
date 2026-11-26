@@ -19,6 +19,7 @@ export interface PayClient {
   createdAt: string
   etiClaimable?: boolean
   etiClaimableNote?: string | null
+  clientApprovalRequired?: boolean
 }
 
 export interface EmailResult {
@@ -73,13 +74,16 @@ export interface PayEmployee {
 
 export interface PayRun {
   payGroupId?: string | null
+  clientDeclineReason?: string | null
+  sentToClientAt?: string | null
+  clientApprovedAt?: string | null
   id: string
   payRunNumber: string
   periodStart: string
   periodEnd: string
   payDate: string
   taxYear: number
-  status: "DRAFT" | "CALCULATED" | "APPROVED" | "FINALISED" | "REVERSED"
+  status: "DRAFT" | "CALCULATED" | "APPROVED" | "AWAITING_CLIENT" | "CLIENT_APPROVED" | "FINALISED" | "REVERSED"
   totalGross: number | null
   totalPaye: number | null
   totalUif: number | null

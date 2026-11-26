@@ -3,17 +3,18 @@ import { useEffect, useState } from "react"
 import { useParams } from "react-router-dom"
 import { payrollBureauPortalApi } from "../../api/payrollBureauPortal.api"
 import type { PortalFeeNote, PortalDeadline, PortalClientSummary } from "../../types/payrollBureauPortal.types"
+import { PortalPayRuns } from "./PortalPayRuns"
 import { PortalShell } from "../accountant-portal/PortalShell"
 import { color, radius, space, statusTone } from "../accountant-portal/portal-theme"
 
 const fmtR = (n: any) => `R ${Number(n ?? 0).toLocaleString("en-ZA", { minimumFractionDigits: 2 })}`
 const fmtD = (d: any) => (d ? new Date(d).toLocaleDateString("en-ZA", { day: "numeric", month: "short", year: "numeric" }) : "—")
 
-type TabId = "invoices" | "deadlines"
+type TabId = "payruns" | "invoices" | "deadlines"
 
 export function PayrollBureauPortalClientDetailPage() {
   const { clientId } = useParams<{ clientId: string }>()
-  const [tab, setTab] = useState<TabId>("invoices")
+  const [tab, setTab] = useState<TabId>("payruns")
   const [clientName, setClientName] = useState("")
 
   const [feeNotes, setFeeNotes] = useState<PortalFeeNote[]>([])
@@ -30,7 +31,7 @@ export function PayrollBureauPortalClientDetailPage() {
     payrollBureauPortalApi.getMyDeadlines(clientId).then(setDeadlines).finally(() => setDeadlinesLoading(false))
   }, [clientId])
 
-  const tabs: { id: TabId; label: string }[] = [{ id: "invoices", label: "Invoices" }, { id: "deadlines", label: "SARS Deadlines" }]
+  const tabs: { id: TabId; label: string }[] = [{ id: "payruns", label: "Pay Runs" }, { id: "invoices", label: "Invoices" }, { id: "deadlines", label: "SARS Deadlines" }]
 
   return (
     <PortalShell backTo="/payroll-bureau/portal">
@@ -44,6 +45,8 @@ export function PayrollBureauPortalClientDetailPage() {
               fontWeight: tab === t.id ? 700 : 500, fontSize: 13.5, cursor: "pointer", marginBottom: -1 }}>{t.label}</button>
           ))}
         </div>
+
+        {tab === "payruns" && clientId && <PortalPayRuns clientId={clientId} />}
 
         {tab === "invoices" && (
           feeLoading ? <LoadingRows /> : feeNotes.length === 0 ? <EmptyState icon="🧾" title="No invoices yet" body="Fee notes from your payroll bureau will appear here." /> : (

@@ -97,6 +97,10 @@ public class PayClient {
         this.updatedAt = Instant.now();
     }
 
+    @Column(name = "client_approval_required", nullable = false) private boolean clientApprovalRequired;
+
+    public void setClientApprovalRequired(boolean v) { this.clientApprovalRequired = v; this.updatedAt = Instant.now(); }
+
     @Column(name = "eti_claimable", nullable = false) private boolean etiClaimable;
     @Column(name = "eti_claimable_note") private String etiClaimableNote;
     @Column(name = "eti_claimable_set_by") private java.util.UUID etiClaimableSetBy;

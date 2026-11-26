@@ -707,4 +707,22 @@ public class PayrollBureauController {
                 .contentType(org.springframework.http.MediaType.parseMediaType("text/csv; charset=UTF-8"))
                 .body(f.content());
     }
+
+    @PostMapping("/pay-runs/{payRunId}/send-to-client")
+    @PreAuthorize("hasAnyAuthority('PAYROLLBUREAU_MANAGE','PAYROLLBUREAU_ADMIN','PAYROLLBUREAU_APPROVE')")
+    @Operation(summary = "Send a bureau-approved pay run to the client for their approval")
+    public ResponseEntity<ApiResponse<PayRunResponse>> sendToClient(@PathVariable UUID payRunId) {
+        featureGuard.requireModule("payrollbureau");
+        return ResponseEntity.ok(ApiResponse.success(bureauService.sendToClient(TenantContext.getTenantIdAsObject(), payRunId)));
+    }
+
+    @PutMapping("/clients/{clientId}/client-approval")
+    @PreAuthorize("hasAuthority('PAYROLLBUREAU_APPROVE')")
+    @Operation(summary = "Switch on or off the client's own approval of its pay runs")
+    public ResponseEntity<ApiResponse<PayClientResponse>> setClientApproval(@PathVariable UUID clientId, @RequestBody ClientApprovalRequest req) {
+        featureGuard.requireModule("payrollbureau");
+        return ResponseEntity.ok(ApiResponse.success(bureauService.setClientApprovalRequired(TenantContext.getTenantIdAsObject(), clientId, req.required())));
+    }
+
+    public record ClientApprovalRequest(boolean required) {}
 }

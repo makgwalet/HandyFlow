@@ -182,4 +182,8 @@ export const payrollBureauApi = {
     apiClient.get(`/api/v1/payroll-bureau/clients/${clientId}/emp501?period=${period}&taxYear=${taxYear}`).then(r => r.data as Emp501),
   downloadEmp501WorkingPaper: (clientId: string, period: string, taxYear: number) =>
     apiClient.get(`/api/v1/payroll-bureau/clients/${clientId}/emp501/working-paper?period=${period}&taxYear=${taxYear}`, { responseType: "blob" }).then(r => r.data as Blob),
+  sendPayRunToClient: (payRunId: string) =>
+    apiClient.post(`/api/v1/payroll-bureau/pay-runs/${payRunId}/send-to-client`).then(r => r.data as PayRun),
+  setClientApproval: (clientId: string, required: boolean) =>
+    apiClient.put(`/api/v1/payroll-bureau/clients/${clientId}/client-approval`, { required }).then(r => r.data as PayClient),
 }
